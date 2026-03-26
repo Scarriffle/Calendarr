@@ -193,6 +193,76 @@ a { color: var(--primary); text-decoration: none; }
 .color-swatch:hover { transform: scale(1.15); }
 .color-swatch.active { border-color: var(--text-1); }
 
+.ev-color-row { display: flex; align-items: center; gap: 8px; }
+.ev-color-hex {
+  flex: 1; height: 36px; padding: 0 10px;
+  background: var(--bg-hover); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-1);
+  font-family: 'Roboto Mono', monospace; font-size: 13px;
+}
+.ev-color-hex:focus { outline: none; border-color: var(--primary); }
+.ev-color-preview {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); cursor: pointer;
+  flex-shrink: 0; transition: box-shadow var(--transition);
+}
+.ev-color-preview:hover { box-shadow: 0 0 0 2px var(--primary); }
+
+/* ── Gradient Color Picker (Dark) ──────────────────────── */
+.gcp {
+  position: fixed; z-index: 600;
+  width: 252px; padding: 16px;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.gcp-sv {
+  display: block; width: 100%; height: 160px;
+  border-radius: var(--radius-sm); cursor: crosshair;
+}
+.gcp-sv-cursor {
+  position: absolute; width: 14px; height: 14px;
+  border: 2px solid #fff; border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.3);
+  transform: translate(-50%, -50%); pointer-events: none;
+}
+.gcp-hue-track {
+  position: relative; margin-top: 12px; height: 14px; cursor: pointer;
+}
+.gcp-hue {
+  display: block; width: 100%; height: 14px;
+  border-radius: 7px; cursor: pointer;
+}
+.gcp-hue-thumb {
+  position: absolute; top: 50%; width: 18px; height: 18px;
+  border: 2px solid #fff; border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.3), 0 1px 4px rgba(0,0,0,.4);
+  transform: translate(-50%, -50%); pointer-events: none;
+  background: transparent;
+}
+.gcp-bottom {
+  display: flex; align-items: center; gap: 10px; margin-top: 12px;
+}
+.gcp-preview {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+.gcp-hex {
+  flex: 1; height: 36px; padding: 0 10px;
+  background: var(--bg-hover); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-1);
+  font-family: 'Roboto Mono', monospace; font-size: 13px;
+  outline: none;
+}
+.gcp-hex:focus { border-color: var(--primary); }
+.gcp-select {
+  display: block; width: 100%; margin-top: 12px;
+  padding: 8px 0; background: var(--primary); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-weight: 600; font-size: 13px; cursor: pointer;
+  transition: opacity var(--transition);
+}
+.gcp-select:hover { opacity: .85; }
+
 /* ── Top Bar ────────────────────────────────────────────── */
 .topbar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
@@ -321,21 +391,6 @@ a { color: var(--primary); text-decoration: none; }
   width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; cursor: pointer;
 }
 .cal-item-dot:hover { outline: 2px solid var(--text-2); outline-offset: 1px; }
-.cal-color-picker {
-  position: fixed; z-index: 500;
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-  padding: 10px;
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow-lg);
-}
-.cal-cp-swatch {
-  width: 28px; height: 28px; border-radius: 50%;
-  cursor: pointer; transition: transform .1s, box-shadow .1s;
-}
-.cal-cp-swatch:hover {
-  transform: scale(1.2);
-  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px currentColor;
-}
 .cal-item input[type=checkbox] { accent-color: var(--primary); width: 14px; height: 14px; }
 .cal-item-name { font-size: 13px; flex: 1; color: var(--text-1); cursor: default; }
 .cal-rename-input {

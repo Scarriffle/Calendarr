@@ -3,6 +3,7 @@ import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, date
 import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
+import { openColorPicker } from './color-picker.js';
 
 // Fetch avatar image as blob URL (with auth header)
 function fetchAvatarBlob() {
@@ -516,9 +517,10 @@ function toggleAlldayFields(allDay) {
 
 function resetColorPicker(color) {
   state.selectedEventColor = color;
-  document.querySelectorAll('#ev-color-picker .color-swatch').forEach(sw => {
-    sw.classList.toggle('active', (sw.dataset.color || '') === color);
-  });
+  const hex = document.getElementById('ev-color-hex');
+  const preview = document.getElementById('ev-color-preview');
+  hex.value = color ? color.toUpperCase() : '';
+  preview.style.background = color || 'var(--primary)';
 }
 
 function bindEventModal() {
@@ -526,11 +528,22 @@ function bindEventModal() {
     toggleAlldayFields(e.target.checked);
   });
 
-  document.querySelectorAll('#ev-color-picker .color-swatch').forEach(sw => {
-    sw.addEventListener('click', () => {
-      state.selectedEventColor = sw.dataset.color || '';
-      resetColorPicker(state.selectedEventColor);
-    });
+  // Color picker: click preview to open gradient picker
+  const evColorPreview = document.getElementById('ev-color-preview');
+  const evColorHex = document.getElementById('ev-color-hex');
+
+  evColorPreview.addEventListener('click', async () => {
+    const current = state.selectedEventColor || '#4285f4';
+    const picked = await openColorPicker(evColorPreview, current);
+    if (picked) resetColorPicker(picked);
+  });
+
+  evColorHex.addEventListener('change', () => {
+    let val = evColorHex.value.trim();
+    if (!val.startsWith('#')) val = '#' + val;
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      resetColorPicker(val);
+    }
   });
 
   document.getElementById('ev-save').onclick = async () => {
@@ -943,71 +956,26 @@ function updateTopbarAvatar(hasAvatar) {
 }
 
 // ── Calendar Color Picker ─────────────────────────────────
-const CAL_COLORS = [
-  '#4285f4', '#7986cb', '#8e24aa', '#e67c73',
-  '#f4511e', '#f6bf26', '#33b679', '#0b8043',
-  '#039be5', '#616161', '#3f51b5', '#d50000',
-  '#e4c441', '#009688', '#795548', '#ef6c00',
-];
-
-let activeColorPicker = null;
-
-function openCalColorPicker(anchor, calId) {
-  closeCalColorPicker();
-
-  const rect = anchor.getBoundingClientRect();
-  const picker = document.createElement('div');
-  picker.className = 'cal-color-picker';
-  picker.innerHTML = CAL_COLORS.map(c =>
-    `<div class="cal-cp-swatch" data-color="${c}" style="background:${c}" title="${c}"></div>`
-  ).join('');
-
-  picker.style.top = (rect.bottom + 6) + 'px';
-  picker.style.left = rect.left + 'px';
-
-  // Ensure picker stays in viewport
-  document.body.appendChild(picker);
-  const pRect = picker.getBoundingClientRect();
-  if (pRect.right > window.innerWidth - 8) {
-    picker.style.left = (window.innerWidth - pRect.width - 8) + 'px';
+async function openCalColorPicker(anchor, calId) {
+  // Find current color of the calendar
+  let currentColor = '#4285f4';
+  for (const acc of state.accounts) {
+    for (const cal of acc.calendars) {
+      if (cal.id === calId && cal.color) currentColor = cal.color;
+    }
   }
 
-  picker.querySelectorAll('.cal-cp-swatch').forEach(sw => {
-    sw.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const color = sw.dataset.color;
-      await api.put(`/caldav/calendars/${calId}`, { color });
-      for (const acc of state.accounts) {
-        for (const cal of acc.calendars) {
-          if (cal.id === calId) cal.color = color;
-        }
-      }
-      closeCalColorPicker();
-      renderCalendarList();
-      fetchAndRender();
-    });
-  });
+  const picked = await openColorPicker(anchor, currentColor);
+  if (!picked) return;
 
-  activeColorPicker = picker;
-
-  // Close on outside click (next tick to avoid immediate close)
-  setTimeout(() => {
-    document.addEventListener('click', closeCalColorPickerOutside);
-  }, 0);
-}
-
-function closeCalColorPicker() {
-  if (activeColorPicker) {
-    activeColorPicker.remove();
-    activeColorPicker = null;
-    document.removeEventListener('click', closeCalColorPickerOutside);
+  await api.put(`/caldav/calendars/${calId}`, { color: picked });
+  for (const acc of state.accounts) {
+    for (const cal of acc.calendars) {
+      if (cal.id === calId) cal.color = picked;
+    }
   }
-}
-
-function closeCalColorPickerOutside(e) {
-  if (activeColorPicker && !activeColorPicker.contains(e.target)) {
-    closeCalColorPicker();
-  }
+  renderCalendarList();
+  fetchAndRender();
 }
 
 // ── Avatar Crop ──────────────────────────────────────────

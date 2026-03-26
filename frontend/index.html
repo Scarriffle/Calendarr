@@ -220,16 +220,9 @@
       </div>
       <div class="form-group">
         <label>Farbe</label>
-        <div class="color-picker" id="ev-color-picker">
-          <div class="color-swatch active" data-color="" style="background:var(--cal-color,#4285f4)" title="Kalenderfarbe"></div>
-          <div class="color-swatch" data-color="#4285f4" style="background:#4285f4"></div>
-          <div class="color-swatch" data-color="#ea4335" style="background:#ea4335"></div>
-          <div class="color-swatch" data-color="#fbbc04" style="background:#fbbc04"></div>
-          <div class="color-swatch" data-color="#34a853" style="background:#34a853"></div>
-          <div class="color-swatch" data-color="#ff6d00" style="background:#ff6d00"></div>
-          <div class="color-swatch" data-color="#46bdc6" style="background:#46bdc6"></div>
-          <div class="color-swatch" data-color="#8e24aa" style="background:#8e24aa"></div>
-          <div class="color-swatch" data-color="#e67c73" style="background:#e67c73"></div>
+        <div class="ev-color-row">
+          <input type="text" id="ev-color-hex" class="ev-color-hex" maxlength="7" placeholder="#4285f4" spellcheck="false" />
+          <div class="ev-color-preview" id="ev-color-preview" title="Farbe wählen"></div>
         </div>
       </div>
     </div>
