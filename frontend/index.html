@@ -282,7 +282,10 @@
       </div>
       <div class="form-group">
         <label>Farbe</label>
-        <input type="color" id="acc-color" value="#4285f4" class="color-input" />
+        <div class="ev-color-row">
+          <input type="text" id="acc-color-hex" class="ev-color-hex" maxlength="7" value="#4285f4" spellcheck="false" />
+          <div class="ev-color-preview" id="acc-color-preview" style="background:#4285f4" title="Farbe wählen"></div>
+        </div>
       </div>
       <div id="acc-error" class="form-error hidden"></div>
     </div>
@@ -321,23 +324,23 @@
         </div>
         <div class="form-group">
           <label>Primärfarbe</label>
-          <div class="color-row">
-            <input type="color" id="cfg-primary-color" class="color-input" />
-            <span class="color-label" id="cfg-primary-label">#4285f4</span>
+          <div class="ev-color-row">
+            <input type="text" id="cfg-primary-hex" class="ev-color-hex" maxlength="7" spellcheck="false" />
+            <div class="ev-color-preview" id="cfg-primary-preview" title="Farbe wählen"></div>
           </div>
         </div>
         <div class="form-group">
           <label>Akzentfarbe</label>
-          <div class="color-row">
-            <input type="color" id="cfg-accent-color" class="color-input" />
-            <span class="color-label" id="cfg-accent-label">#ea4335</span>
+          <div class="ev-color-row">
+            <input type="text" id="cfg-accent-hex" class="ev-color-hex" maxlength="7" spellcheck="false" />
+            <div class="ev-color-preview" id="cfg-accent-preview" title="Farbe wählen"></div>
           </div>
         </div>
         <div class="form-group">
           <label>Heutige-Tag-Farbe</label>
-          <div class="color-row">
-            <input type="color" id="cfg-today-color" class="color-input" />
-            <span class="color-label" id="cfg-today-label">#4285f4</span>
+          <div class="ev-color-row">
+            <input type="text" id="cfg-today-hex" class="ev-color-hex" maxlength="7" spellcheck="false" />
+            <div class="ev-color-preview" id="cfg-today-preview" title="Farbe wählen"></div>
           </div>
         </div>
         <div class="form-group">

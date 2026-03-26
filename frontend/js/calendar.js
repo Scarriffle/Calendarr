@@ -610,18 +610,31 @@ function openAccountModal() {
   document.getElementById('acc-url').value = '';
   document.getElementById('acc-username').value = '';
   document.getElementById('acc-password').value = '';
-  document.getElementById('acc-color').value = '#4285f4';
+  document.getElementById('acc-color-hex').value = '#4285f4';
+  document.getElementById('acc-color-preview').style.background = '#4285f4';
   document.getElementById('acc-error').classList.add('hidden');
   openModal('modal-account');
 }
 
 function bindAccountModal() {
+  const accPreview = document.getElementById('acc-color-preview');
+  const accHex = document.getElementById('acc-color-hex');
+  accPreview.addEventListener('click', async () => {
+    const picked = await openColorPicker(accPreview, accHex.value || '#4285f4');
+    if (picked) { accHex.value = picked.toUpperCase(); accPreview.style.background = picked; }
+  });
+  accHex.addEventListener('change', () => {
+    let val = accHex.value.trim();
+    if (!val.startsWith('#')) val = '#' + val;
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) { accHex.value = val.toUpperCase(); accPreview.style.background = val; }
+  });
+
   document.getElementById('acc-save').onclick = async () => {
     const name     = document.getElementById('acc-name').value.trim();
     const url      = document.getElementById('acc-url').value.trim();
     const username = document.getElementById('acc-username').value.trim();
     const password = document.getElementById('acc-password').value;
-    const color    = document.getElementById('acc-color').value;
+    const color    = document.getElementById('acc-color-hex').value;
     const errEl    = document.getElementById('acc-error');
 
     if (!name || !url || !username || !password) {
@@ -655,14 +668,16 @@ function openSettingsModal() {
   const s = state.settings;
   document.getElementById('cfg-default-view').value  = s.default_view   || 'month';
   document.getElementById('cfg-week-start').value    = s.week_start_day || 'monday';
-  document.getElementById('cfg-primary-color').value = s.primary_color  || '#4285f4';
-  document.getElementById('cfg-accent-color').value  = s.accent_color   || '#ea4335';
-  document.getElementById('cfg-today-color').value   = s.today_color    || '#4285f4';
-  document.getElementById('cfg-dim-past').checked    = !!s.dim_past_events;
-
-  document.getElementById('cfg-primary-label').textContent = s.primary_color || '#4285f4';
-  document.getElementById('cfg-accent-label').textContent  = s.accent_color  || '#ea4335';
-  document.getElementById('cfg-today-label').textContent   = s.today_color   || '#4285f4';
+  const colors = [
+    { id: 'cfg-primary', val: s.primary_color || '#4285f4' },
+    { id: 'cfg-accent',  val: s.accent_color  || '#ea4335' },
+    { id: 'cfg-today',   val: s.today_color   || '#4285f4' },
+  ];
+  colors.forEach(({ id, val }) => {
+    document.getElementById(id + '-hex').value = val.toUpperCase();
+    document.getElementById(id + '-preview').style.background = val;
+  });
+  document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
 
   // Show users section only for admins
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -709,10 +724,17 @@ async function loadUsers() {
 }
 
 function bindSettingsModal() {
-  ['cfg-primary-color','cfg-accent-color','cfg-today-color'].forEach(id => {
-    document.getElementById(id).addEventListener('input', e => {
-      const labelId = id.replace('color', 'label');
-      document.getElementById(labelId).textContent = e.target.value;
+  ['cfg-primary','cfg-accent','cfg-today'].forEach(prefix => {
+    const preview = document.getElementById(prefix + '-preview');
+    const hex = document.getElementById(prefix + '-hex');
+    preview.addEventListener('click', async () => {
+      const picked = await openColorPicker(preview, hex.value || '#4285f4');
+      if (picked) { hex.value = picked.toUpperCase(); preview.style.background = picked; }
+    });
+    hex.addEventListener('change', () => {
+      let val = hex.value.trim();
+      if (!val.startsWith('#')) val = '#' + val;
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) { hex.value = val.toUpperCase(); preview.style.background = val; }
     });
   });
 
@@ -739,9 +761,9 @@ function bindSettingsModal() {
     const settings = {
       default_view:    document.getElementById('cfg-default-view').value,
       week_start_day:  document.getElementById('cfg-week-start').value,
-      primary_color:   document.getElementById('cfg-primary-color').value,
-      accent_color:    document.getElementById('cfg-accent-color').value,
-      today_color:     document.getElementById('cfg-today-color').value,
+      primary_color:   document.getElementById('cfg-primary-hex').value,
+      accent_color:    document.getElementById('cfg-accent-hex').value,
+      today_color:     document.getElementById('cfg-today-hex').value,
       dim_past_events: document.getElementById('cfg-dim-past').checked,
     };
     try {
