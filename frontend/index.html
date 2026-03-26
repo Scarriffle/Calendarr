@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendarr</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+
+<!-- ─── SETUP SCREEN ─────────────────────────────────────── -->
+<div id="screen-setup" class="auth-screen hidden">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="logo-icon">📅</span>
+      <h1>Calendarr</h1>
+    </div>
+    <h2>Ersteinrichtung</h2>
+    <p class="auth-sub">Erstelle den Administrator-Account</p>
+    <form id="setup-form">
+      <div class="form-group">
+        <label>Benutzername</label>
+        <input type="text" id="setup-username" required autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>E-Mail (optional)</label>
+        <input type="email" id="setup-email" autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label>Passwort</label>
+        <input type="password" id="setup-password" required autocomplete="new-password" />
+      </div>
+      <div class="form-group">
+        <label>Passwort wiederholen</label>
+        <input type="password" id="setup-password2" required autocomplete="new-password" />
+      </div>
+      <div id="setup-error" class="form-error hidden"></div>
+      <button type="submit" class="btn btn-primary btn-full">Admin-Account erstellen</button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── LOGIN SCREEN ─────────────────────────────────────── -->
+<div id="screen-login" class="auth-screen hidden">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="logo-icon">📅</span>
+      <h1>Calendarr</h1>
+    </div>
+    <h2>Anmelden</h2>
+    <form id="login-form">
+      <div class="form-group">
+        <label>Benutzername</label>
+        <input type="text" id="login-username" required autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>Passwort</label>
+        <input type="password" id="login-password" required autocomplete="current-password" />
+      </div>
+      <div id="login-error" class="form-error hidden"></div>
+      <button type="submit" class="btn btn-primary btn-full">Anmelden</button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── MAIN APP ──────────────────────────────────────────── -->
+<div id="app" class="hidden">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="icon-btn" id="sidebar-toggle" title="Seitenleiste">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      </button>
+      <div class="topbar-logo">
+        <span>📅</span>
+        <span class="logo-text">Calendarr</span>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <button class="btn btn-ghost" id="btn-today">Heute</button>
+      <button class="icon-btn" id="btn-prev">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-next">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
+      <h2 id="view-title" class="view-title"></h2>
+    </div>
+    <div class="topbar-right">
+      <div class="view-switcher">
+        <button class="view-btn" data-view="month">Monat</button>
+        <button class="view-btn" data-view="week">Woche</button>
+        <button class="view-btn" data-view="day">Tag</button>
+        <button class="view-btn" data-view="agenda">Termine</button>
+      </div>
+      <button class="icon-btn" id="btn-settings" title="Einstellungen">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+      </button>
+      <div class="user-avatar" id="user-avatar" title="Benutzer"></div>
+    </div>
+  </header>
+
+  <!-- CONTENT -->
+  <div class="content-wrapper">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+        <button class="btn btn-fab" id="btn-create-event">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span>Erstellen</span>
+        </button>
+
+        <!-- Mini Calendar -->
+        <div class="mini-cal" id="mini-cal">
+          <div class="mini-cal-header">
+            <button class="icon-btn mini-btn" id="mini-prev">&#8249;</button>
+            <span id="mini-title" class="mini-title"></span>
+            <button class="icon-btn mini-btn" id="mini-next">&#8250;</button>
+          </div>
+          <div class="mini-cal-grid">
+            <div class="mini-dow">So</div><div class="mini-dow">Mo</div>
+            <div class="mini-dow">Di</div><div class="mini-dow">Mi</div>
+            <div class="mini-dow">Do</div><div class="mini-dow">Fr</div>
+            <div class="mini-dow">Sa</div>
+          </div>
+          <div class="mini-cal-days" id="mini-days"></div>
+        </div>
+
+        <!-- Calendar List -->
+        <div class="cal-list" id="cal-list">
+          <div class="cal-list-header">
+            <span>Meine Kalender</span>
+            <button class="icon-btn mini-btn" id="btn-add-account" title="CalDAV-Konto hinzufügen">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </button>
+          </div>
+          <div id="cal-list-items"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN VIEW -->
+    <main class="main-view" id="main-view">
+      <div id="view-container"></div>
+    </main>
+
+  </div><!-- content-wrapper -->
+</div><!-- app -->
+
+<!-- ─── MODALS ────────────────────────────────────────────── -->
+
+<!-- Event Modal -->
+<div id="modal-event" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:520px">
+    <div class="modal-header">
+      <h3 id="modal-event-title-label">Termin erstellen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-event">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <input type="text" id="ev-title" placeholder="Titel hinzufügen" class="input-title" />
+      </div>
+      <div class="form-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="ev-allday" /> Ganztägig
+        </label>
+      </div>
+      <div class="form-row" id="ev-time-row">
+        <div class="form-group half">
+          <label>Start</label>
+          <input type="datetime-local" id="ev-start" />
+        </div>
+        <div class="form-group half">
+          <label>Ende</label>
+          <input type="datetime-local" id="ev-end" />
+        </div>
+      </div>
+      <div class="form-row" id="ev-date-row" style="display:none">
+        <div class="form-group half">
+          <label>Start</label>
+          <input type="date" id="ev-start-date" />
+        </div>
+        <div class="form-group half">
+          <label>Ende</label>
+          <input type="date" id="ev-end-date" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Kalender</label>
+        <select id="ev-calendar"></select>
+      </div>
+      <div class="form-group">
+        <label>Ort</label>
+        <input type="text" id="ev-location" placeholder="Ort hinzufügen" />
+      </div>
+      <div class="form-group">
+        <label>Beschreibung</label>
+        <textarea id="ev-description" placeholder="Beschreibung hinzufügen" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Farbe</label>
+        <div class="color-picker" id="ev-color-picker">
+          <div class="color-swatch active" data-color="" style="background:var(--cal-color,#4285f4)" title="Kalenderfarbe"></div>
+          <div class="color-swatch" data-color="#4285f4" style="background:#4285f4"></div>
+          <div class="color-swatch" data-color="#ea4335" style="background:#ea4335"></div>
+          <div class="color-swatch" data-color="#fbbc04" style="background:#fbbc04"></div>
+          <div class="color-swatch" data-color="#34a853" style="background:#34a853"></div>
+          <div class="color-swatch" data-color="#ff6d00" style="background:#ff6d00"></div>
+          <div class="color-swatch" data-color="#46bdc6" style="background:#46bdc6"></div>
+          <div class="color-swatch" data-color="#8e24aa" style="background:#8e24aa"></div>
+          <div class="color-swatch" data-color="#e67c73" style="background:#e67c73"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger hidden" id="ev-delete">Löschen</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" data-modal="modal-event">Abbrechen</button>
+      <button class="btn btn-primary" id="ev-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event Detail Popup -->
+<div id="popup-event" class="event-popup hidden">
+  <div class="popup-header">
+    <div class="popup-color-dot" id="popup-color-dot"></div>
+    <h4 id="popup-title"></h4>
+    <button class="icon-btn popup-action" id="popup-edit" title="Bearbeiten">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    </button>
+    <button class="icon-btn popup-action" id="popup-delete" title="Löschen">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+    </button>
+    <button class="icon-btn popup-close" id="popup-close">&times;</button>
+  </div>
+  <div class="popup-body">
+    <div class="popup-time" id="popup-time"></div>
+    <div class="popup-location" id="popup-location"></div>
+    <div class="popup-description" id="popup-description"></div>
+    <div class="popup-calendar" id="popup-calendar"></div>
+  </div>
+</div>
+
+<!-- Add CalDAV Account Modal -->
+<div id="modal-account" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-header">
+      <h3>CalDAV-Konto hinzufügen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-account">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Anzeigename</label>
+        <input type="text" id="acc-name" placeholder="z.B. Mein Nextcloud" />
+      </div>
+      <div class="form-group">
+        <label>CalDAV-URL</label>
+        <input type="url" id="acc-url" placeholder="https://cloud.example.com/remote.php/dav" />
+      </div>
+      <div class="form-group">
+        <label>Benutzername</label>
+        <input type="text" id="acc-username" autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>Passwort</label>
+        <input type="password" id="acc-password" autocomplete="current-password" />
+      </div>
+      <div class="form-group">
+        <label>Farbe</label>
+        <input type="color" id="acc-color" value="#4285f4" class="color-input" />
+      </div>
+      <div id="acc-error" class="form-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal="modal-account">Abbrechen</button>
+      <button class="btn btn-primary" id="acc-save">Verbinden</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="modal-settings" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:520px">
+    <div class="modal-header">
+      <h3>Einstellungen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-settings">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-section">
+        <h4>Darstellung</h4>
+        <div class="form-group">
+          <label>Standardansicht</label>
+          <select id="cfg-default-view">
+            <option value="month">Monat</option>
+            <option value="week">Woche</option>
+            <option value="day">Tag</option>
+            <option value="agenda">Termine</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Primärfarbe</label>
+          <div class="color-row">
+            <input type="color" id="cfg-primary-color" class="color-input" />
+            <span class="color-label" id="cfg-primary-label">#4285f4</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Akzentfarbe</label>
+          <div class="color-row">
+            <input type="color" id="cfg-accent-color" class="color-input" />
+            <span class="color-label" id="cfg-accent-label">#ea4335</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Heutige-Tag-Farbe</label>
+          <div class="color-row">
+            <input type="color" id="cfg-today-color" class="color-input" />
+            <span class="color-label" id="cfg-today-label">#4285f4</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="toggle-label">
+            <input type="checkbox" id="cfg-dim-past" />
+            Vergangene Termine ausgrauen
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section" id="settings-users-section">
+        <h4>Benutzerverwaltung <span class="badge-admin">Admin</span></h4>
+        <div id="users-list"></div>
+        <button class="btn btn-secondary" id="btn-add-user">Benutzer hinzufügen</button>
+        <div id="add-user-form" class="hidden" style="margin-top:12px">
+          <div class="form-group">
+            <label>Benutzername</label>
+            <input type="text" id="new-username" />
+          </div>
+          <div class="form-group">
+            <label>Passwort</label>
+            <input type="password" id="new-password" />
+          </div>
+          <label class="toggle-label" style="margin-bottom:8px">
+            <input type="checkbox" id="new-is-admin" /> Administrator
+          </label>
+          <button class="btn btn-primary" id="new-user-save">Erstellen</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal="modal-settings">Schließen</button>
+      <button class="btn btn-primary" id="settings-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

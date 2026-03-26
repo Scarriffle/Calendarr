@@ -1,0 +1,375 @@
+import logging
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+import caldav_client
+import models
+from auth import get_current_user
+from database import get_db
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+PALETTE = ["#4285f4", "#ea4335", "#fbbc04", "#34a853", "#ff6d00", "#46bdc6", "#8e24aa"]
+
+
+class AccountCreate(BaseModel):
+    name: str
+    url: str
+    username: str
+    password: str
+    color: str = "#4285f4"
+
+
+class CalendarUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    color: Optional[str] = None
+
+
+class EventCreate(BaseModel):
+    calendar_id: int
+    title: str
+    start: str
+    end: str
+    allDay: bool = False
+    location: Optional[str] = None
+    description: Optional[str] = None
+    color: Optional[str] = None
+
+
+class EventUpdate(BaseModel):
+    title: Optional[str] = None
+    start: Optional[str] = None
+    end: Optional[str] = None
+    allDay: Optional[bool] = None
+    location: Optional[str] = None
+    description: Optional[str] = None
+    color: Optional[str] = None
+
+
+def _account_dict(a: models.CalDAVAccount) -> dict:
+    return {
+        "id": a.id,
+        "name": a.name,
+        "url": a.url,
+        "username": a.username,
+        "color": a.color,
+        "enabled": a.enabled,
+        "calendars": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "color": c.color or a.color,
+                "enabled": c.enabled,
+                "cal_id": c.cal_id,
+            }
+            for c in a.calendars
+        ],
+    }
+
+
+def _find_account_for_event_url(
+    event_url: str, accounts: list[models.CalDAVAccount]
+) -> Optional[models.CalDAVAccount]:
+    for acc in accounts:
+        if event_url.startswith(acc.url):
+            return acc
+    # fallback: check calendar urls
+    for acc in accounts:
+        for cal in acc.calendars:
+            if event_url.startswith(cal.cal_id):
+                return acc
+    return None
+
+
+@router.get("/accounts")
+def list_accounts(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    accounts = (
+        db.query(models.CalDAVAccount)
+        .filter(models.CalDAVAccount.user_id == current_user.id)
+        .all()
+    )
+    return [_account_dict(a) for a in accounts]
+
+
+@router.post("/accounts")
+def add_account(
+    data: AccountCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    try:
+        remote_cals = caldav_client.fetch_calendars(data.url, data.username, data.password)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    account = models.CalDAVAccount(
+        user_id=current_user.id,
+        name=data.name,
+        url=data.url,
+        username=data.username,
+        password=data.password,
+        color=data.color,
+    )
+    db.add(account)
+    db.flush()
+
+    for idx, cal in enumerate(remote_cals):
+        db.add(
+            models.Calendar(
+                account_id=account.id,
+                cal_id=cal["url"],
+                name=cal["name"],
+                color=cal.get("color") or PALETTE[idx % len(PALETTE)],
+                enabled=True,
+            )
+        )
+
+    db.commit()
+    db.refresh(account)
+    return _account_dict(account)
+
+
+@router.delete("/accounts/{account_id}")
+def delete_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    account = (
+        db.query(models.CalDAVAccount)
+        .filter(
+            models.CalDAVAccount.id == account_id,
+            models.CalDAVAccount.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not account:
+        raise HTTPException(404, "Account not found")
+    db.delete(account)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/accounts/{account_id}/sync")
+def sync_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    account = (
+        db.query(models.CalDAVAccount)
+        .filter(
+            models.CalDAVAccount.id == account_id,
+            models.CalDAVAccount.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not account:
+        raise HTTPException(404, "Account not found")
+    try:
+        remote_cals = caldav_client.fetch_calendars(
+            account.url, account.username, account.password
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    existing = {c.cal_id: c for c in account.calendars}
+    for idx, cal in enumerate(remote_cals):
+        if cal["url"] not in existing:
+            db.add(
+                models.Calendar(
+                    account_id=account.id,
+                    cal_id=cal["url"],
+                    name=cal["name"],
+                    color=cal.get("color") or PALETTE[idx % len(PALETTE)],
+                    enabled=True,
+                )
+            )
+        else:
+            existing[cal["url"]].name = cal["name"]
+    db.commit()
+    db.refresh(account)
+    return _account_dict(account)
+
+
+@router.put("/calendars/{calendar_id}")
+def update_calendar(
+    calendar_id: int,
+    data: CalendarUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    calendar = (
+        db.query(models.Calendar)
+        .join(models.CalDAVAccount)
+        .filter(
+            models.Calendar.id == calendar_id,
+            models.CalDAVAccount.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not calendar:
+        raise HTTPException(404, "Calendar not found")
+    if data.enabled is not None:
+        calendar.enabled = data.enabled
+    if data.color is not None:
+        calendar.color = data.color
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/events")
+def get_events(
+    start: str = Query(...),
+    end: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    from datetime import datetime, timezone
+
+    try:
+        start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(400, "Invalid date format — use ISO 8601")
+
+    # Make timezone-aware
+    if start_dt.tzinfo is None:
+        start_dt = start_dt.replace(tzinfo=timezone.utc)
+    if end_dt.tzinfo is None:
+        end_dt = end_dt.replace(tzinfo=timezone.utc)
+
+    all_events = []
+    accounts = (
+        db.query(models.CalDAVAccount)
+        .filter(
+            models.CalDAVAccount.user_id == current_user.id,
+            models.CalDAVAccount.enabled == True,
+        )
+        .all()
+    )
+
+    for account in accounts:
+        for calendar in account.calendars:
+            if not calendar.enabled:
+                continue
+            try:
+                events = caldav_client.fetch_events(
+                    account.url,
+                    account.username,
+                    account.password,
+                    calendar.cal_id,
+                    start_dt,
+                    end_dt,
+                )
+                cal_color = calendar.color or account.color
+                for ev in events:
+                    ev["calendar_id"] = calendar.id
+                    ev["calendar_name"] = calendar.name
+                    ev["calendarColor"] = cal_color
+                    all_events.append(ev)
+            except Exception as exc:
+                logger.error(
+                    "Error fetching calendar %s: %s", calendar.id, exc
+                )
+
+    return all_events
+
+
+@router.post("/events")
+def create_event(
+    data: EventCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    calendar = (
+        db.query(models.Calendar)
+        .join(models.CalDAVAccount)
+        .filter(
+            models.Calendar.id == data.calendar_id,
+            models.CalDAVAccount.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not calendar:
+        raise HTTPException(404, "Calendar not found")
+    account = calendar.account
+    try:
+        uid = caldav_client.create_event(
+            account.url,
+            account.username,
+            account.password,
+            calendar.cal_id,
+            {
+                "title": data.title,
+                "start": data.start,
+                "end": data.end,
+                "allDay": data.allDay,
+                "location": data.location,
+                "description": data.description,
+                "color": data.color,
+            },
+        )
+        return {"uid": uid, "calendar_id": data.calendar_id}
+    except Exception as exc:
+        raise HTTPException(500, f"Could not create event: {exc}")
+
+
+@router.put("/events/{event_id}")
+def update_event(
+    event_id: str,
+    event_url: str = Query(...),
+    data: EventUpdate = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    accounts = (
+        db.query(models.CalDAVAccount)
+        .filter(models.CalDAVAccount.user_id == current_user.id)
+        .all()
+    )
+    account = _find_account_for_event_url(event_url, accounts)
+    if not account:
+        raise HTTPException(404, "Event not found or not authorized")
+    try:
+        caldav_client.update_event(
+            account.url,
+            account.username,
+            account.password,
+            event_url,
+            data.model_dump(exclude_none=True) if data else {},
+        )
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(500, f"Could not update event: {exc}")
+
+
+@router.delete("/events/{event_id}")
+def delete_event(
+    event_id: str,
+    event_url: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    accounts = (
+        db.query(models.CalDAVAccount)
+        .filter(models.CalDAVAccount.user_id == current_user.id)
+        .all()
+    )
+    account = _find_account_for_event_url(event_url, accounts)
+    if not account:
+        raise HTTPException(404, "Event not found or not authorized")
+    try:
+        caldav_client.delete_event(
+            account.url, account.username, account.password, event_url
+        )
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(500, f"Could not delete event: {exc}")

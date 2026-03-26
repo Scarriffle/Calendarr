@@ -1,0 +1,17 @@
+[Unit]
+Description=Calendarr – Self-hosted CalDAV Calendar UI
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/calendarr
+EnvironmentFile=/opt/calendarr/.env
+ExecStart=/opt/calendarr/venv/bin/python /opt/calendarr/backend/main.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
