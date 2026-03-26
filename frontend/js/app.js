@@ -162,17 +162,27 @@ function bindLoginForm() {
 
 // ── Avatar Helper ────────────────────────────────────────
 function loadAvatarImage(avatarEl, username) {
-  const img = new Image();
-  img.onload = () => {
-    avatarEl.innerHTML = '';
-    img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
-    avatarEl.appendChild(img);
-  };
-  img.onerror = () => {
-    avatarEl.innerHTML = '';
-    avatarEl.textContent = (username || '?')[0].toUpperCase();
-  };
-  img.src = `/api/profile/avatar?t=${Date.now()}`;
+  const token = localStorage.getItem('token');
+  fetch(`/api/profile/avatar?t=${Date.now()}`, {
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('No avatar');
+      return res.blob();
+    })
+    .then(blob => {
+      const img = new Image();
+      img.onload = () => {
+        avatarEl.innerHTML = '';
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+        avatarEl.appendChild(img);
+      };
+      img.src = URL.createObjectURL(blob);
+    })
+    .catch(() => {
+      avatarEl.innerHTML = '';
+      avatarEl.textContent = (username || '?')[0].toUpperCase();
+    });
 }
 
 // ── Start ─────────────────────────────────────────────────

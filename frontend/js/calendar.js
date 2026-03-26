@@ -4,6 +4,17 @@ import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
 
+// Fetch avatar image as blob URL (with auth header)
+function fetchAvatarBlob() {
+  const token = localStorage.getItem('token');
+  return fetch(`/api/profile/avatar?t=${Date.now()}`, {
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+  }).then(res => {
+    if (!res.ok) throw new Error('No avatar');
+    return res.blob();
+  }).then(blob => URL.createObjectURL(blob));
+}
+
 // week start day global (loaded from settings)
 let weekStartDay = 'monday';
 
@@ -751,9 +762,15 @@ export function openProfileModal() {
     const img = document.getElementById('profile-avatar-img');
     const removeBtn = document.getElementById('profile-avatar-remove');
     if (profile.has_avatar) {
-      img.src = `/api/profile/avatar?t=${Date.now()}`;
-      img.classList.remove('hidden');
-      letter.classList.add('hidden');
+      fetchAvatarBlob().then(blobUrl => {
+        img.src = blobUrl;
+        img.classList.remove('hidden');
+        letter.classList.add('hidden');
+      }).catch(() => {
+        img.classList.add('hidden');
+        letter.classList.remove('hidden');
+        letter.textContent = (user.username || '?')[0].toUpperCase();
+      });
       removeBtn.classList.remove('hidden');
     } else {
       img.classList.add('hidden');
@@ -899,18 +916,19 @@ function bindProfileModal() {
 function updateTopbarAvatar(hasAvatar) {
   const avatar = document.getElementById('user-avatar');
   if (hasAvatar) {
-    const img = new Image();
-    img.onload = () => {
-      avatar.innerHTML = '';
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
-      avatar.appendChild(img);
-    };
-    img.onerror = () => {
+    fetchAvatarBlob().then(blobUrl => {
+      const img = new Image();
+      img.onload = () => {
+        avatar.innerHTML = '';
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+        avatar.appendChild(img);
+      };
+      img.src = blobUrl;
+    }).catch(() => {
       avatar.innerHTML = '';
       const u = JSON.parse(localStorage.getItem('user')||'{}');
       avatar.textContent = (u.username||'?')[0].toUpperCase();
-    };
-    img.src = `/api/profile/avatar?t=${Date.now()}`;
+    });
     // Update localStorage so avatar persists across reloads
     const u = JSON.parse(localStorage.getItem('user')||'{}');
     u.has_avatar = true;
@@ -1047,9 +1065,11 @@ document.getElementById('crop-save').onclick = async () => {
       showToast('Profilbild hochgeladen');
       // Update profile modal avatar
       const img = document.getElementById('profile-avatar-img');
-      img.src = `/api/profile/avatar?t=${Date.now()}`;
-      img.classList.remove('hidden');
-      document.getElementById('profile-avatar-letter').classList.add('hidden');
+      fetchAvatarBlob().then(blobUrl => {
+        img.src = blobUrl;
+        img.classList.remove('hidden');
+        document.getElementById('profile-avatar-letter').classList.add('hidden');
+      });
       document.getElementById('profile-avatar-remove').classList.remove('hidden');
       // Update topbar avatar
       updateTopbarAvatar(true);
