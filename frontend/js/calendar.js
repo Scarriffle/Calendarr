@@ -191,7 +191,7 @@ function renderMiniCal() {
       isSelected && !isToday_ ? 'selected' : '',
       hasEvs    ? 'has-events' : '',
     ].filter(Boolean).join(' ');
-    return `<div class="${cls}" data-date="${dayKey(day)}">${day.getDate()}</div>`;
+    return `<div class="${cls}" data-date="${dateKey(day)}">${day.getDate()}</div>`;
   }).join('');
 
   document.getElementById('mini-days').innerHTML = html;
