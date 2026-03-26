@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -17,6 +18,21 @@ logging.basicConfig(level=logging.INFO)
 
 # Create DB tables on startup
 Base.metadata.create_all(bind=engine)
+
+# Run column migrations for new fields (safe: only adds if not exists)
+def _migrate():
+    with engine.connect() as conn:
+        # Add week_start_day to user_settings if not present
+        try:
+            conn.execute(text(
+                "ALTER TABLE user_settings ADD COLUMN week_start_day VARCHAR(10) DEFAULT 'monday'"
+            ))
+            conn.commit()
+            logging.info("Migration: added week_start_day column")
+        except Exception:
+            pass  # Column already exists
+
+_migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
 

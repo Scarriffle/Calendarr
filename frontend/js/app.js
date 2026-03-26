@@ -164,12 +164,12 @@ function bindLoginForm() {
 function loadAvatarImage(avatarEl, username) {
   const img = new Image();
   img.onload = () => {
-    avatarEl.textContent = '';
-    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+    avatarEl.innerHTML = '';
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
     avatarEl.appendChild(img);
   };
   img.onerror = () => {
-    // Fallback to letter
+    avatarEl.innerHTML = '';
     avatarEl.textContent = (username || '?')[0].toUpperCase();
   };
   img.src = `/api/profile/avatar?t=${Date.now()}`;

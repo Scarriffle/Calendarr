@@ -139,10 +139,10 @@
             <button class="icon-btn mini-btn" id="mini-next">&#8250;</button>
           </div>
           <div class="mini-cal-grid">
-            <div class="mini-dow">So</div><div class="mini-dow">Mo</div>
-            <div class="mini-dow">Di</div><div class="mini-dow">Mi</div>
-            <div class="mini-dow">Do</div><div class="mini-dow">Fr</div>
-            <div class="mini-dow">Sa</div>
+            <div class="mini-dow">Mo</div><div class="mini-dow">Di</div>
+            <div class="mini-dow">Mi</div><div class="mini-dow">Do</div>
+            <div class="mini-dow">Fr</div><div class="mini-dow">Sa</div>
+            <div class="mini-dow">So</div>
           </div>
           <div class="mini-cal-days" id="mini-days"></div>
         </div>
@@ -317,6 +317,13 @@
             <option value="week">Woche</option>
             <option value="day">Tag</option>
             <option value="agenda">Termine</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Erster Wochentag</label>
+          <select id="cfg-week-start">
+            <option value="monday">Montag</option>
+            <option value="sunday">Sonntag</option>
           </select>
         </div>
         <div class="form-group">

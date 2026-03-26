@@ -6,7 +6,7 @@ from typing import Optional
 import pyotp
 import qrcode
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -80,10 +80,19 @@ async def upload_avatar(
     if len(data) > MAX_AVATAR_SIZE:
         raise HTTPException(400, "Datei zu groß (max. 5 MB)")
 
-    # Resize to 256x256
+    # Resize to 512x512 square
     img = Image.open(io.BytesIO(data))
     img = img.convert("RGB")
-    img.thumbnail((512, 512))
+    # Use resize instead of thumbnail to ensure exact dimensions
+    # If already cropped (square), this just resizes; otherwise fit to 512x512
+    w, h = img.size
+    if w != h:
+        # Crop to square center
+        side = min(w, h)
+        left = (w - side) // 2
+        top = (h - side) // 2
+        img = img.crop((left, top, left + side, top + side))
+    img = img.resize((512, 512), Image.LANCZOS)
 
     filename = f"user_{current_user.id}.jpg"
     path = AVATAR_DIR / filename
@@ -101,7 +110,11 @@ def get_avatar(current_user: models.User = Depends(get_current_user)):
     path = AVATAR_DIR / current_user.avatar_filename
     if not path.exists():
         raise HTTPException(404, "Kein Profilbild")
-    return FileResponse(str(path), media_type="image/jpeg")
+    return FileResponse(
+        str(path),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @router.get("/avatar/{user_id}")

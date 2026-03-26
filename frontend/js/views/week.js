@@ -1,17 +1,16 @@
-import { isToday, isPast } from '../utils.js';
+import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber } from '../utils.js';
 
 const DOW_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-export function renderWeek(container, currentDate, events, onSlotClick, onEventClick, isSingleDay = false) {
+export function renderWeek(container, currentDate, events, onSlotClick, onEventClick, isSingleDay = false, weekStartDay = 'monday') {
   // Build the days array (7 days for week, 1 for day)
   const days = [];
   if (isSingleDay) {
     days.push(new Date(currentDate));
   } else {
-    const sunday = new Date(currentDate);
-    sunday.setDate(sunday.getDate() - sunday.getDay());
+    const monday = weekStart(currentDate, weekStartDay);
     for (let i = 0; i < 7; i++) {
-      const d = new Date(sunday);
+      const d = new Date(monday);
       d.setDate(d.getDate() + i);
       days.push(d);
     }
@@ -20,6 +19,12 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   // Separate all-day and timed events
   const allDayEvs = events.filter(ev => ev.allDay);
   const timedEvs  = events.filter(ev => !ev.allDay);
+
+  // ── KW Badge ──────────────────────────────────────────
+  const kwNum = getISOWeekNumber(days[0]);
+  const kwBadge = !isSingleDay
+    ? `<div class="week-kw-badge">KW ${kwNum}</div>`
+    : '';
 
   // ── Header ────────────────────────────────────────────
   const headerCols = days.map(day => {
@@ -98,7 +103,7 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
 
   container.innerHTML = `<div class="${viewClass}">
     <div class="week-header-row">
-      <div class="week-time-gutter"></div>
+      <div class="week-time-gutter">${kwBadge}</div>
       ${headerCols}
     </div>
     <div class="week-allday-row">

@@ -1,8 +1,11 @@
 import { api } from './api.js';
-import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey } from './utils.js';
+import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart } from './utils.js';
 import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
+
+// week start day global (loaded from settings)
+let weekStartDay = 'monday';
 
 const MONTHS = ['Januar','Februar','März','April','Mai','Juni',
                 'Juli','August','September','Oktober','November','Dezember'];
@@ -29,6 +32,7 @@ export async function initCalendar() {
   state.accounts = accounts;
   state.currentView = settings.default_view || 'month';
   state.dimPast = settings.dim_past_events;
+  weekStartDay = settings.week_start_day || 'monday';
 
   applyTheme(settings);
   updateViewButtons();
@@ -65,13 +69,11 @@ function getViewRange() {
 
   if (state.currentView === 'month') {
     start = new Date(d.getFullYear(), d.getMonth(), 1);
-    start.setDate(start.getDate() - start.getDay() - 1);
+    start.setDate(start.getDate() - dayOfWeek(start, weekStartDay) - 1);
     end   = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    end.setDate(end.getDate() + (6 - end.getDay()) + 1);
+    end.setDate(end.getDate() + (6 - dayOfWeek(end, weekStartDay)) + 1);
   } else if (state.currentView === 'week') {
-    start = new Date(d);
-    start.setDate(d.getDate() - d.getDay());
-    start.setHours(0, 0, 0, 0);
+    start = weekStart(d, weekStartDay);
     end = new Date(start);
     end.setDate(start.getDate() + 7);
   } else if (state.currentView === 'day') {
@@ -96,7 +98,8 @@ function renderView() {
   if (state.currentView === 'month') {
     renderMonth(container, state.currentDate, evs,
       date => { state.currentDate = date; state.currentView = 'day'; updateViewButtons(); fetchAndRender(); },
-      showEventPopup
+      showEventPopup,
+      weekStartDay
     );
   } else if (state.currentView === 'week') {
     renderWeek(container, state.currentDate, evs,
@@ -104,13 +107,16 @@ function renderView() {
         if (switchDay) { state.currentDate = date; state.currentView = 'day'; updateViewButtons(); fetchAndRender(); }
         else openNewEventModal(date);
       },
-      showEventPopup
+      showEventPopup,
+      false,
+      weekStartDay
     );
   } else if (state.currentView === 'day') {
     renderWeek(container, state.currentDate, evs,
       (date, switchDay) => { if (!switchDay) openNewEventModal(date); },
       showEventPopup,
-      true
+      true,
+      weekStartDay
     );
   } else {
     renderAgenda(container, state.currentDate, evs, showEventPopup);
@@ -133,14 +139,13 @@ function updateTitle() {
   if (state.currentView === 'month') {
     title = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   } else if (state.currentView === 'week') {
-    const sun = new Date(d);
-    sun.setDate(d.getDate() - d.getDay());
-    const sat = new Date(sun);
-    sat.setDate(sun.getDate() + 6);
-    const sameMonth = sun.getMonth() === sat.getMonth();
+    const mon = weekStart(d, weekStartDay);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const sameMonth = mon.getMonth() === sun.getMonth();
     title = sameMonth
-      ? `${sun.getDate()}. – ${sat.getDate()}. ${MONTHS[sat.getMonth()]} ${sat.getFullYear()}`
-      : `${sun.getDate()}. ${MONTHS[sun.getMonth()]} – ${sat.getDate()}. ${MONTHS[sat.getMonth()]} ${sat.getFullYear()}`;
+      ? `${mon.getDate()}. – ${sun.getDate()}. ${MONTHS[sun.getMonth()]} ${sun.getFullYear()}`
+      : `${mon.getDate()}. ${MONTHS[mon.getMonth()]} – ${sun.getDate()}. ${MONTHS[sun.getMonth()]} ${sun.getFullYear()}`;
   } else if (state.currentView === 'day') {
     title = `${d.getDate()}. ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   } else {
@@ -164,9 +169,15 @@ function renderMiniCal() {
     `${MONTHS[miniD.getMonth()]} ${miniD.getFullYear()}`;
 
   const firstDay = new Date(miniD.getFullYear(), miniD.getMonth(), 1);
-  const lastDay  = new Date(miniD.getFullYear(), miniD.getMonth() + 1, 0);
   const gridStart = new Date(firstDay);
-  gridStart.setDate(gridStart.getDate() - firstDay.getDay());
+  gridStart.setDate(gridStart.getDate() - dayOfWeek(firstDay, weekStartDay));
+
+  // Update mini-cal DOW headers based on weekStartDay
+  const miniDowEls = document.querySelectorAll('.mini-cal-grid .mini-dow');
+  const DOW_MONDAY = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const DOW_SUNDAY = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const DOW_LABELS = weekStartDay === 'sunday' ? DOW_SUNDAY : DOW_MONDAY;
+  miniDowEls.forEach((el, i) => { el.textContent = DOW_LABELS[i]; });
 
   // Build event date set
   const eventDates = new Set(state.events.map(ev => {
@@ -618,10 +629,11 @@ function bindAccountModal() {
 // ── Settings Modal ────────────────────────────────────────
 function openSettingsModal() {
   const s = state.settings;
-  document.getElementById('cfg-default-view').value = s.default_view || 'month';
-  document.getElementById('cfg-primary-color').value = s.primary_color || '#4285f4';
-  document.getElementById('cfg-accent-color').value  = s.accent_color  || '#ea4335';
-  document.getElementById('cfg-today-color').value   = s.today_color   || '#4285f4';
+  document.getElementById('cfg-default-view').value  = s.default_view   || 'month';
+  document.getElementById('cfg-week-start').value    = s.week_start_day || 'monday';
+  document.getElementById('cfg-primary-color').value = s.primary_color  || '#4285f4';
+  document.getElementById('cfg-accent-color').value  = s.accent_color   || '#ea4335';
+  document.getElementById('cfg-today-color').value   = s.today_color    || '#4285f4';
   document.getElementById('cfg-dim-past').checked    = !!s.dim_past_events;
 
   document.getElementById('cfg-primary-label').textContent = s.primary_color || '#4285f4';
@@ -701,20 +713,23 @@ function bindSettingsModal() {
 
   document.getElementById('settings-save').onclick = async () => {
     const settings = {
-      default_view:   document.getElementById('cfg-default-view').value,
-      primary_color:  document.getElementById('cfg-primary-color').value,
-      accent_color:   document.getElementById('cfg-accent-color').value,
-      today_color:    document.getElementById('cfg-today-color').value,
+      default_view:    document.getElementById('cfg-default-view').value,
+      week_start_day:  document.getElementById('cfg-week-start').value,
+      primary_color:   document.getElementById('cfg-primary-color').value,
+      accent_color:    document.getElementById('cfg-accent-color').value,
+      today_color:     document.getElementById('cfg-today-color').value,
       dim_past_events: document.getElementById('cfg-dim-past').checked,
     };
     try {
       await api.put('/settings/', settings);
       state.settings = { ...state.settings, ...settings };
       state.dimPast  = settings.dim_past_events;
+      weekStartDay   = settings.week_start_day;
       applyTheme(settings);
       showToast('Einstellungen gespeichert');
       closeModal('modal-settings');
-      renderView();
+      renderMiniCal();
+      fetchAndRender();
     } catch (e) { showToast(e.message, true); }
   };
 }
@@ -885,12 +900,27 @@ function updateTopbarAvatar(hasAvatar) {
   const avatar = document.getElementById('user-avatar');
   if (hasAvatar) {
     const img = new Image();
-    img.onload = () => { avatar.textContent = ''; img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%'; avatar.appendChild(img); };
-    img.onerror = () => { const u = JSON.parse(localStorage.getItem('user')||'{}'); avatar.textContent = (u.username||'?')[0].toUpperCase(); };
+    img.onload = () => {
+      avatar.innerHTML = '';
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+      avatar.appendChild(img);
+    };
+    img.onerror = () => {
+      avatar.innerHTML = '';
+      const u = JSON.parse(localStorage.getItem('user')||'{}');
+      avatar.textContent = (u.username||'?')[0].toUpperCase();
+    };
     img.src = `/api/profile/avatar?t=${Date.now()}`;
+    // Update localStorage so avatar persists across reloads
+    const u = JSON.parse(localStorage.getItem('user')||'{}');
+    u.has_avatar = true;
+    localStorage.setItem('user', JSON.stringify(u));
   } else {
+    avatar.innerHTML = '';
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     avatar.textContent = (user.username || '?')[0].toUpperCase();
+    user.has_avatar = false;
+    localStorage.setItem('user', JSON.stringify(user));
   }
 }
 
@@ -969,25 +999,34 @@ function openCropModal(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     const cropImg = document.getElementById('crop-image');
-    cropImg.src = e.target.result;
-
-    openModal('modal-crop');
 
     // Destroy previous cropper if any
     if (activeCropper) { activeCropper.destroy(); activeCropper = null; }
 
-    // Wait for image to load then init cropper
-    cropImg.onload = () => {
-      activeCropper = new Cropper(cropImg, {
-        aspectRatio: 1,
-        viewMode: 1,
-        dragMode: 'move',
-        autoCropArea: 1,
-        cropBoxResizable: true,
-        cropBoxMovable: true,
-        background: false,
-      });
-    };
+    // Reset image src first to force reload
+    cropImg.removeAttribute('src');
+
+    openModal('modal-crop');
+
+    // Use requestAnimationFrame to ensure modal is visible before initializing cropper
+    requestAnimationFrame(() => {
+      cropImg.onload = () => {
+        // Small delay to ensure the image is fully rendered in the DOM
+        setTimeout(() => {
+          if (activeCropper) { activeCropper.destroy(); activeCropper = null; }
+          activeCropper = new Cropper(cropImg, {
+            aspectRatio: 1,
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 1,
+            cropBoxResizable: true,
+            cropBoxMovable: true,
+            background: false,
+          });
+        }, 100);
+      };
+      cropImg.src = e.target.result;
+    });
   };
   reader.readAsDataURL(file);
 }

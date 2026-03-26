@@ -170,7 +170,16 @@ a { color: var(--primary); text-decoration: none; }
   cursor: pointer; color: var(--text-1);
 }
 .toggle-label input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary); }
-.color-input { width: 44px; height: 36px; padding: 2px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-app); cursor: pointer; }
+.color-input {
+  width: 52px; height: 40px; padding: 3px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  cursor: pointer;
+  outline: none;
+}
+.color-input::-webkit-color-swatch-wrapper { padding: 2px; }
+.color-input::-webkit-color-swatch { border-radius: 3px; border: none; }
 .color-row { display: flex; align-items: center; gap: 10px; }
 .color-label { font-size: 12px; color: var(--text-2); font-family: monospace; }
 
@@ -219,6 +228,7 @@ a { color: var(--primary); text-decoration: none; }
   display: flex; align-items: center; justify-content: center;
   font-weight: 600; font-size: 14px; color: #fff;
   cursor: pointer; user-select: none; flex-shrink: 0;
+  overflow: hidden; position: relative;
 }
 .user-dropdown {
   position: absolute; top: 42px; right: 0;
@@ -341,8 +351,14 @@ a { color: var(--primary); text-decoration: none; }
 /* ── Month View ─────────────────────────────────────────── */
 .month-view { display: flex; flex-direction: column; height: 100%; }
 .month-header {
-  display: grid; grid-template-columns: repeat(7, 1fr);
+  display: grid; grid-template-columns: 32px repeat(7, 1fr);
   border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.month-kw-header {
+  padding: 8px 0; text-align: center;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .3px; color: var(--text-3);
+  border-right: 1px solid var(--border-light);
 }
 .month-dow {
   padding: 8px 0; text-align: center;
@@ -350,9 +366,18 @@ a { color: var(--primary); text-decoration: none; }
   letter-spacing: .5px; color: var(--text-2);
 }
 .month-grid {
-  display: grid; grid-template-columns: repeat(7, 1fr);
+  display: grid; grid-template-columns: 32px repeat(7, 1fr);
   grid-template-rows: repeat(6, 1fr);
   flex: 1; overflow: hidden;
+}
+.month-kw-cell {
+  border-right: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 6px;
+  font-size: 10px; color: var(--text-3); font-weight: 500;
+  cursor: default; user-select: none;
+  min-height: 0;
 }
 .month-cell {
   border-right: 1px solid var(--border);
@@ -363,7 +388,8 @@ a { color: var(--primary); text-decoration: none; }
   transition: background var(--transition);
   min-height: 0;
 }
-.month-cell:nth-child(7n) { border-right: none; }
+/* every 8th child is the last day column (after KW cell) */
+.month-cell:nth-child(8n) { border-right: none; }
 .month-cell:hover { background: var(--bg-hover); }
 .month-cell.today { background: rgba(66,133,244,.08); }
 .month-cell.other-month .cell-day { color: var(--text-3); }
@@ -399,7 +425,18 @@ a { color: var(--primary); text-decoration: none; }
   flex-shrink: 0; background: var(--bg-app);
   position: sticky; top: 0; z-index: 10;
 }
-.week-time-gutter { width: 56px; flex-shrink: 0; }
+/* KW badge in week view header gutter */
+.week-kw-badge {
+  font-size: 10px; font-weight: 600; color: var(--text-3);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 6px;
+  text-transform: uppercase; letter-spacing: .3px;
+  user-select: none;
+}
+.week-time-gutter {
+  width: 56px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: stretch;
+}
 .week-day-header {
   flex: 1; padding: 8px 4px; text-align: center;
   border-left: 1px solid var(--border); cursor: pointer;

@@ -13,6 +13,7 @@ router = APIRouter()
 
 class SettingsUpdate(BaseModel):
     default_view: Optional[str] = None
+    week_start_day: Optional[str] = None
     primary_color: Optional[str] = None
     accent_color: Optional[str] = None
     today_color: Optional[str] = None
@@ -22,6 +23,7 @@ class SettingsUpdate(BaseModel):
 def _settings_dict(s: models.UserSettings) -> dict:
     return {
         "default_view": s.default_view,
+        "week_start_day": s.week_start_day or "monday",
         "primary_color": s.primary_color,
         "accent_color": s.accent_color,
         "today_color": s.today_color,

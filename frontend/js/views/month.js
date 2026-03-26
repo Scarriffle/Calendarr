@@ -1,17 +1,20 @@
-import { formatDate, isSameDay, isToday, isPast } from '../utils.js';
+import { formatDate, isSameDay, isToday, isPast, dayOfWeek, getISOWeekNumber } from '../utils.js';
 
-const DOW = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const DOW_MONDAY = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const DOW_SUNDAY = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-export function renderMonth(container, currentDate, events, onDayClick, onEventClick) {
+export function renderMonth(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+  const DOW = weekStartDay === 'sunday' ? DOW_SUNDAY : DOW_MONDAY;
 
   const firstDay = new Date(year, month, 1);
   const lastDay  = new Date(year, month + 1, 0);
 
-  // Start grid on Sunday of the week containing the 1st
+  // Start grid on the correct weekday
   const gridStart = new Date(firstDay);
-  gridStart.setDate(gridStart.getDate() - firstDay.getDay());
+  const offset = dayOfWeek(firstDay, weekStartDay);
+  gridStart.setDate(gridStart.getDate() - offset);
 
   const cells = [];
   const d = new Date(gridStart);
@@ -39,45 +42,55 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
     }
   });
 
-  // Header
-  const headerHtml = DOW.map(d => `<div class="month-dow">${d}</div>`).join('');
+  // Header: KW-Spalte + Wochentage
+  const headerHtml = `<div class="month-kw-header">KW</div>` +
+    DOW.map(d => `<div class="month-dow">${d}</div>`).join('');
 
-  // Cells
-  const cellsHtml = cells.map(cell => {
-    const key = dateKey(cell);
-    const cellEvs = (evMap[key] || []).slice().sort((a, b) => {
-      if (a.allDay && !b.allDay) return -1;
-      if (!a.allDay && b.allDay) return 1;
-      return new Date(a.start) - new Date(b.start);
-    });
+  // Build rows (6 weeks × 7 days)
+  let cellsHtml = '';
+  for (let row = 0; row < 6; row++) {
+    // KW cell for the first day of this row
+    const rowFirstDay = cells[row * 7];
+    const kw = getISOWeekNumber(rowFirstDay);
+    cellsHtml += `<div class="month-kw-cell">${kw}</div>`;
 
-    const isOther = cell.getMonth() !== month;
-    const todayClass = isToday(cell) ? 'today' : '';
-    const otherClass = isOther ? 'other-month' : '';
-    const numClass = isToday(cell) ? 'today' : '';
+    for (let col = 0; col < 7; col++) {
+      const cell = cells[row * 7 + col];
+      const key = dateKey(cell);
+      const cellEvs = (evMap[key] || []).slice().sort((a, b) => {
+        if (a.allDay && !b.allDay) return -1;
+        if (!a.allDay && b.allDay) return 1;
+        return new Date(a.start) - new Date(b.start);
+      });
 
-    const MAX_VISIBLE = 3;
-    const visible = cellEvs.slice(0, MAX_VISIBLE);
-    const hiddenCount = cellEvs.length - MAX_VISIBLE;
+      const isOther = cell.getMonth() !== month;
+      const todayClass = isToday(cell) ? 'today' : '';
+      const otherClass = isOther ? 'other-month' : '';
+      const numClass = isToday(cell) ? 'today' : '';
 
-    const evHtml = visible.map(ev => {
-      const color = ev.color || ev.calendarColor || '#4285f4';
-      const pastClass = isPast(ev) ? 'past' : '';
-      const title = ev.allDay ? ev.title : `${fmtTime(new Date(ev.start))} ${ev.title}`;
-      return `<div class="month-event ${pastClass}" data-id="${ev.id}" data-url="${escAttr(ev.url)}"
-        style="background:${color};color:#fff"
-        title="${escAttr(ev.title)}">${escHtml(title)}</div>`;
-    }).join('');
+      const MAX_VISIBLE = 3;
+      const visible = cellEvs.slice(0, MAX_VISIBLE);
+      const hiddenCount = cellEvs.length - MAX_VISIBLE;
 
-    const moreHtml = hiddenCount > 0
-      ? `<div class="month-more" data-date="${key}">+${hiddenCount} weitere</div>`
-      : '';
+      const evHtml = visible.map(ev => {
+        const color = ev.color || ev.calendarColor || '#4285f4';
+        const pastClass = isPast(ev) ? 'past' : '';
+        const title = ev.allDay ? ev.title : `${fmtTime(new Date(ev.start))} ${ev.title}`;
+        return `<div class="month-event ${pastClass}" data-id="${ev.id}" data-url="${escAttr(ev.url)}"
+          style="background:${color};color:#fff"
+          title="${escAttr(ev.title)}">${escHtml(title)}</div>`;
+      }).join('');
 
-    return `<div class="month-cell ${todayClass} ${otherClass}" data-date="${key}">
-      <div class="cell-day ${numClass}">${cell.getDate()}</div>
-      ${evHtml}${moreHtml}
-    </div>`;
-  }).join('');
+      const moreHtml = hiddenCount > 0
+        ? `<div class="month-more" data-date="${key}">+${hiddenCount} weitere</div>`
+        : '';
+
+      cellsHtml += `<div class="month-cell ${todayClass} ${otherClass}" data-date="${key}">
+        <div class="cell-day ${numClass}">${cell.getDate()}</div>
+        ${evHtml}${moreHtml}
+      </div>`;
+    }
+  }
 
   container.innerHTML = `<div class="month-view">
     <div class="month-header">${headerHtml}</div>

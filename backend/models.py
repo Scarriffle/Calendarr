@@ -60,6 +60,7 @@ class UserSettings(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     default_view = Column(String(20), default="month")
+    week_start_day = Column(String(10), default="monday")
     primary_color = Column(String(7), default="#4285f4")
     accent_color = Column(String(7), default="#ea4335")
     today_color = Column(String(7), default="#4285f4")
