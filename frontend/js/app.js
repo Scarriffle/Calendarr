@@ -67,7 +67,7 @@ async function launchApp() {
   });
 
   document.addEventListener('click', e => {
-    if (!dropdown.contains(e.target) && e.target !== avatar) {
+    if (!dropdown.contains(e.target) && !avatar.contains(e.target)) {
       dropdown.classList.add('hidden');
     }
   });
