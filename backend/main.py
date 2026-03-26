@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import Base, engine
-from routers import auth_router, caldav_router, settings_router, users_router
+from routers import auth_router, caldav_router, profile_router, settings_router, users_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,6 +24,7 @@ app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users_router.router, prefix="/api/users", tags=["users"])
 app.include_router(caldav_router.router, prefix="/api/caldav", tags=["caldav"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
+app.include_router(profile_router.router, prefix="/api/profile", tags=["profile"])
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")

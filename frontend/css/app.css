@@ -212,12 +212,33 @@ a { color: var(--primary); text-decoration: none; }
 .view-btn:hover { background: var(--bg-hover); color: var(--text-1); }
 .view-btn.active { background: var(--primary-dim); color: var(--primary); }
 
+.user-menu-wrapper { position: relative; }
 .user-avatar {
   width: 34px; height: 34px; border-radius: 50%;
   background: var(--primary);
   display: flex; align-items: center; justify-content: center;
   font-weight: 600; font-size: 14px; color: #fff;
   cursor: pointer; user-select: none; flex-shrink: 0;
+}
+.user-dropdown {
+  position: absolute; top: 42px; right: 0;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius); min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 200;
+  overflow: hidden;
+}
+.dropdown-user {
+  padding: 12px 16px; font-size: 13px; font-weight: 600;
+  color: var(--text-1); border-bottom: 1px solid var(--border);
+}
+.dropdown-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 10px 16px; border: none;
+  background: none; color: var(--text-2); font-size: 13px;
+  cursor: pointer; transition: background var(--transition);
+}
+.dropdown-item:hover { background: var(--bg-hover); color: var(--text-1); }
+.dropdown-item svg { flex-shrink: 0;
 }
 
 /* ── Layout ─────────────────────────────────────────────── */
@@ -239,6 +260,7 @@ a { color: var(--primary); text-decoration: none; }
 .sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-w))); margin-right: calc(-1 * var(--sidebar-w)); }
 .sidebar-inner { padding-bottom: 24px; }
 .main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; }
+#view-container { flex: 1; display: flex; flex-direction: column; }
 
 /* ── Mini Calendar ──────────────────────────────────────── */
 .mini-cal { padding: 12px 16px; }
@@ -285,8 +307,15 @@ a { color: var(--primary); text-decoration: none; }
   margin-right: 12px;
 }
 .cal-item:hover { background: var(--bg-hover); }
+.cal-item-dot-wrapper { position: relative; flex-shrink: 0; }
 .cal-item-dot {
-  width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; cursor: pointer;
+}
+.cal-item-dot:hover { outline: 2px solid var(--text-2); outline-offset: 1px; }
+.cal-color-input {
+  position: absolute; top: 0; left: 0;
+  width: 14px; height: 14px; opacity: 0;
+  pointer-events: none;
 }
 .cal-item input[type=checkbox] { accent-color: var(--primary); width: 14px; height: 14px; }
 .cal-item-name { font-size: 13px; flex: 1; color: var(--text-1); }
@@ -540,6 +569,55 @@ a { color: var(--primary); text-decoration: none; }
 .users-list-item .uname { font-weight: 500; }
 .users-list-item .uemail { font-size: 12px; color: var(--text-2); }
 .users-list-item .ubadge { font-size: 11px; color: var(--text-3); background: var(--bg-hover); padding: 2px 6px; border-radius: 10px; }
+
+/* ── Profile ───────────────────────────────────────────── */
+.profile-avatar-section {
+  display: flex; align-items: center; gap: 20px;
+  margin-bottom: 28px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-avatar {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: var(--primary); display: flex;
+  align-items: center; justify-content: center;
+  font-size: 32px; font-weight: 700; color: #fff;
+  flex-shrink: 0; overflow: hidden; position: relative;
+}
+.profile-avatar img {
+  width: 100%; height: 100%; object-fit: cover;
+  position: absolute; inset: 0;
+}
+.profile-avatar-actions { display: flex; flex-direction: column; gap: 6px; }
+.profile-username { font-size: 18px; font-weight: 600; color: var(--text-1); }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.input-disabled { opacity: .5; cursor: not-allowed; }
+.text-muted { font-size: 13px; color: var(--text-2); margin-bottom: 12px; }
+.text-success { font-size: 13px; color: #34a853; margin-bottom: 12px; font-weight: 500; }
+.totp-qr-wrapper {
+  display: flex; justify-content: center;
+  margin: 16px 0; padding: 16px;
+  background: #fff; border-radius: var(--radius);
+  width: fit-content;
+}
+.totp-qr-wrapper img { width: 200px; height: 200px; }
+.totp-secret-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-app); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 12px;
+}
+.totp-secret-row code {
+  font-family: monospace; font-size: 14px; color: var(--text-1);
+  word-break: break-all; flex: 1;
+}
+.profile-cal-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border-light);
+}
+.profile-cal-dot {
+  width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+}
+.profile-cal-name { font-size: 13px; color: var(--text-1); }
+.profile-cal-account { font-size: 11px; color: var(--text-3); }
 
 /* ── Toast ──────────────────────────────────────────────── */
 .toast {

@@ -1,5 +1,6 @@
 from typing import Optional
 
+import pyotp
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -16,6 +17,12 @@ class SetupRequest(BaseModel):
     username: str
     password: str
     email: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+    totp_code: Optional[str] = None
 
 
 def _user_dict(user: models.User) -> dict:
@@ -59,6 +66,37 @@ def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if user.totp_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="2fa_required",
+        )
+    token = create_access_token({"sub": user.username})
+    return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
+
+
+@router.post("/login")
+def login_json(req: LoginRequest, db: Session = Depends(get_db)):
+    user = (
+        db.query(models.User).filter(models.User.username == req.username).first()
+    )
+    if not user or not verify_password(req.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Benutzername oder Passwort falsch",
+        )
+    if user.totp_enabled:
+        if not req.totp_code:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="2fa_required",
+            )
+        totp = pyotp.TOTP(user.totp_secret)
+        if not totp.verify(req.totp_code, valid_window=1):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Ungültiger 2FA-Code",
+            )
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
 
@@ -70,4 +108,6 @@ def me(current_user: models.User = Depends(get_current_user)):
         "username": current_user.username,
         "email": current_user.email,
         "is_admin": current_user.is_admin,
+        "has_avatar": current_user.avatar_filename is not None,
+        "totp_enabled": current_user.totp_enabled,
     }

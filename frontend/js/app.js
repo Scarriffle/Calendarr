@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { initCalendar, showToast } from './calendar.js';
+import { initCalendar, showToast, openProfileModal } from './calendar.js';
 
 // ── Bootstrap ─────────────────────────────────────────────
 async function boot() {
@@ -57,14 +57,39 @@ async function launchApp() {
     avatar.title = user.username;
   }
 
-  // Logout on avatar click (simple UX)
-  avatar.addEventListener('click', () => {
-    if (confirm('Abmelden?')) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.reload();
+  // User dropdown menu
+  const dropdown = document.getElementById('user-dropdown');
+  document.getElementById('dropdown-username').textContent = user.username || 'Benutzer';
+
+  avatar.addEventListener('click', e => {
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', e => {
+    if (!dropdown.contains(e.target) && e.target !== avatar) {
+      dropdown.classList.add('hidden');
     }
   });
+
+  document.getElementById('btn-profile').addEventListener('click', () => {
+    dropdown.classList.add('hidden');
+    openProfileModal();
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.reload();
+  });
+
+  // Load avatar image if available
+  try {
+    const me = await api.get('/auth/me');
+    if (me.has_avatar) {
+      avatar.innerHTML = `<img src="/api/profile/avatar?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    }
+  } catch (_) {}
 
   await initCalendar();
 }
@@ -106,21 +131,29 @@ function bindSetupForm() {
 
 // ── Login Form ────────────────────────────────────────────
 function bindLoginForm() {
+  const totpRow = document.getElementById('login-totp-row');
+
   document.getElementById('login-form').addEventListener('submit', async e => {
     e.preventDefault();
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
+    const totpCode = document.getElementById('login-totp')?.value.trim() || null;
     const errEl    = document.getElementById('login-error');
     errEl.classList.add('hidden');
 
     try {
-      const res = await api.login(username, password);
+      const res = await api.login(username, password, totpCode);
       localStorage.setItem('token', res.access_token);
       localStorage.setItem('user', JSON.stringify(res.user));
       await launchApp();
     } catch (err) {
-      errEl.textContent = err.message;
-      errEl.classList.remove('hidden');
+      if (err.message === '2fa_required') {
+        totpRow.classList.remove('hidden');
+        document.getElementById('login-totp').focus();
+      } else {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+      }
     }
   });
 }

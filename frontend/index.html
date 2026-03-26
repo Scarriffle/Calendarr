@@ -57,6 +57,10 @@
         <label>Passwort</label>
         <input type="password" id="login-password" required autocomplete="current-password" />
       </div>
+      <div class="form-group hidden" id="login-totp-row">
+        <label>2FA-Code</label>
+        <input type="text" id="login-totp" placeholder="6-stelliger Code" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
+      </div>
       <div id="login-error" class="form-error hidden"></div>
       <button type="submit" class="btn btn-primary btn-full">Anmelden</button>
     </form>
@@ -97,7 +101,20 @@
       <button class="icon-btn" id="btn-settings" title="Einstellungen">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
       </button>
-      <div class="user-avatar" id="user-avatar" title="Benutzer"></div>
+      <div class="user-menu-wrapper">
+        <div class="user-avatar" id="user-avatar" title="Benutzer"></div>
+        <div class="user-dropdown hidden" id="user-dropdown">
+          <div class="dropdown-user" id="dropdown-username"></div>
+          <button class="dropdown-item" id="btn-profile">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            Profil
+          </button>
+          <button class="dropdown-item" id="btn-logout">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+            Abmelden
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -352,6 +369,114 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" data-modal="modal-settings">Schließen</button>
       <button class="btn btn-primary" id="settings-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Modal -->
+<div id="modal-profile" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:540px">
+    <div class="modal-header">
+      <h3>Profil</h3>
+      <button class="icon-btn modal-close" data-modal="modal-profile">&times;</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Avatar Section -->
+      <div class="profile-avatar-section">
+        <div class="profile-avatar" id="profile-avatar">
+          <span id="profile-avatar-letter"></span>
+          <img id="profile-avatar-img" class="hidden" />
+        </div>
+        <div class="profile-avatar-actions">
+          <button class="btn btn-secondary btn-sm" id="profile-avatar-upload">Bild hochladen</button>
+          <button class="btn btn-ghost btn-sm hidden" id="profile-avatar-remove">Entfernen</button>
+          <input type="file" id="profile-avatar-input" accept="image/jpeg,image/png,image/webp" class="hidden" />
+          <div class="profile-username" id="profile-display-name"></div>
+        </div>
+      </div>
+
+      <!-- Account Info -->
+      <div class="settings-section">
+        <h4>Konto</h4>
+        <div class="form-group">
+          <label>Benutzername</label>
+          <input type="text" id="profile-username" disabled class="input-disabled" />
+        </div>
+        <div class="form-group">
+          <label>E-Mail</label>
+          <input type="email" id="profile-email" placeholder="Keine E-Mail hinterlegt" />
+        </div>
+        <button class="btn btn-primary btn-sm" id="profile-save-info">Speichern</button>
+      </div>
+
+      <!-- Password -->
+      <div class="settings-section">
+        <h4>Passwort ändern</h4>
+        <div class="form-group">
+          <label>Aktuelles Passwort</label>
+          <input type="password" id="profile-pw-current" autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label>Neues Passwort</label>
+          <input type="password" id="profile-pw-new" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label>Neues Passwort wiederholen</label>
+          <input type="password" id="profile-pw-confirm" autocomplete="new-password" />
+        </div>
+        <button class="btn btn-primary btn-sm" id="profile-pw-save">Passwort ändern</button>
+      </div>
+
+      <!-- 2FA -->
+      <div class="settings-section">
+        <h4>Zwei-Faktor-Authentifizierung</h4>
+        <div id="2fa-status">
+          <div id="2fa-disabled-section">
+            <p class="text-muted">2FA ist deaktiviert. Schütze dein Konto mit einem Authenticator.</p>
+            <button class="btn btn-primary btn-sm" id="2fa-setup-btn">2FA einrichten</button>
+          </div>
+          <div id="2fa-setup-section" class="hidden">
+            <p class="text-muted">Scanne den QR-Code mit deiner Authenticator-App (z.B. Bitwarden, Google Authenticator).</p>
+            <div class="totp-qr-wrapper">
+              <img id="2fa-qr-img" />
+            </div>
+            <div class="form-group">
+              <label>Oder gib diesen Schlüssel manuell ein</label>
+              <div class="totp-secret-row">
+                <code id="2fa-secret-code"></code>
+                <button class="btn btn-ghost btn-sm" id="2fa-copy-secret" title="Kopieren">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Bestätigungscode eingeben</label>
+              <input type="text" id="2fa-verify-code" placeholder="6-stelliger Code" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
+            </div>
+            <button class="btn btn-primary btn-sm" id="2fa-enable-btn">Aktivieren</button>
+            <button class="btn btn-ghost btn-sm" id="2fa-cancel-btn">Abbrechen</button>
+          </div>
+          <div id="2fa-enabled-section" class="hidden">
+            <p class="text-success">2FA ist aktiviert.</p>
+            <div class="form-group">
+              <label>Passwort zum Deaktivieren</label>
+              <input type="password" id="2fa-disable-pw" autocomplete="current-password" />
+            </div>
+            <button class="btn btn-danger btn-sm" id="2fa-disable-btn">2FA deaktivieren</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendars -->
+      <div class="settings-section">
+        <h4>Meine Kalender</h4>
+        <div id="profile-calendars"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal="modal-profile">Schließen</button>
     </div>
   </div>
 </div>

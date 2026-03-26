@@ -40,6 +40,7 @@ export async function initCalendar() {
   bindEventModal();
   bindAccountModal();
   bindSettingsModal();
+  bindProfileModal();
 }
 
 // ── Data fetching ─────────────────────────────────────────
@@ -231,7 +232,10 @@ function renderCalendarList() {
     acc.calendars.map(cal =>
       `<div class="cal-item" data-cal-id="${cal.id}">
         <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" />
-        <div class="cal-item-dot" style="background:${cal.color}"></div>
+        <div class="cal-item-dot-wrapper">
+          <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" title="Farbe ändern"></div>
+          <input type="color" class="cal-color-input" data-cal-id="${cal.id}" value="${cal.color || '#4285f4'}" />
+        </div>
         <span class="cal-item-name">${escHtml(cal.name)}</span>
         <button class="icon-btn mini-btn cal-item-remove" data-acc-id="${acc.id}" title="Konto entfernen">
           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -252,6 +256,29 @@ function renderCalendarList() {
           if (cal.id === calId) cal.enabled = cb.checked;
         }
       }
+      fetchAndRender();
+    });
+  });
+
+  container.querySelectorAll('.cal-item-dot').forEach(dot => {
+    dot.addEventListener('click', e => {
+      e.stopPropagation();
+      const colorInput = dot.parentElement.querySelector('.cal-color-input');
+      colorInput.click();
+    });
+  });
+
+  container.querySelectorAll('.cal-color-input').forEach(input => {
+    input.addEventListener('change', async e => {
+      const calId = parseInt(e.target.dataset.calId);
+      const color = e.target.value;
+      await api.put(`/caldav/calendars/${calId}`, { color });
+      for (const acc of state.accounts) {
+        for (const cal of acc.calendars) {
+          if (cal.id === calId) cal.color = color;
+        }
+      }
+      renderCalendarList();
       fetchAndRender();
     });
   });
@@ -673,6 +700,191 @@ function bindSettingsModal() {
       renderView();
     } catch (e) { showToast(e.message, true); }
   };
+}
+
+// ── Profile Modal ─────────────────────────────────────────
+export function openProfileModal() {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  // Username & email
+  document.getElementById('profile-username').value = user.username || '';
+  document.getElementById('profile-display-name').textContent = user.username || '';
+
+  // Load fresh profile data
+  api.get('/profile/').then(profile => {
+    document.getElementById('profile-email').value = profile.email || '';
+
+    // Avatar
+    const letter = document.getElementById('profile-avatar-letter');
+    const img = document.getElementById('profile-avatar-img');
+    const removeBtn = document.getElementById('profile-avatar-remove');
+    if (profile.has_avatar) {
+      img.src = `/api/profile/avatar?t=${Date.now()}`;
+      img.classList.remove('hidden');
+      letter.classList.add('hidden');
+      removeBtn.classList.remove('hidden');
+    } else {
+      img.classList.add('hidden');
+      letter.classList.remove('hidden');
+      letter.textContent = (user.username || '?')[0].toUpperCase();
+      removeBtn.classList.add('hidden');
+    }
+
+    // 2FA status
+    document.getElementById('2fa-disabled-section').classList.toggle('hidden', profile.totp_enabled);
+    document.getElementById('2fa-setup-section').classList.add('hidden');
+    document.getElementById('2fa-enabled-section').classList.toggle('hidden', !profile.totp_enabled);
+  }).catch(() => {});
+
+  // Clear password fields
+  document.getElementById('profile-pw-current').value = '';
+  document.getElementById('profile-pw-new').value = '';
+  document.getElementById('profile-pw-confirm').value = '';
+  document.getElementById('2fa-disable-pw').value = '';
+  document.getElementById('2fa-verify-code').value = '';
+
+  // Load calendars
+  renderProfileCalendars();
+
+  openModal('modal-profile');
+}
+
+function renderProfileCalendars() {
+  const container = document.getElementById('profile-calendars');
+  if (!state.accounts.length) {
+    container.innerHTML = '<p class="text-muted">Keine CalDAV-Konten verbunden.</p>';
+    return;
+  }
+  const html = state.accounts.map(acc =>
+    acc.calendars.map(cal =>
+      `<div class="profile-cal-item">
+        <div class="profile-cal-dot" style="background:${cal.color}"></div>
+        <div>
+          <div class="profile-cal-name">${escHtml(cal.name)}</div>
+          <div class="profile-cal-account">${escHtml(acc.name)}</div>
+        </div>
+      </div>`
+    ).join('')
+  ).join('');
+  container.innerHTML = html;
+}
+
+function bindProfileModal() {
+  // Save profile info (email)
+  document.getElementById('profile-save-info').onclick = async () => {
+    const email = document.getElementById('profile-email').value.trim();
+    try {
+      await api.put('/profile/', { email: email || null });
+      showToast('Profil gespeichert');
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  // Avatar upload
+  document.getElementById('profile-avatar-upload').onclick = () => {
+    document.getElementById('profile-avatar-input').click();
+  };
+
+  document.getElementById('profile-avatar-input').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      await api.upload('/profile/avatar', form);
+      showToast('Profilbild hochgeladen');
+      // Update display
+      const img = document.getElementById('profile-avatar-img');
+      img.src = `/api/profile/avatar?t=${Date.now()}`;
+      img.classList.remove('hidden');
+      document.getElementById('profile-avatar-letter').classList.add('hidden');
+      document.getElementById('profile-avatar-remove').classList.remove('hidden');
+      // Update topbar avatar
+      updateTopbarAvatar(true);
+    } catch (err) { showToast(err.message, true); }
+    e.target.value = '';
+  };
+
+  document.getElementById('profile-avatar-remove').onclick = async () => {
+    try {
+      await api.delete('/profile/avatar');
+      showToast('Profilbild entfernt');
+      document.getElementById('profile-avatar-img').classList.add('hidden');
+      document.getElementById('profile-avatar-letter').classList.remove('hidden');
+      document.getElementById('profile-avatar-remove').classList.add('hidden');
+      updateTopbarAvatar(false);
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  // Password change
+  document.getElementById('profile-pw-save').onclick = async () => {
+    const current = document.getElementById('profile-pw-current').value;
+    const newPw = document.getElementById('profile-pw-new').value;
+    const confirm = document.getElementById('profile-pw-confirm').value;
+    if (!current || !newPw) { showToast('Bitte alle Felder ausfüllen', true); return; }
+    if (newPw !== confirm) { showToast('Passwörter stimmen nicht überein', true); return; }
+    if (newPw.length < 6) { showToast('Mindestens 6 Zeichen', true); return; }
+    try {
+      await api.post('/profile/password', { current_password: current, new_password: newPw });
+      showToast('Passwort geändert');
+      document.getElementById('profile-pw-current').value = '';
+      document.getElementById('profile-pw-new').value = '';
+      document.getElementById('profile-pw-confirm').value = '';
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  // 2FA Setup
+  document.getElementById('2fa-setup-btn').onclick = async () => {
+    try {
+      const res = await api.post('/profile/2fa/setup', {});
+      document.getElementById('2fa-qr-img').src = res.qr_code;
+      document.getElementById('2fa-secret-code').textContent = res.secret;
+      document.getElementById('2fa-disabled-section').classList.add('hidden');
+      document.getElementById('2fa-setup-section').classList.remove('hidden');
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  document.getElementById('2fa-copy-secret').onclick = () => {
+    const secret = document.getElementById('2fa-secret-code').textContent;
+    navigator.clipboard.writeText(secret).then(() => showToast('Schlüssel kopiert'));
+  };
+
+  document.getElementById('2fa-enable-btn').onclick = async () => {
+    const code = document.getElementById('2fa-verify-code').value.trim();
+    if (!code || code.length !== 6) { showToast('Bitte 6-stelligen Code eingeben', true); return; }
+    try {
+      await api.post('/profile/2fa/enable', { code });
+      showToast('2FA aktiviert');
+      document.getElementById('2fa-setup-section').classList.add('hidden');
+      document.getElementById('2fa-enabled-section').classList.remove('hidden');
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  document.getElementById('2fa-cancel-btn').onclick = () => {
+    document.getElementById('2fa-setup-section').classList.add('hidden');
+    document.getElementById('2fa-disabled-section').classList.remove('hidden');
+  };
+
+  document.getElementById('2fa-disable-btn').onclick = async () => {
+    const pw = document.getElementById('2fa-disable-pw').value;
+    if (!pw) { showToast('Bitte Passwort eingeben', true); return; }
+    try {
+      await api.post('/profile/2fa/disable', { password: pw });
+      showToast('2FA deaktiviert');
+      document.getElementById('2fa-enabled-section').classList.add('hidden');
+      document.getElementById('2fa-disabled-section').classList.remove('hidden');
+      document.getElementById('2fa-disable-pw').value = '';
+    } catch (e) { showToast(e.message, true); }
+  };
+}
+
+function updateTopbarAvatar(hasAvatar) {
+  const avatar = document.getElementById('user-avatar');
+  if (hasAvatar) {
+    avatar.innerHTML = `<img src="/api/profile/avatar?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    avatar.textContent = (user.username || '?')[0].toUpperCase();
+  }
 }
 
 // ── Modal helpers ─────────────────────────────────────────

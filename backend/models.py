@@ -11,6 +11,9 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=True)
     password_hash = Column(String(255), nullable=False)
     is_admin = Column(Boolean, default=False)
+    avatar_filename = Column(String(255), nullable=True)
+    totp_secret = Column(String(32), nullable=True)
+    totp_enabled = Column(Boolean, default=False)
 
     caldav_accounts = relationship(
         "CalDAVAccount", back_populates="user", cascade="all, delete-orphan"
