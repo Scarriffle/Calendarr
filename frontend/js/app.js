@@ -86,8 +86,10 @@ async function launchApp() {
   // Load avatar image if available
   try {
     const me = await api.get('/auth/me');
+    // Store extended user info
+    localStorage.setItem('user', JSON.stringify({ ...user, ...me }));
     if (me.has_avatar) {
-      avatar.innerHTML = `<img src="/api/profile/avatar?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      loadAvatarImage(avatar, user.username);
     }
   } catch (_) {}
 
@@ -156,6 +158,21 @@ function bindLoginForm() {
       }
     }
   });
+}
+
+// ── Avatar Helper ────────────────────────────────────────
+function loadAvatarImage(avatarEl, username) {
+  const img = new Image();
+  img.onload = () => {
+    avatarEl.textContent = '';
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+    avatarEl.appendChild(img);
+  };
+  img.onerror = () => {
+    // Fallback to letter
+    avatarEl.textContent = (username || '?')[0].toUpperCase();
+  };
+  img.src = `/api/profile/avatar?t=${Date.now()}`;
 }
 
 // ── Start ─────────────────────────────────────────────────

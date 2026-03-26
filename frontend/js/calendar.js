@@ -147,6 +147,7 @@ function updateTitle() {
     title = `Ab ${d.getDate()}. ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   }
   document.getElementById('view-title').textContent = title;
+  document.title = `Calendarr - ${title}`;
 }
 
 function updateViewButtons() {
@@ -232,10 +233,7 @@ function renderCalendarList() {
     acc.calendars.map(cal =>
       `<div class="cal-item" data-cal-id="${cal.id}">
         <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" />
-        <div class="cal-item-dot-wrapper">
-          <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" title="Farbe ändern"></div>
-          <input type="color" class="cal-color-input" data-cal-id="${cal.id}" value="${cal.color || '#4285f4'}" />
-        </div>
+        <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" title="Farbe ändern"></div>
         <span class="cal-item-name">${escHtml(cal.name)}</span>
         <button class="icon-btn mini-btn cal-item-remove" data-acc-id="${acc.id}" title="Konto entfernen">
           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -263,23 +261,42 @@ function renderCalendarList() {
   container.querySelectorAll('.cal-item-dot').forEach(dot => {
     dot.addEventListener('click', e => {
       e.stopPropagation();
-      const colorInput = dot.parentElement.querySelector('.cal-color-input');
-      colorInput.click();
+      const calId = parseInt(dot.dataset.calId);
+      openCalColorPicker(dot, calId);
     });
   });
 
-  container.querySelectorAll('.cal-color-input').forEach(input => {
-    input.addEventListener('change', async e => {
-      const calId = parseInt(e.target.dataset.calId);
-      const color = e.target.value;
-      await api.put(`/caldav/calendars/${calId}`, { color });
-      for (const acc of state.accounts) {
-        for (const cal of acc.calendars) {
-          if (cal.id === calId) cal.color = color;
+  container.querySelectorAll('.cal-item-name').forEach(nameEl => {
+    nameEl.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      const calId = parseInt(nameEl.closest('.cal-item').dataset.calId);
+      const currentName = nameEl.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentName;
+      input.className = 'cal-rename-input';
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const save = async () => {
+        const newName = input.value.trim();
+        if (newName && newName !== currentName) {
+          await api.put(`/caldav/calendars/${calId}`, { name: newName });
+          for (const acc of state.accounts) {
+            for (const cal of acc.calendars) {
+              if (cal.id === calId) cal.name = newName;
+            }
+          }
         }
-      }
-      renderCalendarList();
-      fetchAndRender();
+        renderCalendarList();
+      };
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') save();
+        if (e.key === 'Escape') renderCalendarList();
+      });
+      input.addEventListener('blur', save);
     });
   });
 
@@ -784,24 +801,11 @@ function bindProfileModal() {
     document.getElementById('profile-avatar-input').click();
   };
 
-  document.getElementById('profile-avatar-input').onchange = async (e) => {
+  document.getElementById('profile-avatar-input').onchange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const form = new FormData();
-    form.append('file', file);
-    try {
-      await api.upload('/profile/avatar', form);
-      showToast('Profilbild hochgeladen');
-      // Update display
-      const img = document.getElementById('profile-avatar-img');
-      img.src = `/api/profile/avatar?t=${Date.now()}`;
-      img.classList.remove('hidden');
-      document.getElementById('profile-avatar-letter').classList.add('hidden');
-      document.getElementById('profile-avatar-remove').classList.remove('hidden');
-      // Update topbar avatar
-      updateTopbarAvatar(true);
-    } catch (err) { showToast(err.message, true); }
     e.target.value = '';
+    openCropModal(file);
   };
 
   document.getElementById('profile-avatar-remove').onclick = async () => {
@@ -880,12 +884,147 @@ function bindProfileModal() {
 function updateTopbarAvatar(hasAvatar) {
   const avatar = document.getElementById('user-avatar');
   if (hasAvatar) {
-    avatar.innerHTML = `<img src="/api/profile/avatar?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    const img = new Image();
+    img.onload = () => { avatar.textContent = ''; img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%'; avatar.appendChild(img); };
+    img.onerror = () => { const u = JSON.parse(localStorage.getItem('user')||'{}'); avatar.textContent = (u.username||'?')[0].toUpperCase(); };
+    img.src = `/api/profile/avatar?t=${Date.now()}`;
   } else {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     avatar.textContent = (user.username || '?')[0].toUpperCase();
   }
 }
+
+// ── Calendar Color Picker ─────────────────────────────────
+const CAL_COLORS = [
+  '#4285f4', '#7986cb', '#8e24aa', '#e67c73',
+  '#f4511e', '#f6bf26', '#33b679', '#0b8043',
+  '#039be5', '#616161', '#3f51b5', '#d50000',
+  '#e4c441', '#009688', '#795548', '#ef6c00',
+];
+
+let activeColorPicker = null;
+
+function openCalColorPicker(anchor, calId) {
+  closeCalColorPicker();
+
+  const rect = anchor.getBoundingClientRect();
+  const picker = document.createElement('div');
+  picker.className = 'cal-color-picker';
+  picker.innerHTML = CAL_COLORS.map(c =>
+    `<div class="cal-cp-swatch" data-color="${c}" style="background:${c}" title="${c}"></div>`
+  ).join('');
+
+  picker.style.top = (rect.bottom + 6) + 'px';
+  picker.style.left = rect.left + 'px';
+
+  // Ensure picker stays in viewport
+  document.body.appendChild(picker);
+  const pRect = picker.getBoundingClientRect();
+  if (pRect.right > window.innerWidth - 8) {
+    picker.style.left = (window.innerWidth - pRect.width - 8) + 'px';
+  }
+
+  picker.querySelectorAll('.cal-cp-swatch').forEach(sw => {
+    sw.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const color = sw.dataset.color;
+      await api.put(`/caldav/calendars/${calId}`, { color });
+      for (const acc of state.accounts) {
+        for (const cal of acc.calendars) {
+          if (cal.id === calId) cal.color = color;
+        }
+      }
+      closeCalColorPicker();
+      renderCalendarList();
+      fetchAndRender();
+    });
+  });
+
+  activeColorPicker = picker;
+
+  // Close on outside click (next tick to avoid immediate close)
+  setTimeout(() => {
+    document.addEventListener('click', closeCalColorPickerOutside);
+  }, 0);
+}
+
+function closeCalColorPicker() {
+  if (activeColorPicker) {
+    activeColorPicker.remove();
+    activeColorPicker = null;
+    document.removeEventListener('click', closeCalColorPickerOutside);
+  }
+}
+
+function closeCalColorPickerOutside(e) {
+  if (activeColorPicker && !activeColorPicker.contains(e.target)) {
+    closeCalColorPicker();
+  }
+}
+
+// ── Avatar Crop ──────────────────────────────────────────
+let activeCropper = null;
+
+function openCropModal(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const cropImg = document.getElementById('crop-image');
+    cropImg.src = e.target.result;
+
+    openModal('modal-crop');
+
+    // Destroy previous cropper if any
+    if (activeCropper) { activeCropper.destroy(); activeCropper = null; }
+
+    // Wait for image to load then init cropper
+    cropImg.onload = () => {
+      activeCropper = new Cropper(cropImg, {
+        aspectRatio: 1,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 1,
+        cropBoxResizable: true,
+        cropBoxMovable: true,
+        background: false,
+      });
+    };
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('crop-save').onclick = async () => {
+  if (!activeCropper) return;
+  const canvas = activeCropper.getCroppedCanvas({
+    width: 512,
+    height: 512,
+    imageSmoothingQuality: 'high',
+  });
+
+  canvas.toBlob(async (blob) => {
+    const form = new FormData();
+    form.append('file', blob, 'avatar.jpg');
+    try {
+      await api.upload('/profile/avatar', form);
+      showToast('Profilbild hochgeladen');
+      // Update profile modal avatar
+      const img = document.getElementById('profile-avatar-img');
+      img.src = `/api/profile/avatar?t=${Date.now()}`;
+      img.classList.remove('hidden');
+      document.getElementById('profile-avatar-letter').classList.add('hidden');
+      document.getElementById('profile-avatar-remove').classList.remove('hidden');
+      // Update topbar avatar
+      updateTopbarAvatar(true);
+      closeModal('modal-crop');
+    } catch (err) { showToast(err.message, true); }
+  }, 'image/jpeg', 0.9);
+};
+
+// Clean up cropper when modal closes
+document.getElementById('modal-crop').addEventListener('click', (e) => {
+  if (e.target.matches('[data-modal="modal-crop"]') || e.target === document.getElementById('modal-crop')) {
+    if (activeCropper) { activeCropper.destroy(); activeCropper = null; }
+  }
+});
 
 // ── Modal helpers ─────────────────────────────────────────
 function openModal(id) {

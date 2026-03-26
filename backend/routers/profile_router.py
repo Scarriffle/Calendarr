@@ -19,7 +19,7 @@ router = APIRouter()
 
 AVATAR_DIR = DATA_DIR / "avatars"
 AVATAR_DIR.mkdir(parents=True, exist_ok=True)
-MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2 MB
+MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
@@ -78,12 +78,12 @@ async def upload_avatar(
 
     data = await file.read()
     if len(data) > MAX_AVATAR_SIZE:
-        raise HTTPException(400, "Datei zu groß (max. 2 MB)")
+        raise HTTPException(400, "Datei zu groß (max. 5 MB)")
 
     # Resize to 256x256
     img = Image.open(io.BytesIO(data))
     img = img.convert("RGB")
-    img.thumbnail((256, 256))
+    img.thumbnail((512, 512))
 
     filename = f"user_{current_user.id}.jpg"
     path = AVATAR_DIR / filename

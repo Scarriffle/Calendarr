@@ -27,6 +27,7 @@ class AccountCreate(BaseModel):
 class CalendarUpdate(BaseModel):
     enabled: Optional[bool] = None
     color: Optional[str] = None
+    name: Optional[str] = None
 
 
 class EventCreate(BaseModel):
@@ -221,6 +222,8 @@ def update_calendar(
         calendar.enabled = data.enabled
     if data.color is not None:
         calendar.color = data.color
+    if data.name is not None:
+        calendar.name = data.name
     db.commit()
     return {"ok": True}
 

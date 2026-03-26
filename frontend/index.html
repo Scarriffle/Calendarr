@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Calendarr</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
   <link rel="stylesheet" href="/static/css/app.css" />
 </head>
 <body>
@@ -481,9 +483,29 @@
   </div>
 </div>
 
+<!-- Avatar Crop Modal -->
+<div id="modal-crop" class="modal-overlay hidden" style="z-index:1000">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-header">
+      <h3>Bildausschnitt wählen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-crop">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div class="crop-container">
+        <img id="crop-image" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal="modal-crop">Abbrechen</button>
+      <button class="btn btn-primary" id="crop-save">Zuschneiden & Hochladen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script type="module" src="/static/js/app.js"></script>
 </body>
 </html>
