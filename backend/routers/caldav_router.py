@@ -336,6 +336,19 @@ def get_events(
         except Exception as exc:
             logger.error("Error fetching iCal subscription %s: %s", sub.id, exc)
 
+    # ── Google Calendar events ───────────────────────────
+    from routers.google_router import get_google_events
+    google_accounts = (
+        db.query(models.GoogleAccount)
+        .filter(models.GoogleAccount.user_id == current_user.id)
+        .all()
+    )
+    for g_acc in google_accounts:
+        try:
+            all_events.extend(get_google_events(g_acc, start_dt, end_dt, db))
+        except Exception as exc:
+            logger.error("Error fetching Google Calendar for %s: %s", g_acc.email, exc)
+
     return all_events
 
 

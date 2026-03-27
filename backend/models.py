@@ -27,6 +27,9 @@ class User(Base):
     ical_subscriptions = relationship(
         "ICalSubscription", back_populates="user", cascade="all, delete-orphan"
     )
+    google_accounts = relationship(
+        "GoogleAccount", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class CalDAVAccount(Base):
@@ -138,3 +141,16 @@ class ICalOverride(Base):
     color = Column(String(7), nullable=True)
 
     subscription = relationship("ICalSubscription", back_populates="overrides")
+
+
+class GoogleAccount(Base):
+    __tablename__ = "google_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    email = Column(String(255), nullable=False)
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=False)
+    token_expiry = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="google_accounts")
