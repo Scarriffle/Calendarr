@@ -4,6 +4,7 @@ import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
 import { openColorPicker } from './color-picker.js';
+import { t, setLang, applyLang } from './i18n.js';
 
 // Fetch avatar image as blob URL (with auth header)
 function fetchAvatarBlob() {
@@ -19,8 +20,7 @@ function fetchAvatarBlob() {
 // week start day global (loaded from settings)
 let weekStartDay = 'monday';
 
-const MONTHS = ['Januar','Februar','März','April','Mai','Juni',
-                'Juli','August','September','Oktober','November','Dezember'];
+// month names come from i18n: t('months')
 
 let state = {
   currentDate: new Date(),
@@ -55,6 +55,7 @@ export async function initCalendar() {
   state.dimPast = settings.dim_past_events;
   weekStartDay = settings.week_start_day || 'monday';
 
+  setLang(settings.language || 'de');
   applyTheme(settings);
   updateViewButtons();
   renderCalendarList();
@@ -78,7 +79,7 @@ async function fetchAndRender() {
     const events = await api.get(`/caldav/events?start=${start.toISOString()}&end=${end.toISOString()}`);
     state.events = events;
   } catch (e) {
-    showToast('Fehler beim Laden der Termine: ' + e.message, true);
+    showToast(t('error_load_events') + ': ' + e.message, true);
     state.events = [];
   }
   renderView();
@@ -161,20 +162,21 @@ function showLoading() {
 function updateTitle() {
   const d = state.currentDate;
   let title = '';
+  const M = t('months');
   if (state.currentView === 'month') {
-    title = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    title = `${M[d.getMonth()]} ${d.getFullYear()}`;
   } else if (state.currentView === 'week') {
     const mon = weekStart(d, weekStartDay);
     const sun = new Date(mon);
     sun.setDate(mon.getDate() + 6);
     const sameMonth = mon.getMonth() === sun.getMonth();
     title = sameMonth
-      ? `${mon.getDate()}. – ${sun.getDate()}. ${MONTHS[sun.getMonth()]} ${sun.getFullYear()}`
-      : `${mon.getDate()}. ${MONTHS[mon.getMonth()]} – ${sun.getDate()}. ${MONTHS[sun.getMonth()]} ${sun.getFullYear()}`;
+      ? `${mon.getDate()}. – ${sun.getDate()}. ${M[sun.getMonth()]} ${sun.getFullYear()}`
+      : `${mon.getDate()}. ${M[mon.getMonth()]} – ${sun.getDate()}. ${M[sun.getMonth()]} ${sun.getFullYear()}`;
   } else if (state.currentView === 'day') {
-    title = `${d.getDate()}. ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    title = `${d.getDate()}. ${M[d.getMonth()]} ${d.getFullYear()}`;
   } else {
-    title = `Ab ${d.getDate()}. ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    title = `${d.getDate()}. ${M[d.getMonth()]} ${d.getFullYear()}`;
   }
   document.getElementById('view-title').textContent = title;
   document.title = `Calendarr - ${title}`;
@@ -191,7 +193,7 @@ function renderMiniCal() {
   const d = state.currentDate;
   const miniD = new Date(d.getFullYear(), d.getMonth(), 1);
   document.getElementById('mini-title').textContent =
-    `${MONTHS[miniD.getMonth()]} ${miniD.getFullYear()}`;
+    `${t('months')[miniD.getMonth()]} ${miniD.getFullYear()}`;
 
   const firstDay = new Date(miniD.getFullYear(), miniD.getMonth(), 1);
   const gridStart = new Date(firstDay);
@@ -270,9 +272,9 @@ function renderCalendarList() {
         visibleCals.map(cal =>
           `<div class="cal-item" data-cal-id="${cal.id}" data-source="caldav">
             <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="caldav" />
-            <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="caldav" title="Farbe ändern"></div>
+            <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="caldav" title="${t('change_color')}"></div>
             <span class="cal-item-name" data-source="caldav">${escHtml(cal.name)}</span>
-            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="caldav" title="Kalender ausblenden">
+            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="caldav" title="${t('hide_cal')}">
               <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
             </button>
           </div>`
@@ -282,13 +284,13 @@ function renderCalendarList() {
 
   // ── Local calendars ────────────────────────────────────
   if (state.localCalendars.length) {
-    html += `<div class="cal-account-name">Lokale Kalender</div>`;
+    html += `<div class="cal-account-name">${t('cal_local')}</div>`;
     html += state.localCalendars.map(cal =>
       `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
         <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="local" />
-        <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="local" title="Farbe ändern"></div>
+        <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="local" title="${t('change_color')}"></div>
         <span class="cal-item-name" data-source="local">${escHtml(cal.name)}</span>
-        <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="local" title="Kalender entfernen">
+        <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="local" title="${t('remove_cal')}">
           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
         </button>
       </div>`
@@ -297,13 +299,13 @@ function renderCalendarList() {
 
   // ── iCal subscriptions ─────────────────────────────────
   if (state.icalSubscriptions.length) {
-    html += `<div class="cal-account-name">Abonnements</div>`;
+    html += `<div class="cal-account-name">${t('cal_ical')}</div>`;
     html += state.icalSubscriptions.map(sub =>
       `<div class="cal-item" data-sub-id="${sub.id}" data-source="ical">
         <input type="checkbox" ${sub.enabled ? 'checked' : ''} data-sub-id="${sub.id}" data-source="ical" />
-        <div class="cal-item-dot" style="background:${sub.color}" data-sub-id="${sub.id}" data-source="ical" title="Farbe ändern"></div>
+        <div class="cal-item-dot" style="background:${sub.color}" data-sub-id="${sub.id}" data-source="ical" title="${t('change_color')}"></div>
         <span class="cal-item-name" data-source="ical">${escHtml(sub.name)}</span>
-        <button class="icon-btn mini-btn cal-item-remove" data-sub-id="${sub.id}" data-source="ical" title="Abo entfernen">
+        <button class="icon-btn mini-btn cal-item-remove" data-sub-id="${sub.id}" data-source="ical" title="${t('remove_ical_sub')}">
           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
         </button>
       </div>`
@@ -319,9 +321,9 @@ function renderCalendarList() {
         visibleCals.map(cal =>
           `<div class="cal-item" data-cal-id="${cal.id}" data-source="google">
             <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="google" />
-            <div class="cal-item-dot" style="background:${cal.color || '#4285f4'}" data-cal-id="${cal.id}" data-source="google" title="Farbe ändern"></div>
+            <div class="cal-item-dot" style="background:${cal.color || '#4285f4'}" data-cal-id="${cal.id}" data-source="google" title="${t('change_color')}"></div>
             <span class="cal-item-name" data-source="google">${escHtml(cal.name)}</span>
-            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="google" title="Kalender ausblenden">
+            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="google" title="${t('hide_cal')}">
               <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
             </button>
           </div>`
@@ -330,7 +332,7 @@ function renderCalendarList() {
   }
 
   if (!html) {
-    container.innerHTML = `<div style="padding:8px 16px;font-size:12px;color:var(--text-3)">Keine Kalender</div>`;
+    container.innerHTML = `<div style="padding:8px 16px;font-size:12px;color:var(--text-3)">${t('error_no_calendars')}</div>`;
     return;
   }
 
@@ -476,12 +478,12 @@ function renderCalendarList() {
           }
         }
       } else if (source === 'local') {
-        if (!confirm('Lokalen Kalender wirklich löschen?')) return;
+        if (!confirm(t('confirm_delete_local_cal'))) return;
         const calId = parseInt(btn.dataset.calId);
         await api.delete(`/local/calendars/${calId}`);
         state.localCalendars = state.localCalendars.filter(c => c.id !== calId);
       } else if (source === 'ical') {
-        if (!confirm('Abonnement wirklich entfernen?')) return;
+        if (!confirm(t('confirm_remove_ical'))) return;
         const subId = parseInt(btn.dataset.subId);
         await api.delete(`/ical/subscriptions/${subId}`);
         state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== subId);
@@ -576,13 +578,13 @@ function bindSidebar() {
     try {
       const { configured } = await api.get('/google/configured');
       if (!configured) {
-        showToast('Google OAuth ist nicht konfiguriert (Admin muss GOOGLE_CLIENT_ID/SECRET setzen)', true);
+        showToast(t('google_not_configured'), true);
         return;
       }
       const { url } = await api.get('/google/auth-url');
       window.location.href = url;
     } catch (e) {
-      showToast('Fehler: ' + e.message, true);
+      showToast(t('error_prefix') + e.message, true);
     }
   };
 }
@@ -627,7 +629,7 @@ function showEventPopup(ev, anchor) {
     openEditEventModal(ev);
   };
   document.getElementById('popup-delete').onclick = async () => {
-    if (!confirm(`"${ev.title}" wirklich löschen?`)) return;
+    if (!confirm(t("confirm_delete_event", {title: ev.title}))) return;
     popup.classList.add('hidden');
     try {
       if (ev.source === 'google') {
@@ -641,7 +643,7 @@ function showEventPopup(ev, anchor) {
       } else {
         await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
       }
-      showToast('Termin gelöscht');
+      showToast(t('event_deleted'));
       fetchAndRender();
     } catch (e) { showToast(e.message, true); }
   };
@@ -782,7 +784,7 @@ function bindEventModal() {
 
   document.getElementById('ev-save').onclick = async () => {
     const title = document.getElementById('ev-title').value.trim();
-    if (!title) { showToast('Bitte Titel eingeben', true); return; }
+    if (!title) { showToast(t('error_enter_title'), true); return; }
 
     const allDay  = document.getElementById('ev-allday').checked;
     const calVal  = document.getElementById('ev-calendar').value;
@@ -796,12 +798,12 @@ function bindEventModal() {
     if (allDay) {
       start = document.getElementById('ev-start-date').value;
       end   = document.getElementById('ev-end-date').value;
-      if (!start) { showToast('Bitte Datum eingeben', true); return; }
+      if (!start) { showToast(t('error_enter_date'), true); return; }
       if (!end || end < start) end = start;
     } else {
       const sv = document.getElementById('ev-start').value;
       const ev2 = document.getElementById('ev-end').value;
-      if (!sv) { showToast('Bitte Start-Zeit eingeben', true); return; }
+      if (!sv) { showToast(t('error_enter_start'), true); return; }
       start = new Date(sv).toISOString();
       end   = ev2 ? new Date(ev2).toISOString() : new Date(new Date(sv).getTime() + 3600000).toISOString();
     }
@@ -829,28 +831,28 @@ function bindEventModal() {
             { title, start, end, allDay, location: loc, description: desc, color: color || null }
           );
         }
-        showToast('Termin aktualisiert');
+        showToast(t('event_updated'));
       } else if (isGoogle) {
         const calDbId = parseInt(calVal.replace('google-', ''));
         await api.post('/google/events', {
           calendar_db_id: calDbId, title, start, end, allDay,
           location: loc, description: desc,
         });
-        showToast('Termin erstellt');
+        showToast(t('event_created'));
       } else if (isLocal) {
         const calId = parseInt(calVal.replace('local-', ''));
         await api.post('/local/events', {
           calendar_id: calId, title, start, end, allDay,
           location: loc, description: desc, color: color || null,
         });
-        showToast('Termin erstellt');
+        showToast(t('event_created'));
       } else {
         const calId = parseInt(calVal);
         await api.post('/caldav/events', {
           calendar_id: calId, title, start, end, allDay,
           location: loc, description: desc, color: color || null,
         });
-        showToast('Termin erstellt');
+        showToast(t('event_created'));
       }
       closeModal('modal-event');
       fetchAndRender();
@@ -862,7 +864,7 @@ function bindEventModal() {
   document.getElementById('ev-delete').onclick = async () => {
     const ev = state.editingEvent;
     if (!ev) return;
-    if (!confirm(`"${ev.title}" wirklich löschen?`)) return;
+    if (!confirm(t("confirm_delete_event", {title: ev.title}))) return;
     try {
       if (ev.source === 'google') {
         const accId = ev.calendar_id.replace('google-', '');
@@ -875,7 +877,7 @@ function bindEventModal() {
       } else {
         await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
       }
-      showToast('Termin gelöscht');
+      showToast(t('event_deleted'));
       closeModal('modal-event');
       fetchAndRender();
     } catch (e) { showToast(e.message, true); }
@@ -929,7 +931,7 @@ function bindAccountModal() {
       state.accounts.push(acc);
       renderCalendarList();
       closeModal('modal-account');
-      showToast(`Konto "${name}" hinzugefügt`);
+      showToast(t("account_added", {name}));
       fetchAndRender();
     } catch (e) {
       errEl.textContent = e.message;
@@ -964,14 +966,14 @@ function bindLocalCalModal() {
 
   document.getElementById('local-cal-save').onclick = async () => {
     const name = document.getElementById('local-cal-name').value.trim();
-    if (!name) { showToast('Bitte Name eingeben', true); return; }
+    if (!name) { showToast(t('error_enter_name'), true); return; }
     const color = hex.value;
     try {
       const cal = await api.post('/local/calendars', { name, color });
       state.localCalendars.push(cal);
       renderCalendarList();
       closeModal('modal-local-cal');
-      showToast(`Kalender "${name}" erstellt`);
+      showToast(t("calendar_created", {name}));
     } catch (e) { showToast(e.message, true); }
   };
 }
@@ -1017,7 +1019,7 @@ function bindICalSubModal() {
       state.icalSubscriptions.push(sub);
       renderCalendarList();
       closeModal('modal-ical-sub');
-      showToast(`"${name}" abonniert`);
+      showToast(t("ical_subscribed", {name}));
       fetchAndRender();
     } catch (e) {
       errEl.textContent = e.message;
@@ -1044,6 +1046,7 @@ function openSettingsModal() {
     document.getElementById(id + '-preview').style.background = val;
   });
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
+  document.getElementById('cfg-language').value = s.language || 'de';
 
   // Set active contrast/hour-height buttons
   [
@@ -1084,15 +1087,15 @@ function renderGoogleAccounts() {
   const list = document.getElementById('google-accounts-list');
   if (!list) return;
   if (!state.googleAccounts.length) {
-    list.innerHTML = '<span style="font-size:13px;color:var(--text-3)">Keine Google-Konten verbunden</span>';
+    list.innerHTML = `<span style="font-size:13px;color:var(--text-3)">${t('settings_no_google')}</span>`;
     return;
   }
   list.innerHTML = state.googleAccounts.map(acc =>
     `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
       <span style="font-size:13px">${escHtml(acc.email)}</span>
       <div style="display:flex;gap:6px">
-        <button class="btn btn-secondary btn-sm" data-sync-acc="${acc.id}">Sync</button>
-        <button class="btn btn-ghost btn-sm" data-disconnect-acc="${acc.id}">Trennen</button>
+        <button class="btn btn-secondary btn-sm" data-sync-acc="${acc.id}">${t('sync')}</button>
+        <button class="btn btn-ghost btn-sm" data-disconnect-acc="${acc.id}">${t('disconnect')}</button>
       </div>
     </div>`
   ).join('');
@@ -1107,20 +1110,20 @@ function renderGoogleAccounts() {
         renderGoogleAccounts();
         renderCalendarList();
         fetchAndRender();
-        showToast('Kalender synchronisiert');
+        showToast(t('google_synced'));
       } catch (e) { showToast(e.message, true); }
     });
   });
   list.querySelectorAll('[data-disconnect-acc]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Google-Konto wirklich trennen?')) return;
+      if (!confirm(t('confirm_google_disconnect'))) return;
       try {
         await api.delete(`/google/accounts/${btn.dataset.disconnectAcc}`);
         state.googleAccounts = state.googleAccounts.filter(a => a.id !== parseInt(btn.dataset.disconnectAcc));
         renderGoogleAccounts();
         renderCalendarList();
         fetchAndRender();
-        showToast('Google-Konto getrennt');
+        showToast(t('google_disconnected'));
       } catch (e) { showToast(e.message, true); }
     });
   });
@@ -1140,13 +1143,13 @@ function renderHiddenCalendars() {
     }
   }
   if (!hidden.length) {
-    list.innerHTML = '<span style="font-size:13px;color:var(--text-3)">Keine ausgeblendeten Kalender</span>';
+    list.innerHTML = `<span style="font-size:13px;color:var(--text-3)">${t('settings_no_hidden_cals')}</span>`;
     return;
   }
   list.innerHTML = hidden.map(c =>
     `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
       <span style="font-size:13px">${escHtml(c.acc)} / ${escHtml(c.name)}</span>
-      <button class="btn btn-secondary btn-sm" data-restore-cal="${c.id}" data-restore-source="${c.source}">Einblenden</button>
+      <button class="btn btn-secondary btn-sm" data-restore-cal="${c.id}" data-restore-source="${c.source}">${t('show_cal')}</button>
     </div>`
   ).join('');
   list.querySelectorAll('[data-restore-cal]').forEach(btn => {
@@ -1196,7 +1199,7 @@ async function loadUsers() {
 
     list.querySelectorAll('[data-del-user]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Benutzer löschen?')) return;
+        if (!confirm(t('confirm_delete_user'))) return;
         try {
           await api.delete(`/users/${btn.dataset.delUser}`);
           loadUsers();
@@ -1244,10 +1247,10 @@ function bindSettingsModal() {
     const username = document.getElementById('new-username').value.trim();
     const password = document.getElementById('new-password').value;
     const is_admin = document.getElementById('new-is-admin').checked;
-    if (!username || !password) { showToast('Benutzername und Passwort erforderlich', true); return; }
+    if (!username || !password) { showToast(t('error_username_password'), true); return; }
     try {
       await api.post('/users/', { username, password, is_admin });
-      showToast(`Benutzer "${username}" erstellt`);
+      showToast(t("user_created", {name: username}));
       document.getElementById('add-user-form').classList.add('hidden');
       document.getElementById('new-username').value = '';
       document.getElementById('new-password').value = '';
@@ -1270,14 +1273,16 @@ function bindSettingsModal() {
       text_contrast:   getActive('cfg-text-contrast') || 3,
       line_contrast:   getActive('cfg-line-contrast') || 3,
       hour_height:     getActive('cfg-hour-height')   || 60,
+      language:        document.getElementById('cfg-language').value,
     };
     try {
       await api.put('/settings/', settings);
       state.settings = { ...state.settings, ...settings };
       state.dimPast  = settings.dim_past_events;
       weekStartDay   = settings.week_start_day;
+      setLang(settings.language);
       applyTheme(state.settings);
-      showToast('Einstellungen gespeichert');
+      showToast(t('settings_saved'));
       closeModal('modal-settings');
       renderMiniCal();
       fetchAndRender();
@@ -1341,7 +1346,7 @@ export function openProfileModal() {
 function renderProfileCalendars() {
   const container = document.getElementById('profile-calendars');
   if (!state.accounts.length) {
-    container.innerHTML = '<p class="text-muted">Keine CalDAV-Konten verbunden.</p>';
+    container.innerHTML = `<p class="text-muted">${t('no_caldav')}</p>`;
     return;
   }
   const html = state.accounts.map(acc =>
@@ -1364,7 +1369,7 @@ function bindProfileModal() {
     const email = document.getElementById('profile-email').value.trim();
     try {
       await api.put('/profile/', { email: email || null });
-      showToast('Profil gespeichert');
+      showToast(t('profile_saved'));
     } catch (e) { showToast(e.message, true); }
   };
 
@@ -1383,7 +1388,7 @@ function bindProfileModal() {
   document.getElementById('profile-avatar-remove').onclick = async () => {
     try {
       await api.delete('/profile/avatar');
-      showToast('Profilbild entfernt');
+      showToast(t('avatar_removed'));
       document.getElementById('profile-avatar-img').classList.add('hidden');
       document.getElementById('profile-avatar-letter').classList.remove('hidden');
       document.getElementById('profile-avatar-remove').classList.add('hidden');
@@ -1396,12 +1401,12 @@ function bindProfileModal() {
     const current = document.getElementById('profile-pw-current').value;
     const newPw = document.getElementById('profile-pw-new').value;
     const confirm = document.getElementById('profile-pw-confirm').value;
-    if (!current || !newPw) { showToast('Bitte alle Felder ausfüllen', true); return; }
-    if (newPw !== confirm) { showToast('Passwörter stimmen nicht überein', true); return; }
-    if (newPw.length < 6) { showToast('Mindestens 6 Zeichen', true); return; }
+    if (!current || !newPw) { showToast(t('error_fill_all'), true); return; }
+    if (newPw !== confirm) { showToast(t('error_pw_mismatch'), true); return; }
+    if (newPw.length < 6) { showToast(t('error_pw_length'), true); return; }
     try {
       await api.post('/profile/password', { current_password: current, new_password: newPw });
-      showToast('Passwort geändert');
+      showToast(t('password_changed'));
       document.getElementById('profile-pw-current').value = '';
       document.getElementById('profile-pw-new').value = '';
       document.getElementById('profile-pw-confirm').value = '';
@@ -1421,15 +1426,15 @@ function bindProfileModal() {
 
   document.getElementById('2fa-copy-secret').onclick = () => {
     const secret = document.getElementById('2fa-secret-code').textContent;
-    navigator.clipboard.writeText(secret).then(() => showToast('Schlüssel kopiert'));
+    navigator.clipboard.writeText(secret).then(() => showToast(t('key_copied')));
   };
 
   document.getElementById('2fa-enable-btn').onclick = async () => {
     const code = document.getElementById('2fa-verify-code').value.trim();
-    if (!code || code.length !== 6) { showToast('Bitte 6-stelligen Code eingeben', true); return; }
+    if (!code || code.length !== 6) { showToast(t('error_enter_6digit'), true); return; }
     try {
       await api.post('/profile/2fa/enable', { code });
-      showToast('2FA aktiviert');
+      showToast(t('totp_enabled'));
       document.getElementById('2fa-setup-section').classList.add('hidden');
       document.getElementById('2fa-enabled-section').classList.remove('hidden');
     } catch (e) { showToast(e.message, true); }
@@ -1442,10 +1447,10 @@ function bindProfileModal() {
 
   document.getElementById('2fa-disable-btn').onclick = async () => {
     const pw = document.getElementById('2fa-disable-pw').value;
-    if (!pw) { showToast('Bitte Passwort eingeben', true); return; }
+    if (!pw) { showToast(t('error_enter_password'), true); return; }
     try {
       await api.post('/profile/2fa/disable', { password: pw });
-      showToast('2FA deaktiviert');
+      showToast(t('totp_disabled'));
       document.getElementById('2fa-enabled-section').classList.add('hidden');
       document.getElementById('2fa-disabled-section').classList.remove('hidden');
       document.getElementById('2fa-disable-pw').value = '';
@@ -1557,7 +1562,7 @@ document.getElementById('crop-save').onclick = async () => {
     form.append('file', blob, 'avatar.jpg');
     try {
       await api.upload('/profile/avatar', form);
-      showToast('Profilbild hochgeladen');
+      showToast(t('avatar_uploaded'));
       // Update profile modal avatar
       const img = document.getElementById('profile-avatar-img');
       fetchAvatarBlob().then(blobUrl => {

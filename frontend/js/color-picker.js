@@ -3,6 +3,8 @@
    Returns hex string or null if cancelled.
 ────────────────────────────────────────────────────────── */
 
+import { t } from './i18n.js';
+
 // ── HSV ↔ RGB helpers ─────────────────────────────────────
 function hsvToRgb(h, s, v) {
   h = h / 360 * 6;
@@ -80,7 +82,7 @@ export function openColorPicker(anchorEl, currentColor = '#4285f4') {
         <div class="gcp-preview"></div>
         <input class="gcp-hex" type="text" maxlength="7" spellcheck="false" />
       </div>
-      <button class="gcp-select">Auswählen</button>
+      <button class="gcp-select">${t('color_select')}</button>
     `;
 
     const svCanvas = picker.querySelector('.gcp-sv');

@@ -400,98 +400,106 @@
         <!-- Einstellungen (merged: Darstellung + Ansicht & Raster + Ausgeblendete Kalender) -->
         <div class="settings-panel active" id="settings-panel-general">
 
-          <h4 class="panel-title">Farben</h4>
+          <h4 class="panel-title" data-i18n="settings_colors">Farben</h4>
           <div class="form-group">
-            <label>Primärfarbe</label>
+            <label data-i18n="settings_primary_color">Primärfarbe</label>
             <div class="ev-color-row">
               <input type="text" id="cfg-primary-hex" class="ev-color-hex" maxlength="7" spellcheck="false" />
-              <div class="ev-color-preview" id="cfg-primary-preview" title="Farbe wählen"></div>
+              <div class="ev-color-preview" id="cfg-primary-preview" data-i18n-title="color_pick" title="Farbe wählen"></div>
             </div>
           </div>
           <div class="form-group">
-            <label>Akzentfarbe</label>
+            <label data-i18n="settings_accent_color">Akzentfarbe</label>
             <div class="ev-color-row">
               <input type="text" id="cfg-accent-hex" class="ev-color-hex" maxlength="7" spellcheck="false" />
-              <div class="ev-color-preview" id="cfg-accent-preview" title="Farbe wählen"></div>
+              <div class="ev-color-preview" id="cfg-accent-preview" data-i18n-title="color_pick" title="Farbe wählen"></div>
             </div>
           </div>
           <div class="form-group">
-            <label>Heutige-Tag-Farbe</label>
+            <label data-i18n="settings_today_color">Heutige-Tag-Farbe</label>
             <div class="ev-color-row">
               <input type="text" id="cfg-today-hex" class="ev-color-hex" maxlength="7" spellcheck="false" />
-              <div class="ev-color-preview" id="cfg-today-preview" title="Farbe wählen"></div>
+              <div class="ev-color-preview" id="cfg-today-preview" data-i18n-title="color_pick" title="Farbe wählen"></div>
             </div>
           </div>
 
-          <h4 class="panel-title" style="margin-top:24px">Schriftkontrast</h4>
-          <p class="panel-desc">Helligkeit der Beschriftungen und Texte</p>
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_text_contrast">Schriftkontrast</h4>
+          <p class="panel-desc" data-i18n="settings_text_contrast_desc">Helligkeit der Beschriftungen und Texte</p>
           <div class="contrast-selector" id="cfg-text-contrast" data-setting="text_contrast">
-            <button class="contrast-btn" data-val="1"><span style="color:#606070">Aa</span><span class="contrast-lbl">Dunkel</span></button>
-            <button class="contrast-btn" data-val="2"><span style="color:#9090a8">Aa</span><span class="contrast-lbl">Mittel</span></button>
-            <button class="contrast-btn" data-val="3"><span style="color:#c8c8d8">Aa</span><span class="contrast-lbl">Hell</span></button>
-            <button class="contrast-btn" data-val="4"><span style="color:#ffffff">Aa</span><span class="contrast-lbl">Maximum</span></button>
+            <button class="contrast-btn" data-val="1"><span style="color:#606070">Aa</span><span class="contrast-lbl" data-i18n="contrast_dark">Dunkel</span></button>
+            <button class="contrast-btn" data-val="2"><span style="color:#9090a8">Aa</span><span class="contrast-lbl" data-i18n="contrast_medium">Mittel</span></button>
+            <button class="contrast-btn" data-val="3"><span style="color:#c8c8d8">Aa</span><span class="contrast-lbl" data-i18n="contrast_light">Hell</span></button>
+            <button class="contrast-btn" data-val="4"><span style="color:#ffffff">Aa</span><span class="contrast-lbl" data-i18n="contrast_max">Maximum</span></button>
           </div>
 
-          <h4 class="panel-title" style="margin-top:24px">Linienkontrast</h4>
-          <p class="panel-desc">Sichtbarkeit von Trennlinien und Rahmen</p>
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_line_contrast">Linienkontrast</h4>
+          <p class="panel-desc" data-i18n="settings_line_contrast_desc">Sichtbarkeit von Trennlinien und Rahmen</p>
           <div class="contrast-selector" id="cfg-line-contrast" data-setting="line_contrast">
-            <button class="contrast-btn" data-val="1"><span class="line-preview" style="border-color:#1e1e2c"></span><span class="contrast-lbl">Kaum</span></button>
-            <button class="contrast-btn" data-val="2"><span class="line-preview" style="border-color:#2a2a3c"></span><span class="contrast-lbl">Subtil</span></button>
-            <button class="contrast-btn" data-val="3"><span class="line-preview" style="border-color:#3a3a52"></span><span class="contrast-lbl">Normal</span></button>
-            <button class="contrast-btn" data-val="4"><span class="line-preview" style="border-color:#5a5a78"></span><span class="contrast-lbl">Stark</span></button>
+            <button class="contrast-btn" data-val="1"><span class="line-preview" style="border-color:#1e1e2c"></span><span class="contrast-lbl" data-i18n="line_barely">Kaum</span></button>
+            <button class="contrast-btn" data-val="2"><span class="line-preview" style="border-color:#2a2a3c"></span><span class="contrast-lbl" data-i18n="line_subtle">Subtil</span></button>
+            <button class="contrast-btn" data-val="3"><span class="line-preview" style="border-color:#3a3a52"></span><span class="contrast-lbl" data-i18n="line_normal">Normal</span></button>
+            <button class="contrast-btn" data-val="4"><span class="line-preview" style="border-color:#5a5a78"></span><span class="contrast-lbl" data-i18n="line_strong">Stark</span></button>
           </div>
 
-          <h4 class="panel-title" style="margin-top:24px">Kalenderansicht</h4>
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_calendar_view">Kalenderansicht</h4>
           <div class="form-group">
-            <label>Standardansicht</label>
+            <label data-i18n="settings_default_view">Standardansicht</label>
             <select id="cfg-default-view">
-              <option value="month">Monat</option>
-              <option value="week">Woche</option>
-              <option value="day">Tag</option>
-              <option value="agenda">Termine</option>
+              <option value="month" data-i18n="view_month">Monat</option>
+              <option value="week" data-i18n="view_week">Woche</option>
+              <option value="day" data-i18n="view_day">Tag</option>
+              <option value="agenda" data-i18n="view_agenda">Termine</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Erster Wochentag</label>
+            <label data-i18n="settings_week_start">Erster Wochentag</label>
             <select id="cfg-week-start">
-              <option value="monday">Montag</option>
-              <option value="sunday">Sonntag</option>
+              <option value="monday" data-i18n="week_start_monday">Montag</option>
+              <option value="sunday" data-i18n="week_start_sunday">Sonntag</option>
             </select>
           </div>
           <div class="form-group">
             <label class="toggle-label">
               <input type="checkbox" id="cfg-dim-past" />
-              Vergangene Termine ausgrauen
+              <span data-i18n="settings_dim_past">Vergangene Termine ausgrauen</span>
             </label>
           </div>
 
-          <h4 class="panel-title" style="margin-top:24px">Stundenhöhe (Wochen- &amp; Tagesansicht)</h4>
-          <p class="panel-desc">Wie viel Platz eine Stunde in der Zeitrasteransicht einnimmt</p>
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_hour_height">Stundenhöhe (Wochen- &amp; Tagesansicht)</h4>
+          <p class="panel-desc" data-i18n="settings_hour_height_desc">Wie viel Platz eine Stunde in der Zeitrasteransicht einnimmt</p>
           <div class="contrast-selector" id="cfg-hour-height" data-setting="hour_height">
-            <button class="contrast-btn" data-val="40"><span class="hour-preview">━━</span><span class="contrast-lbl">Kompakt</span></button>
-            <button class="contrast-btn" data-val="60"><span class="hour-preview">━━━</span><span class="contrast-lbl">Normal</span></button>
-            <button class="contrast-btn" data-val="80"><span class="hour-preview">━━━━</span><span class="contrast-lbl">Komfort</span></button>
-            <button class="contrast-btn" data-val="100"><span class="hour-preview">━━━━━</span><span class="contrast-lbl">Gross</span></button>
+            <button class="contrast-btn" data-val="40"><span class="hour-preview">━━</span><span class="contrast-lbl" data-i18n="hour_compact">Kompakt</span></button>
+            <button class="contrast-btn" data-val="60"><span class="hour-preview">━━━</span><span class="contrast-lbl" data-i18n="hour_normal">Normal</span></button>
+            <button class="contrast-btn" data-val="80"><span class="hour-preview">━━━━</span><span class="contrast-lbl" data-i18n="hour_comfort">Komfort</span></button>
+            <button class="contrast-btn" data-val="100"><span class="hour-preview">━━━━━</span><span class="contrast-lbl" data-i18n="hour_large">Gross</span></button>
           </div>
 
-          <h4 class="panel-title" style="margin-top:24px">Ausgeblendete Kalender</h4>
-          <div id="hidden-cals-list"><span style="font-size:13px;color:var(--text-3)">Keine ausgeblendeten Kalender</span></div>
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_language">Sprache</h4>
+          <div class="form-group">
+            <select id="cfg-language">
+              <option value="de">Deutsch</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_hidden_cals">Ausgeblendete Kalender</h4>
+          <div id="hidden-cals-list"><span style="font-size:13px;color:var(--text-3)" data-i18n="settings_no_hidden_cals">Keine ausgeblendeten Kalender</span></div>
         </div>
 
         <!-- Google Konten -->
         <div class="settings-panel" id="settings-panel-google">
-          <h4 class="panel-title">Google Konten</h4>
-          <div id="google-accounts-list"><span style="font-size:13px;color:var(--text-3)">Keine Google-Konten verbunden</span></div>
+          <h4 class="panel-title" data-i18n="settings_nav_google">Google Konten</h4>
+          <div id="google-accounts-list"><span style="font-size:13px;color:var(--text-3)" data-i18n="settings_no_google">Keine Google-Konten verbunden</span></div>
         </div>
 
         <!-- Benutzerverwaltung -->
         <div class="settings-panel" id="settings-panel-users">
-          <h4 class="panel-title">Benutzerverwaltung <span class="badge-admin">Admin</span></h4>
+          <h4 class="panel-title"><span data-i18n="settings_nav_users">Benutzerverwaltung</span> <span class="badge-admin">Admin</span></h4>
           <div id="users-list"></div>
-          <button class="btn btn-secondary" id="btn-add-user" style="margin-top:12px">Benutzer hinzufügen</button>
+          <button class="btn btn-secondary" id="btn-add-user" style="margin-top:12px" data-i18n="users_add">Benutzer hinzufügen</button>
           <div id="add-user-form" class="hidden" style="margin-top:12px">
             <div class="form-group">
-              <label>Benutzername</label>
+              <label data-i18n="username">Benutzername</label>
               <input type="text" id="new-username" />
             </div>
             <div class="form-group">

@@ -1,6 +1,5 @@
 import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber } from '../utils.js';
-
-const DOW_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+import { t } from '../i18n.js';
 
 export function renderWeek(container, currentDate, events, onSlotClick, onEventClick, isSingleDay = false, weekStartDay = 'monday', hourH = 60) {
   // Build the days array (7 days for week, 1 for day)
@@ -23,14 +22,14 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   // ── KW Badge ──────────────────────────────────────────
   const kwNum = getISOWeekNumber(days[0]);
   const kwBadge = !isSingleDay
-    ? `<div class="week-kw-badge">KW ${kwNum}</div>`
+    ? `<div class="week-kw-badge">${t('week_abbr')} ${kwNum}</div>`
     : '';
 
   // ── Header ────────────────────────────────────────────
   const headerCols = days.map(day => {
     const todayCls = isToday(day) ? 'today' : '';
     return `<div class="week-day-header ${todayCls}" data-date="${dayKey(day)}">
-      <div class="day-name">${DOW_SHORT[day.getDay()]}</div>
+      <div class="day-name">${t('dow_index')[day.getDay()]}</div>
       <div class="day-num">${day.getDate()}</div>
     </div>`;
   }).join('');
@@ -105,7 +104,7 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       ${headerCols}
     </div>
     <div class="week-allday-row">
-      <div class="allday-gutter">ganztägig</div>
+      <div class="allday-gutter">${t('allday')}</div>
       <div class="allday-cols">${alldayCols}</div>
     </div>
     <div class="week-body">

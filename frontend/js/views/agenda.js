@@ -1,11 +1,9 @@
 import { isPast } from '../utils.js';
-
-const DOW = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-const MON  = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+import { t, getLang } from '../i18n.js';
 
 export function renderAgenda(container, currentDate, events, onEventClick) {
   if (!events.length) {
-    container.innerHTML = `<div class="agenda-view"><div class="agenda-empty">Keine Termine im angezeigten Zeitraum</div></div>`;
+    container.innerHTML = `<div class="agenda-view"><div class="agenda-empty">${t('no_events')}</div></div>`;
     return;
   }
 
@@ -35,7 +33,7 @@ export function renderAgenda(container, currentDate, events, onEventClick) {
       .map(ev => {
         const color = ev.color || ev.calendarColor || '#4285f4';
         const pastCls = isPast(ev) ? 'past' : '';
-        let timeStr = 'Ganztägig';
+        let timeStr = t('allday_cap');
         if (!ev.allDay) {
           const s = new Date(ev.start);
           const e = new Date(ev.end);
@@ -57,8 +55,8 @@ export function renderAgenda(container, currentDate, events, onEventClick) {
       <div class="agenda-date ${todayCls}">
         <div class="agenda-date-num">${date.getDate()}</div>
         <div class="agenda-date-label">
-          <span class="wd">${DOW[date.getDay()]}</span>
-          <span class="mo">${MON[date.getMonth()]} ${date.getFullYear()}</span>
+          <span class="wd">${t('days_long')[date.getDay()]}</span>
+          <span class="mo">${t('months_short')[date.getMonth()]} ${date.getFullYear()}</span>
         </div>
       </div>
       ${evHtml}
@@ -83,7 +81,7 @@ function isTodayDate(d) {
 }
 
 function fmtTime(d) {
-  return d.toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(getLang(), { hour: '2-digit', minute: '2-digit' });
 }
 
 function escHtml(s) {

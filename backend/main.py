@@ -58,6 +58,11 @@ def _migrate():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN language VARCHAR(5) DEFAULT 'de'"))
+            conn.commit()
+        except Exception:
+            pass
 
 _migrate()
 

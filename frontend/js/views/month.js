@@ -1,12 +1,10 @@
 import { formatDate, isSameDay, isToday, isPast, dayOfWeek, getISOWeekNumber } from '../utils.js';
-
-const DOW_MONDAY = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const DOW_SUNDAY = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+import { t } from '../i18n.js';
 
 export function renderMonth(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  const DOW = weekStartDay === 'sunday' ? DOW_SUNDAY : DOW_MONDAY;
+  const DOW = weekStartDay === 'sunday' ? t('dow_sunday') : t('dow_monday');
 
   const firstDay = new Date(year, month, 1);
   const lastDay  = new Date(year, month + 1, 0);
@@ -82,7 +80,7 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       }).join('');
 
       const moreHtml = hiddenCount > 0
-        ? `<div class="month-more" data-date="${key}">+${hiddenCount} weitere</div>`
+        ? `<div class="month-more" data-date="${key}">${t('more_events', {n: hiddenCount})}</div>`
         : '';
 
       cellsHtml += `<div class="month-cell ${todayClass} ${otherClass}" data-date="${key}">

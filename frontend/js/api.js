@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 const BASE = '/api';
 
 async function request(method, path, body = null, formEncoded = false) {
@@ -27,7 +28,7 @@ async function request(method, path, body = null, formEncoded = false) {
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Unbekannter Fehler' }));
+    const err = await res.json().catch(() => ({ detail: t('unknown_error') }));
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
 
@@ -49,7 +50,7 @@ async function uploadRequest(path, formData) {
     return null;
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Unbekannter Fehler' }));
+    const err = await res.json().catch(() => ({ detail: t('unknown_error') }));
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
   if (res.status === 204) return null;

@@ -1,5 +1,6 @@
 import { api } from './api.js';
 import { initCalendar, showToast, openProfileModal } from './calendar.js';
+import { t } from './i18n.js';
 
 // ── Bootstrap ─────────────────────────────────────────────
 async function boot() {
@@ -109,12 +110,12 @@ function bindSetupForm() {
     errEl.classList.add('hidden');
 
     if (pw1 !== pw2) {
-      errEl.textContent = 'Passwörter stimmen nicht überein';
+      errEl.textContent = t('setup_pw_mismatch');
       errEl.classList.remove('hidden');
       return;
     }
     if (pw1.length < 6) {
-      errEl.textContent = 'Passwort muss mindestens 6 Zeichen haben';
+      errEl.textContent = t('setup_pw_short');
       errEl.classList.remove('hidden');
       return;
     }

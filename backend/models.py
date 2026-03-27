@@ -78,6 +78,7 @@ class UserSettings(Base):
     text_contrast = Column(Integer, default=3)
     line_contrast = Column(Integer, default=3)
     hour_height = Column(Integer, default=60)
+    language = Column(String(5), default="de")
 
     user = relationship("User", back_populates="settings")
 

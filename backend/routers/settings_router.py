@@ -21,6 +21,7 @@ class SettingsUpdate(BaseModel):
     text_contrast: Optional[int] = None
     line_contrast: Optional[int] = None
     hour_height: Optional[int] = None
+    language: Optional[str] = None
 
 
 def _settings_dict(s: models.UserSettings) -> dict:
@@ -34,6 +35,7 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "text_contrast": s.text_contrast or 3,
         "line_contrast": s.line_contrast or 3,
         "hour_height": s.hour_height or 60,
+        "language": s.language or "de",
     }
 
 

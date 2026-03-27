@@ -1,0 +1,395 @@
+const translations = {
+  de: {
+    // Common
+    save: 'Speichern', cancel: 'Abbrechen', close: 'Schliessen',
+    create: 'Erstellen', delete: 'Löschen', edit: 'Bearbeiten',
+    name: 'Name', username: 'Benutzername', password: 'Passwort',
+    email: 'E-Mail', color: 'Farbe', color_pick: 'Farbe wählen',
+    loading: 'Lade…', connecting: 'Verbinde…',
+    unknown_error: 'Unbekannter Fehler',
+
+    // Setup
+    setup_title: 'Ersteinrichtung',
+    setup_subtitle: 'Erstelle den Administrator-Account',
+    setup_email: 'E-Mail (optional)',
+    setup_pw_confirm: 'Passwort wiederholen',
+    setup_submit: 'Admin-Account erstellen',
+    setup_pw_mismatch: 'Passwörter stimmen nicht überein',
+    setup_pw_short: 'Passwort muss mindestens 6 Zeichen haben',
+
+    // Login
+    login_tagline: 'das minimalistische Kalender Frontend',
+    login_submit: 'Anmelden',
+    login_2fa_ph: '6-stelliger Code',
+
+    // Topbar
+    btn_today: 'Heute',
+    view_month: 'Monat', view_week: 'Woche', view_day: 'Tag', view_agenda: 'Termine',
+
+    // Sidebar
+    btn_create: 'Erstellen',
+    my_calendars: 'Meine Kalender',
+    add_calendar: 'Kalender hinzufügen',
+    cal_local: 'Lokaler Kalender', cal_caldav: 'CalDAV-Konto',
+    cal_ical: 'iCal-URL abonnieren', cal_google: 'Google Kalender',
+
+    // Event modal
+    event_create_title: 'Termin erstellen', event_edit_title: 'Termin bearbeiten',
+    event_title_ph: 'Titel hinzufügen', event_allday: 'Ganztägig',
+    event_start: 'Start', event_end: 'Ende', event_calendar: 'Kalender',
+    event_location: 'Ort', event_location_ph: 'Ort hinzufügen',
+    event_description: 'Beschreibung', event_description_ph: 'Beschreibung hinzufügen',
+
+    // CalDAV modal
+    caldav_add_title: 'CalDAV-Konto hinzufügen',
+    caldav_display_name: 'Anzeigename', caldav_display_name_ph: 'z.B. Mein Nextcloud',
+    caldav_url: 'CalDAV-URL', caldav_connect: 'Verbinden',
+
+    // Local calendar modal
+    localcal_create_title: 'Lokalen Kalender erstellen',
+    localcal_name_ph: 'z.B. Persönlich',
+
+    // iCal modal
+    ical_title: 'iCal-URL abonnieren', ical_name_ph: 'z.B. Feiertage',
+    ical_url_label: 'iCal-URL', ical_refresh: 'Aktualisierung',
+    ical_15min: 'Alle 15 Minuten', ical_30min: 'Alle 30 Minuten',
+    ical_hourly: 'Stündlich', ical_6h: 'Alle 6 Stunden', ical_daily: 'Täglich',
+    ical_subscribe: 'Abonnieren',
+
+    // Settings
+    settings_title: 'Einstellungen',
+    settings_nav_appearance: 'Darstellung',
+    settings_nav_google: 'Google Konten',
+    settings_nav_users: 'Benutzerverwaltung',
+    settings_colors: 'Farben',
+    settings_primary_color: 'Primärfarbe', settings_accent_color: 'Akzentfarbe',
+    settings_today_color: 'Heutige-Tag-Farbe',
+    settings_text_contrast: 'Schriftkontrast',
+    settings_text_contrast_desc: 'Helligkeit der Beschriftungen und Texte',
+    contrast_dark: 'Dunkel', contrast_medium: 'Mittel',
+    contrast_light: 'Hell', contrast_max: 'Maximum',
+    settings_line_contrast: 'Linienkontrast',
+    settings_line_contrast_desc: 'Sichtbarkeit von Trennlinien und Rahmen',
+    line_barely: 'Kaum', line_subtle: 'Subtil',
+    line_normal: 'Normal', line_strong: 'Stark',
+    settings_calendar_view: 'Kalenderansicht',
+    settings_default_view: 'Standardansicht',
+    settings_week_start: 'Erster Wochentag',
+    week_start_monday: 'Montag', week_start_sunday: 'Sonntag',
+    settings_dim_past: 'Vergangene Termine ausgrauen',
+    settings_hour_height: 'Stundenhöhe (Wochen- & Tagesansicht)',
+    settings_hour_height_desc: 'Wie viel Platz eine Stunde in der Zeitrasteransicht einnimmt',
+    hour_compact: 'Kompakt', hour_normal: 'Normal',
+    hour_comfort: 'Komfort', hour_large: 'Gross',
+    settings_language: 'Sprache',
+    settings_hidden_cals: 'Ausgeblendete Kalender',
+    settings_no_hidden_cals: 'Keine ausgeblendeten Kalender',
+    settings_no_google: 'Keine Google-Konten verbunden',
+
+    // User management
+    users_add: 'Benutzer hinzufügen', users_is_admin: 'Administrator',
+
+    // Profile
+    profile_title: 'Profil', profile_upload: 'Bild hochladen',
+    profile_remove_avatar: 'Entfernen', profile_account: 'Konto',
+    profile_email_ph: 'Keine E-Mail hinterlegt',
+    profile_change_pw: 'Passwort ändern',
+    profile_pw_current: 'Aktuelles Passwort', profile_pw_new: 'Neues Passwort',
+    profile_pw_confirm: 'Neues Passwort wiederholen',
+    profile_2fa: 'Zwei-Faktor-Authentifizierung',
+    profile_2fa_disabled_text: '2FA ist deaktiviert. Schütze dein Konto mit einem Authenticator.',
+    profile_2fa_setup: '2FA einrichten',
+    profile_2fa_scan: 'Scanne den QR-Code mit deiner Authenticator-App (z.B. Bitwarden, Google Authenticator).',
+    profile_2fa_manual: 'Oder gib diesen Schlüssel manuell ein',
+    profile_2fa_copy: 'Kopieren', profile_2fa_code_label: 'Bestätigungscode eingeben',
+    profile_2fa_ph: '6-stelliger Code', profile_2fa_activate: 'Aktivieren',
+    profile_2fa_enabled_text: '2FA ist aktiviert.',
+    profile_2fa_pw_disable: 'Passwort zum Deaktivieren',
+    profile_2fa_disable: '2FA deaktivieren',
+    profile_my_calendars: 'Meine Kalender',
+
+    // Avatar crop
+    crop_title: 'Bildausschnitt wählen', crop_submit: 'Zuschneiden & Hochladen',
+
+    // Impressum
+    impressum_title: 'Impressum',
+    impressum_desc: 'Software & Webentwicklung',
+    impressum_about: 'Diese Software wurde von Scarriffleservices mit grösster Sorgfalt entwickelt und bereitgestellt. Alle Rechte vorbehalten\u00a0© 2026 Scarriffleservices.',
+    impressum_data_title: 'Datenspeicherung',
+    impressum_data_text: 'Alle Anwendungsdaten werden ausschliesslich in der Schweiz gespeichert und verarbeitet. Bei Nutzung der Google Kalender-Anbindung werden Daten über die Google API abgerufen, welche von Google auf deren Infrastruktur ausserhalb der Schweiz verarbeitet werden. Für diese Daten gelten die Datenschutzbestimmungen von Google.',
+    impressum_disclaimer_title: 'Haftungsausschluss',
+    impressum_disclaimer_text: 'Trotz sorgfältiger Erstellung wird keine Haftung für die Richtigkeit, Vollständigkeit oder Aktualität der bereitgestellten Inhalte übernommen. Die Nutzung erfolgt auf eigene Verantwortung.',
+    impressum_contact: 'Kontakt',
+
+    // Toast / confirms
+    error_load_events: 'Fehler beim Laden der Termine',
+    error_no_calendars: 'Keine Kalender',
+    confirm_delete_local_cal: 'Lokalen Kalender wirklich löschen?',
+    confirm_remove_ical: 'Abonnement wirklich entfernen?',
+    google_not_configured: 'Google OAuth ist nicht konfiguriert (Admin muss GOOGLE_CLIENT_ID/SECRET setzen)',
+    error_enter_title: 'Bitte Titel eingeben',
+    error_enter_date: 'Bitte Datum eingeben',
+    error_enter_start: 'Bitte Start-Zeit eingeben',
+    event_updated: 'Termin aktualisiert', event_created: 'Termin erstellt',
+    confirm_delete_event: '"{title}" wirklich löschen?',
+    event_deleted: 'Termin gelöscht',
+    error_fill_all: 'Bitte alle Felder ausfüllen',
+    account_added: 'Konto "{name}" hinzugefügt',
+    error_enter_name: 'Bitte Name eingeben',
+    calendar_created: 'Kalender "{name}" erstellt',
+    error_name_url: 'Bitte Name und URL eingeben',
+    ical_subscribed: '"{name}" abonniert',
+    google_synced: 'Kalender synchronisiert',
+    confirm_google_disconnect: 'Google-Konto wirklich trennen?',
+    google_disconnected: 'Google-Konto getrennt',
+    error_username_password: 'Benutzername und Passwort erforderlich',
+    user_created: 'Benutzer "{name}" erstellt',
+    settings_saved: 'Einstellungen gespeichert',
+    no_caldav: 'Keine CalDAV-Konten verbunden.',
+    profile_saved: 'Profil gespeichert',
+    avatar_removed: 'Profilbild entfernt',
+    avatar_uploaded: 'Profilbild hochgeladen',
+    error_pw_mismatch: 'Passwörter stimmen nicht überein',
+    error_pw_length: 'Mindestens 6 Zeichen',
+    password_changed: 'Passwort geändert',
+    key_copied: 'Schlüssel kopiert',
+    error_enter_6digit: 'Bitte 6-stelligen Code eingeben',
+    totp_enabled: '2FA aktiviert', totp_disabled: '2FA deaktiviert',
+    error_enter_password: 'Bitte Passwort eingeben',
+    confirm_delete_user: 'Benutzer löschen?',
+    show_cal: 'Einblenden', hide_cal: 'Ausblenden',
+    remove_cal: 'Kalender entfernen', remove_ical_sub: 'Abo entfernen',
+    change_color: 'Farbe ändern',
+    sync: 'Sync', disconnect: 'Trennen',
+
+    // Calendar / date
+    months: ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
+    months_short: ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'],
+    days_long: ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'],
+    dow_monday: ['Mo','Di','Mi','Do','Fr','Sa','So'],
+    dow_sunday: ['So','Mo','Di','Mi','Do','Fr','Sa'],
+    dow_index: ['So','Mo','Di','Mi','Do','Fr','Sa'],
+    week_abbr: 'KW',
+    allday: 'ganztägig', allday_cap: 'Ganztägig',
+    no_events: 'Keine Termine im angezeigten Zeitraum',
+    more_events: '+{n} weitere',
+
+    // Color picker
+    color_select: 'Auswählen',
+
+    // Locale for time formatting
+    locale: 'de',
+  },
+
+  en: {
+    // Common
+    save: 'Save', cancel: 'Cancel', close: 'Close',
+    create: 'Create', delete: 'Delete', edit: 'Edit',
+    name: 'Name', username: 'Username', password: 'Password',
+    email: 'Email', color: 'Color', color_pick: 'Choose color',
+    loading: 'Loading…', connecting: 'Connecting…',
+    unknown_error: 'Unknown error',
+
+    // Setup
+    setup_title: 'Initial Setup',
+    setup_subtitle: 'Create the administrator account',
+    setup_email: 'Email (optional)',
+    setup_pw_confirm: 'Confirm password',
+    setup_submit: 'Create admin account',
+    setup_pw_mismatch: 'Passwords do not match',
+    setup_pw_short: 'Password must be at least 6 characters',
+
+    // Login
+    login_tagline: 'the minimalist calendar frontend',
+    login_submit: 'Sign in',
+    login_2fa_ph: '6-digit code',
+
+    // Topbar
+    btn_today: 'Today',
+    view_month: 'Month', view_week: 'Week', view_day: 'Day', view_agenda: 'Events',
+
+    // Sidebar
+    btn_create: 'Create',
+    my_calendars: 'My Calendars',
+    add_calendar: 'Add calendar',
+    cal_local: 'Local calendar', cal_caldav: 'CalDAV account',
+    cal_ical: 'Subscribe to iCal URL', cal_google: 'Google Calendar',
+
+    // Event modal
+    event_create_title: 'Create event', event_edit_title: 'Edit event',
+    event_title_ph: 'Add title', event_allday: 'All day',
+    event_start: 'Start', event_end: 'End', event_calendar: 'Calendar',
+    event_location: 'Location', event_location_ph: 'Add location',
+    event_description: 'Description', event_description_ph: 'Add description',
+
+    // CalDAV modal
+    caldav_add_title: 'Add CalDAV account',
+    caldav_display_name: 'Display name', caldav_display_name_ph: 'e.g. My Nextcloud',
+    caldav_url: 'CalDAV URL', caldav_connect: 'Connect',
+
+    // Local calendar modal
+    localcal_create_title: 'Create local calendar',
+    localcal_name_ph: 'e.g. Personal',
+
+    // iCal modal
+    ical_title: 'Subscribe to iCal URL', ical_name_ph: 'e.g. Holidays',
+    ical_url_label: 'iCal URL', ical_refresh: 'Refresh interval',
+    ical_15min: 'Every 15 minutes', ical_30min: 'Every 30 minutes',
+    ical_hourly: 'Every hour', ical_6h: 'Every 6 hours', ical_daily: 'Daily',
+    ical_subscribe: 'Subscribe',
+
+    // Settings
+    settings_title: 'Settings',
+    settings_nav_appearance: 'Appearance',
+    settings_nav_google: 'Google Accounts',
+    settings_nav_users: 'User Management',
+    settings_colors: 'Colors',
+    settings_primary_color: 'Primary color', settings_accent_color: 'Accent color',
+    settings_today_color: 'Today highlight color',
+    settings_text_contrast: 'Text contrast',
+    settings_text_contrast_desc: 'Brightness of labels and text',
+    contrast_dark: 'Dark', contrast_medium: 'Medium',
+    contrast_light: 'Light', contrast_max: 'Maximum',
+    settings_line_contrast: 'Line contrast',
+    settings_line_contrast_desc: 'Visibility of borders and dividers',
+    line_barely: 'Barely', line_subtle: 'Subtle',
+    line_normal: 'Normal', line_strong: 'Strong',
+    settings_calendar_view: 'Calendar view',
+    settings_default_view: 'Default view',
+    settings_week_start: 'First day of week',
+    week_start_monday: 'Monday', week_start_sunday: 'Sunday',
+    settings_dim_past: 'Dim past events',
+    settings_hour_height: 'Hour height (week & day view)',
+    settings_hour_height_desc: 'How much space one hour takes in the time grid',
+    hour_compact: 'Compact', hour_normal: 'Normal',
+    hour_comfort: 'Comfort', hour_large: 'Large',
+    settings_language: 'Language',
+    settings_hidden_cals: 'Hidden calendars',
+    settings_no_hidden_cals: 'No hidden calendars',
+    settings_no_google: 'No Google accounts connected',
+
+    // User management
+    users_add: 'Add user', users_is_admin: 'Administrator',
+
+    // Profile
+    profile_title: 'Profile', profile_upload: 'Upload image',
+    profile_remove_avatar: 'Remove', profile_account: 'Account',
+    profile_email_ph: 'No email set',
+    profile_change_pw: 'Change password',
+    profile_pw_current: 'Current password', profile_pw_new: 'New password',
+    profile_pw_confirm: 'Confirm new password',
+    profile_2fa: 'Two-Factor Authentication',
+    profile_2fa_disabled_text: '2FA is disabled. Protect your account with an authenticator.',
+    profile_2fa_setup: 'Set up 2FA',
+    profile_2fa_scan: 'Scan the QR code with your authenticator app (e.g. Bitwarden, Google Authenticator).',
+    profile_2fa_manual: 'Or enter this key manually',
+    profile_2fa_copy: 'Copy', profile_2fa_code_label: 'Enter verification code',
+    profile_2fa_ph: '6-digit code', profile_2fa_activate: 'Activate',
+    profile_2fa_enabled_text: '2FA is enabled.',
+    profile_2fa_pw_disable: 'Password to disable',
+    profile_2fa_disable: 'Disable 2FA',
+    profile_my_calendars: 'My Calendars',
+
+    // Avatar crop
+    crop_title: 'Crop image', crop_submit: 'Crop & Upload',
+
+    // Impressum
+    impressum_title: 'Legal Notice',
+    impressum_desc: 'Software & Web Development',
+    impressum_about: 'This software was developed and provided by Scarriffleservices with the utmost care. All rights reserved\u00a0© 2026 Scarriffleservices.',
+    impressum_data_title: 'Data Storage',
+    impressum_data_text: 'All application data is stored and processed exclusively in Switzerland. When using the Google Calendar integration, data is retrieved via the Google API, which Google processes on their infrastructure outside Switzerland. Google\'s privacy policy applies to this data.',
+    impressum_disclaimer_title: 'Disclaimer',
+    impressum_disclaimer_text: 'Despite careful preparation, no liability is assumed for the accuracy, completeness or timeliness of the content provided. Use is at your own risk.',
+    impressum_contact: 'Contact',
+
+    // Toast / confirms
+    error_load_events: 'Error loading events',
+    error_no_calendars: 'No calendars',
+    confirm_delete_local_cal: 'Really delete local calendar?',
+    confirm_remove_ical: 'Really remove subscription?',
+    google_not_configured: 'Google OAuth is not configured (admin must set GOOGLE_CLIENT_ID/SECRET)',
+    error_enter_title: 'Please enter a title',
+    error_enter_date: 'Please enter a date',
+    error_enter_start: 'Please enter a start time',
+    event_updated: 'Event updated', event_created: 'Event created',
+    confirm_delete_event: 'Really delete "{title}"?',
+    event_deleted: 'Event deleted',
+    error_fill_all: 'Please fill in all fields',
+    account_added: 'Account "{name}" added',
+    error_enter_name: 'Please enter a name',
+    calendar_created: 'Calendar "{name}" created',
+    error_name_url: 'Please enter a name and URL',
+    ical_subscribed: '"{name}" subscribed',
+    google_synced: 'Calendar synced',
+    confirm_google_disconnect: 'Really disconnect Google account?',
+    google_disconnected: 'Google account disconnected',
+    error_username_password: 'Username and password required',
+    user_created: 'User "{name}" created',
+    settings_saved: 'Settings saved',
+    no_caldav: 'No CalDAV accounts connected.',
+    profile_saved: 'Profile saved',
+    avatar_removed: 'Profile picture removed',
+    avatar_uploaded: 'Profile picture uploaded',
+    error_pw_mismatch: 'Passwords do not match',
+    error_pw_length: 'At least 6 characters required',
+    password_changed: 'Password changed',
+    key_copied: 'Key copied',
+    error_enter_6digit: 'Please enter a 6-digit code',
+    totp_enabled: '2FA enabled', totp_disabled: '2FA disabled',
+    error_enter_password: 'Please enter your password',
+    confirm_delete_user: 'Delete user?',
+    show_cal: 'Show', hide_cal: 'Hide',
+    remove_cal: 'Remove calendar', remove_ical_sub: 'Remove subscription',
+    change_color: 'Change color',
+    sync: 'Sync', disconnect: 'Disconnect',
+
+    // Calendar / date
+    months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+    months_short: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    days_long: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+    dow_monday: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    dow_sunday: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+    dow_index: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+    week_abbr: 'CW',
+    allday: 'all day', allday_cap: 'All day',
+    no_events: 'No events in the displayed period',
+    more_events: '+{n} more',
+
+    // Color picker
+    color_select: 'Select',
+
+    // Locale for time formatting
+    locale: 'en',
+  },
+};
+
+let currentLang = 'de';
+
+export function getLang() { return currentLang; }
+
+export function setLang(lang) {
+  currentLang = (lang && translations[lang]) ? lang : 'de';
+  document.documentElement.lang = currentLang;
+  applyLang();
+}
+
+export function t(key, vars = {}) {
+  const dict = translations[currentLang] ?? translations.de;
+  const val = dict[key] ?? translations.de[key] ?? key;
+  if (typeof val !== 'string') return val;
+  return val.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+}
+
+export function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const v = t(el.dataset.i18n);
+    if (typeof v === 'string') el.textContent = v;
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPh);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+}
