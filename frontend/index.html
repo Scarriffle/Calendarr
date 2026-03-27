@@ -67,6 +67,7 @@
       <button type="submit" class="btn btn-primary btn-full">Anmelden</button>
     </form>
   </div>
+  <button class="impressum-link" onclick="openImpressum()">© 2026 Scarriffleservices</button>
 </div>
 
 <!-- ─── MAIN APP ──────────────────────────────────────────── -->
@@ -166,6 +167,7 @@
           <div id="cal-list-items"></div>
         </div>
       </div>
+      <button class="sidebar-copyright" onclick="openImpressum()">© 2026 Scarriffleservices</button>
     </aside>
 
     <!-- MAIN VIEW -->
@@ -594,6 +596,39 @@
 
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
+
+<!-- Impressum Modal -->
+<div id="modal-impressum" class="modal-overlay hidden" onclick="if(event.target===this)closeImpressum()">
+  <div class="modal-card" style="max-width:460px">
+    <div class="modal-header">
+      <h3>Impressum</h3>
+      <button class="icon-btn" style="font-size:20px;line-height:1" onclick="closeImpressum()">&times;</button>
+    </div>
+    <div class="modal-body" style="line-height:1.7">
+      <p><strong>Scarriffleservices</strong><br>
+      Software &amp; Webentwicklung</p>
+      <p>Diese Software wurde von Scarriffleservices mit grösster Sorgfalt entwickelt und bereitgestellt. Alle Rechte vorbehalten &copy; 2026 Scarriffleservices.</p>
+      <p><strong>Datenspeicherung</strong><br>
+      Alle Daten werden ausschliesslich in der Schweiz gespeichert und verarbeitet.</p>
+      <p><strong>Haftungsausschluss</strong><br>
+      Trotz sorgfältiger Erstellung wird keine Haftung für die Richtigkeit, Vollständigkeit oder Aktualität der bereitgestellten Inhalte übernommen. Die Nutzung erfolgt auf eigene Verantwortung.</p>
+      <p><strong>Kontakt</strong><br>
+      <a href="mailto:scarriffleservices@gmail.com">scarriffleservices@gmail.com</a></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeImpressum()">Schliessen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openImpressum() {
+  document.getElementById('modal-impressum').classList.remove('hidden');
+}
+function closeImpressum() {
+  document.getElementById('modal-impressum').classList.add('hidden');
+}
+</script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script type="module" src="/static/js/app.js"></script>
