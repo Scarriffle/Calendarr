@@ -154,3 +154,19 @@ class GoogleAccount(Base):
     token_expiry = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="google_accounts")
+    calendars = relationship(
+        "GoogleCalendar", back_populates="account", cascade="all, delete-orphan"
+    )
+
+
+class GoogleCalendar(Base):
+    __tablename__ = "google_calendars"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("google_accounts.id"), nullable=False)
+    cal_id = Column(String(500), nullable=False)
+    name = Column(String(255), nullable=False)
+    color = Column(String(7), nullable=True)
+    enabled = Column(Boolean, default=True)
+
+    account = relationship("GoogleAccount", back_populates="calendars")

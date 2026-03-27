@@ -5,7 +5,7 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import requests as http_requests
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -98,7 +98,7 @@ def _build_event_body(data: dict) -> dict:
     return body
 
 
-def _parse_google_event(ev: dict, account_id: int, cal_name: str, cal_color: str) -> dict:
+def _parse_google_event(ev: dict, gcal_db_id: int, cal_name: str, cal_color: str) -> dict:
     """Convert Google Calendar event to our format."""
     start = ev.get("start", {})
     end = ev.get("end", {})
@@ -106,7 +106,7 @@ def _parse_google_event(ev: dict, account_id: int, cal_name: str, cal_color: str
 
     return {
         "id": ev["id"],
-        "url": f"google://{account_id}/{ev['id']}",
+        "url": f"google://{gcal_db_id}/{ev['id']}",
         "title": ev.get("summary", "(Kein Titel)"),
         "start": start.get("date") or start.get("dateTime", ""),
         "end": end.get("date") or end.get("dateTime", ""),
@@ -114,11 +114,55 @@ def _parse_google_event(ev: dict, account_id: int, cal_name: str, cal_color: str
         "location": ev.get("location", ""),
         "description": ev.get("description", ""),
         "color": None,
-        "calendar_id": f"google-{account_id}",
+        "calendar_id": f"google-{gcal_db_id}",
         "calendar_name": cal_name,
         "calendarColor": cal_color,
         "source": "google",
     }
+
+
+def _account_dict(a: models.GoogleAccount) -> dict:
+    return {
+        "id": a.id,
+        "email": a.email,
+        "calendars": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "color": c.color or "#4285f4",
+                "enabled": c.enabled,
+            }
+            for c in a.calendars
+        ],
+    }
+
+
+def _sync_google_calendars(account: models.GoogleAccount, db: Session):
+    """Fetch calendar list from Google and persist/update GoogleCalendar records."""
+    try:
+        token = _refresh_access_token(account, db)
+        cal_list = _google_api(token, "/users/me/calendarList")
+        existing = {c.cal_id: c for c in account.calendars}
+        for cal in cal_list.get("items", []):
+            if cal.get("deleted"):
+                continue
+            cal_id = cal["id"]
+            if cal_id not in existing:
+                db.add(models.GoogleCalendar(
+                    account_id=account.id,
+                    cal_id=cal_id,
+                    name=cal.get("summary", cal_id),
+                    color=cal.get("backgroundColor", "#4285f4"),
+                    enabled=True,
+                ))
+            else:
+                existing[cal_id].name = cal.get("summary", cal_id)
+                if not existing[cal_id].color:
+                    existing[cal_id].color = cal.get("backgroundColor", "#4285f4")
+        db.commit()
+        db.refresh(account)
+    except Exception as exc:
+        logger.error("Error syncing Google calendars for %s: %s", account.email, exc)
 
 
 # ── OAuth2 Flow ──────────────────────────────────────────
@@ -198,8 +242,10 @@ def oauth_callback(
         existing.token_expiry = datetime.fromtimestamp(
             datetime.now(timezone.utc).timestamp() + expires_in, tz=timezone.utc
         )
+        db.commit()
+        account = existing
     else:
-        db.add(models.GoogleAccount(
+        account = models.GoogleAccount(
             user_id=user_id,
             email=email,
             access_token=access_token,
@@ -207,10 +253,14 @@ def oauth_callback(
             token_expiry=datetime.fromtimestamp(
                 datetime.now(timezone.utc).timestamp() + expires_in, tz=timezone.utc
             ),
-        ))
-    db.commit()
+        )
+        db.add(account)
+        db.commit()
+        db.refresh(account)
 
-    # Redirect back to app
+    # Sync calendars after connecting/reconnecting
+    _sync_google_calendars(account, db)
+
     return RedirectResponse(url="/", status_code=302)
 
 
@@ -226,7 +276,11 @@ def list_accounts(
         .filter(models.GoogleAccount.user_id == current_user.id)
         .all()
     )
-    return [{"id": a.id, "email": a.email} for a in accounts]
+    # Auto-sync calendars for accounts that have none yet
+    for acc in accounts:
+        if not acc.calendars:
+            _sync_google_calendars(acc, db)
+    return [_account_dict(a) for a in accounts]
 
 
 @router.delete("/accounts/{account_id}")
@@ -247,10 +301,64 @@ def delete_account(
     return {"ok": True}
 
 
+@router.post("/accounts/{account_id}/sync")
+def sync_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    acc = (
+        db.query(models.GoogleAccount)
+        .filter(models.GoogleAccount.id == account_id, models.GoogleAccount.user_id == current_user.id)
+        .first()
+    )
+    if not acc:
+        raise HTTPException(404, "Account not found")
+    _sync_google_calendars(acc, db)
+    db.refresh(acc)
+    return _account_dict(acc)
+
+
+# ── Calendar Management ──────────────────────────────────
+
+class GoogleCalendarUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    color: Optional[str] = None
+    name: Optional[str] = None
+
+
+@router.put("/calendars/{calendar_id}")
+def update_calendar(
+    calendar_id: int,
+    data: GoogleCalendarUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    gcal = (
+        db.query(models.GoogleCalendar)
+        .join(models.GoogleAccount)
+        .filter(
+            models.GoogleCalendar.id == calendar_id,
+            models.GoogleAccount.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not gcal:
+        raise HTTPException(404, "Calendar not found")
+    if data.enabled is not None:
+        gcal.enabled = data.enabled
+    if data.color is not None:
+        gcal.color = data.color
+    if data.name is not None:
+        gcal.name = data.name
+    db.commit()
+    return {"ok": True}
+
+
 # ── Events ───────────────────────────────────────────────
 
 def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt: datetime, db: Session) -> list:
-    """Fetch events from all calendars in a Google account."""
+    """Fetch events from all enabled Google calendars for an account."""
     try:
         token = _refresh_access_token(account, db)
     except Exception:
@@ -258,15 +366,10 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
 
     all_events = []
     try:
-        cal_list = _google_api(token, "/users/me/calendarList")
-        for cal in cal_list.get("items", []):
-            if cal.get("deleted"):
+        for gcal in account.calendars:
+            if not gcal.enabled:
                 continue
-            cal_id = cal["id"]
-            cal_name = cal.get("summary", cal_id)
-            cal_color = cal.get("backgroundColor", "#4285f4")
-
-            events_resp = _google_api(token, f"/calendars/{cal_id}/events", params={
+            events_resp = _google_api(token, f"/calendars/{gcal.cal_id}/events", params={
                 "timeMin": start_dt.isoformat(),
                 "timeMax": end_dt.isoformat(),
                 "singleEvents": "true",
@@ -275,7 +378,7 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
             for ev in events_resp.get("items", []):
                 if ev.get("status") == "cancelled":
                     continue
-                all_events.append(_parse_google_event(ev, account.id, cal_name, cal_color))
+                all_events.append(_parse_google_event(ev, gcal.id, gcal.name, gcal.color or "#4285f4"))
     except Exception as exc:
         logger.error("Error fetching Google Calendar for %s: %s", account.email, exc)
 
@@ -283,7 +386,7 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
 
 
 class GoogleEventCreate(BaseModel):
-    account_id: int
+    calendar_db_id: int
     title: str
     start: str
     end: str
@@ -307,57 +410,69 @@ def create_event(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    acc = (
-        db.query(models.GoogleAccount)
-        .filter(models.GoogleAccount.id == data.account_id, models.GoogleAccount.user_id == current_user.id)
+    gcal = (
+        db.query(models.GoogleCalendar)
+        .join(models.GoogleAccount)
+        .filter(
+            models.GoogleCalendar.id == data.calendar_db_id,
+            models.GoogleAccount.user_id == current_user.id,
+        )
         .first()
     )
-    if not acc:
-        raise HTTPException(404, "Google account not found")
+    if not gcal:
+        raise HTTPException(404, "Google calendar not found")
 
-    token = _refresh_access_token(acc, db)
+    token = _refresh_access_token(gcal.account, db)
     body = _build_event_body(data.model_dump())
-    result = _google_api(token, "/calendars/primary/events", method="POST", json_body=body)
+    result = _google_api(token, f"/calendars/{gcal.cal_id}/events", method="POST", json_body=body)
     return {"id": result.get("id"), "ok": True}
 
 
-@router.put("/events/{account_id}/{event_id}")
+@router.put("/events/{gcal_db_id}/{event_id}")
 def update_event(
-    account_id: int,
+    gcal_db_id: int,
     event_id: str,
     data: GoogleEventUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    acc = (
-        db.query(models.GoogleAccount)
-        .filter(models.GoogleAccount.id == account_id, models.GoogleAccount.user_id == current_user.id)
+    gcal = (
+        db.query(models.GoogleCalendar)
+        .join(models.GoogleAccount)
+        .filter(
+            models.GoogleCalendar.id == gcal_db_id,
+            models.GoogleAccount.user_id == current_user.id,
+        )
         .first()
     )
-    if not acc:
-        raise HTTPException(404, "Google account not found")
+    if not gcal:
+        raise HTTPException(404, "Google calendar not found")
 
-    token = _refresh_access_token(acc, db)
+    token = _refresh_access_token(gcal.account, db)
     body = _build_event_body(data.model_dump(exclude_none=True))
-    _google_api(token, f"/calendars/primary/events/{event_id}", method="PATCH", json_body=body)
+    _google_api(token, f"/calendars/{gcal.cal_id}/events/{event_id}", method="PATCH", json_body=body)
     return {"ok": True}
 
 
-@router.delete("/events/{account_id}/{event_id}")
+@router.delete("/events/{gcal_db_id}/{event_id}")
 def delete_event(
-    account_id: int,
+    gcal_db_id: int,
     event_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    acc = (
-        db.query(models.GoogleAccount)
-        .filter(models.GoogleAccount.id == account_id, models.GoogleAccount.user_id == current_user.id)
+    gcal = (
+        db.query(models.GoogleCalendar)
+        .join(models.GoogleAccount)
+        .filter(
+            models.GoogleCalendar.id == gcal_db_id,
+            models.GoogleAccount.user_id == current_user.id,
+        )
         .first()
     )
-    if not acc:
-        raise HTTPException(404, "Google account not found")
+    if not gcal:
+        raise HTTPException(404, "Google calendar not found")
 
-    token = _refresh_access_token(acc, db)
-    _google_api(token, f"/calendars/primary/events/{event_id}", method="DELETE")
+    token = _refresh_access_token(gcal.account, db)
+    _google_api(token, f"/calendars/{gcal.cal_id}/events/{event_id}", method="DELETE")
     return {"ok": True}

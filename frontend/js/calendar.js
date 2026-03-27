@@ -310,16 +310,21 @@ function renderCalendarList() {
 
   // ── Google accounts ───────────────────────────────────
   if (state.googleAccounts.length) {
-    html += `<div class="cal-account-name">Google Kalender</div>`;
-    html += state.googleAccounts.map(acc =>
-      `<div class="cal-item" data-acc-id="${acc.id}" data-source="google">
-        <div class="cal-item-dot" style="background:#4285f4"></div>
-        <span class="cal-item-name" data-source="google">${escHtml(acc.email)}</span>
-        <button class="icon-btn mini-btn cal-item-remove" data-acc-id="${acc.id}" data-source="google" title="Google-Konto entfernen">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>
-      </div>`
-    ).join('');
+    html += state.googleAccounts.map(acc => {
+      const visibleCals = acc.calendars.filter(c => !c._hidden);
+      if (!visibleCals.length) return `<div class="cal-account-name">${escHtml(acc.email)}</div>`;
+      return `<div class="cal-account-name">${escHtml(acc.email)}</div>` +
+        visibleCals.map(cal =>
+          `<div class="cal-item" data-cal-id="${cal.id}" data-source="google">
+            <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="google" />
+            <div class="cal-item-dot" style="background:${cal.color || '#4285f4'}" data-cal-id="${cal.id}" data-source="google" title="Farbe ändern"></div>
+            <span class="cal-item-name" data-source="google">${escHtml(cal.name)}</span>
+            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="google" title="Kalender ausblenden">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+            </button>
+          </div>`
+        ).join('');
+    }).join('');
   }
 
   if (!html) {
@@ -351,6 +356,13 @@ function renderCalendarList() {
         await api.put(`/ical/subscriptions/${subId}`, { enabled: cb.checked });
         const sub = state.icalSubscriptions.find(s => s.id === subId);
         if (sub) sub.enabled = cb.checked;
+      } else if (source === 'google') {
+        const calId = parseInt(cb.dataset.calId);
+        await api.put(`/google/calendars/${calId}`, { enabled: cb.checked });
+        for (const acc of state.googleAccounts) {
+          const cal = acc.calendars.find(c => c.id === calId);
+          if (cal) cal.enabled = cb.checked;
+        }
       }
       fetchAndRender();
     });
@@ -380,6 +392,20 @@ function renderCalendarList() {
         if (picked) {
           await api.put(`/ical/subscriptions/${subId}`, { color: picked });
           if (sub) sub.color = picked;
+          renderCalendarList();
+          fetchAndRender();
+        }
+      } else if (source === 'google') {
+        const calId = parseInt(dot.dataset.calId);
+        let gcal = null;
+        for (const acc of state.googleAccounts) {
+          gcal = acc.calendars.find(c => c.id === calId);
+          if (gcal) break;
+        }
+        const picked = await openColorPicker(dot, gcal?.color || '#4285f4');
+        if (picked) {
+          await api.put(`/google/calendars/${calId}`, { color: picked });
+          if (gcal) gcal.color = picked;
           renderCalendarList();
           fetchAndRender();
         }
@@ -458,10 +484,13 @@ function renderCalendarList() {
         await api.delete(`/ical/subscriptions/${subId}`);
         state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== subId);
       } else if (source === 'google') {
-        if (!confirm('Google-Konto wirklich entfernen?')) return;
-        const accId = parseInt(btn.dataset.accId);
-        await api.delete(`/google/accounts/${accId}`);
-        state.googleAccounts = state.googleAccounts.filter(a => a.id !== accId);
+        const calId = parseInt(btn.dataset.calId);
+        await api.put(`/google/calendars/${calId}`, { enabled: false });
+        for (const acc of state.googleAccounts) {
+          for (const cal of acc.calendars) {
+            if (cal.id === calId) { cal.enabled = false; cal._hidden = true; }
+          }
+        }
       }
       renderCalendarList();
       fetchAndRender();
@@ -650,11 +679,13 @@ function populateCalendarSelect(selectedId) {
   // iCal subscriptions are read-only, not shown here
   // Google calendars (read/write)
   state.googleAccounts.forEach(acc => {
-    const opt = document.createElement('option');
-    opt.value = `google-${acc.id}`;
-    opt.textContent = `Google / ${acc.email}`;
-    if (`google-${acc.id}` === selectedId) opt.selected = true;
-    sel.appendChild(opt);
+    acc.calendars.filter(c => c.enabled).forEach(cal => {
+      const opt = document.createElement('option');
+      opt.value = `google-${cal.id}`;
+      opt.textContent = `${acc.email} / ${cal.name}`;
+      if (`google-${cal.id}` === selectedId) opt.selected = true;
+      sel.appendChild(opt);
+    });
   });
 }
 
@@ -798,9 +829,9 @@ function bindEventModal() {
         }
         showToast('Termin aktualisiert');
       } else if (isGoogle) {
-        const accId = parseInt(calVal.replace('google-', ''));
+        const calDbId = parseInt(calVal.replace('google-', ''));
         await api.post('/google/events', {
-          account_id: accId, title, start, end, allDay,
+          calendar_db_id: calDbId, title, start, end, allDay,
           location: loc, description: desc,
         });
         showToast('Termin erstellt');
@@ -1022,10 +1053,59 @@ function openSettingsModal() {
     usersSection.classList.add('hidden');
   }
 
+  // Render Google accounts
+  renderGoogleAccounts();
+
   // Render hidden calendars
   renderHiddenCalendars();
 
   openModal('modal-settings');
+}
+
+function renderGoogleAccounts() {
+  const list = document.getElementById('google-accounts-list');
+  if (!list) return;
+  if (!state.googleAccounts.length) {
+    list.innerHTML = '<span style="font-size:13px;color:var(--text-3)">Keine Google-Konten verbunden</span>';
+    return;
+  }
+  list.innerHTML = state.googleAccounts.map(acc =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+      <span style="font-size:13px">${escHtml(acc.email)}</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" data-sync-acc="${acc.id}">Sync</button>
+        <button class="btn btn-ghost btn-sm" data-disconnect-acc="${acc.id}">Trennen</button>
+      </div>
+    </div>`
+  ).join('');
+  list.querySelectorAll('[data-sync-acc]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const updated = await api.post(`/google/accounts/${btn.dataset.syncAcc}/sync`);
+        const idx = state.googleAccounts.findIndex(a => a.id === updated.id);
+        if (idx !== -1) state.googleAccounts[idx] = updated;
+        renderGoogleAccounts();
+        renderCalendarList();
+        fetchAndRender();
+        showToast('Kalender synchronisiert');
+      } catch (e) { showToast(e.message, true); }
+    });
+  });
+  list.querySelectorAll('[data-disconnect-acc]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Google-Konto wirklich trennen?')) return;
+      try {
+        await api.delete(`/google/accounts/${btn.dataset.disconnectAcc}`);
+        state.googleAccounts = state.googleAccounts.filter(a => a.id !== parseInt(btn.dataset.disconnectAcc));
+        renderGoogleAccounts();
+        renderCalendarList();
+        fetchAndRender();
+        showToast('Google-Konto getrennt');
+      } catch (e) { showToast(e.message, true); }
+    });
+  });
 }
 
 function renderHiddenCalendars() {
@@ -1033,7 +1113,12 @@ function renderHiddenCalendars() {
   const hidden = [];
   for (const acc of state.accounts) {
     for (const cal of acc.calendars) {
-      if (!cal.enabled || cal._hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.name });
+      if (!cal.enabled || cal._hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.name, source: 'caldav' });
+    }
+  }
+  for (const acc of state.googleAccounts) {
+    for (const cal of acc.calendars) {
+      if (!cal.enabled || cal._hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.email, source: 'google' });
     }
   }
   if (!hidden.length) {
@@ -1043,16 +1128,26 @@ function renderHiddenCalendars() {
   list.innerHTML = hidden.map(c =>
     `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
       <span style="font-size:13px">${escHtml(c.acc)} / ${escHtml(c.name)}</span>
-      <button class="btn btn-secondary btn-sm" data-restore-cal="${c.id}">Einblenden</button>
+      <button class="btn btn-secondary btn-sm" data-restore-cal="${c.id}" data-restore-source="${c.source}">Einblenden</button>
     </div>`
   ).join('');
   list.querySelectorAll('[data-restore-cal]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const calId = parseInt(btn.dataset.restoreCal);
-      await api.put(`/caldav/calendars/${calId}`, { enabled: true });
-      for (const acc of state.accounts) {
-        for (const cal of acc.calendars) {
-          if (cal.id === calId) { cal.enabled = true; delete cal._hidden; }
+      const source = btn.dataset.restoreSource;
+      if (source === 'google') {
+        await api.put(`/google/calendars/${calId}`, { enabled: true });
+        for (const acc of state.googleAccounts) {
+          for (const cal of acc.calendars) {
+            if (cal.id === calId) { cal.enabled = true; delete cal._hidden; }
+          }
+        }
+      } else {
+        await api.put(`/caldav/calendars/${calId}`, { enabled: true });
+        for (const acc of state.accounts) {
+          for (const cal of acc.calendars) {
+            if (cal.id === calId) { cal.enabled = true; delete cal._hidden; }
+          }
         }
       }
       renderHiddenCalendars();
