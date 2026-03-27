@@ -262,7 +262,7 @@ function renderCalendarList() {
   // ── CalDAV accounts ────────────────────────────────────
   if (state.accounts.length) {
     html += state.accounts.map(acc => {
-      const visibleCals = acc.calendars.filter(c => !c._hidden);
+      const visibleCals = acc.calendars.filter(c => !c.sidebar_hidden);
       if (!visibleCals.length) return '';
       return `<div class="cal-account-name">${escHtml(acc.name)}</div>` +
         visibleCals.map(cal =>
@@ -311,7 +311,7 @@ function renderCalendarList() {
   // ── Google accounts ───────────────────────────────────
   if (state.googleAccounts.length) {
     html += state.googleAccounts.map(acc => {
-      const visibleCals = acc.calendars.filter(c => !c._hidden);
+      const visibleCals = acc.calendars.filter(c => !c.sidebar_hidden);
       if (!visibleCals.length) return `<div class="cal-account-name">${escHtml(acc.email)}</div>`;
       return `<div class="cal-account-name">${escHtml(acc.email)}</div>` +
         visibleCals.map(cal =>
@@ -467,10 +467,10 @@ function renderCalendarList() {
       const source = btn.dataset.source;
       if (source === 'caldav') {
         const calId = parseInt(btn.dataset.calId);
-        await api.put(`/caldav/calendars/${calId}`, { enabled: false });
+        await api.put(`/caldav/calendars/${calId}`, { enabled: false, sidebar_hidden: true });
         for (const acc of state.accounts) {
           for (const cal of acc.calendars) {
-            if (cal.id === calId) { cal.enabled = false; cal._hidden = true; }
+            if (cal.id === calId) { cal.enabled = false; cal.sidebar_hidden = true; }
           }
         }
       } else if (source === 'local') {
@@ -485,10 +485,10 @@ function renderCalendarList() {
         state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== subId);
       } else if (source === 'google') {
         const calId = parseInt(btn.dataset.calId);
-        await api.put(`/google/calendars/${calId}`, { enabled: false });
+        await api.put(`/google/calendars/${calId}`, { enabled: false, sidebar_hidden: true });
         for (const acc of state.googleAccounts) {
           for (const cal of acc.calendars) {
-            if (cal.id === calId) { cal.enabled = false; cal._hidden = true; }
+            if (cal.id === calId) { cal.enabled = false; cal.sidebar_hidden = true; }
           }
         }
       }
@@ -1113,12 +1113,12 @@ function renderHiddenCalendars() {
   const hidden = [];
   for (const acc of state.accounts) {
     for (const cal of acc.calendars) {
-      if (!cal.enabled || cal._hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.name, source: 'caldav' });
+      if (cal.sidebar_hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.name, source: 'caldav' });
     }
   }
   for (const acc of state.googleAccounts) {
     for (const cal of acc.calendars) {
-      if (!cal.enabled || cal._hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.email, source: 'google' });
+      if (cal.sidebar_hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.email, source: 'google' });
     }
   }
   if (!hidden.length) {
@@ -1136,17 +1136,17 @@ function renderHiddenCalendars() {
       const calId = parseInt(btn.dataset.restoreCal);
       const source = btn.dataset.restoreSource;
       if (source === 'google') {
-        await api.put(`/google/calendars/${calId}`, { enabled: true });
+        await api.put(`/google/calendars/${calId}`, { enabled: true, sidebar_hidden: false });
         for (const acc of state.googleAccounts) {
           for (const cal of acc.calendars) {
-            if (cal.id === calId) { cal.enabled = true; delete cal._hidden; }
+            if (cal.id === calId) { cal.enabled = true; cal.sidebar_hidden = false; }
           }
         }
       } else {
-        await api.put(`/caldav/calendars/${calId}`, { enabled: true });
+        await api.put(`/caldav/calendars/${calId}`, { enabled: true, sidebar_hidden: false });
         for (const acc of state.accounts) {
           for (const cal of acc.calendars) {
-            if (cal.id === calId) { cal.enabled = true; delete cal._hidden; }
+            if (cal.id === calId) { cal.enabled = true; cal.sidebar_hidden = false; }
           }
         }
       }

@@ -335,6 +335,7 @@ a { color: var(--primary); text-decoration: none; }
   border-right: 1px solid var(--border);
   flex-shrink: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   transition: transform var(--transition);
 }
 .sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-w))); margin-right: calc(-1 * var(--sidebar-w)); }

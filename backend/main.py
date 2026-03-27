@@ -31,6 +31,18 @@ def _migrate():
             logging.info("Migration: added week_start_day column")
         except Exception:
             pass  # Column already exists
+        try:
+            conn.execute(text("ALTER TABLE calendars ADD COLUMN sidebar_hidden BOOLEAN DEFAULT 0"))
+            conn.commit()
+            logging.info("Migration: added sidebar_hidden to calendars")
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE google_calendars ADD COLUMN sidebar_hidden BOOLEAN DEFAULT 0"))
+            conn.commit()
+            logging.info("Migration: added sidebar_hidden to google_calendars")
+        except Exception:
+            pass
 
 _migrate()
 

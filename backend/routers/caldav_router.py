@@ -29,6 +29,7 @@ class CalendarUpdate(BaseModel):
     enabled: Optional[bool] = None
     color: Optional[str] = None
     name: Optional[str] = None
+    sidebar_hidden: Optional[bool] = None
 
 
 class EventCreate(BaseModel):
@@ -67,6 +68,7 @@ def _account_dict(a: models.CalDAVAccount) -> dict:
                 "color": c.color or a.color,
                 "enabled": c.enabled,
                 "cal_id": c.cal_id,
+                "sidebar_hidden": bool(c.sidebar_hidden),
             }
             for c in a.calendars
         ],
@@ -225,6 +227,8 @@ def update_calendar(
         calendar.color = data.color
     if data.name is not None:
         calendar.name = data.name
+    if data.sidebar_hidden is not None:
+        calendar.sidebar_hidden = data.sidebar_hidden
     db.commit()
     return {"ok": True}
 

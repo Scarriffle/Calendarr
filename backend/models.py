@@ -59,6 +59,7 @@ class Calendar(Base):
     name = Column(String(100), nullable=False)
     color = Column(String(7), nullable=True)
     enabled = Column(Boolean, default=True)
+    sidebar_hidden = Column(Boolean, default=False)
 
     account = relationship("CalDAVAccount", back_populates="calendars")
 
@@ -168,5 +169,6 @@ class GoogleCalendar(Base):
     name = Column(String(255), nullable=False)
     color = Column(String(7), nullable=True)
     enabled = Column(Boolean, default=True)
+    sidebar_hidden = Column(Boolean, default=False)
 
     account = relationship("GoogleAccount", back_populates="calendars")

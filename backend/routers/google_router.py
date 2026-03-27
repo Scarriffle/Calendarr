@@ -131,6 +131,7 @@ def _account_dict(a: models.GoogleAccount) -> dict:
                 "name": c.name,
                 "color": c.color or "#4285f4",
                 "enabled": c.enabled,
+                "sidebar_hidden": bool(c.sidebar_hidden),
             }
             for c in a.calendars
         ],
@@ -325,6 +326,7 @@ class GoogleCalendarUpdate(BaseModel):
     enabled: Optional[bool] = None
     color: Optional[str] = None
     name: Optional[str] = None
+    sidebar_hidden: Optional[bool] = None
 
 
 @router.put("/calendars/{calendar_id}")
@@ -351,6 +353,8 @@ def update_calendar(
         gcal.color = data.color
     if data.name is not None:
         gcal.name = data.name
+    if data.sidebar_hidden is not None:
+        gcal.sidebar_hidden = data.sidebar_hidden
     db.commit()
     return {"ok": True}
 
