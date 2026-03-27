@@ -355,6 +355,7 @@ a { color: var(--primary); text-decoration: none; }
   text-align: center; cursor: pointer;
   background: none; border: none; border-top: 1px solid var(--border);
   transition: color var(--transition);
+  white-space: nowrap;
   position: sticky; bottom: 0;
   background: var(--bg-sidebar);
 }

@@ -4,6 +4,7 @@ import pyotp
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import models
@@ -39,7 +40,7 @@ def setup(req: SetupRequest, db: Session = Depends(get_db)):
     if db.query(models.User).count() > 0:
         raise HTTPException(400, "Setup already completed")
     user = models.User(
-        username=req.username,
+        username=req.username.lower(),
         email=req.email,
         password_hash=get_password_hash(req.password),
         is_admin=True,
@@ -58,7 +59,7 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
     user = (
-        db.query(models.User).filter(models.User.username == form_data.username).first()
+        db.query(models.User).filter(func.lower(models.User.username) == form_data.username.lower()).first()
     )
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
@@ -78,7 +79,7 @@ def login(
 @router.post("/login")
 def login_json(req: LoginRequest, db: Session = Depends(get_db)):
     user = (
-        db.query(models.User).filter(models.User.username == req.username).first()
+        db.query(models.User).filter(func.lower(models.User.username) == req.username.lower()).first()
     )
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(

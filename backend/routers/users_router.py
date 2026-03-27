@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import models
@@ -40,10 +41,10 @@ def create_user(
     db: Session = Depends(get_db),
     _: models.User = Depends(get_current_admin),
 ):
-    if db.query(models.User).filter(models.User.username == req.username).first():
+    if db.query(models.User).filter(func.lower(models.User.username) == req.username.lower()).first():
         raise HTTPException(400, "Username already taken")
     user = models.User(
-        username=req.username,
+        username=req.username.lower(),
         email=req.email,
         password_hash=get_password_hash(req.password),
         is_admin=req.is_admin,
