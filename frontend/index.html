@@ -151,9 +151,16 @@
         <div class="cal-list" id="cal-list">
           <div class="cal-list-header">
             <span>Meine Kalender</span>
-            <button class="icon-btn mini-btn" id="btn-add-account" title="CalDAV-Konto hinzufügen">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-            </button>
+            <div class="add-cal-dropdown-wrap">
+              <button class="icon-btn mini-btn" id="btn-add-cal" title="Kalender hinzufügen">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              </button>
+              <div class="add-cal-dropdown hidden" id="add-cal-dropdown">
+                <button data-action="local">Lokaler Kalender</button>
+                <button data-action="caldav">CalDAV-Konto</button>
+                <button data-action="ical">iCal-URL abonnieren</button>
+              </div>
+            </div>
           </div>
           <div id="cal-list-items"></div>
         </div>
@@ -292,6 +299,75 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" data-modal="modal-account">Abbrechen</button>
       <button class="btn btn-primary" id="acc-save">Verbinden</button>
+    </div>
+  </div>
+</div>
+
+<!-- Local Calendar Modal -->
+<div id="modal-local-cal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-header">
+      <h3>Lokalen Kalender erstellen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-local-cal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="local-cal-name" placeholder="z.B. Persönlich" />
+      </div>
+      <div class="form-group">
+        <label>Farbe</label>
+        <div class="ev-color-row">
+          <input type="text" id="local-cal-color-hex" class="ev-color-hex" maxlength="7" value="#34a853" spellcheck="false" />
+          <div class="ev-color-preview" id="local-cal-color-preview" style="background:#34a853" title="Farbe wählen"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal="modal-local-cal">Abbrechen</button>
+      <button class="btn btn-primary" id="local-cal-save">Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- iCal Subscription Modal -->
+<div id="modal-ical-sub" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-header">
+      <h3>iCal-URL abonnieren</h3>
+      <button class="icon-btn modal-close" data-modal="modal-ical-sub">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="ical-sub-name" placeholder="z.B. Feiertage" />
+      </div>
+      <div class="form-group">
+        <label>iCal-URL</label>
+        <input type="url" id="ical-sub-url" placeholder="https://example.com/calendar.ics" />
+      </div>
+      <div class="form-group">
+        <label>Farbe</label>
+        <div class="ev-color-row">
+          <input type="text" id="ical-sub-color-hex" class="ev-color-hex" maxlength="7" value="#46bdc6" spellcheck="false" />
+          <div class="ev-color-preview" id="ical-sub-color-preview" style="background:#46bdc6" title="Farbe wählen"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Aktualisierung</label>
+        <select id="ical-sub-refresh">
+          <option value="15">Alle 15 Minuten</option>
+          <option value="30">Alle 30 Minuten</option>
+          <option value="60" selected>Stündlich</option>
+          <option value="360">Alle 6 Stunden</option>
+          <option value="1440">Täglich</option>
+        </select>
+      </div>
+      <div id="ical-sub-error" class="form-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal="modal-ical-sub">Abbrechen</button>
+      <button class="btn btn-primary" id="ical-sub-save">Abonnieren</button>
     </div>
   </div>
 </div>

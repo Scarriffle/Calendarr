@@ -27,6 +27,8 @@ let state = {
   currentView: 'month',
   events: [],
   accounts: [],
+  localCalendars: [],
+  icalSubscriptions: [],
   settings: {},
   dimPast: false,
   editingEvent: null,      // null = new event
@@ -35,13 +37,17 @@ let state = {
 
 // ── Public init ───────────────────────────────────────────
 export async function initCalendar() {
-  const [settings, accounts] = await Promise.all([
+  const [settings, accounts, localCalendars, icalSubscriptions] = await Promise.all([
     api.get('/settings/'),
     api.get('/caldav/accounts'),
+    api.get('/local/calendars'),
+    api.get('/ical/subscriptions'),
   ]);
 
   state.settings = settings;
   state.accounts = accounts;
+  state.localCalendars = localCalendars;
+  state.icalSubscriptions = icalSubscriptions;
   state.currentView = settings.default_view || 'month';
   state.dimPast = settings.dim_past_events;
   weekStartDay = settings.week_start_day || 'monday';
@@ -55,6 +61,8 @@ export async function initCalendar() {
   bindSidebar();
   bindEventModal();
   bindAccountModal();
+  bindLocalCalModal();
+  bindICalSubModal();
   bindSettingsModal();
   bindProfileModal();
 }
@@ -246,53 +254,126 @@ function renderMiniCal() {
 // ── Calendar List ─────────────────────────────────────────
 function renderCalendarList() {
   const container = document.getElementById('cal-list-items');
-  if (!state.accounts.length) {
-    container.innerHTML = `<div style="padding:8px 16px;font-size:12px;color:var(--text-3)">Kein CalDAV-Konto</div>`;
-    return;
+  let html = '';
+
+  // ── CalDAV accounts ────────────────────────────────────
+  if (state.accounts.length) {
+    html += state.accounts.map(acc =>
+      `<div class="cal-account-name">${escHtml(acc.name)}</div>` +
+      acc.calendars.map(cal =>
+        `<div class="cal-item" data-cal-id="${cal.id}" data-source="caldav">
+          <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="caldav" />
+          <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="caldav" title="Farbe ändern"></div>
+          <span class="cal-item-name" data-source="caldav">${escHtml(cal.name)}</span>
+          <button class="icon-btn mini-btn cal-item-remove" data-acc-id="${acc.id}" data-source="caldav" title="Konto entfernen">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>`
+      ).join('')
+    ).join('');
   }
 
-  const html = state.accounts.map(acc =>
-    `<div class="cal-account-name">${escHtml(acc.name)}</div>` +
-    acc.calendars.map(cal =>
-      `<div class="cal-item" data-cal-id="${cal.id}">
-        <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" />
-        <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" title="Farbe ändern"></div>
-        <span class="cal-item-name">${escHtml(cal.name)}</span>
-        <button class="icon-btn mini-btn cal-item-remove" data-acc-id="${acc.id}" title="Konto entfernen">
+  // ── Local calendars ────────────────────────────────────
+  if (state.localCalendars.length) {
+    html += `<div class="cal-account-name">Lokale Kalender</div>`;
+    html += state.localCalendars.map(cal =>
+      `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
+        <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="local" />
+        <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="local" title="Farbe ändern"></div>
+        <span class="cal-item-name" data-source="local">${escHtml(cal.name)}</span>
+        <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="local" title="Kalender entfernen">
           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
         </button>
       </div>`
-    ).join('')
-  ).join('');
+    ).join('');
+  }
+
+  // ── iCal subscriptions ─────────────────────────────────
+  if (state.icalSubscriptions.length) {
+    html += `<div class="cal-account-name">Abonnements</div>`;
+    html += state.icalSubscriptions.map(sub =>
+      `<div class="cal-item" data-sub-id="${sub.id}" data-source="ical">
+        <input type="checkbox" ${sub.enabled ? 'checked' : ''} data-sub-id="${sub.id}" data-source="ical" />
+        <div class="cal-item-dot" style="background:${sub.color}" data-sub-id="${sub.id}" data-source="ical" title="Farbe ändern"></div>
+        <span class="cal-item-name" data-source="ical">${escHtml(sub.name)}</span>
+        <button class="icon-btn mini-btn cal-item-remove" data-sub-id="${sub.id}" data-source="ical" title="Abo entfernen">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
+      </div>`
+    ).join('');
+  }
+
+  if (!html) {
+    container.innerHTML = `<div style="padding:8px 16px;font-size:12px;color:var(--text-3)">Keine Kalender</div>`;
+    return;
+  }
 
   container.innerHTML = html;
 
+  // ── Checkbox handlers ──────────────────────────────────
   container.querySelectorAll('input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', async () => {
-      const calId = parseInt(cb.dataset.calId);
-      await api.put(`/caldav/calendars/${calId}`, { enabled: cb.checked });
-      // Update local state
-      for (const acc of state.accounts) {
-        for (const cal of acc.calendars) {
-          if (cal.id === calId) cal.enabled = cb.checked;
+      const source = cb.dataset.source;
+      if (source === 'caldav') {
+        const calId = parseInt(cb.dataset.calId);
+        await api.put(`/caldav/calendars/${calId}`, { enabled: cb.checked });
+        for (const acc of state.accounts) {
+          for (const cal of acc.calendars) {
+            if (cal.id === calId) cal.enabled = cb.checked;
+          }
         }
+      } else if (source === 'local') {
+        const calId = parseInt(cb.dataset.calId);
+        await api.put(`/local/calendars/${calId}`, { enabled: cb.checked });
+        const cal = state.localCalendars.find(c => c.id === calId);
+        if (cal) cal.enabled = cb.checked;
+      } else if (source === 'ical') {
+        const subId = parseInt(cb.dataset.subId);
+        await api.put(`/ical/subscriptions/${subId}`, { enabled: cb.checked });
+        const sub = state.icalSubscriptions.find(s => s.id === subId);
+        if (sub) sub.enabled = cb.checked;
       }
       fetchAndRender();
     });
   });
 
+  // ── Color dot handlers ─────────────────────────────────
   container.querySelectorAll('.cal-item-dot').forEach(dot => {
-    dot.addEventListener('click', e => {
+    dot.addEventListener('click', async e => {
       e.stopPropagation();
-      const calId = parseInt(dot.dataset.calId);
-      openCalColorPicker(dot, calId);
+      const source = dot.dataset.source;
+      if (source === 'caldav') {
+        openCalColorPicker(dot, parseInt(dot.dataset.calId));
+      } else if (source === 'local') {
+        const calId = parseInt(dot.dataset.calId);
+        const cal = state.localCalendars.find(c => c.id === calId);
+        const picked = await openColorPicker(dot, cal?.color || '#34a853');
+        if (picked) {
+          await api.put(`/local/calendars/${calId}`, { color: picked });
+          if (cal) cal.color = picked;
+          renderCalendarList();
+          fetchAndRender();
+        }
+      } else if (source === 'ical') {
+        const subId = parseInt(dot.dataset.subId);
+        const sub = state.icalSubscriptions.find(s => s.id === subId);
+        const picked = await openColorPicker(dot, sub?.color || '#46bdc6');
+        if (picked) {
+          await api.put(`/ical/subscriptions/${subId}`, { color: picked });
+          if (sub) sub.color = picked;
+          renderCalendarList();
+          fetchAndRender();
+        }
+      }
     });
   });
 
+  // ── Rename on double-click ─────────────────────────────
   container.querySelectorAll('.cal-item-name').forEach(nameEl => {
     nameEl.addEventListener('dblclick', e => {
       e.stopPropagation();
-      const calId = parseInt(nameEl.closest('.cal-item').dataset.calId);
+      const item = nameEl.closest('.cal-item');
+      const source = nameEl.dataset.source;
       const currentName = nameEl.textContent;
       const input = document.createElement('input');
       input.type = 'text';
@@ -305,11 +386,22 @@ function renderCalendarList() {
       const save = async () => {
         const newName = input.value.trim();
         if (newName && newName !== currentName) {
-          await api.put(`/caldav/calendars/${calId}`, { name: newName });
-          for (const acc of state.accounts) {
-            for (const cal of acc.calendars) {
-              if (cal.id === calId) cal.name = newName;
+          if (source === 'caldav') {
+            const calId = parseInt(item.dataset.calId);
+            await api.put(`/caldav/calendars/${calId}`, { name: newName });
+            for (const acc of state.accounts) {
+              for (const cal of acc.calendars) { if (cal.id === calId) cal.name = newName; }
             }
+          } else if (source === 'local') {
+            const calId = parseInt(item.dataset.calId);
+            await api.put(`/local/calendars/${calId}`, { name: newName });
+            const cal = state.localCalendars.find(c => c.id === calId);
+            if (cal) cal.name = newName;
+          } else if (source === 'ical') {
+            const subId = parseInt(item.dataset.subId);
+            await api.put(`/ical/subscriptions/${subId}`, { name: newName });
+            const sub = state.icalSubscriptions.find(s => s.id === subId);
+            if (sub) sub.name = newName;
           }
         }
         renderCalendarList();
@@ -323,13 +415,27 @@ function renderCalendarList() {
     });
   });
 
+  // ── Remove handlers ────────────────────────────────────
   container.querySelectorAll('.cal-item-remove').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
-      if (!confirm('CalDAV-Konto wirklich entfernen?')) return;
-      const accId = parseInt(btn.dataset.accId);
-      await api.delete(`/caldav/accounts/${accId}`);
-      state.accounts = state.accounts.filter(a => a.id !== accId);
+      const source = btn.dataset.source;
+      if (source === 'caldav') {
+        if (!confirm('CalDAV-Konto wirklich entfernen?')) return;
+        const accId = parseInt(btn.dataset.accId);
+        await api.delete(`/caldav/accounts/${accId}`);
+        state.accounts = state.accounts.filter(a => a.id !== accId);
+      } else if (source === 'local') {
+        if (!confirm('Lokalen Kalender wirklich löschen?')) return;
+        const calId = parseInt(btn.dataset.calId);
+        await api.delete(`/local/calendars/${calId}`);
+        state.localCalendars = state.localCalendars.filter(c => c.id !== calId);
+      } else if (source === 'ical') {
+        if (!confirm('Abonnement wirklich entfernen?')) return;
+        const subId = parseInt(btn.dataset.subId);
+        await api.delete(`/ical/subscriptions/${subId}`);
+        state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== subId);
+      }
       renderCalendarList();
       fetchAndRender();
     });
@@ -380,7 +486,33 @@ function bindSidebar() {
   document.getElementById('sidebar-toggle').onclick = () => {
     document.getElementById('sidebar').classList.toggle('collapsed');
   };
-  document.getElementById('btn-add-account').onclick = openAccountModal;
+
+  // Add calendar dropdown
+  const addBtn = document.getElementById('btn-add-cal');
+  const dropdown = document.getElementById('add-cal-dropdown');
+
+  addBtn.onclick = e => {
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+  };
+  document.addEventListener('click', e => {
+    if (!dropdown.contains(e.target) && e.target !== addBtn) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  dropdown.querySelector('[data-action="caldav"]').onclick = () => {
+    dropdown.classList.add('hidden');
+    openAccountModal();
+  };
+  dropdown.querySelector('[data-action="local"]').onclick = () => {
+    dropdown.classList.add('hidden');
+    openLocalCalModal();
+  };
+  dropdown.querySelector('[data-action="ical"]').onclick = () => {
+    dropdown.classList.add('hidden');
+    openICalSubModal();
+  };
 }
 
 // ── Event Popup ───────────────────────────────────────────
@@ -426,7 +558,14 @@ function showEventPopup(ev, anchor) {
     if (!confirm(`"${ev.title}" wirklich löschen?`)) return;
     popup.classList.add('hidden');
     try {
-      await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
+      if (ev.source === 'local') {
+        await api.delete(`/local/events/${encodeURIComponent(ev.id)}`);
+      } else if (ev.source === 'ical') {
+        const subId = ev.calendar_id.replace('ical-', '');
+        await api.delete(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`);
+      } else {
+        await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
+      }
       showToast('Termin gelöscht');
       fetchAndRender();
     } catch (e) { showToast(e.message, true); }
@@ -446,6 +585,7 @@ document.addEventListener('click', e => {
 function populateCalendarSelect(selectedId) {
   const sel = document.getElementById('ev-calendar');
   sel.innerHTML = '';
+  // CalDAV calendars
   state.accounts.forEach(acc => {
     acc.calendars.filter(c => c.enabled).forEach(cal => {
       const opt = document.createElement('option');
@@ -455,6 +595,15 @@ function populateCalendarSelect(selectedId) {
       sel.appendChild(opt);
     });
   });
+  // Local calendars
+  state.localCalendars.filter(c => c.enabled).forEach(cal => {
+    const opt = document.createElement('option');
+    opt.value = `local-${cal.id}`;
+    opt.textContent = cal.name;
+    if (`local-${cal.id}` === selectedId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  // iCal subscriptions are read-only, not shown here
 }
 
 function openNewEventModal(date) {
@@ -551,7 +700,8 @@ function bindEventModal() {
     if (!title) { showToast('Bitte Titel eingeben', true); return; }
 
     const allDay  = document.getElementById('ev-allday').checked;
-    const calId   = parseInt(document.getElementById('ev-calendar').value);
+    const calVal  = document.getElementById('ev-calendar').value;
+    const isLocal = calVal.startsWith('local-');
     const loc     = document.getElementById('ev-location').value.trim();
     const desc    = document.getElementById('ev-description').value.trim();
     const color   = state.selectedEventColor;
@@ -572,12 +722,32 @@ function bindEventModal() {
 
     try {
       if (state.editingEvent) {
-        await api.put(
-          `/caldav/events/${encodeURIComponent(state.editingEvent.id)}?event_url=${encodeURIComponent(state.editingEvent.url)}`,
-          { title, start, end, allDay, location: loc, description: desc, color: color || null }
-        );
+        const ev = state.editingEvent;
+        if (ev.source === 'local') {
+          await api.put(`/local/events/${encodeURIComponent(ev.id)}`,
+            { title, start, end, allDay, location: loc, description: desc, color: color || null }
+          );
+        } else if (ev.source === 'ical') {
+          const subId = ev.calendar_id.replace('ical-', '');
+          await api.put(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`,
+            { title, start, end, allDay, location: loc, description: desc, color: color || null }
+          );
+        } else {
+          await api.put(
+            `/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`,
+            { title, start, end, allDay, location: loc, description: desc, color: color || null }
+          );
+        }
         showToast('Termin aktualisiert');
+      } else if (isLocal) {
+        const calId = parseInt(calVal.replace('local-', ''));
+        await api.post('/local/events', {
+          calendar_id: calId, title, start, end, allDay,
+          location: loc, description: desc, color: color || null,
+        });
+        showToast('Termin erstellt');
       } else {
+        const calId = parseInt(calVal);
         await api.post('/caldav/events', {
           calendar_id: calId, title, start, end, allDay,
           location: loc, description: desc, color: color || null,
@@ -596,7 +766,14 @@ function bindEventModal() {
     if (!ev) return;
     if (!confirm(`"${ev.title}" wirklich löschen?`)) return;
     try {
-      await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
+      if (ev.source === 'local') {
+        await api.delete(`/local/events/${encodeURIComponent(ev.id)}`);
+      } else if (ev.source === 'ical') {
+        const subId = ev.calendar_id.replace('ical-', '');
+        await api.delete(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`);
+      } else {
+        await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
+      }
       showToast('Termin gelöscht');
       closeModal('modal-event');
       fetchAndRender();
@@ -659,6 +836,94 @@ function bindAccountModal() {
     } finally {
       document.getElementById('acc-save').disabled = false;
       document.getElementById('acc-save').textContent = 'Verbinden';
+    }
+  };
+}
+
+// ── Local Calendar Modal ──────────────────────────────────
+function openLocalCalModal() {
+  document.getElementById('local-cal-name').value = '';
+  document.getElementById('local-cal-color-hex').value = '#34a853';
+  document.getElementById('local-cal-color-preview').style.background = '#34a853';
+  openModal('modal-local-cal');
+}
+
+function bindLocalCalModal() {
+  const preview = document.getElementById('local-cal-color-preview');
+  const hex = document.getElementById('local-cal-color-hex');
+  preview.addEventListener('click', async () => {
+    const picked = await openColorPicker(preview, hex.value || '#34a853');
+    if (picked) { hex.value = picked.toUpperCase(); preview.style.background = picked; }
+  });
+  hex.addEventListener('change', () => {
+    let val = hex.value.trim();
+    if (!val.startsWith('#')) val = '#' + val;
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) { hex.value = val.toUpperCase(); preview.style.background = val; }
+  });
+
+  document.getElementById('local-cal-save').onclick = async () => {
+    const name = document.getElementById('local-cal-name').value.trim();
+    if (!name) { showToast('Bitte Name eingeben', true); return; }
+    const color = hex.value;
+    try {
+      const cal = await api.post('/local/calendars', { name, color });
+      state.localCalendars.push(cal);
+      renderCalendarList();
+      closeModal('modal-local-cal');
+      showToast(`Kalender "${name}" erstellt`);
+    } catch (e) { showToast(e.message, true); }
+  };
+}
+
+// ── iCal Subscription Modal ──────────────────────────────
+function openICalSubModal() {
+  document.getElementById('ical-sub-name').value = '';
+  document.getElementById('ical-sub-url').value = '';
+  document.getElementById('ical-sub-color-hex').value = '#46bdc6';
+  document.getElementById('ical-sub-color-preview').style.background = '#46bdc6';
+  document.getElementById('ical-sub-refresh').value = '60';
+  document.getElementById('ical-sub-error').classList.add('hidden');
+  openModal('modal-ical-sub');
+}
+
+function bindICalSubModal() {
+  const preview = document.getElementById('ical-sub-color-preview');
+  const hex = document.getElementById('ical-sub-color-hex');
+  preview.addEventListener('click', async () => {
+    const picked = await openColorPicker(preview, hex.value || '#46bdc6');
+    if (picked) { hex.value = picked.toUpperCase(); preview.style.background = picked; }
+  });
+  hex.addEventListener('change', () => {
+    let val = hex.value.trim();
+    if (!val.startsWith('#')) val = '#' + val;
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) { hex.value = val.toUpperCase(); preview.style.background = val; }
+  });
+
+  document.getElementById('ical-sub-save').onclick = async () => {
+    const name = document.getElementById('ical-sub-name').value.trim();
+    const url = document.getElementById('ical-sub-url').value.trim();
+    const errEl = document.getElementById('ical-sub-error');
+    if (!name || !url) { errEl.textContent = 'Bitte Name und URL eingeben'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+
+    const color = hex.value;
+    const refresh_minutes = parseInt(document.getElementById('ical-sub-refresh').value);
+
+    document.getElementById('ical-sub-save').disabled = true;
+    document.getElementById('ical-sub-save').textContent = 'Lade…';
+    try {
+      const sub = await api.post('/ical/subscriptions', { name, url, color, refresh_minutes });
+      state.icalSubscriptions.push(sub);
+      renderCalendarList();
+      closeModal('modal-ical-sub');
+      showToast(`"${name}" abonniert`);
+      fetchAndRender();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.remove('hidden');
+    } finally {
+      document.getElementById('ical-sub-save').disabled = false;
+      document.getElementById('ical-sub-save').textContent = 'Abonnieren';
     }
   };
 }

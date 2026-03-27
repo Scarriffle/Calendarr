@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -20,6 +20,12 @@ class User(Base):
     )
     settings = relationship(
         "UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+    local_calendars = relationship(
+        "LocalCalendar", back_populates="user", cascade="all, delete-orphan"
+    )
+    ical_subscriptions = relationship(
+        "ICalSubscription", back_populates="user", cascade="all, delete-orphan"
     )
 
 
@@ -67,3 +73,68 @@ class UserSettings(Base):
     dim_past_events = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="settings")
+
+
+class LocalCalendar(Base):
+    __tablename__ = "local_calendars"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    color = Column(String(7), default="#34a853")
+    enabled = Column(Boolean, default=True)
+
+    user = relationship("User", back_populates="local_calendars")
+    events = relationship("LocalEvent", back_populates="calendar", cascade="all, delete-orphan")
+
+
+class LocalEvent(Base):
+    __tablename__ = "local_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    calendar_id = Column(Integer, ForeignKey("local_calendars.id"), nullable=False)
+    uid = Column(String(255), nullable=False, unique=True)
+    title = Column(String(255), nullable=False)
+    start = Column(String(50), nullable=False)
+    end = Column(String(50), nullable=False)
+    all_day = Column(Boolean, default=False)
+    location = Column(String(500), nullable=True)
+    description = Column(Text, nullable=True)
+    color = Column(String(7), nullable=True)
+
+    calendar = relationship("LocalCalendar", back_populates="events")
+
+
+class ICalSubscription(Base):
+    __tablename__ = "ical_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    url = Column(String(1000), nullable=False)
+    color = Column(String(7), default="#46bdc6")
+    enabled = Column(Boolean, default=True)
+    refresh_minutes = Column(Integer, default=60)
+    last_fetched = Column(DateTime, nullable=True)
+    cached_ics = Column(Text, nullable=True)
+
+    user = relationship("User", back_populates="ical_subscriptions")
+    overrides = relationship("ICalOverride", back_populates="subscription", cascade="all, delete-orphan")
+
+
+class ICalOverride(Base):
+    __tablename__ = "ical_overrides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    subscription_id = Column(Integer, ForeignKey("ical_subscriptions.id"), nullable=False)
+    event_uid = Column(String(500), nullable=False)
+    hidden = Column(Boolean, default=False)
+    title = Column(String(255), nullable=True)
+    start = Column(String(50), nullable=True)
+    end = Column(String(50), nullable=True)
+    all_day = Column(Boolean, nullable=True)
+    location = Column(String(500), nullable=True)
+    description = Column(Text, nullable=True)
+    color = Column(String(7), nullable=True)
+
+    subscription = relationship("ICalSubscription", back_populates="overrides")

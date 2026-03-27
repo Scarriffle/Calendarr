@@ -9,6 +9,7 @@ import caldav_client
 import models
 from auth import get_current_user
 from database import get_db
+from routers.ical_router import _refresh_if_needed, get_events_for_subscription
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -282,6 +283,58 @@ def get_events(
                 logger.error(
                     "Error fetching calendar %s: %s", calendar.id, exc
                 )
+
+    # ── Local calendar events ─────────────────────────────
+    local_calendars = (
+        db.query(models.LocalCalendar)
+        .filter(
+            models.LocalCalendar.user_id == current_user.id,
+            models.LocalCalendar.enabled == True,
+        )
+        .all()
+    )
+    for local_cal in local_calendars:
+        local_events = (
+            db.query(models.LocalEvent)
+            .filter(
+                models.LocalEvent.calendar_id == local_cal.id,
+                models.LocalEvent.start < end,
+                models.LocalEvent.end > start,
+            )
+            .all()
+        )
+        for ev in local_events:
+            all_events.append({
+                "id": ev.uid,
+                "url": f"local://{ev.uid}",
+                "title": ev.title,
+                "start": ev.start,
+                "end": ev.end,
+                "allDay": ev.all_day,
+                "location": ev.location or "",
+                "description": ev.description or "",
+                "color": ev.color,
+                "calendar_id": f"local-{local_cal.id}",
+                "calendar_name": local_cal.name,
+                "calendarColor": local_cal.color,
+                "source": "local",
+            })
+
+    # ── iCal subscription events ──────────────────────────
+    ical_subs = (
+        db.query(models.ICalSubscription)
+        .filter(
+            models.ICalSubscription.user_id == current_user.id,
+            models.ICalSubscription.enabled == True,
+        )
+        .all()
+    )
+    for sub in ical_subs:
+        try:
+            _refresh_if_needed(sub, db)
+            all_events.extend(get_events_for_subscription(sub, start_dt, end_dt, db))
+        except Exception as exc:
+            logger.error("Error fetching iCal subscription %s: %s", sub.id, exc)
 
     return all_events
 
