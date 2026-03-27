@@ -18,6 +18,9 @@ class SettingsUpdate(BaseModel):
     accent_color: Optional[str] = None
     today_color: Optional[str] = None
     dim_past_events: Optional[bool] = None
+    text_contrast: Optional[int] = None
+    line_contrast: Optional[int] = None
+    hour_height: Optional[int] = None
 
 
 def _settings_dict(s: models.UserSettings) -> dict:
@@ -28,6 +31,9 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "accent_color": s.accent_color,
         "today_color": s.today_color,
         "dim_past_events": s.dim_past_events,
+        "text_contrast": s.text_contrast or 3,
+        "line_contrast": s.line_contrast or 3,
+        "hour_height": s.hour_height or 60,
     }
 
 

@@ -43,6 +43,21 @@ def _migrate():
             logging.info("Migration: added sidebar_hidden to google_calendars")
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN text_contrast INTEGER DEFAULT 3"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN line_contrast INTEGER DEFAULT 3"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN hour_height INTEGER DEFAULT 60"))
+            conn.commit()
+        except Exception:
+            pass
 
 _migrate()
 

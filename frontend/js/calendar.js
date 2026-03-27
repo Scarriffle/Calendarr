@@ -132,14 +132,16 @@ function renderView() {
       },
       showEventPopup,
       false,
-      weekStartDay
+      weekStartDay,
+      state.settings.hour_height || 60
     );
   } else if (state.currentView === 'day') {
     renderWeek(container, state.currentDate, evs,
       (date, switchDay) => { if (!switchDay) openNewEventModal(date); },
       showEventPopup,
       true,
-      weekStartDay
+      weekStartDay,
+      state.settings.hour_height || 60
     );
   } else {
     renderAgenda(container, state.currentDate, evs, showEventPopup);
@@ -1043,23 +1045,39 @@ function openSettingsModal() {
   });
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
 
-  // Show users section only for admins
+  // Set active contrast/hour-height buttons
+  [
+    { id: 'cfg-text-contrast', val: s.text_contrast || 3 },
+    { id: 'cfg-line-contrast', val: s.line_contrast || 3 },
+    { id: 'cfg-hour-height',   val: s.hour_height   || 60 },
+  ].forEach(({ id, val }) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.querySelectorAll('.contrast-btn').forEach(btn => {
+      btn.classList.toggle('active', String(btn.dataset.val) === String(val));
+    });
+  });
+
+  // Show users nav button only for admins
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const usersSection = document.getElementById('settings-users-section');
-  if (user.is_admin) {
-    usersSection.classList.remove('hidden');
-    loadUsers();
-  } else {
-    usersSection.classList.add('hidden');
-  }
+  const usersNavBtn = document.getElementById('settings-nav-users');
+  if (usersNavBtn) usersNavBtn.classList.toggle('hidden', !user.is_admin);
+  if (user.is_admin) loadUsers();
 
-  // Render Google accounts
+  // Activate first panel
+  const firstBtn = document.querySelector('.settings-nav-btn:not(.hidden)');
+  if (firstBtn) activateSettingsPanel(firstBtn.dataset.panel);
+
+  // Render Google accounts and hidden calendars
   renderGoogleAccounts();
-
-  // Render hidden calendars
   renderHiddenCalendars();
 
   openModal('modal-settings');
+}
+
+function activateSettingsPanel(panel) {
+  document.querySelectorAll('.settings-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.panel === panel));
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.toggle('active', p.id === 'settings-panel-' + panel));
 }
 
 function renderGoogleAccounts() {
@@ -1203,6 +1221,21 @@ function bindSettingsModal() {
     });
   });
 
+  // Panel navigation
+  document.querySelectorAll('.settings-nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => activateSettingsPanel(btn.dataset.panel));
+  });
+
+  // Contrast / hour-height selectors
+  document.querySelectorAll('.contrast-selector').forEach(sel => {
+    sel.addEventListener('click', e => {
+      const btn = e.target.closest('.contrast-btn');
+      if (!btn) return;
+      sel.querySelectorAll('.contrast-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
   document.getElementById('btn-add-user').onclick = () => {
     document.getElementById('add-user-form').classList.toggle('hidden');
   };
@@ -1223,6 +1256,10 @@ function bindSettingsModal() {
   };
 
   document.getElementById('settings-save').onclick = async () => {
+    const getActive = (id) => {
+      const btn = document.querySelector(`#${id} .contrast-btn.active`);
+      return btn ? Number(btn.dataset.val) : null;
+    };
     const settings = {
       default_view:    document.getElementById('cfg-default-view').value,
       week_start_day:  document.getElementById('cfg-week-start').value,
@@ -1230,13 +1267,16 @@ function bindSettingsModal() {
       accent_color:    document.getElementById('cfg-accent-hex').value,
       today_color:     document.getElementById('cfg-today-hex').value,
       dim_past_events: document.getElementById('cfg-dim-past').checked,
+      text_contrast:   getActive('cfg-text-contrast') || 3,
+      line_contrast:   getActive('cfg-line-contrast') || 3,
+      hour_height:     getActive('cfg-hour-height')   || 60,
     };
     try {
       await api.put('/settings/', settings);
       state.settings = { ...state.settings, ...settings };
       state.dimPast  = settings.dim_past_events;
       weekStartDay   = settings.week_start_day;
-      applyTheme(settings);
+      applyTheme(state.settings);
       showToast('Einstellungen gespeichert');
       closeModal('modal-settings');
       renderMiniCal();

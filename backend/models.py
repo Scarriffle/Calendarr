@@ -75,6 +75,9 @@ class UserSettings(Base):
     accent_color = Column(String(7), default="#ea4335")
     today_color = Column(String(7), default="#4285f4")
     dim_past_events = Column(Boolean, default=False)
+    text_contrast = Column(Integer, default=3)
+    line_contrast = Column(Integer, default=3)
+    hour_height = Column(Integer, default=60)
 
     user = relationship("User", back_populates="settings")
 

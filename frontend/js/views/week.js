@@ -2,7 +2,7 @@ import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber } from '../util
 
 const DOW_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-export function renderWeek(container, currentDate, events, onSlotClick, onEventClick, isSingleDay = false, weekStartDay = 'monday') {
+export function renderWeek(container, currentDate, events, onSlotClick, onEventClick, isSingleDay = false, weekStartDay = 'monday', hourH = 60) {
   // Build the days array (7 days for week, 1 for day)
   const days = [];
   if (isSingleDay) {
@@ -58,7 +58,6 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   ).join('');
 
   // ── Day columns ───────────────────────────────────────
-  // For each day, lay out timed events
   const dayCols = days.map(day => {
     const key = dayKey(day);
     const dayEvs = timedEvs.filter(ev => {
@@ -66,18 +65,17 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       return isSameDay(s, day);
     });
 
-    // Compute layout columns for overlapping events
     const positioned = layoutEvents(dayEvs);
 
     const hourLines = Array.from({length: 24}, (_, h) =>
-      `<div class="hour-line" style="top:${h * 60}px"><div class="half-line"></div></div>`
+      `<div class="hour-line" style="top:${h * hourH}px"><div class="half-line"></div></div>`
     ).join('');
 
     const evHtml = positioned.map(({ ev, col, cols }) => {
       const s = new Date(ev.start);
       const e = new Date(ev.end);
-      const top    = (s.getHours() * 60 + s.getMinutes());
-      const height = Math.max(20, (e - s) / 60000);
+      const top    = s.getHours() * hourH + s.getMinutes() * hourH / 60;
+      const height = Math.max(20, (e - s) / 60000 * hourH / 60);
       const left   = (col / cols) * 100;
       const width  = (1 / cols) * 100 - 0.5;
       const color  = ev.color || ev.calendarColor || '#4285f4';
@@ -93,7 +91,7 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       </div>`;
     }).join('');
 
-    return `<div class="week-day-col" data-date="${key}" style="height:${60*24}px">
+    return `<div class="week-day-col" data-date="${key}" style="height:${hourH * 24}px">
       ${hourLines}
       ${evHtml}
     </div>`;
@@ -118,10 +116,10 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
 
   // Scroll to ~8:00
   const body = container.querySelector('.week-body');
-  if (body) body.scrollTop = 8 * 60 - 20;
+  if (body) body.scrollTop = 8 * hourH - 20;
 
   // Render current-time line
-  renderNowLine(container, days);
+  renderNowLine(container, days, hourH);
 
   // Click: slot
   container.querySelectorAll('.week-day-col').forEach(col => {
@@ -129,9 +127,8 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       if (e.target.closest('.timed-event')) return;
       const rect = col.getBoundingClientRect();
       const y    = e.clientY - rect.top + (container.querySelector('.week-body')?.scrollTop || 0);
-      const mins = Math.floor(y);
-      const h    = Math.floor(mins / 60);
-      const m    = Math.round((mins % 60) / 15) * 15;
+      const h    = Math.floor(y / hourH);
+      const m    = Math.round(((y % hourH) / hourH * 60) / 15) * 15;
       const date = new Date(col.dataset.date + 'T00:00:00');
       date.setHours(h, m, 0, 0);
       onSlotClick(date);
@@ -164,34 +161,31 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   });
 }
 
-function renderNowLine(container, days) {
+function renderNowLine(container, days, hourH = 60) {
   const now = new Date();
   const todayCol = container.querySelector(`.week-day-col[data-date="${dayKey(now)}"]`);
   if (!todayCol) return;
 
-  const top = now.getHours() * 60 + now.getMinutes();
+  const top = now.getHours() * hourH + now.getMinutes() * hourH / 60;
   const line = document.createElement('div');
   line.className = 'now-line';
   line.style.top = top + 'px';
   line.innerHTML = '<div class="now-dot"></div>';
   todayCol.appendChild(line);
 
-  // Update every minute
-  setTimeout(() => renderNowLine(container, days), 60000);
+  setTimeout(() => renderNowLine(container, days, hourH), 60000);
 }
 
 function layoutEvents(events) {
   if (!events.length) return [];
 
-  // Sort by start time
   const sorted = events.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
-  const columns = []; // each column is an array of events
+  const columns = [];
 
   const result = sorted.map(ev => {
     const start = new Date(ev.start);
     const end   = new Date(ev.end);
 
-    // Find the first column where the event doesn't overlap
     let placed = false;
     for (let c = 0; c < columns.length; c++) {
       const lastInCol = columns[c][columns[c].length - 1];
@@ -209,11 +203,8 @@ function layoutEvents(events) {
     return ev;
   });
 
-  // Calculate how many columns each event spans
   return result.map(ev => {
     const start = new Date(ev.start);
-    const end   = new Date(ev.end);
-    // Count overlapping events
     let maxCol = ev._col;
     sorted.forEach(other => {
       if (other === ev) return;
