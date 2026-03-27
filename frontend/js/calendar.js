@@ -4,7 +4,7 @@ import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
 import { openColorPicker } from './color-picker.js';
-import { t, setLang, applyLang } from './i18n.js';
+import { t, setLang, getLang } from './i18n.js';
 
 // Fetch avatar image as blob URL (with auth header)
 function fetchAvatarBlob() {
@@ -1046,7 +1046,7 @@ function openSettingsModal() {
     document.getElementById(id + '-preview').style.background = val;
   });
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
-  document.getElementById('cfg-language').value = s.language || 'de';
+  document.getElementById('cfg-language').value = getLang();
 
   // Set active contrast/hour-height buttons
   [

@@ -364,13 +364,16 @@ const translations = {
   },
 };
 
-let currentLang = 'de';
+let currentLang = (() => {
+  try { const l = localStorage.getItem('lang'); return (l && translations[l]) ? l : 'de'; } catch (_) { return 'de'; }
+})();
 
 export function getLang() { return currentLang; }
 
 export function setLang(lang) {
   currentLang = (lang && translations[lang]) ? lang : 'de';
   document.documentElement.lang = currentLang;
+  try { localStorage.setItem('lang', currentLang); } catch (_) {}
   applyLang();
 }
 

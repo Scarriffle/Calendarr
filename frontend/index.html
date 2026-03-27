@@ -385,14 +385,14 @@
       <button class="icon-btn modal-close" data-modal="modal-settings" style="margin-right:8px">
         <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
       </button>
-      <h3>Einstellungen</h3>
-      <button class="btn btn-primary" id="settings-save" style="margin-left:auto">Speichern</button>
+      <h3 data-i18n="settings_title">Einstellungen</h3>
+      <button class="btn btn-primary" id="settings-save" style="margin-left:auto" data-i18n="save">Speichern</button>
     </div>
     <div class="settings-page-body">
       <nav class="settings-nav">
-        <button class="settings-nav-btn active" data-panel="general">Darstellung</button>
-        <button class="settings-nav-btn" data-panel="google">Google Konten</button>
-        <button class="settings-nav-btn hidden" data-panel="users" id="settings-nav-users">Benutzerverwaltung</button>
+        <button class="settings-nav-btn active" data-panel="general" data-i18n="settings_nav_appearance">Darstellung</button>
+        <button class="settings-nav-btn" data-panel="google" data-i18n="settings_nav_google">Google Konten</button>
+        <button class="settings-nav-btn hidden" data-panel="users" id="settings-nav-users" data-i18n="settings_nav_users">Benutzerverwaltung</button>
       </nav>
 
       <div class="settings-panels">
@@ -400,7 +400,15 @@
         <!-- Einstellungen (merged: Darstellung + Ansicht & Raster + Ausgeblendete Kalender) -->
         <div class="settings-panel active" id="settings-panel-general">
 
-          <h4 class="panel-title" data-i18n="settings_colors">Farben</h4>
+          <h4 class="panel-title" data-i18n="settings_language">Sprache</h4>
+          <div class="form-group">
+            <select id="cfg-language">
+              <option value="de">Deutsch</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_colors">Farben</h4>
           <div class="form-group">
             <label data-i18n="settings_primary_color">Primärfarbe</label>
             <div class="ev-color-row">
@@ -472,14 +480,6 @@
             <button class="contrast-btn" data-val="60"><span class="hour-preview">━━━</span><span class="contrast-lbl" data-i18n="hour_normal">Normal</span></button>
             <button class="contrast-btn" data-val="80"><span class="hour-preview">━━━━</span><span class="contrast-lbl" data-i18n="hour_comfort">Komfort</span></button>
             <button class="contrast-btn" data-val="100"><span class="hour-preview">━━━━━</span><span class="contrast-lbl" data-i18n="hour_large">Gross</span></button>
-          </div>
-
-          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_language">Sprache</h4>
-          <div class="form-group">
-            <select id="cfg-language">
-              <option value="de">Deutsch</option>
-              <option value="en">English</option>
-            </select>
           </div>
 
           <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_hidden_cals">Ausgeblendete Kalender</h4>
