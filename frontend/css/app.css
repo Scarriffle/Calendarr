@@ -405,7 +405,8 @@ a { color: var(--primary); text-decoration: none; }
 }
 .cal-item-dot:hover { outline: 2px solid var(--text-2); outline-offset: 1px; }
 .cal-item input[type=checkbox] { accent-color: var(--primary); width: 14px; height: 14px; }
-.cal-item-name { font-size: 13px; flex: 1; color: var(--text-1); cursor: default; }
+.cal-item-name { font-size: 13px; flex: 1; min-width: 0; color: var(--text-1); cursor: default; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-item-remove { flex-shrink: 0; }
 .cal-rename-input {
   font-size: 13px; flex: 1; color: var(--text-1);
   background: var(--bg-app); border: 1px solid var(--primary);
