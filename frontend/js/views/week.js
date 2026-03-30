@@ -183,8 +183,6 @@ function layoutEvents(events) {
 
   const result = sorted.map(ev => {
     const start = new Date(ev.start);
-    const end   = new Date(ev.end);
-
     let placed = false;
     for (let c = 0; c < columns.length; c++) {
       const lastInCol = columns[c][columns[c].length - 1];
@@ -204,6 +202,7 @@ function layoutEvents(events) {
 
   return result.map(ev => {
     const start = new Date(ev.start);
+    const end   = new Date(ev.end);
     let maxCol = ev._col;
     sorted.forEach(other => {
       if (other === ev) return;

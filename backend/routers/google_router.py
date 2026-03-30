@@ -26,6 +26,11 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 CALENDAR_API = "https://www.googleapis.com/calendar/v3"
 
+# System/virtual Google calendars that should never be shown
+SKIP_GOOGLE_CALENDAR_IDS = {
+    "#weekNum@group.v.calendar.google.com",  # Kalenderwochen / Week numbers
+}
+
 
 def _google_configured() -> bool:
     return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
@@ -134,6 +139,7 @@ def _account_dict(a: models.GoogleAccount) -> dict:
                 "sidebar_hidden": bool(c.sidebar_hidden),
             }
             for c in a.calendars
+            if c.cal_id not in SKIP_GOOGLE_CALENDAR_IDS
         ],
     }
 
@@ -148,6 +154,8 @@ def _sync_google_calendars(account: models.GoogleAccount, db: Session):
             if cal.get("deleted"):
                 continue
             cal_id = cal["id"]
+            if cal_id in SKIP_GOOGLE_CALENDAR_IDS:
+                continue
             if cal_id not in existing:
                 db.add(models.GoogleCalendar(
                     account_id=account.id,
@@ -372,6 +380,8 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
     try:
         for gcal in account.calendars:
             if not gcal.enabled:
+                continue
+            if gcal.cal_id in SKIP_GOOGLE_CALENDAR_IDS:
                 continue
             events_resp = _google_api(token, f"/calendars/{gcal.cal_id}/events", params={
                 "timeMin": start_dt.isoformat(),
