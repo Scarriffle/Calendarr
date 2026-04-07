@@ -73,12 +73,54 @@ export async function initCalendar() {
 }
 
 // ── Event cache ───────────────────────────────────────────
-const eventCache = { start: null, end: null, events: [] };
+const CACHE_BUF      = 56 * 86400000; // initial ±8 weeks
+const PREFETCH_EXT   = 56 * 86400000; // extend by 8 weeks when triggered
+const PREFETCH_EDGE  = 28 * 86400000; // trigger when within 4 weeks of cache edge
+
+const eventCache = {
+  start: null, end: null, events: [],
+  _fwdPending: false, _bwdPending: false,
+};
 
 function invalidateCache() {
-  eventCache.start  = null;
-  eventCache.end    = null;
-  eventCache.events = [];
+  eventCache.start      = null;
+  eventCache.end        = null;
+  eventCache.events     = [];
+  eventCache._fwdPending = false;
+  eventCache._bwdPending = false;
+}
+
+function _mergeEvents(newEvents) {
+  const seen = new Set(eventCache.events.map(e => e.id + '@@' + (e.url || '')));
+  for (const e of newEvents) {
+    const k = e.id + '@@' + (e.url || '');
+    if (!seen.has(k)) { seen.add(k); eventCache.events.push(e); }
+  }
+}
+
+// Fire-and-forget: extend the cache toward whichever edge the view is approaching
+function prefetchIfNeeded(viewStart, viewEnd) {
+  if (!eventCache.start || !eventCache.end) return;
+
+  if (!eventCache._fwdPending && (eventCache.end - viewEnd) < PREFETCH_EDGE) {
+    eventCache._fwdPending = true;
+    const from = new Date(eventCache.end);
+    const to   = new Date(eventCache.end.getTime() + PREFETCH_EXT);
+    api.get(`/caldav/events?start=${from.toISOString()}&end=${to.toISOString()}`)
+      .then(evs => { _mergeEvents(evs); eventCache.end = to; })
+      .catch(() => {})
+      .finally(() => { eventCache._fwdPending = false; });
+  }
+
+  if (!eventCache._bwdPending && (viewStart - eventCache.start) < PREFETCH_EDGE) {
+    eventCache._bwdPending = true;
+    const from = new Date(eventCache.start.getTime() - PREFETCH_EXT);
+    const to   = new Date(eventCache.start);
+    api.get(`/caldav/events?start=${from.toISOString()}&end=${to.toISOString()}`)
+      .then(evs => { _mergeEvents(evs); eventCache.start = from; })
+      .catch(() => {})
+      .finally(() => { eventCache._bwdPending = false; });
+  }
 }
 
 // ── Data fetching ─────────────────────────────────────────
@@ -92,13 +134,13 @@ async function fetchAndRender(force = false) {
     renderView();
     updateTitle();
     renderMiniCal();
+    prefetchIfNeeded(start, end); // extend cache in background if approaching an edge
     return;
   }
 
   // Cache miss: fetch a wider window (±8 weeks) so subsequent navigation is instant
-  const BUF = 56 * 86400000; // 8 weeks in ms
-  const fetchStart = new Date(start.getTime() - BUF);
-  const fetchEnd   = new Date(end.getTime()   + BUF);
+  const fetchStart = new Date(start.getTime() - CACHE_BUF);
+  const fetchEnd   = new Date(end.getTime()   + CACHE_BUF);
 
   showLoading();
   try {
