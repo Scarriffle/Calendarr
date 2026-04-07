@@ -4,6 +4,7 @@ import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
 import { openColorPicker } from './color-picker.js';
+import { openDatePicker, formatDtDisplay } from './date-picker.js';
 import { t, setLang, getLang } from './i18n.js';
 
 // Fetch avatar image as blob URL (with auth header)
@@ -540,12 +541,13 @@ function bindTopbar() {
   document.getElementById('btn-settings').onclick = openSettingsModal;
   document.getElementById('btn-create-event').onclick = () => openNewEventModal(new Date());
 
-  // Mouse wheel / trackpad scroll navigation
-  let _wheelTimer = null;
+  // Mouse wheel / trackpad scroll navigation (500ms cooldown = 1 nav per gesture)
+  let _wheelLast = 0;
   document.getElementById('view-container').addEventListener('wheel', e => {
     e.preventDefault();
-    if (_wheelTimer) return;
-    _wheelTimer = setTimeout(() => { _wheelTimer = null; }, 80);
+    const now = Date.now();
+    if (now - _wheelLast < 500) return;
+    _wheelLast = now;
     const dir = e.deltaY > 0 ? 1 : -1;
     if (state.currentView === 'agenda') return;
     if (state.currentView === 'month') {
@@ -710,6 +712,17 @@ function populateCalendarSelect(selectedId) {
   });
 }
 
+// ── Date field helpers ────────────────────────────────────
+function setDtValue(id, isoStr, mode) {
+  const input = document.getElementById(id);
+  if (input) input.value = isoStr || '';
+  const display = document.getElementById(id + '-display');
+  if (display) {
+    display.querySelector('.dt-display-text').textContent =
+      formatDtDisplay(isoStr, mode, getLang());
+  }
+}
+
 function openNewEventModal(date) {
   state.editingEvent = null;
   state.selectedEventColor = '';
@@ -723,10 +736,10 @@ function openNewEventModal(date) {
   const start = new Date(date);
   const end   = new Date(date);
   end.setHours(end.getHours() + 1);
-  document.getElementById('ev-start').value = toLocalDatetimeInput(start);
-  document.getElementById('ev-end').value   = toLocalDatetimeInput(end);
-  document.getElementById('ev-start-date').value = toDateInput(start);
-  document.getElementById('ev-end-date').value   = toDateInput(start);
+  setDtValue('ev-start',      toLocalDatetimeInput(start), 'datetime');
+  setDtValue('ev-end',        toLocalDatetimeInput(end),   'datetime');
+  setDtValue('ev-start-date', toDateInput(start),          'date');
+  setDtValue('ev-end-date',   toDateInput(start),          'date');
 
   toggleAlldayFields(false);
   populateCalendarSelect(null);
@@ -746,14 +759,14 @@ function openEditEventModal(ev) {
   document.getElementById('ev-allday').checked    = ev.allDay;
 
   if (ev.allDay) {
-    document.getElementById('ev-start-date').value = ev.start.slice(0, 10);
-    document.getElementById('ev-end-date').value   = ev.end.slice(0, 10);
+    setDtValue('ev-start-date', ev.start.slice(0, 10), 'date');
+    setDtValue('ev-end-date',   ev.end.slice(0, 10),   'date');
     toggleAlldayFields(true);
   } else {
     const s = new Date(ev.start);
     const e = new Date(ev.end);
-    document.getElementById('ev-start').value = toLocalDatetimeInput(s);
-    document.getElementById('ev-end').value   = toLocalDatetimeInput(e);
+    setDtValue('ev-start', toLocalDatetimeInput(s), 'datetime');
+    setDtValue('ev-end',   toLocalDatetimeInput(e), 'datetime');
     toggleAlldayFields(false);
   }
 
@@ -779,6 +792,24 @@ function resetColorPicker(color) {
 function bindEventModal() {
   document.getElementById('ev-allday').addEventListener('change', e => {
     toggleAlldayFields(e.target.checked);
+  });
+
+  // Date/time pickers
+  [
+    { displayId: 'ev-start-display',      inputId: 'ev-start',      mode: 'datetime' },
+    { displayId: 'ev-end-display',        inputId: 'ev-end',        mode: 'datetime' },
+    { displayId: 'ev-start-date-display', inputId: 'ev-start-date', mode: 'date'     },
+    { displayId: 'ev-end-date-display',   inputId: 'ev-end-date',   mode: 'date'     },
+  ].forEach(({ displayId, inputId, mode }) => {
+    const disp = document.getElementById(displayId);
+    if (!disp) return;
+    const open = async () => {
+      const current = document.getElementById(inputId)?.value || '';
+      const result  = await openDatePicker(disp, current, mode);
+      if (result !== null) setDtValue(inputId, result, mode);
+    };
+    disp.addEventListener('click', open);
+    disp.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') open(); });
   });
 
   // Color picker: click preview to open gradient picker

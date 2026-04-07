@@ -469,8 +469,7 @@ a { color: var(--primary); text-decoration: none; }
   letter-spacing: .5px; color: var(--text-2);
 }
 .month-kw-cell {
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 38px;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 38px;
   display: flex; align-items: flex-start; justify-content: center;
   padding-top: 6px;
   font-size: 13px; color: var(--text-3); font-weight: 700;
@@ -478,32 +477,34 @@ a { color: var(--primary); text-decoration: none; }
   cursor: default; user-select: none; z-index: 1;
   background: var(--bg-app);
 }
-.month-cell {
-  flex: 1;
-  border-right: 1px solid var(--border);
-  padding: 4px 4px 0;
-  cursor: pointer;
-  transition: background var(--transition);
-  min-width: 0;
+/* Full-height column divs — click target + border */
+.month-col {
+  flex: 1; border-right: 1px solid var(--border);
+  cursor: pointer; transition: background var(--transition);
+  padding: 4px 4px 0; min-width: 0;
 }
-.month-cell:last-child { border-right: none; }
-.month-cell:hover { background: var(--bg-hover); }
-.month-cell.today { background: rgba(66,133,244,.08); }
-.month-cell.other-month .cell-day { color: var(--text-3); }
+.month-col:last-child { border-right: none; }
+.month-col:hover { background: var(--bg-hover); }
+.month-col.today { background: rgba(66,133,244,.08); }
+.month-col.other-month .cell-day { color: var(--text-3); }
 .cell-day {
   font-size: 12px; font-weight: 500; color: var(--text-2);
   width: 26px; height: 26px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%; flex-shrink: 0;
 }
-.cell-day.today {
-  background: var(--today-color);
-  color: #fff; font-weight: 700;
+.cell-day.today { background: var(--today-color); color: #fff; font-weight: 700; }
+/* Events overlay — pointer-events:none so clicks pass to columns */
+.month-events-overlay {
+  position: absolute; top: 30px; left: 0; right: 0; bottom: 0;
+  pointer-events: none; overflow: hidden; z-index: 2;
 }
 .month-more {
   position: absolute;
   font-size: 11px; color: var(--text-2); padding: 0 4px;
   cursor: pointer; font-weight: 500;
+  pointer-events: all;
+  white-space: nowrap; overflow: hidden;
 }
 .month-more:hover { color: var(--primary); }
 
@@ -901,32 +902,24 @@ a { color: var(--primary); text-decoration: none; }
   display: flex; flex-direction: column; flex: 1; overflow: hidden;
 }
 .month-row {
-  display: flex; flex: 1; position: relative; min-height: 0;
+  display: flex; flex: 1; position: relative; min-height: 100px;
   border-bottom: 1px solid var(--border);
 }
 .month-row:last-child { border-bottom: none; }
+/* row-right: flex row containing 7 full-height column divs + events overlay */
 .month-row-right {
-  margin-left: 38px; display: flex; flex-direction: column; flex: 1; min-width: 0;
-}
-.month-day-strip {
-  display: flex; flex-shrink: 0;
-}
-.month-events-area {
-  position: relative; flex: 1;
-  min-height: 72px; /* 3 lanes × 22px + 6px padding */
-  overflow: hidden;
+  margin-left: 38px; display: flex; flex: 1; position: relative; min-width: 0;
 }
 .month-span-event {
   position: absolute;
   height: 18px; line-height: 18px;
-  border-radius: 3px;
-  padding: 0 6px;
+  border-radius: 3px; padding: 0 6px;
   font-size: 11px; font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   cursor: pointer; color: #fff;
   transition: filter var(--transition);
   box-sizing: border-box;
-  z-index: 2;
+  pointer-events: all;
 }
 .month-span-event:hover { filter: brightness(1.15); }
 .month-span-event.past { opacity: .45; }
@@ -946,4 +939,119 @@ a { color: var(--primary); text-decoration: none; }
   .view-switcher .view-btn { padding: 6px 8px; font-size: 12px; }
   .logo-text { display: none; }
   .view-title { font-size: 16px; }
+}
+
+/* ── Custom Date/Time Display Field ─────────────────────── */
+.dt-display {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: border-color var(--transition);
+  user-select: none;
+  min-height: 42px;
+}
+.dt-display:hover, .dt-display:focus { border-color: var(--primary); outline: none; }
+.dt-display-text { font-size: 14px; }
+.dt-display-icon { color: var(--text-3); flex-shrink: 0; margin-left: 6px; }
+
+/* ── Date/Time Picker Card ───────────────────────────────── */
+.dtp-overlay {
+  position: fixed; inset: 0; z-index: 700;
+}
+.dtp-card {
+  position: fixed; z-index: 701;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 16px;
+  width: 272px;
+  user-select: none;
+}
+/* Calendar header */
+.dtp-cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.dtp-month-label {
+  font-size: 14px; font-weight: 600; color: var(--text-1);
+}
+.dtp-nav-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 22px; line-height: 1;
+  padding: 2px 6px; border-radius: var(--radius-sm);
+  transition: background var(--transition), color var(--transition);
+}
+.dtp-nav-btn:hover { background: var(--bg-hover); color: var(--text-1); }
+/* Day-of-week headers */
+.dtp-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px; margin-bottom: 4px;
+}
+.dtp-dow {
+  text-align: center; font-size: 11px; font-weight: 600;
+  color: var(--text-3); padding: 4px 0; text-transform: uppercase;
+}
+/* Day cells */
+.dtp-day {
+  display: flex; align-items: center; justify-content: center;
+  height: 34px; border-radius: 6px;
+  font-size: 13px; font-weight: 500; color: var(--text-1);
+  cursor: pointer; transition: background var(--transition);
+}
+.dtp-day:hover { background: var(--bg-hover); }
+.dtp-day.other { color: var(--text-3); }
+.dtp-day.other:hover { background: var(--bg-hover); }
+.dtp-day.today { color: var(--primary); font-weight: 700; }
+.dtp-day.selected {
+  background: var(--primary) !important;
+  color: #fff !important; font-weight: 700;
+}
+/* Time picker */
+.dtp-time-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 4px; margin: 12px 0 8px;
+  border-top: 1px solid var(--border-light);
+  padding-top: 12px;
+}
+.dtp-colon {
+  font-size: 22px; font-weight: 600; color: var(--text-2);
+  padding: 0 2px; line-height: 1;
+  align-self: center;
+}
+.dtp-tc-wrap {
+  position: relative; width: 64px;
+}
+.dtp-tc {
+  height: calc(3 * 40px);     /* 120px = 3 visible items */
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  padding: 40px 0;            /* top/bottom padding so first/last can center */
+  box-sizing: content-box;
+}
+.dtp-tc::-webkit-scrollbar { display: none; }
+.dtp-ti {
+  height: 40px; line-height: 40px;
+  text-align: center; font-size: 20px; font-weight: 500;
+  scroll-snap-align: center;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-2);
+  transition: background .1s, color .1s;
+}
+.dtp-ti:hover { color: var(--text-1); }
+.dtp-ti.selected {
+  background: var(--primary);
+  color: #fff;
+}
+/* Actions */
+.dtp-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid var(--border-light);
 }
