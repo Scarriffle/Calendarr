@@ -72,12 +72,40 @@ export async function initCalendar() {
   bindProfileModal();
 }
 
+// ── Event cache ───────────────────────────────────────────
+const eventCache = { start: null, end: null, events: [] };
+
+function invalidateCache() {
+  eventCache.start  = null;
+  eventCache.end    = null;
+  eventCache.events = [];
+}
+
 // ── Data fetching ─────────────────────────────────────────
-async function fetchAndRender() {
+async function fetchAndRender(force = false) {
   const { start, end } = getViewRange();
+
+  // Cache hit: requested range is fully within what we already have
+  if (!force && eventCache.start && eventCache.end &&
+      start >= eventCache.start && end <= eventCache.end) {
+    state.events = eventCache.events;
+    renderView();
+    updateTitle();
+    renderMiniCal();
+    return;
+  }
+
+  // Cache miss: fetch a wider window (±8 weeks) so subsequent navigation is instant
+  const BUF = 56 * 86400000; // 8 weeks in ms
+  const fetchStart = new Date(start.getTime() - BUF);
+  const fetchEnd   = new Date(end.getTime()   + BUF);
+
   showLoading();
   try {
-    const events = await api.get(`/caldav/events?start=${start.toISOString()}&end=${end.toISOString()}`);
+    const events = await api.get(`/caldav/events?start=${fetchStart.toISOString()}&end=${fetchEnd.toISOString()}`);
+    eventCache.start  = fetchStart;
+    eventCache.end    = fetchEnd;
+    eventCache.events = events;
     state.events = events;
   } catch (e) {
     showToast(t('error_load_events') + ': ' + e.message, true);
@@ -676,7 +704,7 @@ function showEventPopup(ev, anchor) {
         await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
       }
       showToast(t('event_deleted'));
-      fetchAndRender();
+      fetchAndRender(true);
     } catch (e) { showToast(e.message, true); }
   };
   document.getElementById('popup-close').onclick = () => popup.classList.add('hidden');
@@ -916,7 +944,7 @@ function bindEventModal() {
         showToast(t('event_created'));
       }
       closeModal('modal-event');
-      fetchAndRender();
+      fetchAndRender(true);
     } catch (e) {
       showToast(e.message, true);
     }
@@ -940,7 +968,7 @@ function bindEventModal() {
       }
       showToast(t('event_deleted'));
       closeModal('modal-event');
-      fetchAndRender();
+      fetchAndRender(true);
     } catch (e) { showToast(e.message, true); }
   };
 }
@@ -993,7 +1021,7 @@ function bindAccountModal() {
       renderCalendarList();
       closeModal('modal-account');
       showToast(t("account_added", {name}));
-      fetchAndRender();
+      fetchAndRender(true);
     } catch (e) {
       errEl.textContent = e.message;
       errEl.classList.remove('hidden');
@@ -1081,7 +1109,7 @@ function bindICalSubModal() {
       renderCalendarList();
       closeModal('modal-ical-sub');
       showToast(t("ical_subscribed", {name}));
-      fetchAndRender();
+      fetchAndRender(true);
     } catch (e) {
       errEl.textContent = e.message;
       errEl.classList.remove('hidden');
@@ -1170,7 +1198,7 @@ function renderGoogleAccounts() {
         if (idx !== -1) state.googleAccounts[idx] = updated;
         renderGoogleAccounts();
         renderCalendarList();
-        fetchAndRender();
+        fetchAndRender(true);
         showToast(t('google_synced'));
       } catch (e) { showToast(e.message, true); }
     });
@@ -1183,7 +1211,7 @@ function renderGoogleAccounts() {
         state.googleAccounts = state.googleAccounts.filter(a => a.id !== parseInt(btn.dataset.disconnectAcc));
         renderGoogleAccounts();
         renderCalendarList();
-        fetchAndRender();
+        fetchAndRender(true);
         showToast(t('google_disconnected'));
       } catch (e) { showToast(e.message, true); }
     });
@@ -1214,7 +1242,7 @@ function renderAllAccounts() {
           btn.disabled = true; btn.textContent = '…';
           try {
             await api.post(`/caldav/accounts/${btn.dataset.caldavSync}/sync`);
-            renderCalendarList(); fetchAndRender();
+            renderCalendarList(); fetchAndRender(true);
             showToast(t('google_synced'));
           } catch (e) { showToast(e.message, true); }
           finally { btn.disabled = false; btn.textContent = t('sync'); }
@@ -1226,7 +1254,7 @@ function renderAllAccounts() {
           try {
             await api.delete(`/caldav/accounts/${btn.dataset.caldavDisconnect}`);
             state.accounts = state.accounts.filter(a => a.id !== parseInt(btn.dataset.caldavDisconnect));
-            renderAllAccounts(); renderCalendarList(); fetchAndRender();
+            renderAllAccounts(); renderCalendarList(); fetchAndRender(true);
             showToast(t('caldav_disconnected'));
           } catch (e) { showToast(e.message, true); }
         });
@@ -1274,7 +1302,7 @@ function renderAllAccounts() {
           try {
             await api.delete(`/ical/subscriptions/${btn.dataset.icalDelete}`);
             state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== parseInt(btn.dataset.icalDelete));
-            renderAllAccounts(); renderCalendarList(); fetchAndRender();
+            renderAllAccounts(); renderCalendarList(); fetchAndRender(true);
           } catch (e) { showToast(e.message, true); }
         });
       });
