@@ -1,23 +1,23 @@
-import { isToday, isPast, dayOfWeek, getISOWeekNumber } from '../utils.js';
+import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber } from '../utils.js';
 import { t } from '../i18n.js';
 
 const LANE_H    = 20; // px per lane (event height 18px + 2px gap)
 const MAX_LANES = 3;  // max visible lanes per row
 
+const NUM_ROWS = 5; // rolling view: always 5 weeks
+
 export function renderMonth(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
-  const year  = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const DOW   = weekStartDay === 'sunday' ? t('dow_sunday') : t('dow_monday');
+  // "Primary month" = currentDate's month (used for muting other-month days)
+  const primaryMonth = currentDate.getMonth();
+  const DOW = weekStartDay === 'sunday' ? t('dow_sunday') : t('dow_monday');
 
-  const firstDay = new Date(year, month, 1);
+  // Rolling grid: start at the week that contains currentDate
+  const gridStart = weekStart(currentDate, weekStartDay);
 
-  // Build 42-cell grid
+  // Build NUM_ROWS × 7 cells
   const cells = [];
-  const gridStart = new Date(firstDay);
-  const offset = dayOfWeek(firstDay, weekStartDay);
-  gridStart.setDate(gridStart.getDate() - offset);
   const d = new Date(gridStart);
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < NUM_ROWS * 7; i++) {
     cells.push(new Date(d));
     d.setDate(d.getDate() + 1);
   }
@@ -37,7 +37,7 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
 
   // Build rows
   let bodyHtml = '';
-  for (let row = 0; row < 6; row++) {
+  for (let row = 0; row < NUM_ROWS; row++) {
     const rowCells = cells.slice(row * 7, row * 7 + 7);
     const rowStart = new Date(rowCells[0]); rowStart.setHours(0, 0, 0, 0);
     const rowEnd   = new Date(rowCells[6]); rowEnd.setHours(0, 0, 0, 0);
@@ -119,7 +119,7 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
     let colsHtml = '';
     rowCells.forEach(cell => {
       const key      = dateKey(cell);
-      const isOther  = cell.getMonth() !== month;
+      const isOther  = cell.getMonth() !== primaryMonth;
       const todayCls = isToday(cell) ? 'today' : '';
       const otherCls = isOther       ? 'other-month' : '';
       const numCls   = isToday(cell) ? 'today' : '';
