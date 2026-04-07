@@ -98,6 +98,22 @@ function _mergeEvents(newEvents) {
   }
 }
 
+// Patch calendarColor in-place for all cached events belonging to a calendar,
+// then re-render immediately without a network round-trip.
+function applyCalendarColor(source, calId, color) {
+  const id = String(calId);
+  eventCache.events.forEach(ev => {
+    if (ev.source !== source) return;
+    const cid = String(ev.calendar_id);
+    if (cid === id || cid === source + '-' + id || cid.replace(source + '-', '') === id) {
+      ev.calendarColor = color;
+    }
+  });
+  state.events = eventCache.events;
+  renderCalendarList();
+  renderView();
+}
+
 // Fire-and-forget: extend the cache toward whichever edge the view is approaching
 function prefetchIfNeeded(viewStart, viewEnd) {
   if (!eventCache.start || !eventCache.end) return;
@@ -468,8 +484,7 @@ function renderCalendarList() {
         if (picked) {
           await api.put(`/local/calendars/${calId}`, { color: picked });
           if (cal) cal.color = picked;
-          renderCalendarList();
-          fetchAndRender();
+          applyCalendarColor('local', calId, picked);
         }
       } else if (source === 'ical') {
         const subId = parseInt(dot.dataset.subId);
@@ -478,8 +493,7 @@ function renderCalendarList() {
         if (picked) {
           await api.put(`/ical/subscriptions/${subId}`, { color: picked });
           if (sub) sub.color = picked;
-          renderCalendarList();
-          fetchAndRender();
+          applyCalendarColor('ical', subId, picked);
         }
       } else if (source === 'google') {
         const calId = parseInt(dot.dataset.calId);
@@ -492,8 +506,7 @@ function renderCalendarList() {
         if (picked) {
           await api.put(`/google/calendars/${calId}`, { color: picked });
           if (gcal) gcal.color = picked;
-          renderCalendarList();
-          fetchAndRender();
+          applyCalendarColor('google', calId, picked);
         }
       }
     });
@@ -1732,8 +1745,7 @@ async function openCalColorPicker(anchor, calId) {
       if (cal.id === calId) cal.color = picked;
     }
   }
-  renderCalendarList();
-  fetchAndRender();
+  applyCalendarColor('caldav', calId, picked);
 }
 
 // ── Avatar Crop ──────────────────────────────────────────
