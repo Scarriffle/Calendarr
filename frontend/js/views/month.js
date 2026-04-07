@@ -1,119 +1,183 @@
-import { formatDate, isSameDay, isToday, isPast, dayOfWeek, getISOWeekNumber } from '../utils.js';
+import { isToday, isPast, dayOfWeek, getISOWeekNumber } from '../utils.js';
 import { t } from '../i18n.js';
 
+const LANE_H    = 20; // px per lane (height 18px + 2px gap)
+const MAX_LANES = 3;  // max visible event lanes per row
+
 export function renderMonth(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
-  const year = currentDate.getFullYear();
+  const year  = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  const DOW = weekStartDay === 'sunday' ? t('dow_sunday') : t('dow_monday');
+  const DOW   = weekStartDay === 'sunday' ? t('dow_sunday') : t('dow_monday');
 
   const firstDay = new Date(year, month, 1);
-  const lastDay  = new Date(year, month + 1, 0);
 
-  // Start grid on the correct weekday
+  // Build 42-cell grid
+  const cells = [];
   const gridStart = new Date(firstDay);
   const offset = dayOfWeek(firstDay, weekStartDay);
   gridStart.setDate(gridStart.getDate() - offset);
-
-  const cells = [];
   const d = new Date(gridStart);
   for (let i = 0; i < 42; i++) {
     cells.push(new Date(d));
     d.setDate(d.getDate() + 1);
   }
 
-  // Build event map keyed by date string
-  const evMap = {};
-  events.forEach(ev => {
+  // Normalize each event's date range once
+  const normed = events.map(ev => {
     const s = new Date(ev.start);
-    const e = ev.allDay ? new Date(ev.end) : new Date(ev.end);
-    // Spread multi-day events across cells
-    const cur = new Date(s);
-    cur.setHours(0, 0, 0, 0);
-    const endNorm = new Date(e);
-    endNorm.setHours(0, 0, 0, 0);
-    if (ev.allDay && endNorm > cur) endNorm.setDate(endNorm.getDate() - 1);
-    while (cur <= endNorm) {
-      const key = dateKey(cur);
-      if (!evMap[key]) evMap[key] = [];
-      evMap[key].push(ev);
-      cur.setDate(cur.getDate() + 1);
-    }
+    s.setHours(0, 0, 0, 0);
+    const e = new Date(ev.end);
+    e.setHours(0, 0, 0, 0);
+    if (ev.allDay && e > s) e.setDate(e.getDate() - 1); // exclusive → inclusive
+    return { ev, ns: s, ne: e };
   });
 
-  // Header: KW-Spalte + Wochentage
-  const headerHtml = `<div class="month-kw-header">KW</div>` +
+  // Header
+  const headerHtml =
+    `<div class="month-kw-header">KW</div>` +
     DOW.map(d => `<div class="month-dow">${d}</div>`).join('');
 
-  // Build rows (6 weeks × 7 days)
-  let cellsHtml = '';
+  // Build rows
+  let bodyHtml = '';
   for (let row = 0; row < 6; row++) {
-    // KW cell for the first day of this row
-    const rowFirstDay = cells[row * 7];
-    const kw = getISOWeekNumber(rowFirstDay);
-    cellsHtml += `<div class="month-kw-cell">${kw}</div>`;
+    const rowCells = cells.slice(row * 7, row * 7 + 7);
+    const rowStart = new Date(rowCells[0]); rowStart.setHours(0, 0, 0, 0);
+    const rowEnd   = new Date(rowCells[6]); rowEnd.setHours(0, 0, 0, 0);
+    const kw = getISOWeekNumber(rowCells[0]);
 
-    for (let col = 0; col < 7; col++) {
-      const cell = cells[row * 7 + col];
-      const key = dateKey(cell);
-      const cellEvs = (evMap[key] || []).slice().sort((a, b) => {
-        if (a.allDay && !b.allDay) return -1;
-        if (!a.allDay && b.allDay) return 1;
-        return new Date(a.start) - new Date(b.start);
+    // Collect events overlapping this row
+    const rowItems = [];
+    normed.forEach(({ ev, ns, ne }) => {
+      if (ne < rowStart || ns > rowEnd) return;
+      const colStart = Math.max(0, daysBetween(rowStart, ns));
+      const colEnd   = Math.min(6, daysBetween(rowStart, ne));
+      if (colEnd < colStart) return;
+      const span = colEnd - colStart + 1;
+      rowItems.push({
+        ev,
+        colStart,
+        span,
+        continuesLeft:  ns < rowStart,
+        continuesRight: ne > rowEnd,
       });
+    });
 
-      const isOther = cell.getMonth() !== month;
-      const todayClass = isToday(cell) ? 'today' : '';
-      const otherClass = isOther ? 'other-month' : '';
-      const numClass = isToday(cell) ? 'today' : '';
+    // Sort: all-day first, then span desc, then start time
+    rowItems.sort((a, b) => {
+      if (a.ev.allDay && !b.ev.allDay) return -1;
+      if (!a.ev.allDay && b.ev.allDay) return 1;
+      if (b.span !== a.span) return b.span - a.span;
+      return new Date(a.ev.start) - new Date(b.ev.start);
+    });
 
-      const MAX_VISIBLE = 3;
-      const visible = cellEvs.slice(0, MAX_VISIBLE);
-      const hiddenCount = cellEvs.length - MAX_VISIBLE;
+    // Assign lanes (greedy interval packing)
+    const lanes = []; // { colEnd }
+    rowItems.forEach(item => {
+      let laneIdx = lanes.findIndex(l => item.colStart >= l.colEnd);
+      if (laneIdx === -1) { laneIdx = lanes.length; lanes.push({ colEnd: 0 }); }
+      item.lane = laneIdx;
+      lanes[laneIdx].colEnd = item.colStart + item.span;
+    });
 
-      const evHtml = visible.map(ev => {
-        const color = ev.color || ev.calendarColor || '#4285f4';
-        const pastClass = isPast(ev) ? 'past' : '';
-        const title = ev.allDay ? ev.title : `${fmtTime(new Date(ev.start))} ${ev.title}`;
-        return `<div class="month-event ${pastClass}" data-id="${ev.id}" data-url="${escAttr(ev.url)}"
-          style="background:${color};color:#fff"
-          title="${escAttr(ev.title)}">${escHtml(title)}</div>`;
-      }).join('');
+    // Track overflow per column
+    const overflowByCol = {};
+    rowItems.forEach(item => {
+      if (item.lane >= MAX_LANES) {
+        for (let c = item.colStart; c < item.colStart + item.span; c++) {
+          overflowByCol[c] = (overflowByCol[c] || 0) + 1;
+        }
+      }
+    });
 
-      const moreHtml = hiddenCount > 0
-        ? `<div class="month-more" data-date="${key}">${t('more_events', {n: hiddenCount})}</div>`
-        : '';
+    // Render event spans
+    let eventsHtml = '';
+    rowItems.forEach(item => {
+      if (item.lane >= MAX_LANES) return;
+      const { ev, colStart, span, continuesLeft, continuesRight } = item;
+      const leftPct  = (colStart / 7) * 100;
+      const widthPct = (span / 7) * 100 - 0.4;
+      const topPx    = item.lane * LANE_H + 2;
+      const color    = ev.color || ev.calendarColor || '#4285f4';
+      const pastCls  = isPast(ev) ? 'past' : '';
+      const cL = continuesLeft  ? 'continues-left'  : '';
+      const cR = continuesRight ? 'continues-right' : '';
+      const label = ev.allDay
+        ? ev.title
+        : `${fmtTime(new Date(ev.start))} ${ev.title}`;
+      eventsHtml += `<div class="month-span-event ${pastCls} ${cL} ${cR}"
+        data-id="${ev.id}" data-url="${escAttr(ev.url)}"
+        style="left:${leftPct.toFixed(3)}%;width:${widthPct.toFixed(3)}%;top:${topPx}px;background:${color}"
+        title="${escAttr(ev.title)}">${escHtml(label)}</div>`;
+    });
 
-      cellsHtml += `<div class="month-cell ${todayClass} ${otherClass}" data-date="${key}">
-        <div class="cell-day ${numClass}">${cell.getDate()}</div>
-        ${evHtml}${moreHtml}
+    // Render "+N more" per column
+    Object.entries(overflowByCol).forEach(([col, count]) => {
+      const c = parseInt(col);
+      const leftPct  = (c / 7) * 100;
+      const widthPct = (1 / 7) * 100;
+      eventsHtml += `<div class="month-more"
+        data-date="${dateKey(rowCells[c])}"
+        style="left:${leftPct.toFixed(3)}%;width:${widthPct.toFixed(3)}%;bottom:2px">${t('more_events', { n: count })}</div>`;
+    });
+
+    // Day cells (numbers only)
+    let dayCellsHtml = '';
+    rowCells.forEach(cell => {
+      const key      = dateKey(cell);
+      const isOther  = cell.getMonth() !== month;
+      const todayCls = isToday(cell) ? 'today' : '';
+      const otherCls = isOther       ? 'other-month' : '';
+      const numCls   = isToday(cell) ? 'today' : '';
+      dayCellsHtml += `<div class="month-cell ${todayCls} ${otherCls}" data-date="${key}">
+        <div class="cell-day ${numCls}">${cell.getDate()}</div>
       </div>`;
-    }
+    });
+
+    bodyHtml += `<div class="month-row">
+      <div class="month-kw-cell">${kw}</div>
+      <div class="month-row-right">
+        <div class="month-day-strip">${dayCellsHtml}</div>
+        <div class="month-events-area">${eventsHtml}</div>
+      </div>
+    </div>`;
   }
 
   container.innerHTML = `<div class="month-view">
     <div class="month-header">${headerHtml}</div>
-    <div class="month-grid">${cellsHtml}</div>
+    <div class="month-body">${bodyHtml}</div>
   </div>`;
 
-  // Events
-  container.querySelectorAll('.month-cell').forEach(cell => {
-    cell.addEventListener('click', e => {
-      const evEl = e.target.closest('.month-event');
-      if (evEl) {
-        e.stopPropagation();
-        const ev = events.find(ev => ev.id === evEl.dataset.id && ev.url === evEl.dataset.url);
-        if (ev) onEventClick(ev, evEl);
-        return;
-      }
-      const moreEl = e.target.closest('.month-more');
-      if (moreEl) {
-        e.stopPropagation();
-        onDayClick(new Date(moreEl.dataset.date + 'T00:00:00'));
-        return;
-      }
-      onDayClick(new Date(cell.dataset.date + 'T00:00:00'));
-    });
+  // Click handlers — event delegation
+  const body = container.querySelector('.month-body');
+  body.addEventListener('click', e => {
+    // Span event click
+    const spanEl = e.target.closest('.month-span-event');
+    if (spanEl) {
+      e.stopPropagation();
+      const ev = events.find(ev => ev.id === spanEl.dataset.id && ev.url === spanEl.dataset.url);
+      if (ev) onEventClick(ev, spanEl);
+      return;
+    }
+    // "+N more" click → day view
+    const moreEl = e.target.closest('.month-more');
+    if (moreEl) {
+      e.stopPropagation();
+      onDayClick(new Date(moreEl.dataset.date + 'T00:00:00'));
+      return;
+    }
+    // Day cell click → day view
+    const cellEl = e.target.closest('.month-cell');
+    if (cellEl) {
+      onDayClick(new Date(cellEl.dataset.date + 'T00:00:00'));
+    }
   });
+}
+
+// ── Helpers ───────────────────────────────────────────────
+
+function daysBetween(a, b) {
+  // Number of whole days from date a to date b (can be negative)
+  return Math.round((b - a) / 86400000);
 }
 
 function dateKey(d) {
@@ -127,6 +191,7 @@ function fmtTime(d) {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
 function escAttr(s) {
   return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }

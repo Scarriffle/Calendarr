@@ -539,6 +539,23 @@ function bindTopbar() {
 
   document.getElementById('btn-settings').onclick = openSettingsModal;
   document.getElementById('btn-create-event').onclick = () => openNewEventModal(new Date());
+
+  // Mouse wheel / trackpad scroll navigation
+  let _wheelTimer = null;
+  document.getElementById('view-container').addEventListener('wheel', e => {
+    e.preventDefault();
+    if (_wheelTimer) return;
+    _wheelTimer = setTimeout(() => { _wheelTimer = null; }, 80);
+    const dir = e.deltaY > 0 ? 1 : -1;
+    if (state.currentView === 'agenda') return;
+    if (state.currentView === 'month') {
+      state.currentDate = new Date(state.currentDate);
+      state.currentDate.setDate(state.currentDate.getDate() + dir * 7);
+      fetchAndRender();
+    } else {
+      navigate(dir);
+    }
+  }, { passive: false });
 }
 
 // ── Sidebar toggle ────────────────────────────────────────
@@ -1071,8 +1088,8 @@ function openSettingsModal() {
   const firstBtn = document.querySelector('.settings-nav-btn:not(.hidden)');
   if (firstBtn) activateSettingsPanel(firstBtn.dataset.panel);
 
-  // Render Google accounts and hidden calendars
-  renderGoogleAccounts();
+  // Render all accounts and hidden calendars
+  renderAllAccounts();
   renderHiddenCalendars();
 
   openModal('modal-settings');
@@ -1129,6 +1146,101 @@ function renderGoogleAccounts() {
   });
 }
 
+function renderAllAccounts() {
+  // CalDAV section
+  const caldavList = document.getElementById('accounts-caldav-list');
+  if (caldavList) {
+    if (!state.accounts.length) {
+      caldavList.innerHTML = `<span class="accounts-section-empty">${t('settings_no_caldav_accounts')}</span>`;
+    } else {
+      caldavList.innerHTML = state.accounts.map(acc =>
+        `<div class="accounts-row">
+          <div class="accounts-row-info">
+            <span class="accounts-row-name">${escHtml(acc.name)}</span>
+            <span class="accounts-row-sub">${escHtml(acc.url || '')}</span>
+          </div>
+          <div class="accounts-row-actions">
+            <button class="btn btn-secondary btn-sm" data-caldav-sync="${acc.id}">${t('sync')}</button>
+            <button class="btn btn-ghost btn-sm" data-caldav-disconnect="${acc.id}">${t('disconnect')}</button>
+          </div>
+        </div>`
+      ).join('');
+      caldavList.querySelectorAll('[data-caldav-sync]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true; btn.textContent = '…';
+          try {
+            await api.post(`/caldav/accounts/${btn.dataset.caldavSync}/sync`);
+            renderCalendarList(); fetchAndRender();
+            showToast(t('google_synced'));
+          } catch (e) { showToast(e.message, true); }
+          finally { btn.disabled = false; btn.textContent = t('sync'); }
+        });
+      });
+      caldavList.querySelectorAll('[data-caldav-disconnect]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm(t('confirm_caldav_disconnect'))) return;
+          try {
+            await api.delete(`/caldav/accounts/${btn.dataset.caldavDisconnect}`);
+            state.accounts = state.accounts.filter(a => a.id !== parseInt(btn.dataset.caldavDisconnect));
+            renderAllAccounts(); renderCalendarList(); fetchAndRender();
+            showToast(t('caldav_disconnected'));
+          } catch (e) { showToast(e.message, true); }
+        });
+      });
+    }
+  }
+
+  // Local calendars section
+  const localList = document.getElementById('accounts-local-list');
+  if (localList) {
+    if (!state.localCalendars.length) {
+      localList.innerHTML = `<span class="accounts-section-empty">${t('settings_no_local_cals')}</span>`;
+    } else {
+      localList.innerHTML = state.localCalendars.map(cal =>
+        `<div class="accounts-row">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            <span class="accounts-local-dot" style="background:${cal.color || '#34a853'}"></span>
+            <span class="accounts-row-name">${escHtml(cal.name)}</span>
+          </div>
+        </div>`
+      ).join('');
+    }
+  }
+
+  // iCal subscriptions section
+  const icalList = document.getElementById('accounts-ical-list');
+  if (icalList) {
+    if (!state.icalSubscriptions.length) {
+      icalList.innerHTML = `<span class="accounts-section-empty">${t('settings_no_ical_subs')}</span>`;
+    } else {
+      icalList.innerHTML = state.icalSubscriptions.map(sub =>
+        `<div class="accounts-row">
+          <div class="accounts-row-info">
+            <span class="accounts-row-name">${escHtml(sub.name)}</span>
+            <span class="accounts-row-sub">${escHtml(sub.url || '')}</span>
+          </div>
+          <div class="accounts-row-actions">
+            <button class="btn btn-ghost btn-sm" data-ical-delete="${sub.id}">${t('delete')}</button>
+          </div>
+        </div>`
+      ).join('');
+      icalList.querySelectorAll('[data-ical-delete]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm(t('confirm_remove_ical'))) return;
+          try {
+            await api.delete(`/ical/subscriptions/${btn.dataset.icalDelete}`);
+            state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== parseInt(btn.dataset.icalDelete));
+            renderAllAccounts(); renderCalendarList(); fetchAndRender();
+          } catch (e) { showToast(e.message, true); }
+        });
+      });
+    }
+  }
+
+  // Google accounts section — delegate to existing function
+  renderGoogleAccounts();
+}
+
 function renderHiddenCalendars() {
   const list = document.getElementById('hidden-cals-list');
   const hidden = [];
@@ -1147,7 +1259,7 @@ function renderHiddenCalendars() {
     return;
   }
   list.innerHTML = hidden.map(c =>
-    `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-light)">
       <span style="font-size:13px">${escHtml(c.acc)} / ${escHtml(c.name)}</span>
       <button class="btn btn-secondary btn-sm" data-restore-cal="${c.id}" data-restore-source="${c.source}">${t('show_cal')}</button>
     </div>`
