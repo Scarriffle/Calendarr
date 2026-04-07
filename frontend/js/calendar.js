@@ -93,10 +93,11 @@ function getViewRange() {
   let start, end;
 
   if (state.currentView === 'month') {
-    start = new Date(d.getFullYear(), d.getMonth(), 1);
-    start.setDate(start.getDate() - dayOfWeek(start, weekStartDay) - 1);
-    end   = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    end.setDate(end.getDate() + (6 - dayOfWeek(end, weekStartDay)) + 1);
+    // Rolling view: 5 weeks from the start of currentDate's week
+    start = weekStart(d, weekStartDay);
+    start.setDate(start.getDate() - 1); // 1-day buffer
+    end = new Date(start);
+    end.setDate(start.getDate() + 37);  // 5 weeks + buffer
   } else if (state.currentView === 'week') {
     start = weekStart(d, weekStartDay);
     end = new Date(start);
@@ -165,7 +166,17 @@ function updateTitle() {
   let title = '';
   const M = t('months');
   if (state.currentView === 'month') {
-    title = `${M[d.getMonth()]} ${d.getFullYear()}`;
+    // Show date range of the rolling 5-week window
+    const ws = weekStart(d, weekStartDay);
+    const we = new Date(ws); we.setDate(we.getDate() + 34); // last day of 5th week
+    const Ms = t('months_short');
+    if (ws.getFullYear() !== we.getFullYear()) {
+      title = `${Ms[ws.getMonth()]} ${ws.getFullYear()} – ${Ms[we.getMonth()]} ${we.getFullYear()}`;
+    } else if (ws.getMonth() !== we.getMonth()) {
+      title = `${Ms[ws.getMonth()]} – ${Ms[we.getMonth()]} ${we.getFullYear()}`;
+    } else {
+      title = `${M[ws.getMonth()]} ${ws.getFullYear()}`;
+    }
   } else if (state.currentView === 'week') {
     const mon = weekStart(d, weekStartDay);
     const sun = new Date(mon);
@@ -507,7 +518,9 @@ function renderCalendarList() {
 function navigate(dir) {
   const d = state.currentDate;
   if (state.currentView === 'month') {
-    state.currentDate = new Date(d.getFullYear(), d.getMonth() + dir, 1);
+    // Buttons jump 4 weeks (one screenful)
+    state.currentDate = new Date(d);
+    state.currentDate.setDate(d.getDate() + dir * 28);
   } else if (state.currentView === 'week') {
     state.currentDate = new Date(d);
     state.currentDate.setDate(d.getDate() + dir * 7);
@@ -551,8 +564,8 @@ function bindTopbar() {
     const dir = e.deltaY > 0 ? 1 : -1;
     if (state.currentView === 'agenda') return;
     if (state.currentView === 'month') {
-      const d = state.currentDate;
-      state.currentDate = new Date(d.getFullYear(), d.getMonth() + dir, 1);
+      state.currentDate = new Date(state.currentDate);
+      state.currentDate.setDate(state.currentDate.getDate() + dir * 7);
       fetchAndRender();
     } else {
       navigate(dir);
