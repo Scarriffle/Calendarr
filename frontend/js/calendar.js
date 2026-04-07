@@ -551,8 +551,8 @@ function bindTopbar() {
     const dir = e.deltaY > 0 ? 1 : -1;
     if (state.currentView === 'agenda') return;
     if (state.currentView === 'month') {
-      state.currentDate = new Date(state.currentDate);
-      state.currentDate.setDate(state.currentDate.getDate() + dir * 7);
+      const d = state.currentDate;
+      state.currentDate = new Date(d.getFullYear(), d.getMonth() + dir, 1);
       fetchAndRender();
     } else {
       navigate(dir);
