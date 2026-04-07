@@ -1,8 +1,8 @@
 import { isToday, isPast, dayOfWeek, getISOWeekNumber } from '../utils.js';
 import { t } from '../i18n.js';
 
-const LANE_H    = 20; // px per lane (height 18px + 2px gap)
-const MAX_LANES = 3;  // max visible event lanes per row
+const LANE_H    = 20; // px per lane (event height 18px + 2px gap)
+const MAX_LANES = 3;  // max visible lanes per row
 
 export function renderMonth(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
   const year  = currentDate.getFullYear();
@@ -24,10 +24,8 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
 
   // Normalize each event's date range once
   const normed = events.map(ev => {
-    const s = new Date(ev.start);
-    s.setHours(0, 0, 0, 0);
-    const e = new Date(ev.end);
-    e.setHours(0, 0, 0, 0);
+    const s = new Date(ev.start); s.setHours(0, 0, 0, 0);
+    const e = new Date(ev.end);   e.setHours(0, 0, 0, 0);
     if (ev.allDay && e > s) e.setDate(e.getDate() - 1); // exclusive → inclusive
     return { ev, ns: s, ne: e };
   });
@@ -52,11 +50,10 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       const colStart = Math.max(0, daysBetween(rowStart, ns));
       const colEnd   = Math.min(6, daysBetween(rowStart, ne));
       if (colEnd < colStart) return;
-      const span = colEnd - colStart + 1;
       rowItems.push({
         ev,
         colStart,
-        span,
+        span: colEnd - colStart + 1,
         continuesLeft:  ns < rowStart,
         continuesRight: ne > rowEnd,
       });
@@ -71,7 +68,7 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
     });
 
     // Assign lanes (greedy interval packing)
-    const lanes = []; // { colEnd }
+    const lanes = [];
     rowItems.forEach(item => {
       let laneIdx = lanes.findIndex(l => item.colStart >= l.colEnd);
       if (laneIdx === -1) { laneIdx = lanes.length; lanes.push({ colEnd: 0 }); }
@@ -89,7 +86,7 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       }
     });
 
-    // Render event spans
+    // Render event spans HTML (placed in overlay)
     let eventsHtml = '';
     rowItems.forEach(item => {
       if (item.lane >= MAX_LANES) return;
@@ -110,25 +107,23 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
         title="${escAttr(ev.title)}">${escHtml(label)}</div>`;
     });
 
-    // Render "+N more" per column
+    // "+N more" per column
     Object.entries(overflowByCol).forEach(([col, count]) => {
       const c = parseInt(col);
-      const leftPct  = (c / 7) * 100;
-      const widthPct = (1 / 7) * 100;
       eventsHtml += `<div class="month-more"
         data-date="${dateKey(rowCells[c])}"
-        style="left:${leftPct.toFixed(3)}%;width:${widthPct.toFixed(3)}%;bottom:2px">${t('more_events', { n: count })}</div>`;
+        style="left:${((c / 7) * 100).toFixed(3)}%;width:${(100 / 7).toFixed(3)}%;bottom:2px">${t('more_events', { n: count })}</div>`;
     });
 
-    // Day cells (numbers only)
-    let dayCellsHtml = '';
+    // Full-height column divs (click targets + borders)
+    let colsHtml = '';
     rowCells.forEach(cell => {
       const key      = dateKey(cell);
       const isOther  = cell.getMonth() !== month;
       const todayCls = isToday(cell) ? 'today' : '';
       const otherCls = isOther       ? 'other-month' : '';
       const numCls   = isToday(cell) ? 'today' : '';
-      dayCellsHtml += `<div class="month-cell ${todayCls} ${otherCls}" data-date="${key}">
+      colsHtml += `<div class="month-col ${todayCls} ${otherCls}" data-date="${key}">
         <div class="cell-day ${numCls}">${cell.getDate()}</div>
       </div>`;
     });
@@ -136,8 +131,8 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
     bodyHtml += `<div class="month-row">
       <div class="month-kw-cell">${kw}</div>
       <div class="month-row-right">
-        <div class="month-day-strip">${dayCellsHtml}</div>
-        <div class="month-events-area">${eventsHtml}</div>
+        ${colsHtml}
+        <div class="month-events-overlay">${eventsHtml}</div>
       </div>
     </div>`;
   }
@@ -147,7 +142,7 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
     <div class="month-body">${bodyHtml}</div>
   </div>`;
 
-  // Click handlers — event delegation
+  // Click handlers via event delegation on the body
   const body = container.querySelector('.month-body');
   body.addEventListener('click', e => {
     // Span event click
@@ -158,17 +153,17 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       if (ev) onEventClick(ev, spanEl);
       return;
     }
-    // "+N more" click → day view
+    // "+N more" → navigate to day view
     const moreEl = e.target.closest('.month-more');
     if (moreEl) {
       e.stopPropagation();
       onDayClick(new Date(moreEl.dataset.date + 'T00:00:00'));
       return;
     }
-    // Day cell click → day view
-    const cellEl = e.target.closest('.month-cell');
-    if (cellEl) {
-      onDayClick(new Date(cellEl.dataset.date + 'T00:00:00'));
+    // Column click → navigate to day view
+    const colEl = e.target.closest('.month-col');
+    if (colEl) {
+      onDayClick(new Date(colEl.dataset.date + 'T00:00:00'));
     }
   });
 }
@@ -176,7 +171,6 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
 // ── Helpers ───────────────────────────────────────────────
 
 function daysBetween(a, b) {
-  // Number of whole days from date a to date b (can be negative)
   return Math.round((b - a) / 86400000);
 }
 
