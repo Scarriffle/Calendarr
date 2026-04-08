@@ -147,21 +147,15 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
         ${alldayCols}
       </div>
     </div>
-    <div class="week-body">
+    <div class="week-time-area">
       <div class="week-time-col">${timeLabels}</div>
       <div class="week-days-col">${dayCols}</div>
     </div>
   </div>`;
 
   // Scroll to ~8:00
-  const body = container.querySelector('.week-body');
-  if (body) body.scrollTop = 8 * hourH - 20;
-
-  // Align sticky header width to body content width (account for scrollbar)
-  const stickyTop = container.querySelector('.week-head-sticky');
-  if (body && stickyTop) {
-    stickyTop.style.paddingRight = (body.offsetWidth - body.clientWidth) + 'px';
-  }
+  const scrollEl = container.querySelector(`.${viewClass}`);
+  if (scrollEl) scrollEl.scrollTop = 8 * hourH - 20;
 
   // Render current-time line
   renderNowLine(container, days, hourH);
@@ -171,7 +165,7 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
     col.addEventListener('click', e => {
       if (e.target.closest('.timed-event')) return;
       const rect = col.getBoundingClientRect();
-      const y    = e.clientY - rect.top + (container.querySelector('.week-body')?.scrollTop || 0);
+      const y    = e.clientY - rect.top + (scrollEl?.scrollTop || 0);
       const h    = Math.floor(y / hourH);
       const m    = Math.round(((y % hourH) / hourH * 60) / 15) * 15;
       const date = new Date(col.dataset.date + 'T00:00:00');

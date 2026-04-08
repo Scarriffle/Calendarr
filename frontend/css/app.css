@@ -509,7 +509,7 @@ a { color: var(--primary); text-decoration: none; }
 .month-more:hover { color: var(--primary); }
 
 /* ── Week / Day Views ───────────────────────────────────── */
-.week-view, .day-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.week-view, .day-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: scroll; }
 .week-head-sticky {
   flex-shrink: 0; position: sticky; top: 0; z-index: 10;
   background: var(--bg-app);
@@ -573,7 +573,7 @@ a { color: var(--primary); text-decoration: none; }
 .col-span-tint { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 
 /* Time grid */
-.week-body { display: flex; flex: 1; overflow-y: scroll; position: relative; min-height: 0; }
+.week-time-area { display: flex; flex-shrink: 0; }
 .week-time-col { width: 56px; flex-shrink: 0; position: relative; }
 .time-label {
   height: var(--hour-h, 60px); display: flex; align-items: flex-start; justify-content: flex-end;
