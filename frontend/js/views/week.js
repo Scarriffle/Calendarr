@@ -20,15 +20,6 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   const timedEvs       = events.filter(ev => !ev.allDay);
   // Multi-day timed events: timed but spanning more than one calendar day
   const multiDayTimedEvs = timedEvs.filter(ev => !isSameDay(new Date(ev.start), new Date(ev.end)));
-  // Multi-day all-day events (exclusive end → subtract 1 day before comparing)
-  const multiDayAllDayEvs = allDayEvs.filter(ev => {
-    const s = new Date(ev.start);
-    const e = new Date(ev.end);
-    if (e > s) e.setDate(e.getDate() - 1); // exclusive → inclusive
-    return !isSameDay(s, e);
-  });
-  // All events that should generate a column background tint
-  const tintEvs = [...multiDayTimedEvs, ...multiDayAllDayEvs];
 
   // Returns true if event overlaps any part of the given day
   function spansDay(ev, day) {
@@ -58,6 +49,8 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   const ALLDAY_LANE_H = 22;
   const allDayAndMulti = [...allDayEvs, ...multiDayTimedEvs];
   const alldayLayout   = layoutWeekAllDay(allDayAndMulti, days);
+  // Items that span more than one column → used for column background tint
+  const multiDayLayoutItems = alldayLayout.filter(item => item.colEnd > item.colStart);
   const maxAlldayLane  = alldayLayout.length ? alldayLayout.reduce((m, it) => Math.max(m, it.lane), 0) : -1;
   const alldayRowH     = maxAlldayLane < 0 ? 28 : (maxAlldayLane + 1) * ALLDAY_LANE_H + 6;
 
@@ -95,7 +88,7 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   ).join('');
 
   // ── Day columns ───────────────────────────────────────
-  const dayCols = days.map(day => {
+  const dayCols = days.map((day, dayIdx) => {
     const key = dayKey(day);
     const dayEvs = timedEvs.filter(ev => {
       const s = new Date(ev.start);
@@ -130,8 +123,10 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       </div>`;
     }).join('');
 
-    // Background tint for days covered by multi-day events (timed or all-day)
-    const dayTintEvs = tintEvs.filter(ev => spansDay(ev, day));
+    // Background tint: reuse alldayLayout (proven correct) — colEnd > colStart = multi-day
+    const dayTintEvs = multiDayLayoutItems
+      .filter(item => dayIdx >= item.colStart && dayIdx <= item.colEnd)
+      .map(item => item.ev);
     const tintHtml = (() => {
       if (!dayTintEvs.length) return '';
       const colors = dayTintEvs.map(ev => ev.color || ev.calendarColor || '#4285f4');
