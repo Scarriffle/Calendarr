@@ -227,7 +227,7 @@ function renderView() {
       showEventPopup,
       false,
       weekStartDay,
-      state.settings.hour_height || 60
+      state.settings.hour_height || 54
     );
   } else if (state.currentView === 'day') {
     renderWeek(container, state.currentDate, evs,
@@ -235,7 +235,7 @@ function renderView() {
       showEventPopup,
       true,
       weekStartDay,
-      state.settings.hour_height || 60
+      state.settings.hour_height || 54
     );
   } else if (state.currentView === 'quarter') {
     renderQuarter(container, state.currentDate, evs,
@@ -653,15 +653,15 @@ function bindTopbar() {
   document.getElementById('btn-settings').onclick = openSettingsModal;
   document.getElementById('btn-create-event').onclick = () => openNewEventModal(new Date());
 
-  // Mouse wheel / trackpad scroll navigation (500ms cooldown = 1 nav per gesture)
+  // Mouse wheel / trackpad scroll navigation – only for month & quarter
   let _wheelLast = 0;
   document.getElementById('view-container').addEventListener('wheel', e => {
+    if (state.currentView !== 'month' && state.currentView !== 'quarter') return;
     e.preventDefault();
     const now = Date.now();
     if (now - _wheelLast < 500) return;
     _wheelLast = now;
     const dir = e.deltaY > 0 ? 1 : -1;
-    if (state.currentView === 'agenda') return;
     if (state.currentView === 'month') {
       state.currentDate = new Date(state.currentDate);
       state.currentDate.setDate(state.currentDate.getDate() + dir * 7);
@@ -1527,7 +1527,7 @@ function bindSettingsModal() {
       dim_past_events: document.getElementById('cfg-dim-past').checked,
       text_contrast:   getActive('cfg-text-contrast') || 3,
       line_contrast:   getActive('cfg-line-contrast') || 3,
-      hour_height:     getActive('cfg-hour-height')   || 60,
+      hour_height:     getActive('cfg-hour-height')   || 54,
       language:        document.getElementById('cfg-language').value,
     };
     try {
