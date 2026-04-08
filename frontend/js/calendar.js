@@ -731,12 +731,16 @@ function showEventPopup(ev, anchor) {
 
   // Time
   if (ev.allDay) {
-    document.getElementById('popup-time').textContent = 'Ganztägig';
+    document.getElementById('popup-time').textContent = t('allday_cap');
   } else {
     const s = new Date(ev.start);
     const e = new Date(ev.end);
-    document.getElementById('popup-time').textContent =
-      `${fmtDatetime(s)} – ${fmtTime(e)}`;
+    const sameDay = s.getFullYear() === e.getFullYear() &&
+                    s.getMonth()    === e.getMonth()    &&
+                    s.getDate()     === e.getDate();
+    document.getElementById('popup-time').textContent = sameDay
+      ? `${fmtDatetime(s)} – ${fmtTime(e)}`
+      : `${fmtDatetime(s)} – ${fmtDatetime(e)}`;
   }
 
   document.getElementById('popup-location').textContent = ev.location || '';
@@ -759,6 +763,33 @@ function showEventPopup(ev, anchor) {
     popup.classList.add('hidden');
     openEditEventModal(ev);
   };
+
+  // Copy to calendar
+  document.getElementById('popup-copy').onclick = e => {
+    e.stopPropagation();
+    const menu = document.getElementById('popup-copy-menu');
+    if (!menu.classList.contains('hidden')) { menu.classList.add('hidden'); return; }
+    const targets = buildWritableCalendars(ev);
+    if (!targets.length) { showToast('Keine Zielkalender verfügbar', true); return; }
+    menu.innerHTML = `<div class="popup-copy-label">${t('copy_to_calendar')}</div>` +
+      targets.map(c =>
+        `<div class="popup-copy-item" data-cal-idx="${c._idx}">
+          <span class="popup-copy-dot" style="background:${c.color}"></span>
+          <span>${escHtml(c.name)}</span>
+        </div>`
+      ).join('');
+    menu.classList.remove('hidden');
+    menu.querySelectorAll('.popup-copy-item').forEach(el => {
+      el.addEventListener('click', async ev2 => {
+        ev2.stopPropagation();
+        menu.classList.add('hidden');
+        popup.classList.add('hidden');
+        const cal = targets[parseInt(el.dataset.calIdx)];
+        await copyEventToCalendar(ev, cal);
+      });
+    });
+  };
+
   document.getElementById('popup-delete').onclick = async () => {
     if (!confirm(t("confirm_delete_event", {title: ev.title}))) return;
     popup.classList.add('hidden');
@@ -1880,4 +1911,49 @@ function fmtDatetime(d) {
 }
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function buildWritableCalendars(_excludeEv) {
+  const list = [];
+  let idx = 0;
+  for (const acc of state.accounts) {
+    for (const cal of acc.calendars) {
+      if (cal.sidebar_hidden) continue;
+      list.push({ _idx: idx++, id: cal.id, name: `${acc.name} / ${cal.name}`, color: cal.color || '#4285f4', type: 'caldav' });
+    }
+  }
+  for (const cal of state.localCalendars) {
+    list.push({ _idx: idx++, id: cal.id, name: cal.name, color: cal.color || '#34a853', type: 'local' });
+  }
+  for (const acc of state.googleAccounts) {
+    for (const cal of acc.calendars) {
+      if (cal.sidebar_hidden) continue;
+      list.push({ _idx: idx++, id: cal.id, name: `${acc.email} / ${cal.name}`, color: cal.color || '#4285f4', type: 'google' });
+    }
+  }
+  return list;
+}
+
+async function copyEventToCalendar(ev, cal) {
+  const { title, start, end, allDay, location, description, color } = ev;
+  try {
+    if (cal.type === 'google') {
+      await api.post('/google/events', {
+        calendar_db_id: cal.id, title, start, end, allDay,
+        location: location || '', description: description || '',
+      });
+    } else if (cal.type === 'local') {
+      await api.post('/local/events', {
+        calendar_id: cal.id, title, start, end, allDay,
+        location: location || '', description: description || '', color: color || null,
+      });
+    } else {
+      await api.post('/caldav/events', {
+        calendar_id: cal.id, title, start, end, allDay,
+        location: location || '', description: description || '', color: color || null,
+      });
+    }
+    showToast(t('event_copied'));
+    fetchAndRender(true);
+  } catch (e) { showToast(e.message, true); }
 }
