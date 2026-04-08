@@ -573,7 +573,7 @@ a { color: var(--primary); text-decoration: none; }
 .col-span-tint { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 
 /* Time grid */
-.week-body { display: flex; flex: 1; overflow-y: auto; position: relative; min-height: 0; scrollbar-gutter: stable; }
+.week-body { display: flex; flex: 1; overflow-y: scroll; position: relative; min-height: 0; }
 .week-time-col { width: 56px; flex-shrink: 0; position: relative; }
 .time-label {
   height: var(--hour-h, 60px); display: flex; align-items: flex-start; justify-content: flex-end;
