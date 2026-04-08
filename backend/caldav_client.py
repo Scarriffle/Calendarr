@@ -211,7 +211,8 @@ def update_event(
     url: str, username: str, password: str, event_url: str, data: Dict
 ):
     client = _client(url, username, password)
-    resource = client.event(url=event_url)
+    resource = caldav.Event(client=client, url=event_url)
+    resource.load()
     raw = resource.data
 
     cal = Calendar.from_ical(raw)
@@ -255,7 +256,7 @@ def update_event(
 
 def delete_event(url: str, username: str, password: str, event_url: str):
     client = _client(url, username, password)
-    resource = client.event(url=event_url)
+    resource = caldav.Event(client=client, url=event_url)
     resource.delete()
 
 

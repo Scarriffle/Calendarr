@@ -723,6 +723,7 @@ function bindSidebar() {
 // ── Event Popup ───────────────────────────────────────────
 function showEventPopup(ev, anchor) {
   const popup = document.getElementById('popup-event');
+  document.getElementById('popup-copy-menu').classList.add('hidden');
   popup.classList.remove('hidden');
 
   const color = ev.color || ev.calendarColor || '#4285f4';
@@ -1935,7 +1936,11 @@ function buildWritableCalendars(_excludeEv) {
 }
 
 async function copyEventToCalendar(ev, cal) {
-  const { title, start, end, allDay, location, description, color } = ev;
+  const { title, allDay, location, description, color } = ev;
+  // Normalize to UTC ISO string so the backend doesn't misinterpret bare local times
+  const toISO = s => (s && s.length > 10) ? new Date(s).toISOString() : s;
+  const start = allDay ? ev.start : toISO(ev.start);
+  const end   = allDay ? ev.end   : toISO(ev.end);
   try {
     if (cal.type === 'google') {
       await api.post('/google/events', {
