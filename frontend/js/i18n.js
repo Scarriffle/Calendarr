@@ -24,7 +24,7 @@ const translations = {
 
     // Topbar
     btn_today: 'Heute',
-    view_month: 'Monat', view_week: 'Woche', view_day: 'Tag', view_agenda: 'Termine',
+    view_month: 'Monat', view_week: 'Woche', view_day: 'Tag', view_quarter: 'Quartal', view_agenda: 'Termine',
     btn_profile: 'Profil', btn_logout: 'Abmelden',
 
     // Sidebar
@@ -218,7 +218,7 @@ const translations = {
 
     // Topbar
     btn_today: 'Today',
-    view_month: 'Month', view_week: 'Week', view_day: 'Day', view_agenda: 'Events',
+    view_month: 'Month', view_week: 'Week', view_day: 'Day', view_quarter: 'Quarter', view_agenda: 'Events',
     btn_profile: 'Profile', btn_logout: 'Log out',
 
     // Sidebar

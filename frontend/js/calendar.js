@@ -3,6 +3,7 @@ import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, date
 import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
+import { renderQuarter } from './views/quarter.js';
 import { openColorPicker } from './color-picker.js';
 import { openDatePicker, formatDtDisplay } from './date-picker.js';
 import { t, setLang, getLang } from './i18n.js';
@@ -193,6 +194,10 @@ function getViewRange() {
     start.setHours(0, 0, 0, 0);
     end = new Date(start);
     end.setDate(end.getDate() + 1);
+  } else if (state.currentView === 'quarter') {
+    const q = Math.floor(d.getMonth() / 3);
+    start = new Date(d.getFullYear(), q * 3, 1);
+    end   = new Date(d.getFullYear(), q * 3 + 3, 1);
   } else { // agenda
     start = new Date(d);
     start.setHours(0, 0, 0, 0);
@@ -231,6 +236,12 @@ function renderView() {
       true,
       weekStartDay,
       state.settings.hour_height || 60
+    );
+  } else if (state.currentView === 'quarter') {
+    renderQuarter(container, state.currentDate, evs,
+      date => { state.currentDate = date; state.currentView = 'day'; updateViewButtons(); fetchAndRender(); },
+      showEventPopup,
+      weekStartDay
     );
   } else {
     renderAgenda(container, state.currentDate, evs, showEventPopup);
@@ -273,6 +284,9 @@ function updateTitle() {
       : `${mon.getDate()}. ${M[mon.getMonth()]} – ${sun.getDate()}. ${M[sun.getMonth()]} ${sun.getFullYear()}`;
   } else if (state.currentView === 'day') {
     title = `${d.getDate()}. ${M[d.getMonth()]} ${d.getFullYear()}`;
+  } else if (state.currentView === 'quarter') {
+    const q = Math.floor(d.getMonth() / 3) + 1;
+    title = `Q${q} ${d.getFullYear()}`;
   } else {
     title = `${d.getDate()}. ${M[d.getMonth()]} ${d.getFullYear()}`;
   }
@@ -610,6 +624,8 @@ function navigate(dir) {
   } else if (state.currentView === 'day') {
     state.currentDate = new Date(d);
     state.currentDate.setDate(d.getDate() + dir);
+  } else if (state.currentView === 'quarter') {
+    state.currentDate = new Date(d.getFullYear(), d.getMonth() + dir * 3, 1);
   } else {
     state.currentDate = new Date(d);
     state.currentDate.setDate(d.getDate() + dir * 30);
