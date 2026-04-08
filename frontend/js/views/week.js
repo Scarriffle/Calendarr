@@ -74,7 +74,9 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       const s = new Date(ev.start);
       const e = new Date(ev.end);
       const top    = s.getHours() * hourH + s.getMinutes() * hourH / 60;
-      const height = Math.max(20, (e - s) / 60000 * hourH / 60);
+      const dayEnd = new Date(s); dayEnd.setHours(24, 0, 0, 0);
+      const clampedEnd = e > dayEnd ? dayEnd : e;
+      const height = Math.max(20, (clampedEnd - s) / 60000 * hourH / 60);
       const left   = (col / cols) * 100;
       const width  = (1 / cols) * 100 - 0.5;
       const color  = ev.color || ev.calendarColor || '#4285f4';
