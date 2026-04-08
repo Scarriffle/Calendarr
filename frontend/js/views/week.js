@@ -20,6 +20,15 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   const timedEvs       = events.filter(ev => !ev.allDay);
   // Multi-day timed events: timed but spanning more than one calendar day
   const multiDayTimedEvs = timedEvs.filter(ev => !isSameDay(new Date(ev.start), new Date(ev.end)));
+  // Multi-day all-day events (exclusive end → subtract 1 day before comparing)
+  const multiDayAllDayEvs = allDayEvs.filter(ev => {
+    const s = new Date(ev.start);
+    const e = new Date(ev.end);
+    if (e > s) e.setDate(e.getDate() - 1); // exclusive → inclusive
+    return !isSameDay(s, e);
+  });
+  // All events that should generate a column background tint
+  const tintEvs = [...multiDayTimedEvs, ...multiDayAllDayEvs];
 
   // Returns true if event overlaps any part of the given day
   function spansDay(ev, day) {
@@ -121,8 +130,8 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       </div>`;
     }).join('');
 
-    // Background tint for days covered by multi-day timed events
-    const tintHtml = multiDayTimedEvs.filter(ev => spansDay(ev, day)).map(ev => {
+    // Background tint for days covered by multi-day events (timed or all-day)
+    const tintHtml = tintEvs.filter(ev => spansDay(ev, day)).map(ev => {
       const color = ev.color || ev.calendarColor || '#4285f4';
       return `<div class="col-span-tint" style="background:${color}26"></div>`;
     }).join('');
