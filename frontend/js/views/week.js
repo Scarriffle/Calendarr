@@ -45,32 +45,40 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
     </div>`;
   }).join('');
 
-  // ── All-day row ───────────────────────────────────────
-  const alldayCols = days.map(day => {
-    const key = dayKey(day);
-    const dayEvs = allDayEvs.filter(ev => {
-      const s = new Date(ev.start); s.setHours(0,0,0,0);
-      const e = new Date(ev.end);   e.setHours(0,0,0,0);
-      const d = new Date(day);      d.setHours(0,0,0,0);
-      return d >= s && d < e || isSameDay(d, s);
-    });
-    const allDayHtml = dayEvs.map(ev => {
-      const color = ev.color || ev.calendarColor || '#4285f4';
-      return `<div class="allday-event" style="background:${color};color:#fff"
-        data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(ev.title)}">${escHtml(ev.title)}</div>`;
-    }).join('');
+  // ── All-day row (spanning bars, same logic as month view) ──
+  const ALLDAY_LANE_H = 22;
+  const allDayAndMulti = [...allDayEvs, ...multiDayTimedEvs];
+  const alldayLayout   = layoutWeekAllDay(allDayAndMulti, days);
+  const maxAlldayLane  = alldayLayout.length ? alldayLayout.reduce((m, it) => Math.max(m, it.lane), 0) : -1;
+  const alldayRowH     = maxAlldayLane < 0 ? 28 : (maxAlldayLane + 1) * ALLDAY_LANE_H + 6;
 
-    // Multi-day timed events: show in all-day row for every day they span
-    const spanHtml = multiDayTimedEvs.filter(ev => spansDay(ev, day)).map(ev => {
-      const color = ev.color || ev.calendarColor || '#4285f4';
-      const isStart = isSameDay(new Date(ev.start), day);
-      const label   = isStart ? `${fmtTime(new Date(ev.start))} ${ev.title}` : ev.title;
-      return `<div class="allday-event multiday-timed" style="background:${color};color:#fff"
-        data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(ev.title)}">${escHtml(label)}</div>`;
-    }).join('');
-
-    return `<div class="allday-col" data-date="${key}">${allDayHtml}${spanHtml}</div>`;
+  const alldaySpanHtml = alldayLayout.map(({ ev, colStart, colEnd, lane }) => {
+    const isMultiTimed = multiDayTimedEvs.includes(ev);
+    const n     = days.length;
+    const left  = (colStart / n) * 100;
+    const width = ((colEnd - colStart + 1) / n) * 100;
+    const top   = lane * ALLDAY_LANE_H + 2;
+    const color = ev.color || ev.calendarColor || '#4285f4';
+    const pastCls  = isPast(ev) ? 'past' : '';
+    const multiCls = isMultiTimed ? 'multiday-timed' : '';
+    const cL = new Date(ev.start) < new Date(days[0]) ? 'continues-left' : '';
+    const cR = new Date(ev.end)   > (() => { const d = new Date(days[n-1]); d.setHours(24,0,0,0); return d; })() ? 'continues-right' : '';
+    const label = isMultiTimed && isSameDay(new Date(ev.start), days[colStart])
+      ? `${fmtTime(new Date(ev.start))} ${ev.title}`
+      : ev.title;
+    return `<div class="allday-span ${pastCls} ${multiCls} ${cL} ${cR}"
+      style="left:calc(${left.toFixed(2)}% + 1px);width:calc(${width.toFixed(2)}% - 2px);top:${top}px;background:${color};color:#fff"
+      data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(ev.title)}">${escHtml(label)}</div>`;
   }).join('');
+
+  const alldayBgCols = days.map(day =>
+    `<div class="allday-col-bg" data-date="${dayKey(day)}"></div>`
+  ).join('');
+
+  const alldayCols = `<div class="allday-cols-wrap" style="height:${alldayRowH}px">
+    ${alldayBgCols}
+    <div class="allday-spans-layer">${alldaySpanHtml}</div>
+  </div>`;
 
   // ── Time column labels ────────────────────────────────
   const timeLabels = Array.from({length: 24}, (_, h) =>
@@ -180,8 +188,8 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
     });
   });
 
-  // Click: all-day event
-  container.querySelectorAll('.allday-event').forEach(el => {
+  // Click: all-day span
+  container.querySelectorAll('.allday-span').forEach(el => {
     el.addEventListener('click', e => {
       e.stopPropagation();
       const ev = events.find(ev => ev.id === el.dataset.id && ev.url === el.dataset.url);
@@ -203,6 +211,39 @@ function renderNowLine(container, days, hourH = 60) {
   todayCol.appendChild(line);
 
   setTimeout(() => renderNowLine(container, days, hourH), 60000);
+}
+
+function layoutWeekAllDay(evs, days) {
+  const items = [];
+  evs.forEach(ev => {
+    let colStart = -1, colEnd = -1;
+    days.forEach((day, i) => {
+      const ds = new Date(day); ds.setHours(0, 0, 0, 0);
+      const de = new Date(day); de.setHours(24, 0, 0, 0);
+      if (new Date(ev.start) < de && new Date(ev.end) > ds) {
+        if (colStart === -1) colStart = i;
+        colEnd = i;
+      }
+    });
+    if (colStart === -1) return;
+    items.push({ ev, colStart, colEnd });
+  });
+
+  // Sort: longer spans first, then by start column
+  items.sort((a, b) =>
+    (b.colEnd - b.colStart) - (a.colEnd - a.colStart) || a.colStart - b.colStart
+  );
+
+  // Greedy lane assignment
+  const laneEnds = [];
+  items.forEach(item => {
+    let lane = laneEnds.findIndex(end => item.colStart > end);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(-1); }
+    item.lane = lane;
+    laneEnds[lane] = item.colEnd;
+  });
+
+  return items;
 }
 
 function layoutEvents(events) {

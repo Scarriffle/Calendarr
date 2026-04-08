@@ -1,12 +1,16 @@
 import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber } from '../utils.js';
 import { t } from '../i18n.js';
 
-const LANE_H    = 20; // px per lane (event height 18px + 2px gap)
-const MAX_LANES = 3;  // max visible lanes per row
-
-const NUM_ROWS = 5; // rolling view: always 5 weeks
+const LANE_H   = 20; // px per lane (event height 18px + 2px gap)
+const DAY_H    = 30; // day-number row height
+const NUM_ROWS = 5;  // rolling view: always 5 weeks
 
 export function renderMonth(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
+  // Dynamic lane limit: how many events fit in the actual row height
+  const containerH = container.clientHeight || 600;
+  const headerH    = 34; // month-header DOW row
+  const rowH       = (containerH - headerH) / NUM_ROWS;
+  const MAX_LANES  = Math.max(1, Math.floor((rowH - DAY_H) / LANE_H) - 1);
   // "Primary month" = currentDate's month (used for muting other-month days)
   const primaryMonth = currentDate.getMonth();
   const DOW = weekStartDay === 'sunday' ? t('dow_sunday') : t('dow_monday');
