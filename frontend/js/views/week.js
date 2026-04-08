@@ -16,8 +16,19 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   }
 
   // Separate all-day and timed events
-  const allDayEvs = events.filter(ev => ev.allDay);
-  const timedEvs  = events.filter(ev => !ev.allDay);
+  const allDayEvs      = events.filter(ev => ev.allDay);
+  const timedEvs       = events.filter(ev => !ev.allDay);
+  // Multi-day timed events: timed but spanning more than one calendar day
+  const multiDayTimedEvs = timedEvs.filter(ev => !isSameDay(new Date(ev.start), new Date(ev.end)));
+
+  // Returns true if event overlaps any part of the given day
+  function spansDay(ev, day) {
+    const evStart  = new Date(ev.start);
+    const evEnd    = new Date(ev.end);
+    const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd   = new Date(day); dayEnd.setHours(24, 0, 0, 0);
+    return evStart < dayEnd && evEnd > dayStart;
+  }
 
   // ── KW Badge ──────────────────────────────────────────
   const kwNum = getISOWeekNumber(days[0]);
@@ -43,12 +54,22 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       const d = new Date(day);      d.setHours(0,0,0,0);
       return d >= s && d < e || isSameDay(d, s);
     });
-    const inner = dayEvs.map(ev => {
+    const allDayHtml = dayEvs.map(ev => {
       const color = ev.color || ev.calendarColor || '#4285f4';
       return `<div class="allday-event" style="background:${color};color:#fff"
         data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(ev.title)}">${escHtml(ev.title)}</div>`;
     }).join('');
-    return `<div class="allday-col" data-date="${key}">${inner}</div>`;
+
+    // Multi-day timed events: show in all-day row for every day they span
+    const spanHtml = multiDayTimedEvs.filter(ev => spansDay(ev, day)).map(ev => {
+      const color = ev.color || ev.calendarColor || '#4285f4';
+      const isStart = isSameDay(new Date(ev.start), day);
+      const label   = isStart ? `${fmtTime(new Date(ev.start))} ${ev.title}` : ev.title;
+      return `<div class="allday-event multiday-timed" style="background:${color};color:#fff"
+        data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(ev.title)}">${escHtml(label)}</div>`;
+    }).join('');
+
+    return `<div class="allday-col" data-date="${key}">${allDayHtml}${spanHtml}</div>`;
   }).join('');
 
   // ── Time column labels ────────────────────────────────
@@ -92,7 +113,14 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       </div>`;
     }).join('');
 
+    // Background tint for days covered by multi-day timed events
+    const tintHtml = multiDayTimedEvs.filter(ev => spansDay(ev, day)).map(ev => {
+      const color = ev.color || ev.calendarColor || '#4285f4';
+      return `<div class="col-span-tint" style="background:${color}26"></div>`;
+    }).join('');
+
     return `<div class="week-day-col" data-date="${key}" style="height:${hourH * 24}px">
+      ${tintHtml}
       ${hourLines}
       ${evHtml}
     </div>`;
