@@ -92,7 +92,7 @@ export function applyTheme(settings) {
   root.style.setProperty('--border',       lc.border);
   root.style.setProperty('--border-light', lc.light);
 
-  const hh = settings.hour_height || 60;
+  const hh = settings.hour_height || 54;
   root.style.setProperty('--hour-h', hh + 'px');
 }
 
