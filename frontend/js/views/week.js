@@ -157,6 +157,12 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   const body = container.querySelector('.week-body');
   if (body) body.scrollTop = 8 * hourH - 20;
 
+  // Align sticky header width to body content width (account for scrollbar)
+  const stickyTop = container.querySelector('.week-head-sticky');
+  if (body && stickyTop) {
+    stickyTop.style.paddingRight = (body.offsetWidth - body.clientWidth) + 'px';
+  }
+
   // Render current-time line
   renderNowLine(container, days, hourH);
 
