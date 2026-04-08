@@ -616,6 +616,104 @@ a { color: var(--primary); text-decoration: none; }
 /* Day view specifics */
 .day-view .week-day-col { flex: 1; }
 
+/* ── Quarter View ───────────────────────────────────────── */
+.quarter-view {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+.qtr-month {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.qtr-month-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: .3px;
+}
+.qtr-month-grid { padding: 6px 8px 8px; }
+.qtr-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 2px;
+}
+.qtr-dow {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-3);
+  text-align: center;
+  padding: 3px 0;
+}
+.qtr-cells {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, auto);
+}
+.qtr-cell {
+  padding: 3px 2px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 4px;
+  min-height: 36px;
+}
+.qtr-cell:hover { background: var(--bg-hover); }
+.qtr-cell.today .qtr-day-num {
+  background: var(--today-color, var(--primary));
+  color: #fff;
+  border-radius: 50%;
+}
+.qtr-cell.selected .qtr-day-num {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 50%;
+  opacity: .55;
+}
+.qtr-day-num {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  margin: 0 auto 2px;
+}
+.qtr-cell.other-month .qtr-day-num { color: var(--text-3); opacity: .45; }
+.qtr-cell.today .qtr-day-num { color: #fff; }
+.qtr-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  min-height: 6px;
+}
+.qtr-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.qtr-dot.past { opacity: .45; }
+.qtr-dot-more {
+  font-size: 9px;
+  color: var(--text-3);
+  line-height: 6px;
+}
+
 /* ── Agenda View ────────────────────────────────────────── */
 .agenda-view { padding: 16px; }
 .agenda-day { margin-bottom: 16px; }
