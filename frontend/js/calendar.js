@@ -486,7 +486,7 @@ function renderCalendarList() {
           if (cal) cal.enabled = cb.checked;
         }
       }
-      fetchAndRender();
+      fetchAndRender(true);
     });
   });
 
