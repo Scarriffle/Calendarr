@@ -227,7 +227,7 @@ function renderView() {
       showEventPopup,
       false,
       weekStartDay,
-      state.settings.hour_height || 54
+      state.settings.hour_height || 44
     );
   } else if (state.currentView === 'day') {
     renderWeek(container, state.currentDate, evs,
@@ -235,7 +235,7 @@ function renderView() {
       showEventPopup,
       true,
       weekStartDay,
-      state.settings.hour_height || 54
+      state.settings.hour_height || 44
     );
   } else if (state.currentView === 'quarter') {
     renderQuarter(container, state.currentDate, evs,
@@ -1527,7 +1527,7 @@ function bindSettingsModal() {
       dim_past_events: document.getElementById('cfg-dim-past').checked,
       text_contrast:   getActive('cfg-text-contrast') || 3,
       line_contrast:   getActive('cfg-line-contrast') || 3,
-      hour_height:     getActive('cfg-hour-height')   || 54,
+      hour_height:     getActive('cfg-hour-height')   || 44,
       language:        document.getElementById('cfg-language').value,
     };
     try {
