@@ -1,4 +1,4 @@
-import { isToday, isSameDay, isPast, dayOfWeek, getISOWeekNumber } from '../utils.js';
+import { isToday, isPast, dayOfWeek } from '../utils.js';
 import { t } from '../i18n.js';
 
 export function renderQuarter(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
@@ -56,10 +56,9 @@ export function renderQuarter(container, currentDate, events, onDayClick, onEven
         const key = dateKey(cell);
         const cellEvs = evMap[key] || [];
 
-        const isOther   = cell.getMonth() !== month;
-        const todayCls  = isToday(cell)          ? 'today'    : '';
-        const otherCls  = isOther                ? 'other-month' : '';
-        const selCls    = isSameDay(cell, currentDate) && !isToday(cell) ? 'selected' : '';
+        const isOther  = cell.getMonth() !== month;
+        const todayCls = isToday(cell) ? 'today'       : '';
+        const otherCls = isOther       ? 'other-month' : '';
 
         // Up to 3 event dots
         const dots = cellEvs.slice(0, 3).map(ev => {
@@ -71,7 +70,7 @@ export function renderQuarter(container, currentDate, events, onDayClick, onEven
           ? `<span class="qtr-dot-more">+${cellEvs.length - 3}</span>`
           : '';
 
-        rowsHtml += `<div class="qtr-cell ${todayCls} ${otherCls} ${selCls}" data-date="${key}">
+        rowsHtml += `<div class="qtr-cell ${todayCls} ${otherCls}" data-date="${key}">
           <div class="qtr-day-num">${cell.getDate()}</div>
           <div class="qtr-dots">${dots}${moreDot}</div>
         </div>`;

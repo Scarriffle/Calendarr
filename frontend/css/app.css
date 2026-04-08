@@ -675,12 +675,6 @@ a { color: var(--primary); text-decoration: none; }
   color: #fff;
   border-radius: 50%;
 }
-.qtr-cell.selected .qtr-day-num {
-  background: var(--primary);
-  color: #fff;
-  border-radius: 50%;
-  opacity: .55;
-}
 .qtr-day-num {
   font-size: 12px;
   font-weight: 500;
