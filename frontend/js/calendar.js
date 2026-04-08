@@ -141,7 +141,7 @@ function prefetchIfNeeded(viewStart, viewEnd) {
 }
 
 // ── Data fetching ─────────────────────────────────────────
-async function fetchAndRender(force = false) {
+async function fetchAndRender(force = false, silent = false) {
   const { start, end } = getViewRange();
 
   // Cache hit: requested range is fully within what we already have
@@ -159,7 +159,7 @@ async function fetchAndRender(force = false) {
   const fetchStart = new Date(start.getTime() - CACHE_BUF);
   const fetchEnd   = new Date(end.getTime()   + CACHE_BUF);
 
-  showLoading();
+  if (!silent) showLoading();
   try {
     const resp = await api.get(`/caldav/events?start=${fetchStart.toISOString()}&end=${fetchEnd.toISOString()}`);
     const events = resp.events || resp;
@@ -460,6 +460,8 @@ function renderCalendarList() {
   container.querySelectorAll('input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', async () => {
       const source = cb.dataset.source;
+      let cacheCalId = null; // calendar_id value used in cached events
+
       if (source === 'caldav') {
         const calId = parseInt(cb.dataset.calId);
         await api.put(`/caldav/calendars/${calId}`, { enabled: cb.checked });
@@ -468,16 +470,19 @@ function renderCalendarList() {
             if (cal.id === calId) cal.enabled = cb.checked;
           }
         }
+        cacheCalId = calId; // numeric integer in cached events
       } else if (source === 'local') {
         const calId = parseInt(cb.dataset.calId);
         await api.put(`/local/calendars/${calId}`, { enabled: cb.checked });
         const cal = state.localCalendars.find(c => c.id === calId);
         if (cal) cal.enabled = cb.checked;
+        cacheCalId = `local-${calId}`;
       } else if (source === 'ical') {
         const subId = parseInt(cb.dataset.subId);
         await api.put(`/ical/subscriptions/${subId}`, { enabled: cb.checked });
         const sub = state.icalSubscriptions.find(s => s.id === subId);
         if (sub) sub.enabled = cb.checked;
+        cacheCalId = `ical-${subId}`;
       } else if (source === 'google') {
         const calId = parseInt(cb.dataset.calId);
         await api.put(`/google/calendars/${calId}`, { enabled: cb.checked });
@@ -485,8 +490,20 @@ function renderCalendarList() {
           const cal = acc.calendars.find(c => c.id === calId);
           if (cal) cal.enabled = cb.checked;
         }
+        cacheCalId = `google-${calId}`;
       }
-      fetchAndRender(true);
+
+      if (!cb.checked && cacheCalId !== null) {
+        // Hiding: filter from cache instantly, no network call needed
+        eventCache.events = eventCache.events.filter(ev => ev.calendar_id !== cacheCalId);
+        state.events = eventCache.events;
+        renderView();
+        updateTitle();
+        renderMiniCal();
+      } else {
+        // Showing: refetch silently — view stays visible, updates when done
+        fetchAndRender(true, true);
+      }
     });
   });
 
