@@ -32,6 +32,11 @@ SKIP_GOOGLE_CALENDAR_IDS = {
 }
 
 
+def _is_system_calendar(cal_id: str) -> bool:
+    """Return True for virtual/system calendars that should be hidden."""
+    return cal_id in SKIP_GOOGLE_CALENDAR_IDS or "weeknum" in cal_id.lower()
+
+
 def _google_configured() -> bool:
     return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 
@@ -139,7 +144,7 @@ def _account_dict(a: models.GoogleAccount) -> dict:
                 "sidebar_hidden": bool(c.sidebar_hidden),
             }
             for c in a.calendars
-            if c.cal_id not in SKIP_GOOGLE_CALENDAR_IDS
+            if not _is_system_calendar(c.cal_id)
         ],
     }
 
@@ -149,12 +154,16 @@ def _sync_google_calendars(account: models.GoogleAccount, db: Session):
     try:
         token = _refresh_access_token(account, db)
         cal_list = _google_api(token, "/users/me/calendarList")
-        existing = {c.cal_id: c for c in account.calendars}
+        # Remove any previously stored system calendars (e.g. locale-specific weeknum variants)
+        for c in list(account.calendars):
+            if _is_system_calendar(c.cal_id):
+                db.delete(c)
+        existing = {c.cal_id: c for c in account.calendars if not _is_system_calendar(c.cal_id)}
         for cal in cal_list.get("items", []):
             if cal.get("deleted"):
                 continue
             cal_id = cal["id"]
-            if cal_id in SKIP_GOOGLE_CALENDAR_IDS:
+            if _is_system_calendar(cal_id):
                 continue
             if cal_id not in existing:
                 db.add(models.GoogleCalendar(
@@ -378,12 +387,12 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
         raise
 
     all_events = []
-    try:
-        for gcal in account.calendars:
-            if not gcal.enabled:
-                continue
-            if gcal.cal_id in SKIP_GOOGLE_CALENDAR_IDS:
-                continue
+    for gcal in account.calendars:
+        if not gcal.enabled:
+            continue
+        if _is_system_calendar(gcal.cal_id):
+            continue
+        try:
             events_resp = _google_api(token, f"/calendars/{gcal.cal_id}/events", params={
                 "timeMin": start_dt.isoformat(),
                 "timeMax": end_dt.isoformat(),
@@ -394,8 +403,8 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
                 if ev.get("status") == "cancelled":
                     continue
                 all_events.append(_parse_google_event(ev, gcal.id, gcal.name, gcal.color or "#4285f4"))
-    except Exception as exc:
-        logger.error("Error fetching Google Calendar for %s: %s", account.email, exc)
+        except Exception as exc:
+            logger.error("Error fetching events for calendar %s (%s): %s", gcal.name, gcal.cal_id, exc)
 
     return all_events
 
