@@ -124,7 +124,7 @@ function prefetchIfNeeded(viewStart, viewEnd) {
     const from = new Date(eventCache.end);
     const to   = new Date(eventCache.end.getTime() + PREFETCH_EXT);
     api.get(`/caldav/events?start=${from.toISOString()}&end=${to.toISOString()}`)
-      .then(evs => { _mergeEvents(evs); eventCache.end = to; })
+      .then(r => { _mergeEvents(r.events || r); eventCache.end = to; })
       .catch(() => {})
       .finally(() => { eventCache._fwdPending = false; });
   }
@@ -134,7 +134,7 @@ function prefetchIfNeeded(viewStart, viewEnd) {
     const from = new Date(eventCache.start.getTime() - PREFETCH_EXT);
     const to   = new Date(eventCache.start);
     api.get(`/caldav/events?start=${from.toISOString()}&end=${to.toISOString()}`)
-      .then(evs => { _mergeEvents(evs); eventCache.start = from; })
+      .then(r => { _mergeEvents(r.events || r); eventCache.start = from; })
       .catch(() => {})
       .finally(() => { eventCache._bwdPending = false; });
   }
@@ -161,7 +161,13 @@ async function fetchAndRender(force = false) {
 
   showLoading();
   try {
-    const events = await api.get(`/caldav/events?start=${fetchStart.toISOString()}&end=${fetchEnd.toISOString()}`);
+    const resp = await api.get(`/caldav/events?start=${fetchStart.toISOString()}&end=${fetchEnd.toISOString()}`);
+    const events = resp.events || resp;
+    if (resp.errors && resp.errors.length) {
+      for (const err of resp.errors) {
+        showToast(`Google (${err.email}): Token abgelaufen – bitte Konto trennen und neu verbinden`, true);
+      }
+    }
     eventCache.start  = fetchStart;
     eventCache.end    = fetchEnd;
     eventCache.events = events;

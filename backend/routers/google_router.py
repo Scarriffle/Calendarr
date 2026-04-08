@@ -373,8 +373,9 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
     """Fetch events from all enabled Google calendars for an account."""
     try:
         token = _refresh_access_token(account, db)
-    except Exception:
-        return []
+    except Exception as exc:
+        logger.error("Token refresh failed for Google account %s: %s", account.email, exc)
+        raise
 
     all_events = []
     try:
