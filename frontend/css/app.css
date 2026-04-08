@@ -373,8 +373,8 @@ a { color: var(--primary); text-decoration: none; }
   background: var(--bg-sidebar);
 }
 .sidebar-copyright:hover { color: var(--text-1); }
-.main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; }
-#view-container { flex: 1; display: flex; flex-direction: column; }
+.main-view { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+#view-container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* ── Mini Calendar ──────────────────────────────────────── */
 .mini-cal { padding: 12px 16px; }
@@ -452,7 +452,7 @@ a { color: var(--primary); text-decoration: none; }
 .cal-item:hover .cal-item-remove { opacity: 1; }
 
 /* ── Month View ─────────────────────────────────────────── */
-.month-view { display: flex; flex-direction: column; height: 100%; }
+.month-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .month-header {
   display: grid; grid-template-columns: 38px repeat(7, 1fr);
   border-bottom: 1px solid var(--border); flex-shrink: 0;
@@ -509,11 +509,13 @@ a { color: var(--primary); text-decoration: none; }
 .month-more:hover { color: var(--primary); }
 
 /* ── Week / Day Views ───────────────────────────────────── */
-.week-view, .day-view { display: flex; flex-direction: column; height: 100%; }
+.week-view, .day-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.week-head-sticky {
+  flex-shrink: 0; position: sticky; top: 0; z-index: 10;
+  background: var(--bg-app);
+}
 .week-header-row {
   display: flex; border-bottom: 1px solid var(--border);
-  flex-shrink: 0; background: var(--bg-app);
-  position: sticky; top: 0; z-index: 10;
 }
 /* KW badge in week view header gutter */
 .week-kw-badge {
@@ -571,7 +573,7 @@ a { color: var(--primary); text-decoration: none; }
 .col-span-tint { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 
 /* Time grid */
-.week-body { display: flex; flex: 1; overflow-y: auto; position: relative; }
+.week-body { display: flex; flex: 1; overflow-y: auto; position: relative; min-height: 0; }
 .week-time-col { width: 56px; flex-shrink: 0; position: relative; }
 .time-label {
   height: var(--hour-h, 60px); display: flex; align-items: flex-start; justify-content: flex-end;
@@ -631,7 +633,8 @@ a { color: var(--primary); text-decoration: none; }
   display: flex;
   gap: 16px;
   padding: 16px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   box-sizing: border-box;
   overflow-y: auto;
 }
@@ -719,7 +722,7 @@ a { color: var(--primary); text-decoration: none; }
 }
 
 /* ── Agenda View ────────────────────────────────────────── */
-.agenda-view { padding: 16px; }
+.agenda-view { padding: 16px; flex: 1; overflow-y: auto; min-height: 0; }
 .agenda-day { margin-bottom: 16px; }
 .agenda-date {
   font-size: 13px; font-weight: 600; color: var(--text-2);

@@ -137,13 +137,15 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
   const viewClass = isSingleDay ? 'day-view' : 'week-view';
 
   container.innerHTML = `<div class="${viewClass}">
-    <div class="week-header-row">
-      <div class="week-time-gutter">${kwBadge}</div>
-      ${headerCols}
-    </div>
-    <div class="week-allday-row">
-      <div class="allday-gutter">${t('allday')}</div>
-      <div class="allday-cols">${alldayCols}</div>
+    <div class="week-head-sticky">
+      <div class="week-header-row">
+        <div class="week-time-gutter">${kwBadge}</div>
+        ${headerCols}
+      </div>
+      <div class="week-allday-row">
+        <div class="allday-gutter">${t('allday')}</div>
+        ${alldayCols}
+      </div>
     </div>
     <div class="week-body">
       <div class="week-time-col">${timeLabels}</div>
