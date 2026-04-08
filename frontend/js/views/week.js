@@ -131,10 +131,24 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
     }).join('');
 
     // Background tint for days covered by multi-day events (timed or all-day)
-    const tintHtml = tintEvs.filter(ev => spansDay(ev, day)).map(ev => {
-      const color = ev.color || ev.calendarColor || '#4285f4';
-      return `<div class="col-span-tint" style="background:${color}26"></div>`;
-    }).join('');
+    const dayTintEvs = tintEvs.filter(ev => spansDay(ev, day));
+    const tintHtml = (() => {
+      if (!dayTintEvs.length) return '';
+      const colors = dayTintEvs.map(ev => ev.color || ev.calendarColor || '#4285f4');
+      let bg;
+      if (colors.length === 1) {
+        bg = colors[0] + '26';
+      } else {
+        // Vertical gradient bands for multiple overlapping multi-day events
+        const stops = colors.flatMap((c, i) => {
+          const p1 = ((i / colors.length) * 100).toFixed(1);
+          const p2 = (((i + 1) / colors.length) * 100).toFixed(1);
+          return [`${c}26 ${p1}%`, `${c}26 ${p2}%`];
+        }).join(',');
+        bg = `linear-gradient(to bottom,${stops})`;
+      }
+      return `<div class="col-span-tint" style="background:${bg}"></div>`;
+    })();
 
     return `<div class="week-day-col" data-date="${key}" style="height:${hourH * 24}px">
       ${tintHtml}
