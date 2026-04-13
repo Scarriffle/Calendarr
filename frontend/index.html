@@ -165,6 +165,7 @@
                 <button data-action="caldav">CalDAV-Konto</button>
                 <button data-action="ical">iCal-URL abonnieren</button>
                 <button data-action="google">Google Kalender</button>
+                <button data-action="homeassistant">Home Assistant</button>
               </div>
             </div>
           </div>
@@ -399,6 +400,35 @@
   </div>
 </div>
 
+<!-- Home Assistant Account Modal -->
+<div id="modal-ha-account" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-header">
+      <h3>Home Assistant verbinden</h3>
+      <button class="icon-btn modal-close" data-modal="modal-ha-account">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Anzeigename</label>
+        <input type="text" id="ha-account-name" placeholder="z.B. Mein Home Assistant" />
+      </div>
+      <div class="form-group">
+        <label>Home Assistant URL</label>
+        <input type="url" id="ha-account-url" placeholder="http://homeassistant.local:8123" />
+      </div>
+      <div class="form-group">
+        <label>Long-Lived Access Token</label>
+        <input type="password" id="ha-account-token" placeholder="Token aus Profil → Sicherheit" autocomplete="off" />
+      </div>
+      <div id="ha-account-error" class="form-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal="modal-ha-account">Abbrechen</button>
+      <button class="btn btn-primary" id="ha-account-save">Verbinden</button>
+    </div>
+  </div>
+</div>
+
 <!-- Settings Page -->
 <div id="modal-settings" class="modal-overlay hidden">
   <div class="settings-page-card">
@@ -530,6 +560,11 @@
           <div class="accounts-section">
             <div class="accounts-section-heading" data-i18n="settings_accounts_google">Google-Konten</div>
             <div id="google-accounts-list"><span class="accounts-section-empty" data-i18n="settings_no_google_accounts">Keine Google-Konten</span></div>
+          </div>
+
+          <div class="accounts-section">
+            <div class="accounts-section-heading">Home Assistant</div>
+            <div id="accounts-ha-list"><span class="accounts-section-empty">Keine HA-Konten</span></div>
           </div>
         </div>
 

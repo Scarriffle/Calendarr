@@ -12,7 +12,7 @@ from sqlalchemy import text
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import Base, engine
-from routers import auth_router, caldav_router, google_router, ical_router, local_router, profile_router, settings_router, users_router
+from routers import auth_router, caldav_router, google_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -76,6 +76,7 @@ app.include_router(profile_router.router, prefix="/api/profile", tags=["profile"
 app.include_router(local_router.router, prefix="/api/local", tags=["local"])
 app.include_router(ical_router.router, prefix="/api/ical", tags=["ical"])
 app.include_router(google_router.router, prefix="/api/google", tags=["google"])
+app.include_router(homeassistant_router.router, prefix="/api/homeassistant", tags=["homeassistant"])
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")

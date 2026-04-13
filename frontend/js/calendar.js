@@ -32,6 +32,7 @@ let state = {
   localCalendars: [],
   icalSubscriptions: [],
   googleAccounts: [],
+  haAccounts: [],
   settings: {},
   dimPast: false,
   editingEvent: null,      // null = new event
@@ -40,12 +41,13 @@ let state = {
 
 // ── Public init ───────────────────────────────────────────
 export async function initCalendar() {
-  const [settings, accounts, localCalendars, icalSubscriptions, googleAccounts] = await Promise.all([
+  const [settings, accounts, localCalendars, icalSubscriptions, googleAccounts, haAccounts] = await Promise.all([
     api.get('/settings/'),
     api.get('/caldav/accounts'),
     api.get('/local/calendars').catch(() => []),
     api.get('/ical/subscriptions').catch(() => []),
     api.get('/google/accounts').catch(() => []),
+    api.get('/homeassistant/accounts').catch(() => []),
   ]);
 
   state.settings = settings;
@@ -53,6 +55,7 @@ export async function initCalendar() {
   state.localCalendars = localCalendars;
   state.icalSubscriptions = icalSubscriptions;
   state.googleAccounts = googleAccounts;
+  state.haAccounts = haAccounts;
   state.currentView = settings.default_view || 'month';
   state.dimPast = settings.dim_past_events;
   weekStartDay = settings.week_start_day || 'monday';
@@ -69,6 +72,7 @@ export async function initCalendar() {
   bindAccountModal();
   bindLocalCalModal();
   bindICalSubModal();
+  bindHAAccountModal();
   bindSettingsModal();
   bindProfileModal();
 }
@@ -449,6 +453,25 @@ function renderCalendarList() {
     }).join('');
   }
 
+  // ── Home Assistant accounts ───────────────────────────
+  if (state.haAccounts.length) {
+    html += state.haAccounts.map(acc => {
+      const visibleCals = acc.calendars.filter(c => !c.sidebar_hidden);
+      if (!visibleCals.length) return `<div class="cal-account-name">${escHtml(acc.name)}</div>`;
+      return `<div class="cal-account-name">${escHtml(acc.name)}</div>` +
+        visibleCals.map(cal =>
+          `<div class="cal-item" data-cal-id="${cal.id}" data-source="homeassistant">
+            <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="homeassistant" />
+            <div class="cal-item-dot" style="background:${cal.color || '#03a9f4'}" data-cal-id="${cal.id}" data-source="homeassistant" title="${t('change_color')}"></div>
+            <span class="cal-item-name" data-source="homeassistant">${escHtml(cal.name)}</span>
+            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="homeassistant" title="${t('hide_cal')}">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+            </button>
+          </div>`
+        ).join('');
+    }).join('');
+  }
+
   if (!html) {
     container.innerHTML = `<div style="padding:8px 16px;font-size:12px;color:var(--text-3)">${t('error_no_calendars')}</div>`;
     return;
@@ -491,6 +514,14 @@ function renderCalendarList() {
           if (cal) cal.enabled = cb.checked;
         }
         cacheCalId = `google-${calId}`;
+      } else if (source === 'homeassistant') {
+        const calId = parseInt(cb.dataset.calId);
+        await api.put(`/homeassistant/calendars/${calId}`, { enabled: cb.checked });
+        for (const acc of state.haAccounts) {
+          const cal = acc.calendars.find(c => c.id === calId);
+          if (cal) cal.enabled = cb.checked;
+        }
+        cacheCalId = `homeassistant-${calId}`;
       }
 
       if (!cb.checked && cacheCalId !== null) {
@@ -544,6 +575,19 @@ function renderCalendarList() {
           await api.put(`/google/calendars/${calId}`, { color: picked });
           if (gcal) gcal.color = picked;
           applyCalendarColor('google', calId, picked);
+        }
+      } else if (source === 'homeassistant') {
+        const calId = parseInt(dot.dataset.calId);
+        let hacal = null;
+        for (const acc of state.haAccounts) {
+          hacal = acc.calendars.find(c => c.id === calId);
+          if (hacal) break;
+        }
+        const picked = await openColorPicker(dot, hacal?.color || '#03a9f4');
+        if (picked) {
+          await api.put(`/homeassistant/calendars/${calId}`, { color: picked });
+          if (hacal) hacal.color = picked;
+          applyCalendarColor('homeassistant', calId, picked);
         }
       }
     });
@@ -623,6 +667,14 @@ function renderCalendarList() {
         const calId = parseInt(btn.dataset.calId);
         await api.put(`/google/calendars/${calId}`, { enabled: false, sidebar_hidden: true });
         for (const acc of state.googleAccounts) {
+          for (const cal of acc.calendars) {
+            if (cal.id === calId) { cal.enabled = false; cal.sidebar_hidden = true; }
+          }
+        }
+      } else if (source === 'homeassistant') {
+        const calId = parseInt(btn.dataset.calId);
+        await api.put(`/homeassistant/calendars/${calId}`, { enabled: false, sidebar_hidden: true });
+        for (const acc of state.haAccounts) {
           for (const cal of acc.calendars) {
             if (cal.id === calId) { cal.enabled = false; cal.sidebar_hidden = true; }
           }
@@ -726,6 +778,10 @@ function bindSidebar() {
   dropdown.querySelector('[data-action="ical"]').onclick = () => {
     dropdown.classList.add('hidden');
     openICalSubModal();
+  };
+  dropdown.querySelector('[data-action="homeassistant"]').onclick = () => {
+    dropdown.classList.add('hidden');
+    openHAAccountModal();
   };
   dropdown.querySelector('[data-action="google"]').onclick = async () => {
     dropdown.classList.add('hidden');
@@ -1193,6 +1249,48 @@ function bindLocalCalModal() {
   };
 }
 
+// ── Home Assistant Account Modal ─────────────────────────
+function openHAAccountModal() {
+  document.getElementById('ha-account-name').value = '';
+  document.getElementById('ha-account-url').value = '';
+  document.getElementById('ha-account-token').value = '';
+  document.getElementById('ha-account-error').classList.add('hidden');
+  openModal('modal-ha-account');
+}
+
+function bindHAAccountModal() {
+  document.getElementById('ha-account-save').onclick = async () => {
+    const name = document.getElementById('ha-account-name').value.trim();
+    const url = document.getElementById('ha-account-url').value.trim();
+    const token = document.getElementById('ha-account-token').value.trim();
+    const errEl = document.getElementById('ha-account-error');
+    if (!name || !url || !token) {
+      errEl.textContent = 'Bitte alle Felder ausfüllen';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    errEl.classList.add('hidden');
+
+    const saveBtn = document.getElementById('ha-account-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Verbinde…';
+    try {
+      const account = await api.post('/homeassistant/accounts', { name, url, token });
+      state.haAccounts.push(account);
+      renderCalendarList();
+      closeModal('modal-ha-account');
+      showToast(`Home Assistant "${name}" verbunden`);
+      fetchAndRender(true);
+    } catch (e) {
+      errEl.textContent = e.message || 'Home Assistant nicht erreichbar';
+      errEl.classList.remove('hidden');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Verbinden';
+    }
+  };
+}
+
 // ── iCal Subscription Modal ──────────────────────────────
 function openICalSubModal() {
   document.getElementById('ical-sub-name').value = '';
@@ -1437,6 +1535,51 @@ function renderAllAccounts() {
 
   // Google accounts section — delegate to existing function
   renderGoogleAccounts();
+
+  // Home Assistant accounts section
+  const haList = document.getElementById('accounts-ha-list');
+  if (haList) {
+    if (!state.haAccounts.length) {
+      haList.innerHTML = '<span class="accounts-section-empty">Keine HA-Konten</span>';
+    } else {
+      haList.innerHTML = state.haAccounts.map(acc =>
+        `<div class="accounts-row">
+          <div class="accounts-row-info">
+            <span class="accounts-row-name">${escHtml(acc.name)}</span>
+            <span class="accounts-row-sub">${escHtml(acc.url || '')}</span>
+          </div>
+          <div class="accounts-row-actions">
+            <button class="btn btn-secondary btn-sm" data-ha-sync="${acc.id}">${t('sync')}</button>
+            <button class="btn btn-ghost btn-sm" data-ha-disconnect="${acc.id}">${t('disconnect')}</button>
+          </div>
+        </div>`
+      ).join('');
+      haList.querySelectorAll('[data-ha-sync]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true; btn.textContent = '…';
+          try {
+            const updated = await api.post(`/homeassistant/accounts/${btn.dataset.haSync}/sync`);
+            const idx = state.haAccounts.findIndex(a => a.id === parseInt(btn.dataset.haSync));
+            if (idx !== -1) state.haAccounts[idx] = updated;
+            renderAllAccounts(); renderCalendarList(); fetchAndRender(true);
+            showToast('Home Assistant synchronisiert');
+          } catch (e) { showToast(e.message, true); }
+          finally { btn.disabled = false; btn.textContent = t('sync'); }
+        });
+      });
+      haList.querySelectorAll('[data-ha-disconnect]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Home Assistant Konto wirklich trennen?')) return;
+          try {
+            await api.delete(`/homeassistant/accounts/${btn.dataset.haDisconnect}`);
+            state.haAccounts = state.haAccounts.filter(a => a.id !== parseInt(btn.dataset.haDisconnect));
+            renderAllAccounts(); renderCalendarList(); fetchAndRender(true);
+            showToast('Home Assistant getrennt');
+          } catch (e) { showToast(e.message, true); }
+        });
+      });
+    }
+  }
 }
 
 function renderHiddenCalendars() {
@@ -1450,6 +1593,11 @@ function renderHiddenCalendars() {
   for (const acc of state.googleAccounts) {
     for (const cal of acc.calendars) {
       if (cal.sidebar_hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.email, source: 'google' });
+    }
+  }
+  for (const acc of state.haAccounts) {
+    for (const cal of acc.calendars) {
+      if (cal.sidebar_hidden) hidden.push({ id: cal.id, name: cal.name, acc: acc.name, source: 'homeassistant' });
     }
   }
   if (!hidden.length) {
@@ -1469,6 +1617,13 @@ function renderHiddenCalendars() {
       if (source === 'google') {
         await api.put(`/google/calendars/${calId}`, { enabled: true, sidebar_hidden: false });
         for (const acc of state.googleAccounts) {
+          for (const cal of acc.calendars) {
+            if (cal.id === calId) { cal.enabled = true; cal.sidebar_hidden = false; }
+          }
+        }
+      } else if (source === 'homeassistant') {
+        await api.put(`/homeassistant/calendars/${calId}`, { enabled: true, sidebar_hidden: false });
+        for (const acc of state.haAccounts) {
           for (const cal of acc.calendars) {
             if (cal.id === calId) { cal.enabled = true; cal.sidebar_hidden = false; }
           }
