@@ -645,6 +645,7 @@ function renderCalendarList() {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
       const source = btn.dataset.source;
+      let cacheCalId = null;
       if (source === 'caldav') {
         const calId = parseInt(btn.dataset.calId);
         await api.put(`/caldav/calendars/${calId}`, { enabled: false, sidebar_hidden: true });
@@ -653,16 +654,19 @@ function renderCalendarList() {
             if (cal.id === calId) { cal.enabled = false; cal.sidebar_hidden = true; }
           }
         }
+        cacheCalId = calId;
       } else if (source === 'local') {
         if (!confirm(t('confirm_delete_local_cal'))) return;
         const calId = parseInt(btn.dataset.calId);
         await api.delete(`/local/calendars/${calId}`);
         state.localCalendars = state.localCalendars.filter(c => c.id !== calId);
+        cacheCalId = `local-${calId}`;
       } else if (source === 'ical') {
         if (!confirm(t('confirm_remove_ical'))) return;
         const subId = parseInt(btn.dataset.subId);
         await api.delete(`/ical/subscriptions/${subId}`);
         state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== subId);
+        cacheCalId = `ical-${subId}`;
       } else if (source === 'google') {
         const calId = parseInt(btn.dataset.calId);
         await api.put(`/google/calendars/${calId}`, { enabled: false, sidebar_hidden: true });
@@ -671,6 +675,7 @@ function renderCalendarList() {
             if (cal.id === calId) { cal.enabled = false; cal.sidebar_hidden = true; }
           }
         }
+        cacheCalId = `google-${calId}`;
       } else if (source === 'homeassistant') {
         const calId = parseInt(btn.dataset.calId);
         await api.put(`/homeassistant/calendars/${calId}`, { enabled: false, sidebar_hidden: true });
@@ -679,9 +684,16 @@ function renderCalendarList() {
             if (cal.id === calId) { cal.enabled = false; cal.sidebar_hidden = true; }
           }
         }
+        cacheCalId = `homeassistant-${calId}`;
+      }
+      if (cacheCalId !== null) {
+        eventCache.events = eventCache.events.filter(ev => ev.calendar_id !== cacheCalId);
+        state.events = eventCache.events;
       }
       renderCalendarList();
-      fetchAndRender();
+      renderView();
+      updateTitle();
+      renderMiniCal();
     });
   });
 }
