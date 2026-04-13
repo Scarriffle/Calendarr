@@ -128,14 +128,16 @@ export function openColorPicker(anchorEl, currentColor = '#4285f4') {
     function updateUI() {
       const [r, g, b] = hsvToRgb(h, s, v);
       const hex = rgbToHex(r, g, b);
-      // Use rendered size so cursor matches the visible palette area
+      // Use rendered rects to position cursor relative to the picker container
       const svRect = svCanvas.getBoundingClientRect();
+      const pickerRect = picker.getBoundingClientRect();
       const hueRect = hueCanvas.getBoundingClientRect();
-      // SV cursor position
-      svCursor.style.left = (s * svRect.width) + 'px';
-      svCursor.style.top = ((1 - v) * svRect.height) + 'px';
-      // Hue thumb position
-      hueThumb.style.left = (h / 360 * hueRect.width) + 'px';
+      const hueTrackRect = hueTrack.getBoundingClientRect();
+      // SV cursor: offset canvas position within picker + position within canvas
+      svCursor.style.left = (svRect.left - pickerRect.left + s * svRect.width) + 'px';
+      svCursor.style.top  = (svRect.top  - pickerRect.top  + (1 - v) * svRect.height) + 'px';
+      // Hue thumb: offset canvas position within track + position within canvas
+      hueThumb.style.left = (hueRect.left - hueTrackRect.left + (h / 360) * hueRect.width) + 'px';
       // Preview + hex
       preview.style.background = hex;
       hexInput.value = hex.toUpperCase();
