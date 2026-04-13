@@ -266,7 +266,7 @@ def get_events(
 
     for account in accounts:
         for calendar in account.calendars:
-            if not calendar.enabled:
+            if not calendar.enabled or calendar.sidebar_hidden:
                 continue
             try:
                 events = caldav_client.fetch_events(
@@ -354,6 +354,19 @@ def get_events(
         except Exception as exc:
             logger.error("Error fetching Google Calendar for %s: %s", g_acc.email, exc)
             google_errors.append({"email": g_acc.email})
+
+    # ── Home Assistant events ─────────────────────────────
+    from routers.homeassistant_router import get_ha_events
+    ha_accounts = (
+        db.query(models.HomeAssistantAccount)
+        .filter(models.HomeAssistantAccount.user_id == current_user.id)
+        .all()
+    )
+    for ha_acc in ha_accounts:
+        try:
+            all_events.extend(get_ha_events(ha_acc, start_dt, end_dt))
+        except Exception as exc:
+            logger.error("Error fetching HA events for %s: %s", ha_acc.name, exc)
 
     return {"events": all_events, "errors": google_errors}
 

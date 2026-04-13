@@ -388,7 +388,7 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
 
     all_events = []
     for gcal in account.calendars:
-        if not gcal.enabled:
+        if not gcal.enabled or gcal.sidebar_hidden:
             continue
         if _is_system_calendar(gcal.cal_id):
             continue

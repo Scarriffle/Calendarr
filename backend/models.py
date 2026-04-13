@@ -30,6 +30,9 @@ class User(Base):
     google_accounts = relationship(
         "GoogleAccount", back_populates="user", cascade="all, delete-orphan"
     )
+    homeassistant_accounts = relationship(
+        "HomeAssistantAccount", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class CalDAVAccount(Base):
@@ -176,3 +179,32 @@ class GoogleCalendar(Base):
     sidebar_hidden = Column(Boolean, default=False)
 
     account = relationship("GoogleAccount", back_populates="calendars")
+
+
+class HomeAssistantAccount(Base):
+    __tablename__ = "homeassistant_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    url = Column(String(500), nullable=False)
+    token = Column(Text, nullable=False)
+
+    user = relationship("User", back_populates="homeassistant_accounts")
+    calendars = relationship(
+        "HomeAssistantCalendar", back_populates="account", cascade="all, delete-orphan"
+    )
+
+
+class HomeAssistantCalendar(Base):
+    __tablename__ = "homeassistant_calendars"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("homeassistant_accounts.id"), nullable=False)
+    entity_id = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=False)
+    color = Column(String(7), nullable=True)
+    enabled = Column(Boolean, default=True)
+    sidebar_hidden = Column(Boolean, default=False)
+
+    account = relationship("HomeAssistantAccount", back_populates="calendars")
