@@ -1266,20 +1266,57 @@ function openHAAccountModal() {
   document.getElementById('ha-account-name').value = '';
   document.getElementById('ha-account-url').value = '';
   document.getElementById('ha-account-token').value = '';
+  document.getElementById('ha-account-username').value = '';
+  document.getElementById('ha-account-userpass').value = '';
   document.getElementById('ha-account-error').classList.add('hidden');
+  // Reset to token method
+  document.getElementById('ha-auth-token').checked = true;
+  document.getElementById('ha-token-group').classList.remove('hidden');
+  document.getElementById('ha-credentials-group').classList.add('hidden');
   openModal('modal-ha-account');
 }
 
 function bindHAAccountModal() {
+  // Toggle auth method fields
+  document.querySelectorAll('[name="ha-auth-method"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const isPw = document.getElementById('ha-auth-password').checked;
+      document.getElementById('ha-token-group').classList.toggle('hidden', isPw);
+      document.getElementById('ha-credentials-group').classList.toggle('hidden', !isPw);
+    });
+  });
+
   document.getElementById('ha-account-save').onclick = async () => {
     const name = document.getElementById('ha-account-name').value.trim();
     const url = document.getElementById('ha-account-url').value.trim();
-    const token = document.getElementById('ha-account-token').value.trim();
+    const isPw = document.getElementById('ha-auth-password').checked;
     const errEl = document.getElementById('ha-account-error');
-    if (!name || !url || !token) {
-      errEl.textContent = 'Bitte alle Felder ausfüllen';
+
+    if (!name || !url) {
+      errEl.textContent = 'Bitte Name und URL ausfüllen';
       errEl.classList.remove('hidden');
       return;
+    }
+
+    const body = { name, url };
+    if (isPw) {
+      const username = document.getElementById('ha-account-username').value.trim();
+      const password = document.getElementById('ha-account-userpass').value.trim();
+      if (!username || !password) {
+        errEl.textContent = 'Bitte Benutzername und Passwort ausfüllen';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      body.username = username;
+      body.password = password;
+    } else {
+      const token = document.getElementById('ha-account-token').value.trim();
+      if (!token) {
+        errEl.textContent = 'Bitte Access Token ausfüllen';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      body.token = token;
     }
     errEl.classList.add('hidden');
 
@@ -1287,7 +1324,7 @@ function bindHAAccountModal() {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Verbinde…';
     try {
-      const account = await api.post('/homeassistant/accounts', { name, url, token });
+      const account = await api.post('/homeassistant/accounts', body);
       state.haAccounts.push(account);
       renderCalendarList();
       closeModal('modal-ha-account');

@@ -364,7 +364,7 @@ def get_events(
     )
     for ha_acc in ha_accounts:
         try:
-            all_events.extend(get_ha_events(ha_acc, start_dt, end_dt))
+            all_events.extend(get_ha_events(ha_acc, start_dt, end_dt, db))
         except Exception as exc:
             logger.error("Error fetching HA events for %s: %s", ha_acc.name, exc)
 

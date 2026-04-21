@@ -189,6 +189,9 @@ class HomeAssistantAccount(Base):
     name = Column(String(100), nullable=False)
     url = Column(String(500), nullable=False)
     token = Column(Text, nullable=False)
+    auth_method = Column(String(20), default="token")
+    refresh_token = Column(Text, nullable=True)
+    token_expiry = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="homeassistant_accounts")
     calendars = relationship(

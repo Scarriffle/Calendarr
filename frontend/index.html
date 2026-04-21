@@ -417,8 +417,29 @@
         <input type="url" id="ha-account-url" placeholder="http://homeassistant.local:8123" />
       </div>
       <div class="form-group">
+        <label>Anmeldemethode</label>
+        <div style="display:flex;gap:16px">
+          <label class="toggle-label">
+            <input type="radio" name="ha-auth-method" value="token" id="ha-auth-token" checked /> Long-Lived Token
+          </label>
+          <label class="toggle-label">
+            <input type="radio" name="ha-auth-method" value="password" id="ha-auth-password" /> Benutzername/Passwort
+          </label>
+        </div>
+      </div>
+      <div class="form-group" id="ha-token-group">
         <label>Long-Lived Access Token</label>
         <input type="password" id="ha-account-token" placeholder="Token aus Profil → Sicherheit" autocomplete="off" />
+      </div>
+      <div id="ha-credentials-group" class="hidden">
+        <div class="form-group">
+          <label>Benutzername</label>
+          <input type="text" id="ha-account-username" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label>Passwort</label>
+          <input type="password" id="ha-account-userpass" autocomplete="current-password" />
+        </div>
       </div>
       <div id="ha-account-error" class="form-error hidden"></div>
     </div>

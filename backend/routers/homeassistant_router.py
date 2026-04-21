@@ -15,6 +15,70 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 HA_DEFAULT_COLOR = "#03a9f4"
+HA_CLIENT_ID = "http://localhost/"
+
+
+# ── Auth helpers ──────────────────────────────────────────
+
+def _ha_login(url: str, username: str, password: str) -> tuple:
+    """Password grant → (access_token, refresh_token, expires_in)"""
+    try:
+        resp = http_requests.post(
+            f"{url.rstrip('/')}/auth/token",
+            data={
+                "grant_type": "password",
+                "username": username,
+                "password": password,
+                "client_id": HA_CLIENT_ID,
+            },
+            timeout=10,
+            verify=False,
+        )
+    except http_requests.exceptions.ConnectionError:
+        raise HTTPException(503, "Home Assistant nicht erreichbar")
+    except http_requests.exceptions.Timeout:
+        raise HTTPException(503, "Home Assistant antwortet nicht (Timeout)")
+    if resp.status_code in (400, 401):
+        raise HTTPException(401, "Ungültige Anmeldedaten")
+    resp.raise_for_status()
+    data = resp.json()
+    return data["access_token"], data.get("refresh_token", ""), data.get("expires_in", 1800)
+
+
+def _ha_refresh(url: str, refresh_token: str) -> tuple:
+    """Refresh grant → (access_token, expires_in)"""
+    resp = http_requests.post(
+        f"{url.rstrip('/')}/auth/token",
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": HA_CLIENT_ID,
+        },
+        timeout=10,
+        verify=False,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data["access_token"], data.get("expires_in", 1800)
+
+
+def _get_valid_token(account: models.HomeAssistantAccount, db: Session) -> str:
+    """Return a valid access token, refreshing if necessary."""
+    if account.auth_method != "password":
+        return account.token  # Long-Lived Token läuft nicht ab
+    now = datetime.now(timezone.utc)
+    if account.token_expiry and account.token_expiry.replace(tzinfo=timezone.utc) > now:
+        return account.token
+    # Needs refresh
+    try:
+        access_token, expires_in = _ha_refresh(account.url, account.refresh_token)
+    except Exception as exc:
+        logger.error("HA token refresh failed for %s: %s", account.name, exc)
+        raise HTTPException(401, "Home Assistant Token abgelaufen, bitte Konto neu verbinden")
+    account.token = access_token
+    account.token_expiry = datetime.fromtimestamp(now.timestamp() + expires_in, tz=timezone.utc)
+    db.commit()
+    return access_token
 
 
 # ── HA API helpers ────────────────────────────────────────
@@ -77,13 +141,18 @@ def _parse_ha_event(ev: dict, cal_db_id: int, cal_name: str, cal_color: str) -> 
     }
 
 
-def get_ha_events(account: models.HomeAssistantAccount, start_dt: datetime, end_dt: datetime) -> list:
+def get_ha_events(account: models.HomeAssistantAccount, start_dt: datetime, end_dt: datetime, db: Session) -> list:
     all_events = []
+    try:
+        token = _get_valid_token(account, db)
+    except Exception as exc:
+        logger.error("HA token error for %s: %s", account.name, exc)
+        raise
     for cal in account.calendars:
         if not cal.enabled or cal.sidebar_hidden:
             continue
         try:
-            raw = _ha_get_events(account.url, account.token, cal.entity_id, start_dt, end_dt)
+            raw = _ha_get_events(account.url, token, cal.entity_id, start_dt, end_dt)
             color = cal.color or HA_DEFAULT_COLOR
             for ev in raw:
                 all_events.append(_parse_ha_event(ev, cal.id, cal.name, color))
@@ -99,6 +168,7 @@ def _account_dict(a: models.HomeAssistantAccount) -> dict:
         "id": a.id,
         "name": a.name,
         "url": a.url,
+        "auth_method": a.auth_method or "token",
         "calendars": [
             {
                 "id": c.id,
@@ -118,7 +188,9 @@ def _account_dict(a: models.HomeAssistantAccount) -> dict:
 class HAAccountCreate(BaseModel):
     name: str
     url: str
-    token: str
+    token: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
 
 
 class HACalendarUpdate(BaseModel):
@@ -149,13 +221,31 @@ def add_account(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    remote_cals = _ha_get_calendars(data.url, data.token)
+    now = datetime.now(timezone.utc)
+
+    if data.username and data.password:
+        access_token, refresh_tok, expires_in = _ha_login(data.url, data.username, data.password)
+        auth_method = "password"
+        stored_refresh = refresh_tok
+        token_expiry = datetime.fromtimestamp(now.timestamp() + expires_in, tz=timezone.utc)
+    elif data.token:
+        access_token = data.token
+        auth_method = "token"
+        stored_refresh = None
+        token_expiry = None
+    else:
+        raise HTTPException(400, "Token oder Benutzername/Passwort erforderlich")
+
+    remote_cals = _ha_get_calendars(data.url, access_token)
 
     account = models.HomeAssistantAccount(
         user_id=current_user.id,
         name=data.name,
         url=data.url,
-        token=data.token,
+        token=access_token,
+        auth_method=auth_method,
+        refresh_token=stored_refresh,
+        token_expiry=token_expiry,
     )
     db.add(account)
     db.flush()
@@ -215,7 +305,8 @@ def sync_account(
     if not acc:
         raise HTTPException(404, "Account not found")
 
-    remote_cals = _ha_get_calendars(acc.url, acc.token)
+    token = _get_valid_token(acc, db)
+    remote_cals = _ha_get_calendars(acc.url, token)
     existing = {c.entity_id: c for c in acc.calendars}
 
     for cal in remote_cals:
