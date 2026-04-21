@@ -63,6 +63,21 @@ def _migrate():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE homeassistant_accounts ADD COLUMN auth_method VARCHAR(20) DEFAULT 'token'"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE homeassistant_accounts ADD COLUMN refresh_token TEXT"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE homeassistant_accounts ADD COLUMN token_expiry DATETIME"))
+            conn.commit()
+        except Exception:
+            pass
 
 _migrate()
 
