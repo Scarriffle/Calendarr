@@ -1325,6 +1325,7 @@ function bindHAAccountModal() {
     saveBtn.textContent = 'Verbinde…';
     try {
       const account = await api.post('/homeassistant/accounts', body);
+      if (!account) return;
       state.haAccounts.push(account);
       renderCalendarList();
       closeModal('modal-ha-account');

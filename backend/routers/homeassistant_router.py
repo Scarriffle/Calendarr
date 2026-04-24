@@ -39,7 +39,7 @@ def _ha_login(url: str, username: str, password: str) -> tuple:
     except http_requests.exceptions.Timeout:
         raise HTTPException(503, "Home Assistant antwortet nicht (Timeout)")
     if resp.status_code in (400, 401):
-        raise HTTPException(401, "Ungültige Anmeldedaten")
+        raise HTTPException(400, "Ungültige Anmeldedaten")
     resp.raise_for_status()
     data = resp.json()
     return data["access_token"], data.get("refresh_token", ""), data.get("expires_in", 1800)
@@ -99,7 +99,7 @@ def _ha_get_calendars(url: str, token: str) -> list:
         raise HTTPException(503, "Home Assistant antwortet nicht (Timeout)")
     except http_requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 401:
-            raise HTTPException(401, "Ungültiger Access Token")
+            raise HTTPException(400, "Ungültiger Access Token")
         raise HTTPException(502, f"Home Assistant Fehler: {e}")
 
 
