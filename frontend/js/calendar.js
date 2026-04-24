@@ -1,4 +1,4 @@
-import { api } from './api.js';
+﻿import { api } from './api.js';
 import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart } from './utils.js';
 import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
@@ -7,6 +7,7 @@ import { renderQuarter } from './views/quarter.js';
 import { openColorPicker } from './color-picker.js';
 import { openDatePicker, formatDtDisplay } from './date-picker.js';
 import { t, setLang, getLang } from './i18n.js';
+import { APP_VERSION } from './version.js';
 
 // Fetch avatar image as blob URL (with auth header)
 function fetchAvatarBlob() {
@@ -63,6 +64,11 @@ export async function initCalendar() {
   setLang(settings.language || 'de');
   applyTheme(settings);
   updateViewButtons();
+  document.querySelectorAll('.sidebar-copyright, .impressum-link').forEach(el => {
+    el.innerHTML = `© 2026 Scarriffleservices · ${APP_VERSION}`;
+  });
+  const impVer = document.getElementById('impressum-version');
+  if (impVer) impVer.textContent = `Calendarr ${APP_VERSION}`;
   renderCalendarList();
   renderMiniCal();
   await fetchAndRender();
