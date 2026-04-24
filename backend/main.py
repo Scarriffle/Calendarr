@@ -78,6 +78,11 @@ def _migrate():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE homeassistant_accounts ADD COLUMN client_id VARCHAR(500)"))
+            conn.commit()
+        except Exception:
+            pass
 
 _migrate()
 

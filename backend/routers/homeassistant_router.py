@@ -1,9 +1,13 @@
 import logging
+import secrets
+import time
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlencode
 
 import requests as http_requests
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -15,44 +19,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 HA_DEFAULT_COLOR = "#03a9f4"
-HA_CLIENT_ID = "http://localhost/"
+
+# In-memory store for pending OAuth states (short-lived, ~10 min TTL)
+_pending_oauth: dict[str, dict] = {}
+
+
+def _cleanup_pending():
+    now = time.time()
+    for k in [k for k, v in _pending_oauth.items() if v["expires"] < now]:
+        _pending_oauth.pop(k, None)
 
 
 # ── Auth helpers ──────────────────────────────────────────
 
-def _ha_login(url: str, username: str, password: str) -> tuple:
-    """Password grant → (access_token, refresh_token, expires_in)"""
-    try:
-        resp = http_requests.post(
-            f"{url.rstrip('/')}/auth/token",
-            data={
-                "grant_type": "password",
-                "username": username,
-                "password": password,
-                "client_id": HA_CLIENT_ID,
-            },
-            timeout=10,
-            verify=False,
-        )
-    except http_requests.exceptions.ConnectionError:
-        raise HTTPException(503, "Home Assistant nicht erreichbar")
-    except http_requests.exceptions.Timeout:
-        raise HTTPException(503, "Home Assistant antwortet nicht (Timeout)")
-    if resp.status_code in (400, 401):
-        raise HTTPException(400, "Ungültige Anmeldedaten")
-    resp.raise_for_status()
-    data = resp.json()
-    return data["access_token"], data.get("refresh_token", ""), data.get("expires_in", 1800)
-
-
-def _ha_refresh(url: str, refresh_token: str) -> tuple:
+def _ha_refresh(url: str, refresh_token: str, client_id: str) -> tuple:
     """Refresh grant → (access_token, expires_in)"""
     resp = http_requests.post(
         f"{url.rstrip('/')}/auth/token",
         data={
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
-            "client_id": HA_CLIENT_ID,
+            "client_id": client_id,
         },
         timeout=10,
         verify=False,
@@ -64,14 +51,16 @@ def _ha_refresh(url: str, refresh_token: str) -> tuple:
 
 def _get_valid_token(account: models.HomeAssistantAccount, db: Session) -> str:
     """Return a valid access token, refreshing if necessary."""
-    if account.auth_method != "password":
+    if account.auth_method != "oauth":
         return account.token  # Long-Lived Token läuft nicht ab
     now = datetime.now(timezone.utc)
     if account.token_expiry and account.token_expiry.replace(tzinfo=timezone.utc) > now:
         return account.token
     # Needs refresh
     try:
-        access_token, expires_in = _ha_refresh(account.url, account.refresh_token)
+        access_token, expires_in = _ha_refresh(
+            account.url, account.refresh_token, account.client_id or ""
+        )
     except Exception as exc:
         logger.error("HA token refresh failed for %s: %s", account.name, exc)
         raise HTTPException(401, "Home Assistant Token abgelaufen, bitte Konto neu verbinden")
@@ -188,9 +177,14 @@ def _account_dict(a: models.HomeAssistantAccount) -> dict:
 class HAAccountCreate(BaseModel):
     name: str
     url: str
-    token: Optional[str] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
+    token: str
+
+
+class HAOAuthStart(BaseModel):
+    name: str
+    url: str
+    client_id: str
+    redirect_uri: str
 
 
 class HACalendarUpdate(BaseModel):
@@ -221,31 +215,17 @@ def add_account(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    now = datetime.now(timezone.utc)
-
-    if data.username and data.password:
-        access_token, refresh_tok, expires_in = _ha_login(data.url, data.username, data.password)
-        auth_method = "password"
-        stored_refresh = refresh_tok
-        token_expiry = datetime.fromtimestamp(now.timestamp() + expires_in, tz=timezone.utc)
-    elif data.token:
-        access_token = data.token
-        auth_method = "token"
-        stored_refresh = None
-        token_expiry = None
-    else:
-        raise HTTPException(400, "Token oder Benutzername/Passwort erforderlich")
-
-    remote_cals = _ha_get_calendars(data.url, access_token)
+    """Create a HA account from a Long-Lived Access Token."""
+    remote_cals = _ha_get_calendars(data.url, data.token)
 
     account = models.HomeAssistantAccount(
         user_id=current_user.id,
         name=data.name,
         url=data.url,
-        token=access_token,
-        auth_method=auth_method,
-        refresh_token=stored_refresh,
-        token_expiry=token_expiry,
+        token=data.token,
+        auth_method="token",
+        refresh_token=None,
+        token_expiry=None,
     )
     db.add(account)
     db.flush()
@@ -265,6 +245,111 @@ def add_account(
     db.commit()
     db.refresh(account)
     return _account_dict(account)
+
+
+@router.post("/auth-url")
+def oauth_start(
+    data: HAOAuthStart,
+    current_user: models.User = Depends(get_current_user),
+):
+    """Start the OAuth flow: store pending state, return HA authorization URL."""
+    _cleanup_pending()
+    state_token = secrets.token_urlsafe(32)
+    _pending_oauth[state_token] = {
+        "user_id": current_user.id,
+        "ha_url": data.url.rstrip('/'),
+        "name": data.name,
+        "client_id": data.client_id,
+        "redirect_uri": data.redirect_uri,
+        "expires": time.time() + 600,
+    }
+    params = {
+        "client_id": data.client_id,
+        "redirect_uri": data.redirect_uri,
+        "state": state_token,
+        "response_type": "code",
+    }
+    return {"url": f"{data.url.rstrip('/')}/auth/authorize?{urlencode(params)}"}
+
+
+@router.get("/callback")
+def oauth_callback(
+    request: Request,
+    code: str = Query(""),
+    state: str = Query(""),
+    error: str = Query(""),
+    db: Session = Depends(get_db),
+):
+    """Callback from Home Assistant after user authorization."""
+    if error or not code:
+        return RedirectResponse(url=f"/?ha_error={error or 'no_code'}", status_code=302)
+
+    pending = _pending_oauth.pop(state, None)
+    if not pending or pending["expires"] < time.time():
+        return RedirectResponse(url="/?ha_error=state_expired", status_code=302)
+
+    ha_url = pending["ha_url"]
+    client_id = pending["client_id"]
+
+    # Exchange code for tokens
+    try:
+        resp = http_requests.post(
+            f"{ha_url}/auth/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "client_id": client_id,
+            },
+            timeout=15,
+            verify=False,
+        )
+    except Exception as exc:
+        logger.error("HA token exchange connection error: %s", exc)
+        return RedirectResponse(url="/?ha_error=ha_unreachable", status_code=302)
+
+    if resp.status_code != 200:
+        logger.error("HA token exchange failed (%s): %s", resp.status_code, resp.text)
+        return RedirectResponse(url="/?ha_error=token_exchange_failed", status_code=302)
+
+    tokens = resp.json()
+    access_token = tokens["access_token"]
+    refresh_token = tokens.get("refresh_token", "")
+    expires_in = tokens.get("expires_in", 1800)
+    now = datetime.now(timezone.utc)
+
+    try:
+        remote_cals = _ha_get_calendars(ha_url, access_token)
+    except HTTPException as exc:
+        logger.error("HA calendar fetch failed after OAuth: %s", exc.detail)
+        return RedirectResponse(url="/?ha_error=calendars_failed", status_code=302)
+
+    account = models.HomeAssistantAccount(
+        user_id=pending["user_id"],
+        name=pending["name"],
+        url=ha_url,
+        token=access_token,
+        auth_method="oauth",
+        refresh_token=refresh_token,
+        token_expiry=datetime.fromtimestamp(now.timestamp() + expires_in, tz=timezone.utc),
+        client_id=client_id,
+    )
+    db.add(account)
+    db.flush()
+
+    for cal in remote_cals:
+        entity_id = cal.get("entity_id", "")
+        if not entity_id:
+            continue
+        db.add(models.HomeAssistantCalendar(
+            account_id=account.id,
+            entity_id=entity_id,
+            name=cal.get("name") or entity_id,
+            color=None,
+            enabled=True,
+        ))
+
+    db.commit()
+    return RedirectResponse(url="/?ha_connected=1", status_code=302)
 
 
 @router.delete("/accounts/{account_id}")

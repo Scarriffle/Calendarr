@@ -192,6 +192,7 @@ class HomeAssistantAccount(Base):
     auth_method = Column(String(20), default="token")
     refresh_token = Column(Text, nullable=True)
     token_expiry = Column(DateTime, nullable=True)
+    client_id = Column(String(500), nullable=True)
 
     user = relationship("User", back_populates="homeassistant_accounts")
     calendars = relationship(
