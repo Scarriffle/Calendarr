@@ -75,6 +75,32 @@ export async function initCalendar() {
   bindHAAccountModal();
   bindSettingsModal();
   bindProfileModal();
+  handleHAOAuthReturn();
+}
+
+function handleHAOAuthReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const errMap = {
+    no_code: 'Home Assistant hat keinen Autorisierungscode zurückgegeben',
+    state_expired: 'Die Anmeldung ist abgelaufen, bitte erneut versuchen',
+    ha_unreachable: 'Home Assistant nicht erreichbar',
+    token_exchange_failed: 'Token-Austausch mit Home Assistant fehlgeschlagen',
+    calendars_failed: 'Kalender konnten nicht geladen werden',
+  };
+  if (params.has('ha_connected')) {
+    showToast('Home Assistant verbunden');
+    window.history.replaceState({}, '', window.location.pathname);
+    fetchAndRender(true);
+    api.get('/homeassistant/accounts').then(accs => {
+      state.haAccounts = accs || [];
+      renderCalendarList();
+      renderAllAccounts?.();
+    }).catch(() => {});
+  } else if (params.has('ha_error')) {
+    const code = params.get('ha_error');
+    showToast(errMap[code] || `HA-Anmeldung fehlgeschlagen: ${code}`, true);
+    window.history.replaceState({}, '', window.location.pathname);
+  }
 }
 
 // ── Event cache ───────────────────────────────────────────
@@ -1266,30 +1292,32 @@ function openHAAccountModal() {
   document.getElementById('ha-account-name').value = '';
   document.getElementById('ha-account-url').value = '';
   document.getElementById('ha-account-token').value = '';
-  document.getElementById('ha-account-username').value = '';
-  document.getElementById('ha-account-userpass').value = '';
   document.getElementById('ha-account-error').classList.add('hidden');
-  // Reset to token method
-  document.getElementById('ha-auth-token').checked = true;
-  document.getElementById('ha-token-group').classList.remove('hidden');
-  document.getElementById('ha-credentials-group').classList.add('hidden');
+  // Reset to OAuth method
+  document.getElementById('ha-auth-oauth').checked = true;
+  document.getElementById('ha-oauth-info').classList.remove('hidden');
+  document.getElementById('ha-token-group').classList.add('hidden');
+  document.getElementById('ha-account-save').textContent = 'Mit Home Assistant anmelden';
   openModal('modal-ha-account');
 }
 
 function bindHAAccountModal() {
-  // Toggle auth method fields
+  // Toggle auth method fields + save button label
   document.querySelectorAll('[name="ha-auth-method"]').forEach(r => {
     r.addEventListener('change', () => {
-      const isPw = document.getElementById('ha-auth-password').checked;
-      document.getElementById('ha-token-group').classList.toggle('hidden', isPw);
-      document.getElementById('ha-credentials-group').classList.toggle('hidden', !isPw);
+      const isOAuth = document.getElementById('ha-auth-oauth').checked;
+      document.getElementById('ha-oauth-info').classList.toggle('hidden', !isOAuth);
+      document.getElementById('ha-token-group').classList.toggle('hidden', isOAuth);
+      document.getElementById('ha-account-save').textContent = isOAuth
+        ? 'Mit Home Assistant anmelden'
+        : 'Verbinden';
     });
   });
 
   document.getElementById('ha-account-save').onclick = async () => {
     const name = document.getElementById('ha-account-name').value.trim();
     const url = document.getElementById('ha-account-url').value.trim();
-    const isPw = document.getElementById('ha-auth-password').checked;
+    const isOAuth = document.getElementById('ha-auth-oauth').checked;
     const errEl = document.getElementById('ha-account-error');
 
     if (!name || !url) {
@@ -1297,34 +1325,43 @@ function bindHAAccountModal() {
       errEl.classList.remove('hidden');
       return;
     }
-
-    const body = { name, url };
-    if (isPw) {
-      const username = document.getElementById('ha-account-username').value.trim();
-      const password = document.getElementById('ha-account-userpass').value.trim();
-      if (!username || !password) {
-        errEl.textContent = 'Bitte Benutzername und Passwort ausfüllen';
-        errEl.classList.remove('hidden');
-        return;
-      }
-      body.username = username;
-      body.password = password;
-    } else {
-      const token = document.getElementById('ha-account-token').value.trim();
-      if (!token) {
-        errEl.textContent = 'Bitte Access Token ausfüllen';
-        errEl.classList.remove('hidden');
-        return;
-      }
-      body.token = token;
-    }
     errEl.classList.add('hidden');
 
     const saveBtn = document.getElementById('ha-account-save');
     saveBtn.disabled = true;
+
+    if (isOAuth) {
+      saveBtn.textContent = 'Weiterleiten…';
+      try {
+        const base = window.location.origin;
+        const resp = await api.post('/homeassistant/auth-url', {
+          name,
+          url,
+          client_id: base + '/',
+          redirect_uri: base + '/api/homeassistant/callback',
+        });
+        if (!resp) return;
+        window.location.href = resp.url;
+      } catch (e) {
+        errEl.textContent = e.message || 'Fehler beim Starten der Anmeldung';
+        errEl.classList.remove('hidden');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Mit Home Assistant anmelden';
+      }
+      return;
+    }
+
+    // Long-Lived Token flow
+    const token = document.getElementById('ha-account-token').value.trim();
+    if (!token) {
+      errEl.textContent = 'Bitte Access Token ausfüllen';
+      errEl.classList.remove('hidden');
+      saveBtn.disabled = false;
+      return;
+    }
     saveBtn.textContent = 'Verbinde…';
     try {
-      const account = await api.post('/homeassistant/accounts', body);
+      const account = await api.post('/homeassistant/accounts', { name, url, token });
       if (!account) return;
       state.haAccounts.push(account);
       renderCalendarList();
