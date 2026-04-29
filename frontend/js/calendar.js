@@ -1034,9 +1034,9 @@ function showEventPopup(ev, anchor) {
   };
 
   document.getElementById('popup-delete').onclick = async () => {
+    popup.classList.add('hidden');
     const scope = await showDeleteConfirm(ev);
     if (!scope) return;
-    popup.classList.add('hidden');
     try {
       await deleteEventByScope(ev, scope);
       showToast(t('event_deleted'));
