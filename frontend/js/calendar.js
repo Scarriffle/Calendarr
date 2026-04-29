@@ -146,6 +146,19 @@ function applyCalendarColor(source, calId, color) {
   renderView();
 }
 
+// Patch a single event in cache after edit/save, then re-render immediately.
+// 'patch' is the new field values to merge into the existing cached event.
+function applyEventPatch(eventId, eventUrl, patch) {
+  const targetUrl = eventUrl || '';
+  eventCache.events.forEach(ev => {
+    if (ev.id === eventId && (ev.url || '') === targetUrl) {
+      Object.assign(ev, patch);
+    }
+  });
+  state.events = eventCache.events;
+  renderView();
+}
+
 // Fire-and-forget: extend the cache toward whichever edge the view is approaching
 function prefetchIfNeeded(viewStart, viewEnd) {
   if (!eventCache.start || !eventCache.end) return;
@@ -1443,6 +1456,13 @@ function bindEventModal() {
             { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '' }
           );
         }
+        // Patch the cached event in-place so the UI reflects changes immediately
+        applyEventPatch(ev.id, ev.url, {
+          title, start, end, allDay,
+          location: loc, description: desc,
+          color: color || null,
+          rrule: rrule || null,
+        });
         showToast(t('event_updated'));
       } else if (isGoogle) {
         const calDbId = parseInt(calVal.replace('google-', ''));
