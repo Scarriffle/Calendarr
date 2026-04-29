@@ -113,6 +113,7 @@ class LocalEvent(Base):
     description = Column(Text, nullable=True)
     color = Column(String(7), nullable=True)
     rrule = Column(Text, nullable=True)
+    exdate = Column(Text, nullable=True)  # Comma-separated YYYYMMDD dates to exclude
 
     calendar = relationship("LocalCalendar", back_populates="events")
 

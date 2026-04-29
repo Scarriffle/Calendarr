@@ -317,6 +317,32 @@
   </div>
 </div>
 
+<!-- Delete Confirm Modal -->
+<div id="modal-delete-confirm" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-header">
+      <h3 id="delete-confirm-title">Termin löschen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-delete-confirm">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="delete-confirm-text"></p>
+      <div id="delete-series-options" class="hidden" style="margin-top:12px">
+        <label class="toggle-label" style="display:block;margin-bottom:8px">
+          <input type="radio" name="delete-scope" value="single" checked /> Nur diesen Termin
+        </label>
+        <label class="toggle-label" style="display:block">
+          <input type="radio" name="delete-scope" value="all" /> Alle Serienelemente
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" data-modal="modal-delete-confirm">Abbrechen</button>
+      <button class="btn btn-danger" id="delete-confirm-ok">Löschen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Event Detail Popup -->
 <div id="popup-event" class="event-popup hidden">
   <div class="popup-header">

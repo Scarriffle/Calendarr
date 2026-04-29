@@ -57,6 +57,7 @@ class EventUpdate(BaseModel):
     description: Optional[str] = None
     color: Optional[str] = None
     rrule: Optional[str] = None
+    exdate: Optional[str] = None
 
 
 def _account_dict(a: models.CalDAVAccount) -> dict:
@@ -84,6 +85,13 @@ def _account_dict(a: models.CalDAVAccount) -> dict:
 def _expand_recurring_local(ev, local_cal, range_start, range_end):
     """Expand a recurring LocalEvent into individual occurrences within the date range."""
     results = []
+    # Parse excluded dates
+    excluded = set()
+    if ev.exdate:
+        for d in ev.exdate.split(","):
+            d = d.strip()
+            if d:
+                excluded.add(d)
     try:
         ev_start_str = ev.start.replace("Z", "+00:00")
         ev_end_str = ev.end.replace("Z", "+00:00")
@@ -98,6 +106,9 @@ def _expand_recurring_local(ev, local_cal, range_start, range_end):
             occurrences = rule.between(r_start - timedelta(days=1), r_end + timedelta(days=1), inc=True)
             for occ in occurrences:
                 occ_start = occ.date()
+                occ_key = occ_start.strftime("%Y%m%d")
+                if occ_key in excluded:
+                    continue
                 occ_end = occ_start + duration
                 results.append({
                     "id": ev.uid,
@@ -132,6 +143,9 @@ def _expand_recurring_local(ev, local_cal, range_start, range_end):
                 r_end = r_end.replace(tzinfo=dt_timezone.utc)
             occurrences = rule.between(r_start - timedelta(days=1), r_end + timedelta(days=1), inc=True)
             for occ in occurrences:
+                occ_key = occ.strftime("%Y%m%d")
+                if occ_key in excluded:
+                    continue
                 occ_end = occ + duration
                 results.append({
                     "id": ev.uid,
@@ -548,6 +562,7 @@ def update_event(
         .all()
     )
     account = None
+    cal_url = None
     if calendar_id is not None:
         cal = (
             db.query(models.Calendar)
@@ -557,8 +572,15 @@ def update_event(
         )
         if cal:
             account = next((a for a in accounts if a.id == cal.account_id), None)
+            cal_url = cal.cal_id
     if not account:
         account = _find_account_for_event_url(event_url, accounts)
+        # Try to find the calendar URL for the account
+        if account and not cal_url:
+            for c in account.calendars:
+                if event_url.startswith(c.cal_id) or event_url.startswith(_normalize_url(c.cal_id)):
+                    cal_url = c.cal_id
+                    break
     if not account:
         raise HTTPException(404, "Event not found or not authorized")
     try:
@@ -568,6 +590,7 @@ def update_event(
             account.password,
             event_url,
             data.model_dump(exclude_none=True) if data else {},
+            calendar_url=cal_url,
         )
         return {"ok": True}
     except Exception as exc:
@@ -588,6 +611,7 @@ def delete_event(
         .all()
     )
     account = None
+    cal_url = None
     if calendar_id is not None:
         cal = (
             db.query(models.Calendar)
@@ -597,13 +621,20 @@ def delete_event(
         )
         if cal:
             account = next((a for a in accounts if a.id == cal.account_id), None)
+            cal_url = cal.cal_id
     if not account:
         account = _find_account_for_event_url(event_url, accounts)
+        if account and not cal_url:
+            for c in account.calendars:
+                if event_url.startswith(c.cal_id) or event_url.startswith(_normalize_url(c.cal_id)):
+                    cal_url = c.cal_id
+                    break
     if not account:
         raise HTTPException(404, "Event not found or not authorized")
     try:
         caldav_client.delete_event(
-            account.url, account.username, account.password, event_url
+            account.url, account.username, account.password, event_url,
+            calendar_url=cal_url,
         )
         return {"ok": True}
     except Exception as exc:
