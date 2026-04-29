@@ -250,7 +250,23 @@ function renderView() {
 
   if (state.currentView === 'month') {
     renderMonth(container, state.currentDate, evs,
-      date => { state.currentDate = date; state.currentView = 'day'; updateViewButtons(); fetchAndRender(); },
+      (date, action, mouseEvent) => {
+        if (action === 'navigate') {
+          state.currentDate = date;
+          state.currentView = 'day';
+          updateViewButtons();
+          fetchAndRender();
+        } else if (action === 'context') {
+          state.currentDate = date;
+          showDayContextMenu(date, mouseEvent);
+        } else {
+          // 'select' — highlight day without navigating
+          state.currentDate = date;
+          renderMiniCal();
+          renderView();
+          updateTitle();
+        }
+      },
       showEventPopup,
       weekStartDay
     );
@@ -764,7 +780,7 @@ function bindTopbar() {
   });
 
   document.getElementById('btn-settings').onclick = openSettingsModal;
-  document.getElementById('btn-create-event').onclick = () => openNewEventModal(new Date());
+  document.getElementById('btn-create-event').onclick = () => openNewEventModal(state.currentDate);
 
   // Mouse wheel / trackpad scroll navigation – only for month & quarter
   let _wheelLast = 0;
@@ -837,6 +853,29 @@ function bindSidebar() {
   };
 }
 
+// ── Day Context Menu (month view) ────────────────────────
+function showDayContextMenu(date, mouseEvent) {
+  document.querySelectorAll('.cal-context-menu').forEach(m => m.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'cal-context-menu';
+  menu.innerHTML = `<div class="ctx-item" data-action="create">${t('ctx_create_event')}</div>`;
+
+  menu.style.left = mouseEvent.clientX + 'px';
+  menu.style.top  = mouseEvent.clientY + 'px';
+  document.body.appendChild(menu);
+
+  menu.querySelector('[data-action="create"]').onclick = () => {
+    menu.remove();
+    openNewEventModal(date);
+  };
+
+  const close = (e) => {
+    if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', close); }
+  };
+  setTimeout(() => document.addEventListener('click', close), 0);
+}
+
 // ── Event Popup ───────────────────────────────────────────
 function showEventPopup(ev, anchor) {
   const popup = document.getElementById('popup-event');
@@ -876,6 +915,11 @@ function showEventPopup(ev, anchor) {
   if (top + ph > window.innerHeight) top = window.innerHeight - ph - 16;
   popup.style.left = Math.max(8, left) + 'px';
   popup.style.top  = Math.max(8, top)  + 'px';
+
+  // Hide edit/delete for read-only iCal subscription events
+  const isReadOnly = (ev.source === 'ical');
+  document.getElementById('popup-edit').style.display = isReadOnly ? 'none' : '';
+  document.getElementById('popup-delete').style.display = isReadOnly ? 'none' : '';
 
   document.getElementById('popup-edit').onclick = () => {
     popup.classList.add('hidden');
@@ -921,7 +965,7 @@ function showEventPopup(ev, anchor) {
         const subId = ev.calendar_id.replace('ical-', '');
         await api.delete(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`);
       } else {
-        await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
+        await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`);
       }
       showToast(t('event_deleted'));
       fetchAndRender(true);
@@ -1005,11 +1049,13 @@ function openNewEventModal(date) {
   toggleAlldayFields(false);
   populateCalendarSelect(null);
   resetColorPicker('');
+  resetRecurrenceUI();
   document.getElementById('ev-delete').classList.add('hidden');
   openModal('modal-event');
 }
 
 function openEditEventModal(ev) {
+  if (ev.source === 'ical') { showToast(t('event_readonly'), true); return; }
   state.editingEvent = ev;
   state.selectedEventColor = ev.color || '';
 
@@ -1033,6 +1079,23 @@ function openEditEventModal(ev) {
 
   populateCalendarSelect(ev.calendar_id);
   resetColorPicker(ev.color || '');
+
+  // Recurrence
+  const rrule = ev.rrule || '';
+  const recSel = document.getElementById('ev-recurrence');
+  const customPanel = document.getElementById('ev-recurrence-custom');
+  if (!rrule) {
+    recSel.value = '';
+    customPanel.classList.add('hidden');
+  } else if (['FREQ=DAILY', 'FREQ=WEEKLY', 'FREQ=MONTHLY', 'FREQ=YEARLY'].includes(rrule)) {
+    recSel.value = rrule;
+    customPanel.classList.add('hidden');
+  } else {
+    recSel.value = 'custom';
+    customPanel.classList.remove('hidden');
+    parseRruleIntoUI(rrule);
+  }
+
   document.getElementById('ev-delete').classList.remove('hidden');
   openModal('modal-event');
 }
@@ -1050,24 +1113,142 @@ function resetColorPicker(color) {
   preview.style.background = color || 'var(--primary)';
 }
 
+function buildRruleFromUI() {
+  const sel = document.getElementById('ev-recurrence').value;
+  if (!sel) return null;
+  if (sel !== 'custom') return sel;
+
+  const interval = parseInt(document.getElementById('ev-rec-interval').value) || 1;
+  const freq = document.getElementById('ev-rec-freq').value;
+  let rule = `FREQ=${freq}`;
+  if (interval > 1) rule += `;INTERVAL=${interval}`;
+
+  if (freq === 'WEEKLY') {
+    const days = [...document.querySelectorAll('.rec-day-btn.active')].map(b => b.dataset.day);
+    if (days.length) rule += `;BYDAY=${days.join(',')}`;
+  }
+
+  const endType = document.getElementById('ev-rec-end-type').value;
+  if (endType === 'count') {
+    rule += `;COUNT=${parseInt(document.getElementById('ev-rec-count').value) || 10}`;
+  } else if (endType === 'until') {
+    const until = document.getElementById('ev-rec-until').value;
+    if (until) rule += `;UNTIL=${until.replace(/-/g, '')}T235959Z`;
+  }
+  return rule;
+}
+
+function parseRruleIntoUI(rruleStr) {
+  const parts = {};
+  rruleStr.split(';').forEach(p => {
+    const [k, v] = p.split('=', 2);
+    if (k && v) parts[k] = v;
+  });
+
+  document.getElementById('ev-rec-interval').value = parts.INTERVAL || '1';
+  document.getElementById('ev-rec-freq').value = parts.FREQ || 'DAILY';
+  document.getElementById('ev-rec-weekdays').classList.toggle('hidden', parts.FREQ !== 'WEEKLY');
+
+  // Reset all weekday buttons
+  document.querySelectorAll('.rec-day-btn').forEach(btn => btn.classList.remove('active'));
+  if (parts.BYDAY) {
+    parts.BYDAY.split(',').forEach(day => {
+      const btn = document.querySelector(`.rec-day-btn[data-day="${day.trim()}"]`);
+      if (btn) btn.classList.add('active');
+    });
+  }
+
+  if (parts.COUNT) {
+    document.getElementById('ev-rec-end-type').value = 'count';
+    document.getElementById('ev-rec-count').value = parts.COUNT;
+    document.getElementById('ev-rec-end-count').classList.remove('hidden');
+    document.getElementById('ev-rec-end-until').classList.add('hidden');
+  } else if (parts.UNTIL) {
+    document.getElementById('ev-rec-end-type').value = 'until';
+    // Parse UNTIL: 20260501T235959Z → 2026-05-01
+    const u = parts.UNTIL.replace('Z', '');
+    const formatted = u.length >= 8 ? `${u.slice(0,4)}-${u.slice(4,6)}-${u.slice(6,8)}` : '';
+    if (formatted) setDtValue('ev-rec-until', formatted, 'date');
+    document.getElementById('ev-rec-end-count').classList.add('hidden');
+    document.getElementById('ev-rec-end-until').classList.remove('hidden');
+  } else {
+    document.getElementById('ev-rec-end-type').value = 'never';
+    document.getElementById('ev-rec-end-count').classList.add('hidden');
+    document.getElementById('ev-rec-end-until').classList.add('hidden');
+  }
+}
+
+function resetRecurrenceUI() {
+  document.getElementById('ev-recurrence').value = '';
+  document.getElementById('ev-recurrence-custom').classList.add('hidden');
+  document.getElementById('ev-rec-interval').value = '1';
+  document.getElementById('ev-rec-freq').value = 'DAILY';
+  document.getElementById('ev-rec-weekdays').classList.add('hidden');
+  document.querySelectorAll('.rec-day-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('ev-rec-end-type').value = 'never';
+  document.getElementById('ev-rec-end-count').classList.add('hidden');
+  document.getElementById('ev-rec-end-until').classList.add('hidden');
+}
+
 function bindEventModal() {
   document.getElementById('ev-allday').addEventListener('change', e => {
     toggleAlldayFields(e.target.checked);
   });
 
-  // Date/time pickers
+  // Date/time pickers with auto-adjustment logic
   [
-    { displayId: 'ev-start-display',      inputId: 'ev-start',      mode: 'datetime' },
-    { displayId: 'ev-end-display',        inputId: 'ev-end',        mode: 'datetime' },
-    { displayId: 'ev-start-date-display', inputId: 'ev-start-date', mode: 'date'     },
-    { displayId: 'ev-end-date-display',   inputId: 'ev-end-date',   mode: 'date'     },
-  ].forEach(({ displayId, inputId, mode }) => {
+    { displayId: 'ev-start-display',      inputId: 'ev-start',      mode: 'datetime', role: 'start' },
+    { displayId: 'ev-end-display',        inputId: 'ev-end',        mode: 'datetime', role: 'end'   },
+    { displayId: 'ev-start-date-display', inputId: 'ev-start-date', mode: 'date',     role: 'start' },
+    { displayId: 'ev-end-date-display',   inputId: 'ev-end-date',   mode: 'date',     role: 'end'   },
+  ].forEach(({ displayId, inputId, mode, role }) => {
     const disp = document.getElementById(displayId);
     if (!disp) return;
     const open = async () => {
       const current = document.getElementById(inputId)?.value || '';
-      const result  = await openDatePicker(disp, current, mode);
-      if (result !== null) setDtValue(inputId, result, mode);
+      const oldStart = mode === 'datetime'
+        ? document.getElementById('ev-start').value
+        : document.getElementById('ev-start-date').value;
+      const oldEnd = mode === 'datetime'
+        ? document.getElementById('ev-end').value
+        : document.getElementById('ev-end-date').value;
+
+      const result = await openDatePicker(disp, current, mode);
+      if (result === null) return;
+      setDtValue(inputId, result, mode);
+
+      if (role === 'start') {
+        // Adjust end to maintain duration
+        if (mode === 'datetime') {
+          const os = oldStart ? new Date(oldStart) : null;
+          const oe = oldEnd ? new Date(oldEnd) : null;
+          const ns = new Date(result);
+          const duration = (os && oe && oe > os) ? (oe - os) : 3600000;
+          const ne = new Date(ns.getTime() + duration);
+          setDtValue('ev-end', toLocalDatetimeInput(ne), 'datetime');
+        } else {
+          const endVal = document.getElementById('ev-end-date').value;
+          if (!endVal || endVal < result) {
+            setDtValue('ev-end-date', result, 'date');
+          }
+        }
+      } else {
+        // Validate end is not before start
+        if (mode === 'datetime') {
+          const startVal = document.getElementById('ev-start').value;
+          if (startVal && new Date(result) <= new Date(startVal)) {
+            const corrected = new Date(new Date(startVal).getTime() + 3600000);
+            setDtValue('ev-end', toLocalDatetimeInput(corrected), 'datetime');
+            showToast(t('error_end_before_start'), true);
+          }
+        } else {
+          const startVal = document.getElementById('ev-start-date').value;
+          if (startVal && result < startVal) {
+            setDtValue('ev-end-date', startVal, 'date');
+            showToast(t('error_end_before_start'), true);
+          }
+        }
+      }
     };
     disp.addEventListener('click', open);
     disp.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') open(); });
@@ -1091,6 +1272,41 @@ function bindEventModal() {
     }
   });
 
+  // ── Recurrence UI ──────────────────────────────────────
+  const recSel = document.getElementById('ev-recurrence');
+  const customPanel = document.getElementById('ev-recurrence-custom');
+  const recFreq = document.getElementById('ev-rec-freq');
+  const weekdaysDiv = document.getElementById('ev-rec-weekdays');
+  const endTypeSel = document.getElementById('ev-rec-end-type');
+
+  recSel.addEventListener('change', () => {
+    customPanel.classList.toggle('hidden', recSel.value !== 'custom');
+  });
+
+  recFreq.addEventListener('change', () => {
+    weekdaysDiv.classList.toggle('hidden', recFreq.value !== 'WEEKLY');
+  });
+
+  document.querySelectorAll('.rec-day-btn').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
+  });
+
+  endTypeSel.addEventListener('change', () => {
+    document.getElementById('ev-rec-end-count').classList.toggle('hidden', endTypeSel.value !== 'count');
+    document.getElementById('ev-rec-end-until').classList.toggle('hidden', endTypeSel.value !== 'until');
+  });
+
+  const untilDisp = document.getElementById('ev-rec-until-display');
+  if (untilDisp) {
+    const openUntil = async () => {
+      const current = document.getElementById('ev-rec-until').value || '';
+      const result = await openDatePicker(untilDisp, current, 'date');
+      if (result !== null) setDtValue('ev-rec-until', result, 'date');
+    };
+    untilDisp.addEventListener('click', openUntil);
+    untilDisp.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openUntil(); });
+  }
+
   document.getElementById('ev-save').onclick = async () => {
     const title = document.getElementById('ev-title').value.trim();
     if (!title) { showToast(t('error_enter_title'), true); return; }
@@ -1102,6 +1318,7 @@ function bindEventModal() {
     const loc     = document.getElementById('ev-location').value.trim();
     const desc    = document.getElementById('ev-description').value.trim();
     const color   = state.selectedEventColor;
+    const rrule   = buildRruleFromUI();
 
     let start, end;
     if (allDay) {
@@ -1127,7 +1344,7 @@ function bindEventModal() {
           );
         } else if (ev.source === 'local') {
           await api.put(`/local/events/${encodeURIComponent(ev.id)}`,
-            { title, start, end, allDay, location: loc, description: desc, color: color || null }
+            { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '' }
           );
         } else if (ev.source === 'ical') {
           const subId = ev.calendar_id.replace('ical-', '');
@@ -1136,8 +1353,8 @@ function bindEventModal() {
           );
         } else {
           await api.put(
-            `/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`,
-            { title, start, end, allDay, location: loc, description: desc, color: color || null }
+            `/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`,
+            { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '' }
           );
         }
         showToast(t('event_updated'));
@@ -1153,6 +1370,7 @@ function bindEventModal() {
         await api.post('/local/events', {
           calendar_id: calId, title, start, end, allDay,
           location: loc, description: desc, color: color || null,
+          rrule: rrule || null,
         });
         showToast(t('event_created'));
       } else {
@@ -1160,6 +1378,7 @@ function bindEventModal() {
         await api.post('/caldav/events', {
           calendar_id: calId, title, start, end, allDay,
           location: loc, description: desc, color: color || null,
+          rrule: rrule || null,
         });
         showToast(t('event_created'));
       }
@@ -1184,7 +1403,7 @@ function bindEventModal() {
         const subId = ev.calendar_id.replace('ical-', '');
         await api.delete(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`);
       } else {
-        await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}`);
+        await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`);
       }
       showToast(t('event_deleted'));
       closeModal('modal-event');

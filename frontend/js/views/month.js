@@ -1,4 +1,4 @@
-import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber } from '../utils.js';
+import { isToday, isPast, isSameDay, dayOfWeek, weekStart, getISOWeekNumber } from '../utils.js';
 import { t } from '../i18n.js';
 
 const LANE_H   = 20; // px per lane (event height 18px + 2px gap)
@@ -124,10 +124,11 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
     rowCells.forEach(cell => {
       const key      = dateKey(cell);
       const isOther  = cell.getMonth() !== primaryMonth;
-      const todayCls = isToday(cell) ? 'today' : '';
-      const otherCls = isOther       ? 'other-month' : '';
-      const numCls   = isToday(cell) ? 'today' : '';
-      colsHtml += `<div class="month-col ${todayCls} ${otherCls}" data-date="${key}">
+      const todayCls    = isToday(cell) ? 'today' : '';
+      const otherCls    = isOther       ? 'other-month' : '';
+      const selectedCls = isSameDay(cell, currentDate) ? 'month-selected' : '';
+      const numCls      = isToday(cell) ? 'today' : '';
+      colsHtml += `<div class="month-col ${todayCls} ${otherCls} ${selectedCls}" data-date="${key}">
         <div class="cell-day ${numCls}">${cell.getDate()}</div>
       </div>`;
     });
@@ -148,6 +149,8 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
 
   // Click handlers via event delegation on the body
   const body = container.querySelector('.month-body');
+
+  // Single click: select day (or handle event / more clicks)
   body.addEventListener('click', e => {
     // Span event click
     const spanEl = e.target.closest('.month-span-event');
@@ -161,13 +164,30 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
     const moreEl = e.target.closest('.month-more');
     if (moreEl) {
       e.stopPropagation();
-      onDayClick(new Date(moreEl.dataset.date + 'T00:00:00'));
+      onDayClick(new Date(moreEl.dataset.date + 'T00:00:00'), 'navigate');
       return;
     }
-    // Column click → navigate to day view
+    // Column click → select day
     const colEl = e.target.closest('.month-col');
     if (colEl) {
-      onDayClick(new Date(colEl.dataset.date + 'T00:00:00'));
+      onDayClick(new Date(colEl.dataset.date + 'T00:00:00'), 'select');
+    }
+  });
+
+  // Double click: navigate to day view
+  body.addEventListener('dblclick', e => {
+    const colEl = e.target.closest('.month-col');
+    if (colEl && !e.target.closest('.month-span-event')) {
+      onDayClick(new Date(colEl.dataset.date + 'T00:00:00'), 'navigate');
+    }
+  });
+
+  // Right click: context menu
+  body.addEventListener('contextmenu', e => {
+    const colEl = e.target.closest('.month-col');
+    if (colEl) {
+      e.preventDefault();
+      onDayClick(new Date(colEl.dataset.date + 'T00:00:00'), 'context', e);
     }
   });
 }

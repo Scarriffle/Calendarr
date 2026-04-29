@@ -83,6 +83,12 @@ def _migrate():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE local_events ADD COLUMN rrule TEXT"))
+            conn.commit()
+            logging.info("Migration: added rrule to local_events")
+        except Exception:
+            pass
 
 _migrate()
 

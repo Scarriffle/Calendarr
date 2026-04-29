@@ -32,6 +32,7 @@ class EventCreate(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
+    rrule: Optional[str] = None
 
 
 class EventUpdate(BaseModel):
@@ -42,6 +43,7 @@ class EventUpdate(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
+    rrule: Optional[str] = None
 
 
 def _cal_dict(cal: models.LocalCalendar) -> dict:
@@ -64,6 +66,7 @@ def _event_dict(ev: models.LocalEvent, cal: models.LocalCalendar) -> dict:
         "location": ev.location or "",
         "description": ev.description or "",
         "color": ev.color,
+        "rrule": ev.rrule,
         "calendar_id": f"local-{cal.id}",
         "calendar_name": cal.name,
         "calendarColor": cal.color,
@@ -180,6 +183,7 @@ def create_event(
         location=data.location,
         description=data.description,
         color=data.color,
+        rrule=data.rrule,
     )
     db.add(ev)
     db.commit()
@@ -219,6 +223,8 @@ def update_event(
         ev.description = data.description
     if data.color is not None:
         ev.color = data.color
+    if data.rrule is not None:
+        ev.rrule = data.rrule if data.rrule else None
     db.commit()
     return {"ok": True}
 

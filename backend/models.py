@@ -112,6 +112,7 @@ class LocalEvent(Base):
     location = Column(String(500), nullable=True)
     description = Column(Text, nullable=True)
     color = Column(String(7), nullable=True)
+    rrule = Column(Text, nullable=True)
 
     calendar = relationship("LocalCalendar", back_populates="events")
 
