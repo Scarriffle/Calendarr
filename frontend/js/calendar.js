@@ -994,8 +994,8 @@ function showEventPopup(ev, anchor) {
   popup.style.left = Math.max(8, left) + 'px';
   popup.style.top  = Math.max(8, top)  + 'px';
 
-  // Hide edit/delete for read-only iCal subscription events
-  const isReadOnly = (ev.source === 'ical');
+  // Hide edit/delete for read-only sources (iCal subscriptions, Home Assistant)
+  const isReadOnly = (ev.source === 'ical' || ev.source === 'homeassistant');
   document.getElementById('popup-edit').style.display = isReadOnly ? 'none' : '';
   document.getElementById('popup-delete').style.display = isReadOnly ? 'none' : '';
 
@@ -1134,7 +1134,7 @@ function openNewEventModal(date) {
 }
 
 function openEditEventModal(ev) {
-  if (ev.source === 'ical') { showToast(t('event_readonly'), true); return; }
+  if (ev.source === 'ical' || ev.source === 'homeassistant') { showToast(t('event_readonly'), true); return; }
   state.editingEvent = ev;
   state.selectedEventColor = ev.color || '';
 
@@ -1426,11 +1426,9 @@ function bindEventModal() {
           await api.put(`/local/events/${encodeURIComponent(ev.id)}`,
             { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '' }
           );
-        } else if (ev.source === 'ical') {
-          const subId = ev.calendar_id.replace('ical-', '');
-          await api.put(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`,
-            { title, start, end, allDay, location: loc, description: desc, color: color || null }
-          );
+        } else if (ev.source === 'ical' || ev.source === 'homeassistant') {
+          showToast(t('event_readonly'), true);
+          return;
         } else {
           await api.put(
             `/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`,
