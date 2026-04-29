@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 import caldav
-from icalendar import Calendar, Event
+from icalendar import Calendar, Event, vRecur
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,8 @@ def _parse_ics(raw: str, event_url: str) -> List[Dict]:
             location = str(component.get("LOCATION", "") or "")
             description = str(component.get("DESCRIPTION", "") or "")
             color = str(component.get("X-CALENDARR-COLOR", "") or "")
+            rrule_prop = component.get("RRULE")
+            rrule_str = rrule_prop.to_ical().decode("utf-8") if rrule_prop else None
 
             dtstart_prop = component.get("DTSTART")
             dtend_prop = component.get("DTEND")
@@ -154,6 +156,7 @@ def _parse_ics(raw: str, event_url: str) -> List[Dict]:
                     "location": location,
                     "description": description,
                     "color": color or None,
+                    "rrule": rrule_str,
                 }
             )
         except Exception as exc:
@@ -201,6 +204,8 @@ def create_event(
         event.add("description", data["description"])
     if data.get("color"):
         event.add("x-calendarr-color", data["color"])
+    if data.get("rrule"):
+        event.add("rrule", _parse_rrule_str(data["rrule"]))
 
     cal.add_component(event)
     cal_obj.save_event(cal.to_ical().decode("utf-8"))
@@ -247,6 +252,11 @@ def update_event(
             component["DESCRIPTION"] = data["description"]
         if "color" in data:
             component["X-CALENDARR-COLOR"] = data["color"]
+        if "rrule" in data:
+            if data["rrule"]:
+                component["RRULE"] = _parse_rrule_str(data["rrule"])
+            elif "RRULE" in component:
+                del component["RRULE"]
 
         new_cal.add_component(component)
 
@@ -258,6 +268,20 @@ def delete_event(url: str, username: str, password: str, event_url: str):
     client = _client(url, username, password)
     resource = caldav.Event(client=client, url=event_url)
     resource.delete()
+
+
+def _parse_rrule_str(rrule_str: str) -> vRecur:
+    """Parse an RRULE string like 'FREQ=WEEKLY;BYDAY=MO,WE' into a vRecur."""
+    params = {}
+    for part in rrule_str.split(";"):
+        if "=" not in part:
+            continue
+        key, val = part.split("=", 1)
+        if "," in val:
+            params[key] = val.split(",")
+        else:
+            params[key] = val
+    return vRecur(params)
 
 
 def _parse_dt(s: str) -> datetime:

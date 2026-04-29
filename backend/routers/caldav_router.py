@@ -1,9 +1,13 @@
 import logging
+from datetime import datetime as dt_datetime, date as dt_date, timedelta, timezone as dt_timezone
 from typing import Optional
+from urllib.parse import urlparse
 
+from dateutil.rrule import rrulestr
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 import caldav_client
 import models
@@ -41,6 +45,7 @@ class EventCreate(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
+    rrule: Optional[str] = None
 
 
 class EventUpdate(BaseModel):
@@ -51,6 +56,7 @@ class EventUpdate(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
+    rrule: Optional[str] = None
 
 
 def _account_dict(a: models.CalDAVAccount) -> dict:
@@ -75,16 +81,124 @@ def _account_dict(a: models.CalDAVAccount) -> dict:
     }
 
 
+def _expand_recurring_local(ev, local_cal, range_start, range_end):
+    """Expand a recurring LocalEvent into individual occurrences within the date range."""
+    results = []
+    try:
+        ev_start_str = ev.start.replace("Z", "+00:00")
+        ev_end_str = ev.end.replace("Z", "+00:00")
+
+        if ev.all_day:
+            ev_start = dt_date.fromisoformat(ev_start_str[:10])
+            ev_end = dt_date.fromisoformat(ev_end_str[:10])
+            duration = ev_end - ev_start
+            rule = rrulestr(f"RRULE:{ev.rrule}", dtstart=dt_datetime.combine(ev_start, dt_datetime.min.time()))
+            r_start = dt_datetime.combine(range_start if isinstance(range_start, dt_date) else range_start.date(), dt_datetime.min.time())
+            r_end = dt_datetime.combine(range_end if isinstance(range_end, dt_date) else range_end.date(), dt_datetime.min.time())
+            occurrences = rule.between(r_start - timedelta(days=1), r_end + timedelta(days=1), inc=True)
+            for occ in occurrences:
+                occ_start = occ.date()
+                occ_end = occ_start + duration
+                results.append({
+                    "id": ev.uid,
+                    "url": f"local://{ev.uid}",
+                    "title": ev.title,
+                    "start": occ_start.isoformat(),
+                    "end": occ_end.isoformat(),
+                    "allDay": True,
+                    "location": ev.location or "",
+                    "description": ev.description or "",
+                    "color": ev.color,
+                    "rrule": ev.rrule,
+                    "calendar_id": f"local-{local_cal.id}",
+                    "calendar_name": local_cal.name,
+                    "calendarColor": local_cal.color,
+                    "source": "local",
+                })
+        else:
+            ev_start = dt_datetime.fromisoformat(ev_start_str)
+            ev_end = dt_datetime.fromisoformat(ev_end_str)
+            if ev_start.tzinfo is None:
+                ev_start = ev_start.replace(tzinfo=dt_timezone.utc)
+            if ev_end.tzinfo is None:
+                ev_end = ev_end.replace(tzinfo=dt_timezone.utc)
+            duration = ev_end - ev_start
+            rule = rrulestr(f"RRULE:{ev.rrule}", dtstart=ev_start)
+            r_start = range_start if isinstance(range_start, dt_datetime) else dt_datetime.combine(range_start, dt_datetime.min.time(), tzinfo=dt_timezone.utc)
+            r_end = range_end if isinstance(range_end, dt_datetime) else dt_datetime.combine(range_end, dt_datetime.min.time(), tzinfo=dt_timezone.utc)
+            if r_start.tzinfo is None:
+                r_start = r_start.replace(tzinfo=dt_timezone.utc)
+            if r_end.tzinfo is None:
+                r_end = r_end.replace(tzinfo=dt_timezone.utc)
+            occurrences = rule.between(r_start - timedelta(days=1), r_end + timedelta(days=1), inc=True)
+            for occ in occurrences:
+                occ_end = occ + duration
+                results.append({
+                    "id": ev.uid,
+                    "url": f"local://{ev.uid}",
+                    "title": ev.title,
+                    "start": occ.isoformat(),
+                    "end": occ_end.isoformat(),
+                    "allDay": False,
+                    "location": ev.location or "",
+                    "description": ev.description or "",
+                    "color": ev.color,
+                    "rrule": ev.rrule,
+                    "calendar_id": f"local-{local_cal.id}",
+                    "calendar_name": local_cal.name,
+                    "calendarColor": local_cal.color,
+                    "source": "local",
+                })
+    except Exception as exc:
+        logger.warning("Error expanding recurring event %s: %s", ev.uid, exc)
+        # Fall back to single event
+        results.append({
+            "id": ev.uid, "url": f"local://{ev.uid}", "title": ev.title,
+            "start": ev.start, "end": ev.end, "allDay": ev.all_day,
+            "location": ev.location or "", "description": ev.description or "",
+            "color": ev.color, "rrule": ev.rrule,
+            "calendar_id": f"local-{local_cal.id}", "calendar_name": local_cal.name,
+            "calendarColor": local_cal.color, "source": "local",
+        })
+    return results
+
+
+def _normalize_url(url: str) -> str:
+    """Normalize URL for comparison: lowercase scheme/host, strip trailing slash."""
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+    host = (parsed.hostname or '').lower()
+    port = parsed.port
+    if (scheme == 'https' and port == 443) or (scheme == 'http' and port == 80):
+        port = None
+    netloc = f"{host}:{port}" if port else host
+    path = parsed.path.rstrip('/')
+    return f"{scheme}://{netloc}{path}"
+
+
 def _find_account_for_event_url(
     event_url: str, accounts: list[models.CalDAVAccount]
 ) -> Optional[models.CalDAVAccount]:
+    norm_event = _normalize_url(event_url)
+    # Primary: match against normalized account URL
     for acc in accounts:
-        if event_url.startswith(acc.url):
+        if norm_event.startswith(_normalize_url(acc.url)):
             return acc
-    # fallback: check calendar urls
+    # Fallback: match against normalized calendar URLs
     for acc in accounts:
         for cal in acc.calendars:
-            if event_url.startswith(cal.cal_id):
+            if norm_event.startswith(_normalize_url(cal.cal_id)):
+                return acc
+    # Second fallback: path-only matching
+    event_path = urlparse(event_url).path.rstrip('/')
+    for acc in accounts:
+        acc_path = urlparse(acc.url).path.rstrip('/')
+        if acc_path and event_path.startswith(acc_path):
+            return acc
+    for acc in accounts:
+        for cal in acc.calendars:
+            cal_path = urlparse(cal.cal_id).path.rstrip('/')
+            if cal_path and event_path.startswith(cal_path):
                 return acc
     return None
 
@@ -302,27 +416,35 @@ def get_events(
             db.query(models.LocalEvent)
             .filter(
                 models.LocalEvent.calendar_id == local_cal.id,
-                models.LocalEvent.start < end,
-                models.LocalEvent.end > start,
+                or_(
+                    # Non-recurring events in range
+                    (models.LocalEvent.rrule == None) & (models.LocalEvent.start < end) & (models.LocalEvent.end > start),
+                    # Recurring events: always include so we can expand
+                    models.LocalEvent.rrule != None,
+                ),
             )
             .all()
         )
         for ev in local_events:
-            all_events.append({
-                "id": ev.uid,
-                "url": f"local://{ev.uid}",
-                "title": ev.title,
-                "start": ev.start,
-                "end": ev.end,
-                "allDay": ev.all_day,
-                "location": ev.location or "",
-                "description": ev.description or "",
-                "color": ev.color,
-                "calendar_id": f"local-{local_cal.id}",
-                "calendar_name": local_cal.name,
-                "calendarColor": local_cal.color,
-                "source": "local",
-            })
+            if ev.rrule:
+                all_events.extend(_expand_recurring_local(ev, local_cal, start_dt, end_dt))
+            else:
+                all_events.append({
+                    "id": ev.uid,
+                    "url": f"local://{ev.uid}",
+                    "title": ev.title,
+                    "start": ev.start,
+                    "end": ev.end,
+                    "allDay": ev.all_day,
+                    "location": ev.location or "",
+                    "description": ev.description or "",
+                    "color": ev.color,
+                    "rrule": None,
+                    "calendar_id": f"local-{local_cal.id}",
+                    "calendar_name": local_cal.name,
+                    "calendarColor": local_cal.color,
+                    "source": "local",
+                })
 
     # ── iCal subscription events ──────────────────────────
     ical_subs = (
@@ -403,6 +525,7 @@ def create_event(
                 "location": data.location,
                 "description": data.description,
                 "color": data.color,
+                "rrule": data.rrule,
             },
         )
         return {"uid": uid, "calendar_id": data.calendar_id}
@@ -414,6 +537,7 @@ def create_event(
 def update_event(
     event_id: str,
     event_url: str = Query(...),
+    calendar_id: Optional[int] = Query(None),
     data: EventUpdate = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
@@ -423,7 +547,18 @@ def update_event(
         .filter(models.CalDAVAccount.user_id == current_user.id)
         .all()
     )
-    account = _find_account_for_event_url(event_url, accounts)
+    account = None
+    if calendar_id is not None:
+        cal = (
+            db.query(models.Calendar)
+            .join(models.CalDAVAccount)
+            .filter(models.Calendar.id == calendar_id, models.CalDAVAccount.user_id == current_user.id)
+            .first()
+        )
+        if cal:
+            account = next((a for a in accounts if a.id == cal.account_id), None)
+    if not account:
+        account = _find_account_for_event_url(event_url, accounts)
     if not account:
         raise HTTPException(404, "Event not found or not authorized")
     try:
@@ -443,6 +578,7 @@ def update_event(
 def delete_event(
     event_id: str,
     event_url: str = Query(...),
+    calendar_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -451,7 +587,18 @@ def delete_event(
         .filter(models.CalDAVAccount.user_id == current_user.id)
         .all()
     )
-    account = _find_account_for_event_url(event_url, accounts)
+    account = None
+    if calendar_id is not None:
+        cal = (
+            db.query(models.Calendar)
+            .join(models.CalDAVAccount)
+            .filter(models.Calendar.id == calendar_id, models.CalDAVAccount.user_id == current_user.id)
+            .first()
+        )
+        if cal:
+            account = next((a for a in accounts if a.id == cal.account_id), None)
+    if not account:
+        account = _find_account_for_event_url(event_url, accounts)
     if not account:
         raise HTTPException(404, "Event not found or not authorized")
     try:

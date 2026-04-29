@@ -486,6 +486,8 @@ a { color: var(--primary); text-decoration: none; }
 .month-col:last-child { border-right: none; }
 .month-col:hover { background: var(--bg-hover); }
 .month-col.today { background: rgba(66,133,244,.08); }
+.month-col.month-selected { background: var(--primary-dim); }
+.month-col.month-selected .cell-day { color: var(--primary); font-weight: 600; }
 .month-col.other-month .cell-day { color: var(--text-3); }
 .cell-day {
   font-size: 12px; font-weight: 500; color: var(--text-2);
@@ -784,6 +786,30 @@ a { color: var(--primary); text-decoration: none; }
   display: flex; align-items: center; gap: 8px;
   padding: 12px 20px; border-top: 1px solid var(--border);
 }
+
+/* ── Recurrence UI ─────────────────────────────────────── */
+.rec-weekdays { display: flex; gap: 4px; margin-top: 8px; }
+.rec-day-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-2); cursor: pointer; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition), color var(--transition);
+}
+.rec-day-btn:hover { background: var(--bg-hover); }
+.rec-day-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ── Day Context Menu ──────────────────────────────────── */
+.cal-context-menu {
+  position: fixed; z-index: 1000;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  min-width: 180px; padding: 4px 0;
+}
+.ctx-item {
+  padding: 8px 16px; font-size: 13px; color: var(--text-1); cursor: pointer;
+}
+.ctx-item:hover { background: var(--bg-hover); }
 
 /* ── Event Popup ────────────────────────────────────────── */
 .event-popup {

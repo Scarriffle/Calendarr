@@ -10,3 +10,4 @@ requests==2.32.3
 pyotp==2.9.0
 qrcode[pil]==8.0
 Pillow==11.0.0
+python-dateutil==2.9.0

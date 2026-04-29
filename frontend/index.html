@@ -239,6 +239,56 @@
         </div>
       </div>
       <div class="form-group">
+        <label id="ev-rec-label">Wiederholung</label>
+        <select id="ev-recurrence">
+          <option value="">Keine</option>
+          <option value="FREQ=DAILY">Täglich</option>
+          <option value="FREQ=WEEKLY">Wöchentlich</option>
+          <option value="FREQ=MONTHLY">Monatlich</option>
+          <option value="FREQ=YEARLY">Jährlich</option>
+          <option value="custom">Benutzerdefiniert…</option>
+        </select>
+      </div>
+      <div id="ev-recurrence-custom" class="form-group hidden">
+        <div class="form-row" style="gap:8px;align-items:center">
+          <label style="white-space:nowrap" id="ev-rec-every-label">Alle</label>
+          <input type="number" id="ev-rec-interval" value="1" min="1" max="99" style="width:60px" />
+          <select id="ev-rec-freq">
+            <option value="DAILY">Tage</option>
+            <option value="WEEKLY">Wochen</option>
+            <option value="MONTHLY">Monate</option>
+          </select>
+        </div>
+        <div id="ev-rec-weekdays" class="rec-weekdays hidden">
+          <button type="button" class="rec-day-btn" data-day="MO">Mo</button>
+          <button type="button" class="rec-day-btn" data-day="TU">Di</button>
+          <button type="button" class="rec-day-btn" data-day="WE">Mi</button>
+          <button type="button" class="rec-day-btn" data-day="TH">Do</button>
+          <button type="button" class="rec-day-btn" data-day="FR">Fr</button>
+          <button type="button" class="rec-day-btn" data-day="SA">Sa</button>
+          <button type="button" class="rec-day-btn" data-day="SU">So</button>
+        </div>
+        <div class="form-row" style="gap:8px;align-items:center;margin-top:8px">
+          <label id="ev-rec-ends-label">Endet</label>
+          <select id="ev-rec-end-type">
+            <option value="never">Nie</option>
+            <option value="count">Nach Anzahl</option>
+            <option value="until">Am Datum</option>
+          </select>
+        </div>
+        <div id="ev-rec-end-count" class="hidden" style="margin-top:4px">
+          <input type="number" id="ev-rec-count" value="10" min="1" max="999" style="width:80px" />
+          <span id="ev-rec-occ-label"> Termine</span>
+        </div>
+        <div id="ev-rec-end-until" class="hidden" style="margin-top:4px">
+          <input type="hidden" id="ev-rec-until" />
+          <div class="dt-display" id="ev-rec-until-display" tabindex="0" role="button">
+            <span class="dt-display-text">—</span>
+            <svg class="dt-display-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v24a2 2 0 002 2h14a2 2 0 002-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v21zM7 10h5v5H7z"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
         <label>Kalender</label>
         <select id="ev-calendar"></select>
       </div>
