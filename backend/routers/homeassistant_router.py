@@ -109,6 +109,25 @@ def _ha_get_events(url: str, token: str, entity_id: str, start_dt: datetime, end
         raise http_requests.exceptions.Timeout(f"HA Timeout für {entity_id}")
 
 
+def _ha_format_dt(s: str) -> str:
+    """Convert ISO datetime to HA format: 'YYYY-MM-DD HH:MM:SS' (no timezone)."""
+    # Strip timezone if present
+    if s.endswith("Z"):
+        s = s[:-1]
+    # Strip +HH:MM or -HH:MM offset
+    for sep in ("+", "-"):
+        idx = s.rfind(sep)
+        if idx > 10:
+            s = s[:idx]
+            break
+    # Replace T with space
+    s = s.replace("T", " ")
+    # Ensure seconds are present
+    if len(s) == 16:  # 'YYYY-MM-DD HH:MM'
+        s += ":00"
+    return s
+
+
 def _ha_build_event_body(entity_id: str, data: dict) -> dict:
     """Build a service-call body for create_event / update_event."""
     body = {"entity_id": entity_id}
@@ -123,11 +142,27 @@ def _ha_build_event_body(entity_id: str, data: dict) -> dict:
             body["start_date"] = data["start"][:10]
             body["end_date"] = data["end"][:10]
         else:
-            s = data["start"].replace("Z", "+00:00") if data["start"].endswith("Z") else data["start"]
-            e = data["end"].replace("Z", "+00:00") if data["end"].endswith("Z") else data["end"]
-            body["start_date_time"] = s
-            body["end_date_time"] = e
+            body["start_date_time"] = _ha_format_dt(data["start"])
+            body["end_date_time"] = _ha_format_dt(data["end"])
     return body
+
+
+def _ha_create_event(url: str, token: str, entity_id: str, data: dict) -> dict:
+    """Create a new event via HA calendar.create_event service."""
+    base = url.rstrip("/")
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = _ha_build_event_body(entity_id, data)
+    resp = http_requests.post(
+        f"{base}/api/services/calendar/create_event",
+        headers=headers, json=body, timeout=15, verify=False,
+    )
+    if not resp.ok:
+        try:
+            detail = resp.json().get("message", resp.text[:500])
+        except Exception:
+            detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+        raise Exception(f"HA create_event ({resp.status_code}): {detail}")
+    return resp
 
 
 def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
@@ -532,6 +567,45 @@ class HAEventUpdate(BaseModel):
     allDay: Optional[bool] = None
     location: Optional[str] = None
     description: Optional[str] = None
+
+
+class HAEventCreate(BaseModel):
+    calendar_id: int
+    title: str
+    start: str
+    end: str
+    allDay: bool = False
+    location: Optional[str] = None
+    description: Optional[str] = None
+
+
+@router.post("/events")
+def create_event(
+    data: HAEventCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    cal = (
+        db.query(models.HomeAssistantCalendar)
+        .join(models.HomeAssistantAccount)
+        .filter(
+            models.HomeAssistantCalendar.id == data.calendar_id,
+            models.HomeAssistantAccount.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not cal:
+        raise HTTPException(404, "Calendar not found")
+    account = cal.account
+    token = _get_valid_token(account, db)
+    try:
+        _ha_create_event(
+            account.url, token, cal.entity_id,
+            data.model_dump(exclude_none=True),
+        )
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(500, f"HA event create failed: {exc}")
 
 
 @router.put("/events/{calendar_id}/{uid}")
