@@ -110,7 +110,11 @@ def _ha_get_events(url: str, token: str, entity_id: str, start_dt: datetime, end
 
 
 def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
-    """Update an event via HA REST API."""
+    """Update an event via HA REST API (HA 2023.11+)."""
+    from urllib.parse import quote
+    base = url.rstrip("/")
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    encoded_uid = quote(uid, safe="")
     body = {}
     if "title" in data:
         body["summary"] = data["title"]
@@ -126,26 +130,35 @@ def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict)
             body["start"] = {"dateTime": data["start"]}
             body["end"] = {"dateTime": data["end"]}
     resp = http_requests.put(
-        f"{url.rstrip('/')}/api/calendars/{entity_id}/{uid}",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        json=body,
-        timeout=15,
-        verify=False,
+        f"{base}/api/calendars/{entity_id}/{encoded_uid}",
+        headers=headers, json=body, timeout=15, verify=False,
     )
     resp.raise_for_status()
     return resp
 
 
 def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
-    """Delete an event via HA REST API."""
+    """Delete an event via HA REST API with fallback to service call."""
+    base = url.rstrip("/")
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    # Try REST API first (HA 2023.11+)
+    from urllib.parse import quote
+    encoded_uid = quote(uid, safe="")
     resp = http_requests.delete(
-        f"{url.rstrip('/')}/api/calendars/{entity_id}/{uid}",
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=15,
-        verify=False,
+        f"{base}/api/calendars/{entity_id}/{encoded_uid}",
+        headers=headers, timeout=15, verify=False,
     )
-    resp.raise_for_status()
-    return resp
+    if resp.status_code < 400:
+        return resp
+    # Fallback: service call
+    resp2 = http_requests.post(
+        f"{base}/api/services/calendar/delete_event",
+        headers=headers,
+        json={"entity_id": entity_id, "uid": uid},
+        timeout=15, verify=False,
+    )
+    resp2.raise_for_status()
+    return resp2
 
 
 def _parse_ha_event(ev: dict, cal_db_id: int, cal_name: str, cal_color: str) -> dict:
