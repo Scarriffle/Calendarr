@@ -220,13 +220,28 @@ def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
         f"{base}/api/services/calendar/delete_event",
         headers=headers, json=body, timeout=15, verify=False,
     )
-    if not resp.ok:
-        try:
-            detail = resp.json().get("message", resp.text[:500])
-        except Exception:
-            detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
-        raise Exception(f"HA delete_event ({resp.status_code}): {detail}")
-    return resp
+    if resp.ok:
+        return resp
+
+    # Try REST API DELETE as fallback (works for some integrations)
+    from urllib.parse import quote
+    encoded_uid = quote(uid, safe="")
+    rest_resp = http_requests.delete(
+        f"{base}/api/calendars/{entity_id}/{encoded_uid}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=15, verify=False,
+    )
+    if rest_resp.ok:
+        return rest_resp
+
+    # Both failed – build a helpful error message
+    try:
+        detail = resp.json().get("message", resp.text[:500])
+    except Exception:
+        detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+    if resp.status_code == 400:
+        detail = f"{detail} (Diese HA-Kalender-Integration unterstützt kein Löschen — z.B. Google-Calendar via HA ist read-only für Updates/Löschen)"
+    raise Exception(f"HA delete_event ({resp.status_code}): {detail}")
 
 
 def _parse_ha_event(ev: dict, cal_db_id: int, cal_name: str, cal_color: str) -> dict:
