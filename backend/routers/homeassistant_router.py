@@ -122,23 +122,20 @@ def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict)
         body["location"] = data["location"]
     if "start" in data and "end" in data:
         if data.get("allDay"):
-            body["dtstart"] = data["start"][:10]
-            body["dtend"] = data["end"][:10]
+            body["start_date"] = data["start"][:10]
+            body["end_date"] = data["end"][:10]
         else:
-            s = data["start"].replace("Z", "").replace("T", " ")
-            e = data["end"].replace("Z", "").replace("T", " ")
-            # Strip timezone offset if present (e.g. +02:00)
-            if "+" in s and s.index("+") > 10:
-                s = s[:s.index("+")]
-            if "+" in e and e.index("+") > 10:
-                e = e[:e.index("+")]
-            body["dtstart"] = s
-            body["dtend"] = e
+            s = data["start"].replace("Z", "+00:00") if data["start"].endswith("Z") else data["start"]
+            e = data["end"].replace("Z", "+00:00") if data["end"].endswith("Z") else data["end"]
+            body["start_date_time"] = s
+            body["end_date_time"] = e
     resp = http_requests.post(
         f"{base}/api/services/calendar/update_event",
         headers=headers, json=body, timeout=15, verify=False,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+        raise Exception(f"HA update_event: {resp.status_code} — {detail}")
     return resp
 
 
@@ -152,7 +149,9 @@ def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
         json={"entity_id": entity_id, "uid": uid},
         timeout=15, verify=False,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+        raise Exception(f"HA delete_event: {resp.status_code} — {detail}")
     return resp
 
 
