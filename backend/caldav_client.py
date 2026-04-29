@@ -237,31 +237,43 @@ def update_event(
             continue
 
         if "title" in data or "summary" in data:
-            component["SUMMARY"] = data.get("title", data.get("summary", ""))
+            if "SUMMARY" in component:
+                del component["SUMMARY"]
+            component.add("summary", data.get("title", data.get("summary", "")))
 
         if "start" in data:
+            if "DTSTART" in component:
+                del component["DTSTART"]
             if data.get("allDay"):
-                component["DTSTART"] = date.fromisoformat(data["start"][:10])
+                component.add("dtstart", date.fromisoformat(data["start"][:10]))
             else:
-                component["DTSTART"] = _parse_dt(data["start"])
+                component.add("dtstart", _parse_dt(data["start"]))
 
         if "end" in data:
+            if "DTEND" in component:
+                del component["DTEND"]
             if data.get("allDay"):
-                component["DTEND"] = date.fromisoformat(data["end"][:10])
+                component.add("dtend", date.fromisoformat(data["end"][:10]))
             else:
-                component["DTEND"] = _parse_dt(data["end"])
+                component.add("dtend", _parse_dt(data["end"]))
 
         if "location" in data:
-            component["LOCATION"] = data["location"]
+            if "LOCATION" in component:
+                del component["LOCATION"]
+            component.add("location", data["location"])
         if "description" in data:
-            component["DESCRIPTION"] = data["description"]
+            if "DESCRIPTION" in component:
+                del component["DESCRIPTION"]
+            component.add("description", data["description"])
         if "color" in data:
-            component["X-CALENDARR-COLOR"] = data["color"]
+            if "X-CALENDARR-COLOR" in component:
+                del component["X-CALENDARR-COLOR"]
+            component.add("x-calendarr-color", data["color"])
         if "rrule" in data:
-            if data["rrule"]:
-                component["RRULE"] = _parse_rrule_str(data["rrule"])
-            elif "RRULE" in component:
+            if "RRULE" in component:
                 del component["RRULE"]
+            if data["rrule"]:
+                component.add("rrule", _parse_rrule_str(data["rrule"]))
 
         if "exdate" in data and data["exdate"]:
             # Parse YYYYMMDD string into a proper EXDATE
