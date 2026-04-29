@@ -1,11 +1,14 @@
+import json
 import logging
 import secrets
+import ssl
 import time
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlencode
 
 import requests as http_requests
+import websocket as ws_client
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -149,8 +152,85 @@ def _ha_build_event_body(entity_id: str, data: dict) -> dict:
     return body
 
 
+def _ha_ws_call(url: str, token: str, command: dict) -> dict:
+    """Send a single WebSocket command to HA and return the result.
+
+    Used for calendar/event/delete and calendar/event/update which are
+    only exposed via WebSocket, not as service calls.
+    """
+    # Convert http(s):// → ws(s)://
+    if url.startswith("https://"):
+        ws_url = "wss://" + url[len("https://"):].rstrip("/") + "/api/websocket"
+        sslopt = {"cert_reqs": ssl.CERT_NONE}
+    elif url.startswith("http://"):
+        ws_url = "ws://" + url[len("http://"):].rstrip("/") + "/api/websocket"
+        sslopt = None
+    else:
+        raise Exception(f"Ungültige HA-URL: {url}")
+
+    sock = ws_client.create_connection(ws_url, timeout=15, sslopt=sslopt)
+    try:
+        # 1. auth_required
+        msg = json.loads(sock.recv())
+        if msg.get("type") != "auth_required":
+            raise Exception(f"Unerwartete WS-Antwort: {msg}")
+        # 2. send auth
+        sock.send(json.dumps({"type": "auth", "access_token": token}))
+        msg = json.loads(sock.recv())
+        if msg.get("type") != "auth_ok":
+            raise Exception(f"WS Auth fehlgeschlagen: {msg.get('message', msg)}")
+        # 3. send command
+        cmd = {"id": 1, **command}
+        logger.info("HA WS command: %s", cmd)
+        sock.send(json.dumps(cmd))
+        # 4. receive result (might receive other messages first, ignore them)
+        for _ in range(10):
+            msg = json.loads(sock.recv())
+            if msg.get("id") == 1:
+                if msg.get("success"):
+                    return msg.get("result", {})
+                err = msg.get("error", {})
+                raise Exception(f"{err.get('code', 'error')}: {err.get('message', 'Unbekannter Fehler')}")
+        raise Exception("Keine Antwort von HA WebSocket")
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+
+def _ha_ws_event_payload(data: dict) -> dict:
+    """Build the 'event' payload for calendar/event/create|update WS commands."""
+    payload = {}
+    if data.get("title"):
+        payload["summary"] = data["title"]
+    if data.get("description"):
+        payload["description"] = data["description"]
+    if data.get("location"):
+        payload["location"] = data["location"]
+    if data.get("start") and data.get("end"):
+        if data.get("allDay"):
+            payload["dtstart"] = data["start"][:10]
+            payload["dtend"] = data["end"][:10]
+        else:
+            payload["dtstart"] = _ha_format_dt(data["start"])
+            payload["dtend"] = _ha_format_dt(data["end"])
+    return payload
+
+
 def _ha_create_event(url: str, token: str, entity_id: str, data: dict) -> dict:
-    """Create a new event via HA calendar.create_event service."""
+    """Create a new event. Tries WebSocket command first, falls back to service call."""
+    # Try WebSocket calendar/event/create
+    try:
+        return _ha_ws_call(url, token, {
+            "type": "calendar/event/create",
+            "entity_id": entity_id,
+            "event": _ha_ws_event_payload(data),
+        })
+    except Exception as exc:
+        logger.info("HA WS create failed (%s), falling back to service call", exc)
+
+    # Fallback: service call
     base = url.rstrip("/")
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     body = _ha_build_event_body(entity_id, data)
@@ -165,90 +245,26 @@ def _ha_create_event(url: str, token: str, entity_id: str, data: dict) -> dict:
         except Exception:
             detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
         raise Exception(f"HA create_event ({resp.status_code}): {detail}")
-    return resp
+    return {}
 
 
 def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
-    """Update via update_event service, fallback to delete+create."""
-    base = url.rstrip("/")
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-    # Try update_event service (HA 2024.6+)
-    body = _ha_build_event_body(entity_id, data)
-    body["uid"] = uid
-    resp = http_requests.post(
-        f"{base}/api/services/calendar/update_event",
-        headers=headers, json=body, timeout=15, verify=False,
-    )
-    if resp.ok:
-        return resp
-
-    logger.info("HA update_event not available (%s), falling back to delete+create", resp.status_code)
-
-    # Fallback: delete old event, then create new one
-    del_resp = http_requests.post(
-        f"{base}/api/services/calendar/delete_event",
-        headers=headers,
-        json={"entity_id": entity_id, "uid": uid},
-        timeout=15, verify=False,
-    )
-    if not del_resp.ok:
-        logger.warning("HA delete_event failed (%s): %s", del_resp.status_code, del_resp.text[:200])
-        # If delete also fails, try create anyway (might duplicate)
-
-    create_body = _ha_build_event_body(entity_id, data)
-    create_resp = http_requests.post(
-        f"{base}/api/services/calendar/create_event",
-        headers=headers, json=create_body, timeout=15, verify=False,
-    )
-    if not create_resp.ok:
-        try:
-            detail = create_resp.json().get("message", create_resp.text[:500])
-        except Exception:
-            detail = create_resp.text[:500] if create_resp.text else str(create_resp.status_code)
-        raise Exception(f"HA create_event ({create_resp.status_code}): {detail}")
-    return create_resp
+    """Update an event via WebSocket command (the only reliable path)."""
+    return _ha_ws_call(url, token, {
+        "type": "calendar/event/update",
+        "entity_id": entity_id,
+        "uid": uid,
+        "event": _ha_ws_event_payload(data),
+    })
 
 
 def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
-    """Delete an event via HA service call API (calendar.delete_event).
-
-    Tries multiple body formats since HA's service-call schema accepts
-    different shapes depending on version.
-    """
-    base = url.rstrip("/")
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    service_url = f"{base}/api/services/calendar/delete_event"
-
-    # Format 1: entity_id flat in body (most common)
-    bodies = [
-        {"entity_id": entity_id, "uid": uid},
-        # Format 2: entity_id as list
-        {"entity_id": [entity_id], "uid": uid},
-        # Format 3: target wrapper
-        {"target": {"entity_id": entity_id}, "uid": uid},
-    ]
-
-    last_resp = None
-    for i, body in enumerate(bodies):
-        logger.info("HA delete_event try %d body: %s", i + 1, body)
-        resp = http_requests.post(
-            service_url, headers=headers, json=body, timeout=15, verify=False,
-        )
-        if resp.ok:
-            return resp
-        last_resp = resp
-        logger.warning("HA delete_event format %d failed (%s): %s",
-                       i + 1, resp.status_code, resp.text[:200])
-
-    # All failed – build a helpful error message
-    try:
-        detail = last_resp.json().get("message", last_resp.text[:500])
-    except Exception:
-        detail = last_resp.text[:500] if last_resp.text else f"HTTP {last_resp.status_code}"
-    if last_resp.status_code == 400:
-        detail = f"{detail} — Vermutlich unterstützt deine HA-Kalender-Integration kein Löschen. Bitte in HA Developer Tools → Services testen mit calendar.delete_event"
-    raise Exception(f"HA delete_event ({last_resp.status_code}): {detail}")
+    """Delete an event via WebSocket command (the only reliable path)."""
+    return _ha_ws_call(url, token, {
+        "type": "calendar/event/delete",
+        "entity_id": entity_id,
+        "uid": uid,
+    })
 
 
 def _parse_ha_event(ev: dict, cal_db_id: int, cal_name: str, cal_color: str) -> dict:
