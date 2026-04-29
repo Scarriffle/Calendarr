@@ -109,6 +109,45 @@ def _ha_get_events(url: str, token: str, entity_id: str, start_dt: datetime, end
         raise http_requests.exceptions.Timeout(f"HA Timeout für {entity_id}")
 
 
+def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
+    """Update an event via HA REST API."""
+    body = {}
+    if "title" in data:
+        body["summary"] = data["title"]
+    if "description" in data:
+        body["description"] = data["description"]
+    if "location" in data:
+        body["location"] = data["location"]
+    if "start" in data and "end" in data:
+        if data.get("allDay"):
+            body["start"] = {"date": data["start"][:10]}
+            body["end"] = {"date": data["end"][:10]}
+        else:
+            body["start"] = {"dateTime": data["start"]}
+            body["end"] = {"dateTime": data["end"]}
+    resp = http_requests.put(
+        f"{url.rstrip('/')}/api/calendars/{entity_id}/{uid}",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json=body,
+        timeout=15,
+        verify=False,
+    )
+    resp.raise_for_status()
+    return resp
+
+
+def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
+    """Delete an event via HA REST API."""
+    resp = http_requests.delete(
+        f"{url.rstrip('/')}/api/calendars/{entity_id}/{uid}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=15,
+        verify=False,
+    )
+    resp.raise_for_status()
+    return resp
+
+
 def _parse_ha_event(ev: dict, cal_db_id: int, cal_name: str, cal_color: str) -> dict:
     start = ev.get("start", {})
     end = ev.get("end", {})
@@ -442,3 +481,72 @@ def update_calendar(
         cal.sidebar_hidden = data.sidebar_hidden
     db.commit()
     return {"ok": True}
+
+
+# ── Event CRUD ───────────────────────────────────────────
+
+class HAEventUpdate(BaseModel):
+    title: Optional[str] = None
+    start: Optional[str] = None
+    end: Optional[str] = None
+    allDay: Optional[bool] = None
+    location: Optional[str] = None
+    description: Optional[str] = None
+
+
+@router.put("/events/{calendar_id}/{uid}")
+def update_event(
+    calendar_id: int,
+    uid: str,
+    data: HAEventUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    cal = (
+        db.query(models.HomeAssistantCalendar)
+        .join(models.HomeAssistantAccount)
+        .filter(
+            models.HomeAssistantCalendar.id == calendar_id,
+            models.HomeAssistantAccount.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not cal:
+        raise HTTPException(404, "Calendar not found")
+    account = cal.account
+    token = _get_valid_token(account, db)
+    try:
+        _ha_update_event(
+            account.url, token, cal.entity_id, uid,
+            data.model_dump(exclude_none=True),
+        )
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(500, f"HA event update failed: {exc}")
+
+
+@router.delete("/events/{calendar_id}/{uid}")
+def delete_event(
+    calendar_id: int,
+    uid: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    cal = (
+        db.query(models.HomeAssistantCalendar)
+        .join(models.HomeAssistantAccount)
+        .filter(
+            models.HomeAssistantCalendar.id == calendar_id,
+            models.HomeAssistantAccount.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not cal:
+        raise HTTPException(404, "Calendar not found")
+    account = cal.account
+    token = _get_valid_token(account, db)
+    try:
+        _ha_delete_event(account.url, token, cal.entity_id, uid)
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(500, f"HA event delete failed: {exc}")

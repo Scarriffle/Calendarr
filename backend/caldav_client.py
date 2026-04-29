@@ -107,6 +107,8 @@ def _parse_ics(raw: str, event_url: str) -> List[Dict]:
             color = str(component.get("X-CALENDARR-COLOR", "") or "")
             rrule_prop = component.get("RRULE")
             rrule_str = rrule_prop.to_ical().decode("utf-8") if rrule_prop else None
+            recurrence_id = component.get("RECURRENCE-ID")
+            is_recurring = rrule_str is not None or recurrence_id is not None
 
             dtstart_prop = component.get("DTSTART")
             dtend_prop = component.get("DTEND")
@@ -157,6 +159,7 @@ def _parse_ics(raw: str, event_url: str) -> List[Dict]:
                     "description": description,
                     "color": color or None,
                     "rrule": rrule_str,
+                    "recurring": is_recurring,
                 }
             )
         except Exception as exc:

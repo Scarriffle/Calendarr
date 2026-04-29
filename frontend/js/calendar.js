@@ -858,7 +858,7 @@ function bindSidebar() {
 // ── Day Context Menu (month view) ────────────────────────
 // ── Delete logic ──────────────────────────────────────────
 async function deleteEventByScope(ev, scope) {
-  if (scope === 'all' || !ev.rrule) {
+  if (scope === 'all' || !(ev.rrule || ev.recurring)) {
     // Delete the entire event (or non-recurring)
     if (ev.source === 'google') {
       const accId = ev.calendar_id.replace('google-', '');
@@ -868,6 +868,9 @@ async function deleteEventByScope(ev, scope) {
     } else if (ev.source === 'ical') {
       const subId = ev.calendar_id.replace('ical-', '');
       await api.delete(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`);
+    } else if (ev.source === 'homeassistant') {
+      const haCalId = ev.calendar_id.replace('homeassistant-', '');
+      await api.delete(`/homeassistant/events/${haCalId}/${encodeURIComponent(ev.id)}`);
     } else {
       await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`);
     }
@@ -894,7 +897,7 @@ async function deleteEventByScope(ev, scope) {
 function showDeleteConfirm(ev) {
   return new Promise(resolve => {
     const modal = document.getElementById('modal-delete-confirm');
-    const isRecurring = !!(ev.rrule);
+    const isRecurring = !!(ev.rrule || ev.recurring);
 
     document.getElementById('delete-confirm-title').textContent = t('confirm_delete_title');
     document.getElementById('delete-confirm-text').textContent = t('confirm_delete_event', { title: ev.title });
@@ -994,8 +997,8 @@ function showEventPopup(ev, anchor) {
   popup.style.left = Math.max(8, left) + 'px';
   popup.style.top  = Math.max(8, top)  + 'px';
 
-  // Hide edit/delete for read-only sources (iCal subscriptions, Home Assistant)
-  const isReadOnly = (ev.source === 'ical' || ev.source === 'homeassistant');
+  // Hide edit/delete for read-only iCal subscription events
+  const isReadOnly = (ev.source === 'ical');
   document.getElementById('popup-edit').style.display = isReadOnly ? 'none' : '';
   document.getElementById('popup-delete').style.display = isReadOnly ? 'none' : '';
 
@@ -1134,7 +1137,7 @@ function openNewEventModal(date) {
 }
 
 function openEditEventModal(ev) {
-  if (ev.source === 'ical' || ev.source === 'homeassistant') { showToast(t('event_readonly'), true); return; }
+  if (ev.source === 'ical') { showToast(t('event_readonly'), true); return; }
   state.editingEvent = ev;
   state.selectedEventColor = ev.color || '';
 
@@ -1426,9 +1429,14 @@ function bindEventModal() {
           await api.put(`/local/events/${encodeURIComponent(ev.id)}`,
             { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '' }
           );
-        } else if (ev.source === 'ical' || ev.source === 'homeassistant') {
+        } else if (ev.source === 'ical') {
           showToast(t('event_readonly'), true);
           return;
+        } else if (ev.source === 'homeassistant') {
+          const haCalId = ev.calendar_id.replace('homeassistant-', '');
+          await api.put(`/homeassistant/events/${haCalId}/${encodeURIComponent(ev.id)}`,
+            { title, start, end, allDay, location: loc, description: desc }
+          );
         } else {
           await api.put(
             `/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`,
