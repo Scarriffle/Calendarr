@@ -211,37 +211,44 @@ def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict)
 
 
 def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
-    """Delete an event via HA service call API (calendar.delete_event)."""
+    """Delete an event via HA service call API (calendar.delete_event).
+
+    Tries multiple body formats since HA's service-call schema accepts
+    different shapes depending on version.
+    """
     base = url.rstrip("/")
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    body = {"entity_id": entity_id, "uid": uid}
-    logger.info("HA delete_event body: %s", body)
-    resp = http_requests.post(
-        f"{base}/api/services/calendar/delete_event",
-        headers=headers, json=body, timeout=15, verify=False,
-    )
-    if resp.ok:
-        return resp
+    service_url = f"{base}/api/services/calendar/delete_event"
 
-    # Try REST API DELETE as fallback (works for some integrations)
-    from urllib.parse import quote
-    encoded_uid = quote(uid, safe="")
-    rest_resp = http_requests.delete(
-        f"{base}/api/calendars/{entity_id}/{encoded_uid}",
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=15, verify=False,
-    )
-    if rest_resp.ok:
-        return rest_resp
+    # Format 1: entity_id flat in body (most common)
+    bodies = [
+        {"entity_id": entity_id, "uid": uid},
+        # Format 2: entity_id as list
+        {"entity_id": [entity_id], "uid": uid},
+        # Format 3: target wrapper
+        {"target": {"entity_id": entity_id}, "uid": uid},
+    ]
 
-    # Both failed – build a helpful error message
+    last_resp = None
+    for i, body in enumerate(bodies):
+        logger.info("HA delete_event try %d body: %s", i + 1, body)
+        resp = http_requests.post(
+            service_url, headers=headers, json=body, timeout=15, verify=False,
+        )
+        if resp.ok:
+            return resp
+        last_resp = resp
+        logger.warning("HA delete_event format %d failed (%s): %s",
+                       i + 1, resp.status_code, resp.text[:200])
+
+    # All failed – build a helpful error message
     try:
-        detail = resp.json().get("message", resp.text[:500])
+        detail = last_resp.json().get("message", last_resp.text[:500])
     except Exception:
-        detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
-    if resp.status_code == 400:
-        detail = f"{detail} (Diese HA-Kalender-Integration unterstützt kein Löschen — z.B. Google-Calendar via HA ist read-only für Updates/Löschen)"
-    raise Exception(f"HA delete_event ({resp.status_code}): {detail}")
+        detail = last_resp.text[:500] if last_resp.text else f"HTTP {last_resp.status_code}"
+    if last_resp.status_code == 400:
+        detail = f"{detail} — Vermutlich unterstützt deine HA-Kalender-Integration kein Löschen. Bitte in HA Developer Tools → Services testen mit calendar.delete_event"
+    raise Exception(f"HA delete_event ({last_resp.status_code}): {detail}")
 
 
 def _parse_ha_event(ev: dict, cal_db_id: int, cal_name: str, cal_color: str) -> dict:
