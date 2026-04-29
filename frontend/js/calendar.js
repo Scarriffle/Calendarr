@@ -1460,8 +1460,12 @@ function bindEventModal() {
         });
         showToast(t('event_created'));
       } else if (isHA) {
-        showToast(t('ha_create_not_supported'), true);
-        return;
+        const haCalId = parseInt(calVal.replace('homeassistant-', ''));
+        await api.post('/homeassistant/events', {
+          calendar_id: haCalId, title, start, end, allDay,
+          location: loc, description: desc,
+        });
+        showToast(t('event_created'));
       } else {
         const calId = parseInt(calVal);
         await api.post('/caldav/events', {
