@@ -109,11 +109,9 @@ def _ha_get_events(url: str, token: str, entity_id: str, start_dt: datetime, end
         raise http_requests.exceptions.Timeout(f"HA Timeout für {entity_id}")
 
 
-def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
-    """Update an event via HA service call API (calendar.update_event)."""
-    base = url.rstrip("/")
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    body = {"entity_id": entity_id, "uid": uid}
+def _ha_build_event_body(entity_id: str, data: dict) -> dict:
+    """Build a service-call body for create_event / update_event."""
+    body = {"entity_id": entity_id}
     if "title" in data:
         body["summary"] = data["title"]
     if "description" in data:
@@ -129,18 +127,49 @@ def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict)
             e = data["end"].replace("Z", "+00:00") if data["end"].endswith("Z") else data["end"]
             body["start_date_time"] = s
             body["end_date_time"] = e
-    logger.info("HA update_event body: %s", body)
+    return body
+
+
+def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
+    """Update via update_event service, fallback to delete+create."""
+    base = url.rstrip("/")
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+    # Try update_event service (HA 2024.6+)
+    body = _ha_build_event_body(entity_id, data)
+    body["uid"] = uid
     resp = http_requests.post(
         f"{base}/api/services/calendar/update_event",
         headers=headers, json=body, timeout=15, verify=False,
     )
-    if not resp.ok:
+    if resp.ok:
+        return resp
+
+    logger.info("HA update_event not available (%s), falling back to delete+create", resp.status_code)
+
+    # Fallback: delete old event, then create new one
+    del_resp = http_requests.post(
+        f"{base}/api/services/calendar/delete_event",
+        headers=headers,
+        json={"entity_id": entity_id, "uid": uid},
+        timeout=15, verify=False,
+    )
+    if not del_resp.ok:
+        logger.warning("HA delete_event failed (%s): %s", del_resp.status_code, del_resp.text[:200])
+        # If delete also fails, try create anyway (might duplicate)
+
+    create_body = _ha_build_event_body(entity_id, data)
+    create_resp = http_requests.post(
+        f"{base}/api/services/calendar/create_event",
+        headers=headers, json=create_body, timeout=15, verify=False,
+    )
+    if not create_resp.ok:
         try:
-            detail = resp.json().get("message", resp.text[:500])
+            detail = create_resp.json().get("message", create_resp.text[:500])
         except Exception:
-            detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
-        raise Exception(f"HA update_event ({resp.status_code}): {detail}")
-    return resp
+            detail = create_resp.text[:500] if create_resp.text else str(create_resp.status_code)
+        raise Exception(f"HA create_event ({create_resp.status_code}): {detail}")
+    return create_resp
 
 
 def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
