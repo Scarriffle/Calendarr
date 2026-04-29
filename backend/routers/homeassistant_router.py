@@ -129,13 +129,17 @@ def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict)
             e = data["end"].replace("Z", "+00:00") if data["end"].endswith("Z") else data["end"]
             body["start_date_time"] = s
             body["end_date_time"] = e
+    logger.info("HA update_event body: %s", body)
     resp = http_requests.post(
         f"{base}/api/services/calendar/update_event",
         headers=headers, json=body, timeout=15, verify=False,
     )
     if not resp.ok:
-        detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
-        raise Exception(f"HA update_event: {resp.status_code} — {detail}")
+        try:
+            detail = resp.json().get("message", resp.text[:500])
+        except Exception:
+            detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+        raise Exception(f"HA update_event ({resp.status_code}): {detail}")
     return resp
 
 
