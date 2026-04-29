@@ -90,6 +90,13 @@ def _migrate():
         except Exception:
             pass
 
+        try:
+            conn.execute(text("ALTER TABLE local_events ADD COLUMN exdate TEXT"))
+            conn.commit()
+            logging.info("Migration: added exdate to local_events")
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)

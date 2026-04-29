@@ -487,7 +487,7 @@ a { color: var(--primary); text-decoration: none; }
 .month-col:hover { background: var(--bg-hover); }
 .month-col.today { background: rgba(66,133,244,.08); }
 .month-col.month-selected { background: var(--primary-dim); }
-.month-col.month-selected .cell-day { color: var(--primary); font-weight: 600; }
+.month-col.month-selected .cell-day { background: var(--primary); color: #fff; font-weight: 700; }
 .month-col.other-month .cell-day { color: var(--text-3); }
 .cell-day {
   font-size: 12px; font-weight: 500; color: var(--text-2);
@@ -802,8 +802,8 @@ a { color: var(--primary); text-decoration: none; }
 /* ── Day Context Menu ──────────────────────────────────── */
 .cal-context-menu {
   position: fixed; z-index: 1000;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,.5);
   min-width: 180px; padding: 4px 0;
 }
 .ctx-item {

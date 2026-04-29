@@ -5,7 +5,7 @@ const LANE_H   = 20; // px per lane (event height 18px + 2px gap)
 const DAY_H    = 30; // day-number row height
 const NUM_ROWS = 5;  // rolling view: always 5 weeks
 
-export function renderMonth(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
+export function renderMonth(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday', selectedDate = null) {
   // Dynamic lane limit: how many events fit in the actual row height
   const containerH = container.clientHeight || 600;
   const headerH    = 34; // month-header DOW row
@@ -126,7 +126,8 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       const isOther  = cell.getMonth() !== primaryMonth;
       const todayCls    = isToday(cell) ? 'today' : '';
       const otherCls    = isOther       ? 'other-month' : '';
-      const selectedCls = isSameDay(cell, currentDate) ? 'month-selected' : '';
+      const selDate     = selectedDate || currentDate;
+      const selectedCls = isSameDay(cell, selDate) ? 'month-selected' : '';
       const numCls      = isToday(cell) ? 'today' : '';
       colsHtml += `<div class="month-col ${todayCls} ${otherCls} ${selectedCls}" data-date="${key}">
         <div class="cell-day ${numCls}">${cell.getDate()}</div>

@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 import caldav
-from icalendar import Calendar, Event, vRecur
+from icalendar import Calendar, Event, vDatetime, vRecur
 
 logger = logging.getLogger(__name__)
 
@@ -213,10 +213,15 @@ def create_event(
 
 
 def update_event(
-    url: str, username: str, password: str, event_url: str, data: Dict
+    url: str, username: str, password: str, event_url: str, data: Dict,
+    calendar_url: str = None,
 ):
     client = _client(url, username, password)
-    resource = caldav.Event(client=client, url=event_url)
+    if calendar_url:
+        cal_obj = client.calendar(url=calendar_url)
+        resource = caldav.Event(client=client, url=event_url, parent=cal_obj)
+    else:
+        resource = caldav.Event(client=client, url=event_url)
     resource.load()
     raw = resource.data
 
@@ -258,15 +263,31 @@ def update_event(
             elif "RRULE" in component:
                 del component["RRULE"]
 
+        if "exdate" in data and data["exdate"]:
+            # Parse YYYYMMDD string into a proper EXDATE
+            exdate_str = data["exdate"]
+            # Determine if event uses dates or datetimes
+            dtstart_prop = component.get("DTSTART")
+            if dtstart_prop and isinstance(dtstart_prop.dt, date) and not isinstance(dtstart_prop.dt, datetime):
+                exdate_val = date(int(exdate_str[:4]), int(exdate_str[4:6]), int(exdate_str[6:8]))
+            else:
+                exdate_val = datetime(int(exdate_str[:4]), int(exdate_str[4:6]), int(exdate_str[6:8]), tzinfo=timezone.utc)
+            component.add("exdate", [exdate_val])
+
         new_cal.add_component(component)
 
     resource.data = new_cal.to_ical().decode("utf-8")
     resource.save()
 
 
-def delete_event(url: str, username: str, password: str, event_url: str):
+def delete_event(url: str, username: str, password: str, event_url: str,
+                  calendar_url: str = None):
     client = _client(url, username, password)
-    resource = caldav.Event(client=client, url=event_url)
+    if calendar_url:
+        cal_obj = client.calendar(url=calendar_url)
+        resource = caldav.Event(client=client, url=event_url, parent=cal_obj)
+    else:
+        resource = caldav.Event(client=client, url=event_url)
     resource.delete()
 
 

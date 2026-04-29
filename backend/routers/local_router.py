@@ -44,6 +44,7 @@ class EventUpdate(BaseModel):
     description: Optional[str] = None
     color: Optional[str] = None
     rrule: Optional[str] = None
+    exdate: Optional[str] = None
 
 
 def _cal_dict(cal: models.LocalCalendar) -> dict:
@@ -67,6 +68,7 @@ def _event_dict(ev: models.LocalEvent, cal: models.LocalCalendar) -> dict:
         "description": ev.description or "",
         "color": ev.color,
         "rrule": ev.rrule,
+        "exdate": ev.exdate,
         "calendar_id": f"local-{cal.id}",
         "calendar_name": cal.name,
         "calendarColor": cal.color,
@@ -225,6 +227,12 @@ def update_event(
         ev.color = data.color
     if data.rrule is not None:
         ev.rrule = data.rrule if data.rrule else None
+    if data.exdate is not None:
+        existing = ev.exdate or ""
+        dates = [d for d in existing.split(",") if d]
+        if data.exdate not in dates:
+            dates.append(data.exdate)
+        ev.exdate = ",".join(dates)
     db.commit()
     return {"ok": True}
 

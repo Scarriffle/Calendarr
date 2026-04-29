@@ -26,6 +26,7 @@ let weekStartDay = 'monday';
 
 let state = {
   currentDate: new Date(),
+  selectedDate: null,      // separate from currentDate; used for month-view selection
   currentView: 'month',
   events: [],
   accounts: [],
@@ -253,22 +254,23 @@ function renderView() {
       (date, action, mouseEvent) => {
         if (action === 'navigate') {
           state.currentDate = date;
+          state.selectedDate = date;
           state.currentView = 'day';
           updateViewButtons();
           fetchAndRender();
         } else if (action === 'context') {
-          state.currentDate = date;
+          state.selectedDate = date;
           showDayContextMenu(date, mouseEvent);
-        } else {
-          // 'select' — highlight day without navigating
-          state.currentDate = date;
-          renderMiniCal();
           renderView();
-          updateTitle();
+        } else {
+          // 'select' — only update selectedDate, don't shift the view
+          state.selectedDate = date;
+          renderView();
         }
       },
       showEventPopup,
-      weekStartDay
+      weekStartDay,
+      state.selectedDate
     );
   } else if (state.currentView === 'week') {
     renderWeek(container, state.currentDate, evs,
@@ -780,7 +782,7 @@ function bindTopbar() {
   });
 
   document.getElementById('btn-settings').onclick = openSettingsModal;
-  document.getElementById('btn-create-event').onclick = () => openNewEventModal(state.currentDate);
+  document.getElementById('btn-create-event').onclick = () => openNewEventModal(state.selectedDate || state.currentDate);
 
   // Mouse wheel / trackpad scroll navigation – only for month & quarter
   let _wheelLast = 0;
@@ -854,6 +856,82 @@ function bindSidebar() {
 }
 
 // ── Day Context Menu (month view) ────────────────────────
+// ── Delete logic ──────────────────────────────────────────
+async function deleteEventByScope(ev, scope) {
+  if (scope === 'all' || !ev.rrule) {
+    // Delete the entire event (or non-recurring)
+    if (ev.source === 'google') {
+      const accId = ev.calendar_id.replace('google-', '');
+      await api.delete(`/google/events/${accId}/${encodeURIComponent(ev.id)}`);
+    } else if (ev.source === 'local') {
+      await api.delete(`/local/events/${encodeURIComponent(ev.id)}`);
+    } else if (ev.source === 'ical') {
+      const subId = ev.calendar_id.replace('ical-', '');
+      await api.delete(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`);
+    } else {
+      await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`);
+    }
+  } else {
+    // Delete single occurrence: add EXDATE to exclude this date
+    const exdate = ev.start.slice(0, 10).replace(/-/g, '');
+    if (ev.source === 'local') {
+      // For local events: update rrule with EXDATE via a special field
+      const currentRrule = ev.rrule || '';
+      await api.put(`/local/events/${encodeURIComponent(ev.id)}`, {
+        exdate: exdate,
+      });
+    } else {
+      // For CalDAV: pass exdate to update
+      await api.put(
+        `/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`,
+        { exdate: exdate }
+      );
+    }
+  }
+}
+
+// ── Delete Confirm Dialog ─────────────────────────────────
+function showDeleteConfirm(ev) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('modal-delete-confirm');
+    const isRecurring = !!(ev.rrule);
+
+    document.getElementById('delete-confirm-title').textContent = t('confirm_delete_title');
+    document.getElementById('delete-confirm-text').textContent = t('confirm_delete_event', { title: ev.title });
+    document.getElementById('delete-series-options').classList.toggle('hidden', !isRecurring);
+
+    // Reset radio
+    const radios = modal.querySelectorAll('input[name="delete-scope"]');
+    radios[0].checked = true;
+
+    // Labels
+    const labels = modal.querySelectorAll('#delete-series-options label');
+    if (labels[0]) labels[0].lastChild.textContent = ' ' + t('delete_single');
+    if (labels[1]) labels[1].lastChild.textContent = ' ' + t('delete_all_series');
+
+    openModal('modal-delete-confirm');
+
+    const okBtn = document.getElementById('delete-confirm-ok');
+    const cleanup = () => {
+      okBtn.onclick = null;
+      modal.querySelectorAll('[data-modal="modal-delete-confirm"]').forEach(b => b.onclick = null);
+    };
+
+    okBtn.onclick = () => {
+      const scope = isRecurring
+        ? modal.querySelector('input[name="delete-scope"]:checked')?.value || 'single'
+        : 'single';
+      cleanup();
+      closeModal('modal-delete-confirm');
+      resolve(scope);
+    };
+
+    modal.querySelectorAll('[data-modal="modal-delete-confirm"]').forEach(b => {
+      b.onclick = () => { cleanup(); closeModal('modal-delete-confirm'); resolve(null); };
+    });
+  });
+}
+
 function showDayContextMenu(date, mouseEvent) {
   document.querySelectorAll('.cal-context-menu').forEach(m => m.remove());
 
@@ -953,20 +1031,11 @@ function showEventPopup(ev, anchor) {
   };
 
   document.getElementById('popup-delete').onclick = async () => {
-    if (!confirm(t("confirm_delete_event", {title: ev.title}))) return;
+    const scope = await showDeleteConfirm(ev);
+    if (!scope) return;
     popup.classList.add('hidden');
     try {
-      if (ev.source === 'google') {
-        const accId = ev.calendar_id.replace('google-', '');
-        await api.delete(`/google/events/${accId}/${encodeURIComponent(ev.id)}`);
-      } else if (ev.source === 'local') {
-        await api.delete(`/local/events/${encodeURIComponent(ev.id)}`);
-      } else if (ev.source === 'ical') {
-        const subId = ev.calendar_id.replace('ical-', '');
-        await api.delete(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`);
-      } else {
-        await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`);
-      }
+      await deleteEventByScope(ev, scope);
       showToast(t('event_deleted'));
       fetchAndRender(true);
     } catch (e) { showToast(e.message, true); }
@@ -1012,6 +1081,16 @@ function populateCalendarSelect(selectedId) {
       opt.value = `google-${cal.id}`;
       opt.textContent = `${acc.email} / ${cal.name}`;
       if (`google-${cal.id}` === selectedId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  });
+  // Home Assistant calendars
+  state.haAccounts.forEach(acc => {
+    acc.calendars.filter(c => c.enabled).forEach(cal => {
+      const opt = document.createElement('option');
+      opt.value = `homeassistant-${cal.id}`;
+      opt.textContent = `${acc.name} / ${cal.name}`;
+      if (`homeassistant-${cal.id}` === selectedId) opt.selected = true;
       sel.appendChild(opt);
     });
   });
@@ -1315,6 +1394,7 @@ function bindEventModal() {
     const calVal  = document.getElementById('ev-calendar').value;
     const isLocal = calVal.startsWith('local-');
     const isGoogle = calVal.startsWith('google-');
+    const isHA = calVal.startsWith('homeassistant-');
     const loc     = document.getElementById('ev-location').value.trim();
     const desc    = document.getElementById('ev-description').value.trim();
     const color   = state.selectedEventColor;
@@ -1373,6 +1453,9 @@ function bindEventModal() {
           rrule: rrule || null,
         });
         showToast(t('event_created'));
+      } else if (isHA) {
+        showToast(t('ha_create_not_supported'), true);
+        return;
       } else {
         const calId = parseInt(calVal);
         await api.post('/caldav/events', {
@@ -1392,19 +1475,10 @@ function bindEventModal() {
   document.getElementById('ev-delete').onclick = async () => {
     const ev = state.editingEvent;
     if (!ev) return;
-    if (!confirm(t("confirm_delete_event", {title: ev.title}))) return;
+    const scope = await showDeleteConfirm(ev);
+    if (!scope) return;
     try {
-      if (ev.source === 'google') {
-        const accId = ev.calendar_id.replace('google-', '');
-        await api.delete(`/google/events/${accId}/${encodeURIComponent(ev.id)}`);
-      } else if (ev.source === 'local') {
-        await api.delete(`/local/events/${encodeURIComponent(ev.id)}`);
-      } else if (ev.source === 'ical') {
-        const subId = ev.calendar_id.replace('ical-', '');
-        await api.delete(`/ical/events/${subId}/${encodeURIComponent(ev.id)}`);
-      } else {
-        await api.delete(`/caldav/events/${encodeURIComponent(ev.id)}?event_url=${encodeURIComponent(ev.url)}&calendar_id=${ev.calendar_id}`);
-      }
+      await deleteEventByScope(ev, scope);
       showToast(t('event_deleted'));
       closeModal('modal-event');
       fetchAndRender(true);
