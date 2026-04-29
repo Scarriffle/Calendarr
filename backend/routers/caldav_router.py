@@ -410,6 +410,7 @@ def get_events(
                     ev["calendar_id"] = calendar.id
                     ev["calendar_name"] = calendar.name
                     ev["calendarColor"] = cal_color
+                    ev["source"] = "caldav"
                     all_events.append(ev)
             except Exception as exc:
                 logger.error(
