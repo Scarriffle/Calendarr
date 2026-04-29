@@ -110,12 +110,10 @@ def _ha_get_events(url: str, token: str, entity_id: str, start_dt: datetime, end
 
 
 def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
-    """Update an event via HA REST API (HA 2023.11+)."""
-    from urllib.parse import quote
+    """Update an event via HA service call API (calendar.update_event)."""
     base = url.rstrip("/")
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    encoded_uid = quote(uid, safe="")
-    body = {}
+    body = {"entity_id": entity_id, "uid": uid}
     if "title" in data:
         body["summary"] = data["title"]
     if "description" in data:
@@ -124,13 +122,20 @@ def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict)
         body["location"] = data["location"]
     if "start" in data and "end" in data:
         if data.get("allDay"):
-            body["start"] = {"date": data["start"][:10]}
-            body["end"] = {"date": data["end"][:10]}
+            body["dtstart"] = data["start"][:10]
+            body["dtend"] = data["end"][:10]
         else:
-            body["start"] = {"dateTime": data["start"]}
-            body["end"] = {"dateTime": data["end"]}
-    resp = http_requests.put(
-        f"{base}/api/calendars/{entity_id}/{encoded_uid}",
+            s = data["start"].replace("Z", "").replace("T", " ")
+            e = data["end"].replace("Z", "").replace("T", " ")
+            # Strip timezone offset if present (e.g. +02:00)
+            if "+" in s and s.index("+") > 10:
+                s = s[:s.index("+")]
+            if "+" in e and e.index("+") > 10:
+                e = e[:e.index("+")]
+            body["dtstart"] = s
+            body["dtend"] = e
+    resp = http_requests.post(
+        f"{base}/api/services/calendar/update_event",
         headers=headers, json=body, timeout=15, verify=False,
     )
     resp.raise_for_status()
@@ -138,27 +143,17 @@ def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict)
 
 
 def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
-    """Delete an event via HA REST API with fallback to service call."""
+    """Delete an event via HA service call API (calendar.delete_event)."""
     base = url.rstrip("/")
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    # Try REST API first (HA 2023.11+)
-    from urllib.parse import quote
-    encoded_uid = quote(uid, safe="")
-    resp = http_requests.delete(
-        f"{base}/api/calendars/{entity_id}/{encoded_uid}",
-        headers=headers, timeout=15, verify=False,
-    )
-    if resp.status_code < 400:
-        return resp
-    # Fallback: service call
-    resp2 = http_requests.post(
+    resp = http_requests.post(
         f"{base}/api/services/calendar/delete_event",
         headers=headers,
         json={"entity_id": entity_id, "uid": uid},
         timeout=15, verify=False,
     )
-    resp2.raise_for_status()
-    return resp2
+    resp.raise_for_status()
+    return resp
 
 
 def _parse_ha_event(ev: dict, cal_db_id: int, cal_name: str, cal_color: str) -> dict:
