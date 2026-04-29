@@ -110,34 +110,36 @@ def _ha_get_events(url: str, token: str, entity_id: str, start_dt: datetime, end
 
 
 def _ha_format_dt(s: str) -> str:
-    """Convert ISO datetime to HA format: 'YYYY-MM-DD HH:MM:SS' (no timezone)."""
-    # Strip timezone if present
+    """Convert ISO datetime to HA format with timezone, no milliseconds.
+
+    HA's cv.datetime accepts ISO 8601. Keep the timezone offset so HA
+    interprets the time correctly regardless of HA's local timezone.
+    """
+    # Frontend sends "2026-05-07T15:00:00.000Z"; normalize Z to +00:00
     if s.endswith("Z"):
-        s = s[:-1]
-    # Strip +HH:MM or -HH:MM offset
-    for sep in ("+", "-"):
-        idx = s.rfind(sep)
-        if idx > 10:
-            s = s[:idx]
-            break
-    # Replace T with space
-    s = s.replace("T", " ")
-    # Ensure seconds are present
-    if len(s) == 16:  # 'YYYY-MM-DD HH:MM'
-        s += ":00"
-    return s
+        s = s[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        # Strip fractional seconds if fromisoformat can't handle them
+        import re
+        s2 = re.sub(r"\.\d+", "", s)
+        dt = datetime.fromisoformat(s2)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat(timespec="seconds")
 
 
 def _ha_build_event_body(entity_id: str, data: dict) -> dict:
     """Build a service-call body for create_event / update_event."""
     body = {"entity_id": entity_id}
-    if "title" in data:
+    if data.get("title"):
         body["summary"] = data["title"]
-    if "description" in data:
+    if data.get("description"):
         body["description"] = data["description"]
-    if "location" in data:
+    if data.get("location"):
         body["location"] = data["location"]
-    if "start" in data and "end" in data:
+    if data.get("start") and data.get("end"):
         if data.get("allDay"):
             body["start_date"] = data["start"][:10]
             body["end_date"] = data["end"][:10]
@@ -152,6 +154,7 @@ def _ha_create_event(url: str, token: str, entity_id: str, data: dict) -> dict:
     base = url.rstrip("/")
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     body = _ha_build_event_body(entity_id, data)
+    logger.info("HA create_event body: %s", body)
     resp = http_requests.post(
         f"{base}/api/services/calendar/create_event",
         headers=headers, json=body, timeout=15, verify=False,
@@ -211,15 +214,18 @@ def _ha_delete_event(url: str, token: str, entity_id: str, uid: str):
     """Delete an event via HA service call API (calendar.delete_event)."""
     base = url.rstrip("/")
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {"entity_id": entity_id, "uid": uid}
+    logger.info("HA delete_event body: %s", body)
     resp = http_requests.post(
         f"{base}/api/services/calendar/delete_event",
-        headers=headers,
-        json={"entity_id": entity_id, "uid": uid},
-        timeout=15, verify=False,
+        headers=headers, json=body, timeout=15, verify=False,
     )
     if not resp.ok:
-        detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
-        raise Exception(f"HA delete_event: {resp.status_code} — {detail}")
+        try:
+            detail = resp.json().get("message", resp.text[:500])
+        except Exception:
+            detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+        raise Exception(f"HA delete_event ({resp.status_code}): {detail}")
     return resp
 
 
