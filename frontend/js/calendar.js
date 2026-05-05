@@ -1071,9 +1071,9 @@ document.addEventListener('click', e => {
 function populateCalendarSelect(selectedId) {
   const sel = document.getElementById('ev-calendar');
   sel.innerHTML = '';
-  // CalDAV calendars
+  // CalDAV calendars (show all that aren't removed from sidebar, even if unchecked)
   state.accounts.forEach(acc => {
-    acc.calendars.filter(c => c.enabled).forEach(cal => {
+    acc.calendars.filter(c => !c.sidebar_hidden).forEach(cal => {
       const opt = document.createElement('option');
       opt.value = cal.id;
       opt.textContent = `${acc.name} / ${cal.name}`;
@@ -1082,7 +1082,7 @@ function populateCalendarSelect(selectedId) {
     });
   });
   // Local calendars
-  state.localCalendars.filter(c => c.enabled).forEach(cal => {
+  state.localCalendars.filter(c => !c.sidebar_hidden).forEach(cal => {
     const opt = document.createElement('option');
     opt.value = `local-${cal.id}`;
     opt.textContent = cal.name;
@@ -1092,7 +1092,7 @@ function populateCalendarSelect(selectedId) {
   // iCal subscriptions are read-only, not shown here
   // Google calendars (read/write)
   state.googleAccounts.forEach(acc => {
-    acc.calendars.filter(c => c.enabled).forEach(cal => {
+    acc.calendars.filter(c => !c.sidebar_hidden).forEach(cal => {
       const opt = document.createElement('option');
       opt.value = `google-${cal.id}`;
       opt.textContent = `${acc.email} / ${cal.name}`;
@@ -1102,7 +1102,7 @@ function populateCalendarSelect(selectedId) {
   });
   // Home Assistant calendars
   state.haAccounts.forEach(acc => {
-    acc.calendars.filter(c => c.enabled).forEach(cal => {
+    acc.calendars.filter(c => !c.sidebar_hidden).forEach(cal => {
       const opt = document.createElement('option');
       opt.value = `homeassistant-${cal.id}`;
       opt.textContent = `${acc.name} / ${cal.name}`;
@@ -2512,12 +2512,19 @@ function buildWritableCalendars(_excludeEv) {
     }
   }
   for (const cal of state.localCalendars) {
+    if (cal.sidebar_hidden) continue;
     list.push({ _idx: idx++, id: cal.id, name: cal.name, color: cal.color || '#34a853', type: 'local' });
   }
   for (const acc of state.googleAccounts) {
     for (const cal of acc.calendars) {
       if (cal.sidebar_hidden) continue;
       list.push({ _idx: idx++, id: cal.id, name: `${acc.email} / ${cal.name}`, color: cal.color || '#4285f4', type: 'google' });
+    }
+  }
+  for (const acc of state.haAccounts) {
+    for (const cal of acc.calendars) {
+      if (cal.sidebar_hidden) continue;
+      list.push({ _idx: idx++, id: cal.id, name: `${acc.name} / ${cal.name}`, color: cal.color || '#03a9f4', type: 'homeassistant' });
     }
   }
   return list;
@@ -2539,6 +2546,11 @@ async function copyEventToCalendar(ev, cal) {
       await api.post('/local/events', {
         calendar_id: cal.id, title, start, end, allDay,
         location: location || '', description: description || '', color: color || null,
+      });
+    } else if (cal.type === 'homeassistant') {
+      await api.post('/homeassistant/events', {
+        calendar_id: cal.id, title, start, end, allDay,
+        location: location || '', description: description || '',
       });
     } else {
       await api.post('/caldav/events', {
