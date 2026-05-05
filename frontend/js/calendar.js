@@ -2502,28 +2502,45 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function buildWritableCalendars(_excludeEv) {
+function buildWritableCalendars(excludeEv) {
+  // Determine the event's current calendar to exclude it from copy targets
+  let excludeType = null;
+  let excludeId = null;
+  if (excludeEv) {
+    const cid = String(excludeEv.calendar_id);
+    if (excludeEv.source === 'local') {
+      excludeType = 'local'; excludeId = parseInt(cid.replace('local-', ''));
+    } else if (excludeEv.source === 'google') {
+      excludeType = 'google'; excludeId = parseInt(cid.replace('google-', ''));
+    } else if (excludeEv.source === 'homeassistant') {
+      excludeType = 'homeassistant'; excludeId = parseInt(cid.replace('homeassistant-', ''));
+    } else if (excludeEv.source === 'caldav' || !excludeEv.source) {
+      excludeType = 'caldav'; excludeId = parseInt(cid);
+    }
+  }
+  const skip = (type, id) => excludeType === type && excludeId === id;
+
   const list = [];
   let idx = 0;
   for (const acc of state.accounts) {
     for (const cal of acc.calendars) {
-      if (cal.sidebar_hidden) continue;
+      if (cal.sidebar_hidden || skip('caldav', cal.id)) continue;
       list.push({ _idx: idx++, id: cal.id, name: `${acc.name} / ${cal.name}`, color: cal.color || '#4285f4', type: 'caldav' });
     }
   }
   for (const cal of state.localCalendars) {
-    if (cal.sidebar_hidden) continue;
+    if (cal.sidebar_hidden || skip('local', cal.id)) continue;
     list.push({ _idx: idx++, id: cal.id, name: cal.name, color: cal.color || '#34a853', type: 'local' });
   }
   for (const acc of state.googleAccounts) {
     for (const cal of acc.calendars) {
-      if (cal.sidebar_hidden) continue;
+      if (cal.sidebar_hidden || skip('google', cal.id)) continue;
       list.push({ _idx: idx++, id: cal.id, name: `${acc.email} / ${cal.name}`, color: cal.color || '#4285f4', type: 'google' });
     }
   }
   for (const acc of state.haAccounts) {
     for (const cal of acc.calendars) {
-      if (cal.sidebar_hidden) continue;
+      if (cal.sidebar_hidden || skip('homeassistant', cal.id)) continue;
       list.push({ _idx: idx++, id: cal.id, name: `${acc.name} / ${cal.name}`, color: cal.color || '#03a9f4', type: 'homeassistant' });
     }
   }
