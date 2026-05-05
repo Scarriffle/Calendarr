@@ -249,11 +249,36 @@ def _ha_create_event(url: str, token: str, entity_id: str, data: dict) -> dict:
 
 
 def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
-    """Update an event via WebSocket command (the only reliable path)."""
+    """Update an event. Tries calendar/event/update first; if the integration
+    doesn't support update (e.g. Google Calendar via HA), falls back to
+    delete+create so the user still sees their changes."""
+    try:
+        return _ha_ws_call(url, token, {
+            "type": "calendar/event/update",
+            "entity_id": entity_id,
+            "uid": uid,
+            "event": _ha_ws_event_payload(data),
+        })
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "not_supported" not in msg and "does not support" not in msg:
+            raise
+        logger.info("HA update not supported for %s, falling back to delete+create", entity_id)
+
+    # Fallback: delete the old event, then create a new one
+    try:
+        _ha_ws_call(url, token, {
+            "type": "calendar/event/delete",
+            "entity_id": entity_id,
+            "uid": uid,
+        })
+    except Exception as exc:
+        logger.warning("HA delete during update fallback failed: %s", exc)
+        # Continue anyway — try the create
+
     return _ha_ws_call(url, token, {
-        "type": "calendar/event/update",
+        "type": "calendar/event/create",
         "entity_id": entity_id,
-        "uid": uid,
         "event": _ha_ws_event_payload(data),
     })
 
