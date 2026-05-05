@@ -1027,7 +1027,12 @@ function showEventPopup(ev, anchor) {
     if (!menu.classList.contains('hidden')) { menu.classList.add('hidden'); return; }
     const targets = buildWritableCalendars(ev);
     if (!targets.length) { showToast('Keine Zielkalender verfügbar', true); return; }
-    menu.innerHTML = `<div class="popup-copy-label">${t('copy_to_calendar')}</div>` +
+    menu.innerHTML =
+      `<div class="popup-copy-label">${t('copy_to_calendar')}</div>` +
+      `<label class="popup-copy-edit-toggle">
+         <input type="checkbox" id="popup-copy-edit-cb" />
+         <span>${t('edit_before_copy')}</span>
+       </label>` +
       targets.map(c =>
         `<div class="popup-copy-item" data-cal-idx="${c._idx}">
           <span class="popup-copy-dot" style="background:${c.color}"></span>
@@ -1035,13 +1040,22 @@ function showEventPopup(ev, anchor) {
         </div>`
       ).join('');
     menu.classList.remove('hidden');
+
+    // Stop clicks on the checkbox label from closing the menu
+    menu.querySelector('.popup-copy-edit-toggle').addEventListener('click', e2 => e2.stopPropagation());
+
     menu.querySelectorAll('.popup-copy-item').forEach(el => {
       el.addEventListener('click', async ev2 => {
         ev2.stopPropagation();
+        const editFirst = document.getElementById('popup-copy-edit-cb').checked;
         menu.classList.add('hidden');
         popup.classList.add('hidden');
         const cal = targets[parseInt(el.dataset.calIdx)];
-        await copyEventToCalendar(ev, cal);
+        if (editFirst) {
+          openCopyEditModal(ev, cal);
+        } else {
+          await copyEventToCalendar(ev, cal);
+        }
       });
     });
   };
@@ -1145,6 +1159,43 @@ function openNewEventModal(date) {
   populateCalendarSelect(null);
   resetColorPicker('');
   resetRecurrenceUI();
+  document.getElementById('ev-delete').classList.add('hidden');
+  openModal('modal-event');
+}
+
+// Open the create-event modal pre-filled with an existing event's data, so
+// the user can edit before copying it into the target calendar.
+function openCopyEditModal(ev, targetCal) {
+  state.editingEvent = null;
+  state.selectedEventColor = ev.color || '';
+
+  document.getElementById('modal-event-title-label').textContent = 'Termin erstellen';
+  document.getElementById('ev-title').value       = ev.title || '';
+  document.getElementById('ev-location').value    = ev.location || '';
+  document.getElementById('ev-description').value = ev.description || '';
+  document.getElementById('ev-allday').checked    = !!ev.allDay;
+
+  if (ev.allDay) {
+    setDtValue('ev-start-date', (ev.start || '').slice(0, 10), 'date');
+    setDtValue('ev-end-date',   (ev.end   || '').slice(0, 10), 'date');
+  } else {
+    const s = new Date(ev.start);
+    const e = new Date(ev.end);
+    setDtValue('ev-start', toLocalDatetimeInput(s), 'datetime');
+    setDtValue('ev-end',   toLocalDatetimeInput(e), 'datetime');
+  }
+
+  toggleAlldayFields(!!ev.allDay);
+
+  // Map target calendar to the dropdown's option value
+  let selectedId;
+  if (targetCal.type === 'caldav') selectedId = targetCal.id;
+  else                              selectedId = `${targetCal.type}-${targetCal.id}`;
+  populateCalendarSelect(selectedId);
+
+  resetColorPicker(ev.color || '');
+  resetRecurrenceUI();
+  if (ev.rrule) parseRruleIntoUI(ev.rrule);
   document.getElementById('ev-delete').classList.add('hidden');
   openModal('modal-event');
 }
