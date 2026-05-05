@@ -1127,6 +1127,21 @@ function populateCalendarSelect(selectedId) {
 }
 
 // ── Date field helpers ────────────────────────────────────
+
+// All-day events use exclusive end-dates (iCal RFC 5545 convention):
+// DTEND points to the day AFTER the last visible day. The user picker
+// uses inclusive end-dates ("ends on 18.08" means 18.08 is the last
+// day). These helpers convert between the two.
+function shiftDate(isoDate, deltaDays) {
+  if (!isoDate) return isoDate;
+  const [y, m, d] = isoDate.slice(0, 10).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + deltaDays);
+  return dt.toISOString().slice(0, 10);
+}
+const allDayEndToInclusive = iso => shiftDate(iso, -1); // storage → picker
+const allDayEndToExclusive = iso => shiftDate(iso, +1); // picker → storage
+
 function setDtValue(id, isoStr, mode) {
   const input = document.getElementById(id);
   if (input) input.value = isoStr || '';
@@ -1177,7 +1192,7 @@ function openCopyEditModal(ev, targetCal) {
 
   if (ev.allDay) {
     setDtValue('ev-start-date', (ev.start || '').slice(0, 10), 'date');
-    setDtValue('ev-end-date',   (ev.end   || '').slice(0, 10), 'date');
+    setDtValue('ev-end-date',   allDayEndToInclusive((ev.end || '').slice(0, 10)), 'date');
   } else {
     const s = new Date(ev.start);
     const e = new Date(ev.end);
@@ -1213,7 +1228,7 @@ function openEditEventModal(ev) {
 
   if (ev.allDay) {
     setDtValue('ev-start-date', ev.start.slice(0, 10), 'date');
-    setDtValue('ev-end-date',   ev.end.slice(0, 10),   'date');
+    setDtValue('ev-end-date',   allDayEndToInclusive(ev.end.slice(0, 10)), 'date');
     toggleAlldayFields(true);
   } else {
     const s = new Date(ev.start);
@@ -1473,6 +1488,8 @@ function bindEventModal() {
       end   = document.getElementById('ev-end-date').value;
       if (!start) { showToast(t('error_enter_date'), true); return; }
       if (!end || end < start) end = start;
+      // User picker uses inclusive end; storage uses exclusive (iCal convention)
+      end = allDayEndToExclusive(end);
     } else {
       const sv = document.getElementById('ev-start').value;
       const ev2 = document.getElementById('ev-end').value;
