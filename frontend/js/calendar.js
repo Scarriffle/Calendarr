@@ -106,9 +106,9 @@ function handleHAOAuthReturn() {
 }
 
 // ── Event cache ───────────────────────────────────────────
-const CACHE_BUF      = 56 * 86400000; // initial ±8 weeks
-const PREFETCH_EXT   = 56 * 86400000; // extend by 8 weeks when triggered
-const PREFETCH_EDGE  = 28 * 86400000; // trigger when within 4 weeks of cache edge
+const CACHE_BUF      = 300 * 86400000; // initial ±10 months around the view
+const PREFETCH_EXT   = 180 * 86400000; // extend by ~6 months when triggered
+const PREFETCH_EDGE  =  90 * 86400000; // trigger when within ~3 months of cache edge
 
 const eventCache = {
   start: null, end: null, events: [],
