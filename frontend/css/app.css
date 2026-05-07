@@ -1211,3 +1211,146 @@ a { color: var(--primary); text-decoration: none; }
   margin-top: 12px; padding-top: 10px;
   border-top: 1px solid var(--border-light);
 }
+
+/* ── Mobile / PWA additions ─────────────────────────────────
+   Additive only — does not modify any existing rules above. */
+
+/* Backdrop element exists in DOM but is hidden by default on desktop */
+.sidebar-backdrop { display: none; }
+
+@media (max-width: 768px) {
+  html, body { overflow-x: hidden; max-width: 100vw; }
+
+  /* ── Sidebar slides in as overlay on mobile ─────────────── */
+  .sidebar {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 0;
+    bottom: 0;
+    width: min(85vw, 320px);
+    z-index: 600;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: var(--shadow-lg);
+    margin-right: 0 !important;
+  }
+  body.sidebar-open .sidebar { transform: translateX(0); }
+  /* Neutralize the desktop .collapsed shift on mobile so the JS toggle
+     never creates a second hidden state to fight with .sidebar-open */
+  .sidebar.collapsed { transform: translateX(-100%); margin-right: 0 !important; }
+  body.sidebar-open .sidebar.collapsed { transform: translateX(0); }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+  }
+  body.sidebar-open .sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ── Topbar tightening + scrollable view switcher ────────── */
+  .topbar { padding: 0 8px; gap: 4px; }
+  .topbar-left { width: auto; flex-shrink: 0; }
+  .topbar-center {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .topbar-center .view-title {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-right {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .view-switcher {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .view-switcher::-webkit-scrollbar { display: none; }
+  .view-switcher .view-btn { flex: 0 0 auto; }
+
+  /* ── 44px minimum tap targets ────────────────────────────── */
+  .icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .btn { min-height: 44px; }
+  .view-switcher .view-btn { min-height: 40px; }
+
+  /* ── Month view: dots instead of full event titles ───────── */
+  .month-span-event {
+    height: 6px !important;
+    line-height: 0 !important;
+    padding: 0 !important;
+    border-radius: 3px !important;
+    font-size: 0 !important;
+    text-overflow: clip !important;
+  }
+  .month-events-overlay { gap: 1px; }
+  .month-more {
+    font-size: 9px;
+    padding: 0 2px;
+  }
+  .cell-day { font-size: 11px; }
+
+  /* ── Week view collapses to single day on mobile when today
+     is in the visible week. Falls back to default 7-col layout
+     for other weeks (use day view there). ──────────────────── */
+  .week-header-row:has(.week-day-header.today) .week-day-header:not(.today) { display: none; }
+  .week-header-row:has(.week-day-header.today) .week-day-header.today { flex: 1 1 100%; width: 100%; }
+  .week-days-col:has(.week-day-col.today) .week-day-col:not(.today) { display: none; }
+  .week-days-col:has(.week-day-col.today) .week-day-col.today { flex: 1 1 100%; width: 100%; }
+  .week-allday-row:has(.week-day-col.today) .week-day-col:not(.today) { display: none; }
+
+  /* ── Modals: full-screen on mobile ───────────────────────── */
+  .modal-overlay { padding: 0; }
+  .modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-footer { flex-shrink: 0; }
+
+  /* Settings page modal: also full-screen */
+  .settings-page-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+
+  /* ── Misc safety: prevent overflow on flex topbar items ──── */
+  .main-view { width: 100%; min-width: 0; }
+  #view-container { max-width: 100%; overflow-x: hidden; }
+}
+
+/* iOS notch / home-indicator safe areas (PWA standalone) */
+@supports (padding: env(safe-area-inset-top)) {
+  .topbar { padding-top: env(safe-area-inset-top); height: calc(var(--topbar-h) + env(safe-area-inset-top)); }
+  .sidebar { padding-bottom: env(safe-area-inset-bottom); }
+}
+

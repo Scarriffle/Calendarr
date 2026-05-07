@@ -115,6 +115,29 @@ FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 
+# ── PWA assets that must live at root scope ──────────────
+@app.get("/manifest.json")
+async def pwa_manifest():
+    return FileResponse(str(FRONTEND_DIR / "manifest.json"), media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+async def pwa_service_worker():
+    return FileResponse(
+        str(FRONTEND_DIR / "sw.js"),
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/icons/{icon_name}")
+async def pwa_icon(icon_name: str):
+    icon_path = FRONTEND_DIR / "icons" / icon_name
+    if not icon_path.exists() or not icon_path.is_file():
+        raise HTTPException(status_code=404, detail="Icon not found")
+    return FileResponse(str(icon_path))
+
+
 @app.get("/{full_path:path}")
 async def spa_fallback(full_path: str):
     if full_path.startswith("api/"):
