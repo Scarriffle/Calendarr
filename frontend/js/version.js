@@ -1,2 +1,2 @@
 // Increment APP_VERSION with every code change
-export const APP_VERSION = 'v8';
+export const APP_VERSION = 'v9';

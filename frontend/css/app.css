@@ -1225,6 +1225,9 @@ a { color: var(--primary); text-decoration: none; }
 .dropdown-item-mobile-only { display: none; }
 .create-fab { display: none; }
 
+/* View-title spans: visual space between main and year on desktop */
+.view-title-year { margin-left: 6px; }
+
 @media (max-width: 768px) {
   html, body { overflow-x: hidden; max-width: 100vw; }
 
@@ -1452,13 +1455,44 @@ a { color: var(--primary); text-decoration: none; }
   /* The title is the most important info — let it grow */
   .topbar-center { flex: 1; min-width: 0; }
   .topbar-center .view-title {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 500;
     padding-left: 4px;
     flex: 1;
+    line-height: 1.1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    overflow: hidden;
+  }
+  .view-title-main {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .view-title-year {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-2);
+    line-height: 1.1;
+    margin-left: 0;
   }
   .topbar-left { gap: 0; }
   .topbar-right { gap: 0; }
+
+  /* Event-Popup: Buttons kompakt halten, kein 44px-Override ───── */
+  .event-popup .icon-btn {
+    min-width: 32px !important;
+    min-height: 32px !important;
+    width: 32px;
+    height: 32px;
+  }
+  .event-popup .popup-header { gap: 2px; padding: 10px 12px; }
+  .event-popup { width: min(92vw, 340px); max-width: 92vw; }
+
+  /* Monatsansicht: Startzeit ausblenden — nur Titel anzeigen ──── */
+  .month-event-time { display: none; }
 
   /* ── Settings modal: nav becomes a slide-in overlay ──────── */
   .settings-nav-toggle { display: inline-flex !important; }
