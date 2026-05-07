@@ -64,8 +64,8 @@ export const api = {
   delete: (path)        => request('DELETE', path),
   upload: (path, form)  => uploadRequest(path, form),
 
-  login: (username, password, totp_code = null) =>
-    request('POST', '/auth/login', { username, password, totp_code }),
+  login: (username, password, totp_code = null, remember_me = false) =>
+    request('POST', '/auth/login', { username, password, totp_code, remember_me }),
 
   setupRequired: () => request('GET', '/auth/setup-required'),
   setup: (data)      => request('POST', '/auth/setup', data),
