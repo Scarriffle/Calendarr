@@ -76,6 +76,7 @@ export async function initCalendar() {
   bindHAAccountModal();
   bindSettingsModal();
   bindProfileModal();
+  bindSwipeNavigation();
   handleHAOAuthReturn();
 }
 
@@ -753,6 +754,33 @@ function renderCalendarList() {
       renderMiniCal();
     });
   });
+}
+
+// ── Swipe navigation (mobile) ─────────────────────────────
+function bindSwipeNavigation() {
+  const container = document.getElementById('view-container');
+  if (!container) return;
+  let startX = 0, startY = 0, startT = 0, active = false;
+  container.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) { active = false; return; }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startT = Date.now();
+    active = true;
+  }, { passive: true });
+  container.addEventListener('touchend', e => {
+    if (!active) return;
+    active = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    const dt = Date.now() - startT;
+    // Horizontal swipe: ≥ 60px, mostly horizontal, faster than 700ms
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 700) {
+      navigate(dx < 0 ? 1 : -1);
+      fetchAndRender();
+    }
+  }, { passive: true });
 }
 
 // ── Navigation ────────────────────────────────────────────
