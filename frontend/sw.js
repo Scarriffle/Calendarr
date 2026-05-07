@@ -1,7 +1,7 @@
 // Calendarr Service Worker
 // Cache-first for static assets, network-first for /api/* (graceful offline)
 
-const CACHE_VERSION = 'calendarr-v9';
+const CACHE_VERSION = 'calendarr-v10';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -60,6 +60,29 @@ self.addEventListener('fetch', event => {
           status: 503,
           headers: { 'Content-Type': 'application/json' },
         })
+      )
+    );
+    return;
+  }
+
+  // Network-first for navigation (HTML) and the version-defining files —
+  // ensures users always get the freshest entry point so new releases
+  // take effect on the next reload without a manual SW unregister.
+  const isHtml = req.mode === 'navigate'
+    || url.pathname === '/'
+    || url.pathname === '/index.html';
+  const isVersionFile = url.pathname === '/static/js/version.js';
+
+  if (isHtml || isVersionFile) {
+    event.respondWith(
+      fetch(req).then(resp => {
+        if (resp && resp.status === 200) {
+          const clone = resp.clone();
+          caches.open(CACHE_VERSION).then(c => c.put(req, clone)).catch(() => {});
+        }
+        return resp;
+      }).catch(() =>
+        caches.match(req).then(c => c || caches.match('/index.html'))
       )
     );
     return;
