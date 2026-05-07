@@ -756,21 +756,57 @@ function renderCalendarList() {
   });
 }
 
-// ── Swipe navigation (mobile) ─────────────────────────────
+// ── Swipe navigation + long-press → context menu (mobile) ──
 function bindSwipeNavigation() {
   const container = document.getElementById('view-container');
   if (!container) return;
   let startX = 0, startY = 0, startT = 0, active = false;
+  let lpTimer = null, lpTarget = null, lpFired = false;
+
   container.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) { active = false; return; }
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     startT = Date.now();
     active = true;
+    lpFired = false;
+
+    // Long-press → context menu (only on day cells, not on events)
+    lpTarget = e.target.closest('.month-col, .week-day-col');
+    if (lpTarget && !e.target.closest('.month-span-event, .week-event')) {
+      lpTimer = setTimeout(() => {
+        const t = e.touches[0];
+        const ev = new MouseEvent('contextmenu', {
+          bubbles: true, cancelable: true,
+          clientX: t.clientX, clientY: t.clientY,
+        });
+        lpTarget.dispatchEvent(ev);
+        lpFired = true;
+      }, 500);
+    }
   }, { passive: true });
+
+  container.addEventListener('touchmove', e => {
+    if (!active) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - startX) > 8 || Math.abs(t.clientY - startY) > 8) {
+      if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+    }
+  }, { passive: true });
+
   container.addEventListener('touchend', e => {
+    if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
     if (!active) return;
     active = false;
+
+    // Suppress the click that follows a long-press
+    if (lpFired) {
+      const blocker = ev => { ev.stopPropagation(); ev.preventDefault(); };
+      document.addEventListener('click', blocker, { capture: true, once: true });
+      lpFired = false;
+      return;
+    }
+
     const t = e.changedTouches[0];
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
@@ -780,6 +816,11 @@ function bindSwipeNavigation() {
       navigate(dx < 0 ? 1 : -1);
       fetchAndRender();
     }
+  }, { passive: true });
+
+  container.addEventListener('touchcancel', () => {
+    if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+    active = false;
   }, { passive: true });
 }
 
@@ -824,6 +865,59 @@ function bindTopbar() {
 
   document.getElementById('btn-settings').onclick = openSettingsModal;
   document.getElementById('btn-create-event').onclick = () => openNewEventModal(state.selectedDate || state.currentDate);
+
+  // Mobile view-toggle popup
+  const viewMobileBtn = document.getElementById('btn-view-mobile');
+  const viewMobileDropdown = document.getElementById('view-mobile-dropdown');
+  if (viewMobileBtn && viewMobileDropdown) {
+    viewMobileBtn.onclick = e => {
+      e.stopPropagation();
+      viewMobileDropdown.classList.toggle('hidden');
+    };
+    document.addEventListener('click', e => {
+      if (!viewMobileDropdown.contains(e.target) && !viewMobileBtn.contains(e.target)) {
+        viewMobileDropdown.classList.add('hidden');
+      }
+    });
+    viewMobileDropdown.querySelectorAll('[data-mobile-view]').forEach(btn => {
+      btn.onclick = () => {
+        state.currentView = btn.dataset.mobileView;
+        updateViewButtons();
+        fetchAndRender();
+        viewMobileDropdown.classList.add('hidden');
+      };
+    });
+    const todayMobile = document.getElementById('btn-today-mobile');
+    if (todayMobile) todayMobile.onclick = () => {
+      state.currentDate = new Date();
+      fetchAndRender();
+      viewMobileDropdown.classList.add('hidden');
+    };
+  }
+
+  // Settings entry inside the user dropdown (mobile)
+  const settingsFromUser = document.getElementById('btn-settings-from-user');
+  if (settingsFromUser) settingsFromUser.onclick = () => {
+    document.getElementById('user-dropdown').classList.add('hidden');
+    openSettingsModal();
+  };
+
+  // Settings nav hamburger (only does something on mobile via CSS)
+  const settingsNavToggle = document.getElementById('settings-nav-toggle');
+  const settingsCard = document.querySelector('#modal-settings .settings-page-card');
+  const settingsNavBackdrop = document.getElementById('settings-nav-backdrop');
+  if (settingsNavToggle && settingsCard) {
+    settingsNavToggle.onclick = () => settingsCard.classList.toggle('nav-open');
+  }
+  if (settingsNavBackdrop && settingsCard) {
+    settingsNavBackdrop.onclick = () => settingsCard.classList.remove('nav-open');
+  }
+  // After picking a section in the nav, close the overlay (mobile UX)
+  document.querySelectorAll('.settings-nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (settingsCard) settingsCard.classList.remove('nav-open');
+    });
+  });
 
   // Mouse wheel / trackpad scroll navigation – only for month & quarter
   let _wheelLast = 0;
