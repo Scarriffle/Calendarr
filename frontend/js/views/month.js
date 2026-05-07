@@ -102,13 +102,14 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       const pastCls  = isPast(ev) ? 'past' : '';
       const cL = continuesLeft  ? 'continues-left'  : '';
       const cR = continuesRight ? 'continues-right' : '';
-      const label = ev.allDay
-        ? ev.title
-        : `${fmtTime(new Date(ev.start))} ${ev.title}`;
+      const titleEsc = escHtml(ev.title);
+      const labelHtml = ev.allDay
+        ? titleEsc
+        : `<span class="month-event-time">${escHtml(fmtTime(new Date(ev.start)))}</span> ${titleEsc}`;
       eventsHtml += `<div class="month-span-event ${pastCls} ${cL} ${cR}"
         data-id="${ev.id}" data-url="${escAttr(ev.url)}"
         style="left:${leftPct.toFixed(3)}%;width:${widthPct.toFixed(3)}%;top:${topPx}px;background:${color}"
-        title="${escAttr(ev.title)}">${escHtml(label)}</div>`;
+        title="${escAttr(ev.title)}">${labelHtml}</div>`;
     });
 
     // "+N more" per column

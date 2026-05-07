@@ -328,38 +328,49 @@ function showLoading() {
 
 function updateTitle() {
   const d = state.currentDate;
-  let title = '';
+  let main = '';   // primary label (months / day range)
+  let year = '';   // year — separated so mobile can wrap to a 2nd line
   const M = t('months');
   if (state.currentView === 'month') {
-    // Show date range of the rolling 5-week window
     const ws = weekStart(d, weekStartDay);
-    const we = new Date(ws); we.setDate(we.getDate() + 34); // last day of 5th week
+    const we = new Date(ws); we.setDate(we.getDate() + 34);
     const Ms = t('months_short');
     if (ws.getFullYear() !== we.getFullYear()) {
-      title = `${Ms[ws.getMonth()]} ${ws.getFullYear()} – ${Ms[we.getMonth()]} ${we.getFullYear()}`;
+      // Cross-year: keep both years inline in main, no separate year
+      main = `${Ms[ws.getMonth()]} ${ws.getFullYear()} – ${Ms[we.getMonth()]} ${we.getFullYear()}`;
     } else if (ws.getMonth() !== we.getMonth()) {
-      title = `${Ms[ws.getMonth()]} – ${Ms[we.getMonth()]} ${we.getFullYear()}`;
+      main = `${Ms[ws.getMonth()]} – ${Ms[we.getMonth()]}`;
+      year = `${we.getFullYear()}`;
     } else {
-      title = `${M[ws.getMonth()]} ${ws.getFullYear()}`;
+      main = `${M[ws.getMonth()]}`;
+      year = `${ws.getFullYear()}`;
     }
   } else if (state.currentView === 'week') {
     const mon = weekStart(d, weekStartDay);
     const sun = new Date(mon);
     sun.setDate(mon.getDate() + 6);
     const sameMonth = mon.getMonth() === sun.getMonth();
-    title = sameMonth
-      ? `${mon.getDate()}. – ${sun.getDate()}. ${M[sun.getMonth()]} ${sun.getFullYear()}`
-      : `${mon.getDate()}. ${M[mon.getMonth()]} – ${sun.getDate()}. ${M[sun.getMonth()]} ${sun.getFullYear()}`;
+    main = sameMonth
+      ? `${mon.getDate()}. – ${sun.getDate()}. ${M[sun.getMonth()]}`
+      : `${mon.getDate()}. ${M[mon.getMonth()]} – ${sun.getDate()}. ${M[sun.getMonth()]}`;
+    year = `${sun.getFullYear()}`;
   } else if (state.currentView === 'day') {
-    title = `${d.getDate()}. ${M[d.getMonth()]} ${d.getFullYear()}`;
+    main = `${d.getDate()}. ${M[d.getMonth()]}`;
+    year = `${d.getFullYear()}`;
   } else if (state.currentView === 'quarter') {
     const q = Math.floor(d.getMonth() / 3) + 1;
-    title = `Q${q} ${d.getFullYear()}`;
+    main = `Q${q}`;
+    year = `${d.getFullYear()}`;
   } else {
-    title = `${d.getDate()}. ${M[d.getMonth()]} ${d.getFullYear()}`;
+    main = `${d.getDate()}. ${M[d.getMonth()]}`;
+    year = `${d.getFullYear()}`;
   }
-  document.getElementById('view-title').textContent = title;
-  document.title = `Calendarr - ${title}`;
+  const fullText = year ? `${main} ${year}` : main;
+  const titleEl = document.getElementById('view-title');
+  titleEl.innerHTML =
+    `<span class="view-title-main">${main}</span>` +
+    (year ? `<span class="view-title-year">${year}</span>` : '');
+  document.title = `Calendarr - ${fullText}`;
 }
 
 function updateViewButtons() {
