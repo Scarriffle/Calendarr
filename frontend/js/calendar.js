@@ -865,6 +865,8 @@ function bindTopbar() {
 
   document.getElementById('btn-settings').onclick = openSettingsModal;
   document.getElementById('btn-create-event').onclick = () => openNewEventModal(state.selectedDate || state.currentDate);
+  const fab = document.getElementById('btn-create-fab');
+  if (fab) fab.onclick = () => openNewEventModal(state.selectedDate || state.currentDate);
 
   // Mobile view-toggle popup
   const viewMobileBtn = document.getElementById('btn-view-mobile');

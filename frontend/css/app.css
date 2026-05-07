@@ -1223,6 +1223,7 @@ a { color: var(--primary); text-decoration: none; }
 .settings-nav-toggle { display: none; }
 .settings-nav-backdrop { display: none; }
 .dropdown-item-mobile-only { display: none; }
+.create-fab { display: none; }
 
 @media (max-width: 768px) {
   html, body { overflow-x: hidden; max-width: 100vw; }
@@ -1418,8 +1419,35 @@ a { color: var(--primary); text-decoration: none; }
   .view-mobile-wrapper { display: inline-block; }
   .dropdown-item-mobile-only { display: flex; }
 
-  /* Hide "Heute" button on desktop topbar (it's in the view popup now) */
-  .topbar #btn-today { display: none; }
+  /* Heute-Button bleibt im Topbar-Center, kompakter Stil für Mobile */
+  .topbar #btn-today {
+    padding: 6px 10px;
+    font-size: 13px;
+    min-height: 36px;
+    flex-shrink: 0;
+  }
+  /* Sidebar create-button: auf Mobile durch den runden FAB ersetzt */
+  #btn-create-event { display: none; }
+  /* Floating action button — bottom-right round button */
+  .create-fab {
+    display: flex;
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5);
+    z-index: 450;
+    transition: filter var(--transition), transform var(--transition);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .create-fab:active { transform: scale(.95); }
+  .create-fab:hover { filter: brightness(1.1); }
 
   /* The title is the most important info — let it grow */
   .topbar-center { flex: 1; min-width: 0; }
