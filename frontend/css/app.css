@@ -1534,7 +1534,20 @@ a { color: var(--primary); text-decoration: none; }
 
 /* iOS notch / home-indicator safe areas (PWA standalone) */
 @supports (padding: env(safe-area-inset-top)) {
-  .topbar { padding-top: env(safe-area-inset-top); height: calc(var(--topbar-h) + env(safe-area-inset-top)); }
+  .topbar {
+    padding-top: env(safe-area-inset-top);
+    height: calc(var(--topbar-h) + env(safe-area-inset-top));
+  }
   .sidebar { padding-bottom: env(safe-area-inset-bottom); }
+  /* The main content sits below the (now taller) topbar and must not
+     extend behind the home indicator at the bottom. */
+  .content-wrapper {
+    margin-top: calc(var(--topbar-h) + env(safe-area-inset-top));
+    height: calc(100vh - var(--topbar-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  /* On mobile the slide-in sidebar also needs to start below the larger topbar */
+  @media (max-width: 768px) {
+    .sidebar { top: calc(var(--topbar-h) + env(safe-area-inset-top)); }
+  }
 }
 
