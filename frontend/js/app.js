@@ -141,11 +141,12 @@ function bindLoginForm() {
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
     const totpCode = document.getElementById('login-totp')?.value.trim() || null;
+    const remember = document.getElementById('login-remember')?.checked || false;
     const errEl    = document.getElementById('login-error');
     errEl.classList.add('hidden');
 
     try {
-      const res = await api.login(username, password, totpCode);
+      const res = await api.login(username, password, totpCode, remember);
       localStorage.setItem('token', res.access_token);
       localStorage.setItem('user', JSON.stringify(res.user));
       await launchApp();

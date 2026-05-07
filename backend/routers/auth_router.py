@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Optional
 
 import pyotp
@@ -10,6 +11,9 @@ from sqlalchemy.orm import Session
 import models
 from auth import create_access_token, get_current_user, get_password_hash, verify_password
 from database import get_db
+
+# When "Angemeldet bleiben" is ticked the token lives for half a year.
+REMEMBER_ME_EXPIRY = timedelta(days=180)
 
 router = APIRouter()
 
@@ -24,6 +28,7 @@ class LoginRequest(BaseModel):
     username: str
     password: str
     totp_code: Optional[str] = None
+    remember_me: Optional[bool] = False
 
 
 def _user_dict(user: models.User) -> dict:
@@ -98,7 +103,8 @@ def login_json(req: LoginRequest, db: Session = Depends(get_db)):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Ungültiger 2FA-Code",
             )
-    token = create_access_token({"sub": user.username})
+    expires = REMEMBER_ME_EXPIRY if req.remember_me else None
+    token = create_access_token({"sub": user.username}, expires_delta=expires)
     return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
 
 
