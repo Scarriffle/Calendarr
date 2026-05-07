@@ -1270,7 +1270,7 @@ a { color: var(--primary); text-decoration: none; }
   }
   .topbar-right {
     min-width: 0;
-    overflow: hidden;
+    /* no overflow:hidden — would clip the user dropdown on tap */
   }
   .view-switcher {
     overflow-x: auto;
@@ -1346,6 +1346,64 @@ a { color: var(--primary); text-decoration: none; }
   /* ── Misc safety: prevent overflow on flex topbar items ──── */
   .main-view { width: 100%; min-width: 0; }
   #view-container { max-width: 100%; overflow-x: hidden; }
+
+  /* ── Long-press / text-selection / image-save fixes ──────── */
+  /* Calendar UI shouldn't be selectable on touch — long-press
+     should reach our handlers, not trigger iOS text selection. */
+  .topbar, .sidebar, .main-view,
+  .month-view, .month-row, .month-col, .cell-day, .month-events-overlay, .month-span-event,
+  .week-view, .day-view, .week-day-col, .week-day-header, .week-allday-row,
+  .quarter-view, .agenda-view,
+  .view-switcher, .view-btn, .btn, .icon-btn, .user-avatar, .user-dropdown, .dropdown-item {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Faster taps, no double-tap zoom on interactive elements */
+  .icon-btn, .btn, .view-btn, .user-avatar, .month-col, .week-day-col, .dropdown-item,
+  .sidebar-copyright, .impressum-link, .modal-close, [data-modal] {
+    touch-action: manipulation;
+  }
+  /* Avatar long-press: don't show "Save Image" — taps reach parent */
+  .user-avatar img {
+    -webkit-touch-callout: none;
+    pointer-events: none;
+  }
+
+  /* ── Calendar weeks (KW) shown as a small bubble, not a column ── */
+  .month-header {
+    grid-template-columns: repeat(7, 1fr) !important;
+  }
+  .month-kw-header { display: none !important; }
+  .month-row-right {
+    margin-left: 0 !important;
+  }
+  .month-kw-cell {
+    position: absolute;
+    left: 3px; top: 3px;
+    width: auto; height: auto;
+    bottom: auto;
+    padding: 1px 7px;
+    background: var(--bg-active);
+    border: none !important;
+    border-radius: 10px;
+    font-size: 10px; font-weight: 600;
+    color: var(--text-2);
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* ── Status-bar safe area inside full-screen modals (PWA) ── */
+  .modal-card .modal-header,
+  .settings-page-header {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  }
+  .modal-footer,
+  .settings-page-body {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* iOS notch / home-indicator safe areas (PWA standalone) */

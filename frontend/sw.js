@@ -1,7 +1,7 @@
 // Calendarr Service Worker
 // Cache-first for static assets, network-first for /api/* (graceful offline)
 
-const CACHE_VERSION = 'calendarr-v3';
+const CACHE_VERSION = 'calendarr-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
