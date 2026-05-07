@@ -820,7 +820,10 @@ function bindTopbar() {
 function bindSidebar() {
   document.getElementById('sidebar-toggle').onclick = () => {
     document.getElementById('sidebar').classList.toggle('collapsed');
+    document.body.classList.toggle('sidebar-open'); // mobile slide-in
   };
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (backdrop) backdrop.onclick = () => document.body.classList.remove('sidebar-open');
 
   // Add calendar dropdown
   const addBtn = document.getElementById('btn-add-cal');

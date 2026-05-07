@@ -2,10 +2,16 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <!-- APP_VERSION: update here + version.js on every release -->
-  <title>Calendarr v2</title>
+  <title>Calendarr v3</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#4285f4" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Calendarr" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
   <link rel="stylesheet" href="/static/css/app.css" />
 </head>
@@ -71,7 +77,7 @@
       <button type="submit" class="btn btn-primary btn-full">Anmelden</button>
     </form>
   </div>
-  <button class="impressum-link" onclick="openImpressum()">©&nbsp;2026&nbsp;Scarriffleservices&nbsp;·&nbsp;v2</button>
+  <button class="impressum-link" onclick="openImpressum()">©&nbsp;2026&nbsp;Scarriffleservices&nbsp;·&nbsp;v3</button>
 </div>
 
 <!-- ─── MAIN APP ──────────────────────────────────────────── -->
@@ -173,8 +179,9 @@
           <div id="cal-list-items"></div>
         </div>
       </div>
-      <button class="sidebar-copyright" onclick="openImpressum()">©&nbsp;2026&nbsp;Scarriffleservices&nbsp;·&nbsp;v2</button>
+      <button class="sidebar-copyright" onclick="openImpressum()">©&nbsp;2026&nbsp;Scarriffleservices&nbsp;·&nbsp;v3</button>
     </aside>
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
 
     <!-- MAIN VIEW -->
     <main class="main-view" id="main-view">
@@ -834,7 +841,7 @@
       <a href="mailto:scarriffleservices@gmail.com">scarriffleservices@gmail.com</a></p>
     </div>
     <div class="modal-footer" style="justify-content:space-between;align-items:center">
-      <span style="font-size:12px;color:var(--text-3)">Calendarr v2</span>
+      <span style="font-size:12px;color:var(--text-3)">Calendarr v3</span>
       <button class="btn btn-ghost" onclick="closeImpressum()">Schliessen</button>
     </div>
   </div>
