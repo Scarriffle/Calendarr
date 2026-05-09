@@ -499,17 +499,46 @@ a { color: var(--primary); text-decoration: none; }
 .cell-day.today { background: var(--today-color); color: #fff; font-weight: 700; }
 
 /* Month boundary marker: thicker line + month abbreviation on the 1st */
+.month-col {
+  position: relative; /* anchor for divider pseudo-elements */
+}
 .month-col.first-of-month {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0;
+  padding-top: 8px;
 }
-.month-col.month-divider-left {
-  box-shadow: inset 3px 0 0 0 var(--month-divider-color, #7090c0);
+/* Dividers via pseudo-elements so they render above events (z-index 2) */
+.month-col.month-divider-left::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--month-divider-color, #7090c0);
+  z-index: 4;
+  pointer-events: none;
+}
+.month-col.month-divider-top::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--month-divider-color, #7090c0);
+  z-index: 4;
+  pointer-events: none;
 }
 .month-row.month-divider-top {
-  box-shadow: inset 0 3px 0 0 var(--month-divider-color, #7090c0);
+  position: relative;
+}
+.month-row.month-divider-top::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--month-divider-color, #7090c0);
+  z-index: 4;
+  pointer-events: none;
 }
 .month-marker {
   font-size: 14px;
@@ -519,7 +548,19 @@ a { color: var(--primary); text-decoration: none; }
   color: var(--month-label-color, #7090c0);
   line-height: 1;
   padding: 0 2px;
-  margin-bottom: -2px;
+  margin-bottom: 2px;
+  position: relative;
+  z-index: 3; /* above events overlay (z-index 2) */
+}
+/* Make sure the day number stays visible above events */
+.cell-day {
+  position: relative;
+  z-index: 3;
+}
+/* Push events overlay down when row contains a first-of-month cell so the
+   day "1" (which sits below the month marker) isn't hidden by event bars */
+.month-row.has-month-marker .month-events-overlay {
+  top: 56px;
 }
 /* Events overlay — pointer-events:none so clicks pass to columns */
 .month-events-overlay {
