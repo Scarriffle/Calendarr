@@ -559,7 +559,7 @@ a { color: var(--primary); text-decoration: none; }
   color: var(--month-label-color, #7090c0);
   line-height: 1;
   padding: 0 2px;
-  margin-bottom: 2px;
+  margin: 0 0 2px 4px;
   position: relative;
   z-index: 3; /* above events overlay (z-index 2) */
 }
