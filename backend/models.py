@@ -82,6 +82,8 @@ class UserSettings(Base):
     line_contrast = Column(Integer, default=3)
     hour_height = Column(Integer, default=60)
     language = Column(String(5), default="de")
+    month_divider_color = Column(String(7), default="#7090c0")
+    month_label_color = Column(String(7), default="#7090c0")
 
     user = relationship("User", back_populates="settings")
 

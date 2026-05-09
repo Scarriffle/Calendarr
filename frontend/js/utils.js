@@ -94,6 +94,9 @@ export function applyTheme(settings) {
 
   const hh = settings.hour_height || 44;
   root.style.setProperty('--hour-h', hh + 'px');
+
+  root.style.setProperty('--month-divider-color', settings.month_divider_color || '#7090c0');
+  root.style.setProperty('--month-label-color',   settings.month_label_color   || '#7090c0');
 }
 
 function hexToRgba(hex, alpha) {
