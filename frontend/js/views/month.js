@@ -120,6 +120,13 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
         style="left:${((c / 7) * 100).toFixed(3)}%;width:${(100 / 7).toFixed(3)}%;bottom:2px">${t('more_events', { n: count })}</div>`;
     });
 
+    // Detect a month boundary in this row. monthChangeIdx is the index of
+    // the first-of-month cell, or -1 if the row doesn't span a month change.
+    let monthChangeIdx = -1;
+    rowCells.forEach((cell, idx) => {
+      if (cell.getDate() === 1 && idx > 0) monthChangeIdx = idx;
+    });
+
     // Full-height column divs (click targets + borders)
     const monthsShort = t('months_short');
     let colsHtml = '';
@@ -134,9 +141,11 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       // First-of-month marker: show month abbreviation, push day number below
       const isFirstOfMonth = cell.getDate() === 1;
       const firstCls   = isFirstOfMonth ? 'first-of-month' : '';
-      // Add divider class on the cell BEFORE a month change (for right border styling)
-      // and on the cell AT a month change (for left border styling) — except at row start
-      const dividerCls = (isFirstOfMonth && idx > 0) ? 'month-divider-left' : '';
+      // Vertical line at month change, horizontal line spanning from change to end of row
+      const dividerClasses = [];
+      if (isFirstOfMonth && idx > 0) dividerClasses.push('month-divider-left');
+      if (monthChangeIdx > 0 && idx >= monthChangeIdx) dividerClasses.push('month-divider-top');
+      const dividerCls = dividerClasses.join(' ');
       const monthLabel = isFirstOfMonth
         ? `<div class="month-marker">${monthsShort[cell.getMonth()]}</div>`
         : '';
@@ -146,9 +155,13 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       </div>`;
     });
 
-    // If the row starts on the 1st of a new month, draw a divider above the row
+    // If the row starts on the 1st of a new month, draw a full-width divider above the row
     const rowDividerCls = rowCells[0].getDate() === 1 ? 'month-divider-top' : '';
-    bodyHtml += `<div class="month-row ${rowDividerCls}">
+    // If any cell in the row is first-of-month, push events overlay down so the day
+    // number isn't hidden by spanning event bars
+    const hasMonthMarker = rowCells.some(c => c.getDate() === 1);
+    const rowMarkerCls = hasMonthMarker ? 'has-month-marker' : '';
+    bodyHtml += `<div class="month-row ${rowDividerCls} ${rowMarkerCls}">
       <div class="month-kw-cell">${kw}</div>
       <div class="month-row-right">
         ${colsHtml}
