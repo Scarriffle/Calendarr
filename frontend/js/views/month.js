@@ -141,10 +141,12 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       // First-of-month marker: show month abbreviation, push day number below
       const isFirstOfMonth = cell.getDate() === 1;
       const firstCls   = isFirstOfMonth ? 'first-of-month' : '';
-      // Vertical line at month change, horizontal line spanning from change to end of row
+      // Step-shaped boundary at month change: bottom under the previous-month
+      // tail, vertical at the change, top across the new-month head.
       const dividerClasses = [];
       if (isFirstOfMonth && idx > 0) dividerClasses.push('month-divider-left');
       if (monthChangeIdx > 0 && idx >= monthChangeIdx) dividerClasses.push('month-divider-top');
+      if (monthChangeIdx > 0 && idx < monthChangeIdx) dividerClasses.push('month-divider-bottom');
       const dividerCls = dividerClasses.join(' ');
       const monthLabel = isFirstOfMonth
         ? `<div class="month-marker">${monthsShort[cell.getMonth()]}</div>`

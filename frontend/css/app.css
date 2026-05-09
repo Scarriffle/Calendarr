@@ -528,6 +528,17 @@ a { color: var(--primary); text-decoration: none; }
   z-index: 4;
   pointer-events: none;
 }
+/* Bottom divider on the previous-month cells in the same row as the change.
+   Uses ::before because these cells never have month-divider-left. */
+.month-col.month-divider-bottom::before {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--month-divider-color, #7090c0);
+  z-index: 4;
+  pointer-events: none;
+}
 .month-row.month-divider-top {
   position: relative;
 }
