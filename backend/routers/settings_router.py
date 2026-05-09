@@ -22,6 +22,8 @@ class SettingsUpdate(BaseModel):
     line_contrast: Optional[int] = None
     hour_height: Optional[int] = None
     language: Optional[str] = None
+    month_divider_color: Optional[str] = None
+    month_label_color: Optional[str] = None
 
 
 def _settings_dict(s: models.UserSettings) -> dict:
@@ -36,6 +38,8 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "line_contrast": s.line_contrast or 3,
         "hour_height": s.hour_height or 60,
         "language": s.language or "de",
+        "month_divider_color": s.month_divider_color or "#7090c0",
+        "month_label_color": s.month_label_color or "#7090c0",
     }
 
 

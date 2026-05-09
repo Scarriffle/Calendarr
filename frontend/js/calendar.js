@@ -1966,9 +1966,11 @@ function openSettingsModal() {
   document.getElementById('cfg-default-view').value  = s.default_view   || 'month';
   document.getElementById('cfg-week-start').value    = s.week_start_day || 'monday';
   const colors = [
-    { id: 'cfg-primary', val: s.primary_color || '#4285f4' },
-    { id: 'cfg-accent',  val: s.accent_color  || '#ea4335' },
-    { id: 'cfg-today',   val: s.today_color   || '#4285f4' },
+    { id: 'cfg-primary',        val: s.primary_color        || '#4285f4' },
+    { id: 'cfg-accent',         val: s.accent_color         || '#ea4335' },
+    { id: 'cfg-today',          val: s.today_color          || '#4285f4' },
+    { id: 'cfg-month-divider',  val: s.month_divider_color  || '#7090c0' },
+    { id: 'cfg-month-label',    val: s.month_label_color    || '#7090c0' },
   ];
   colors.forEach(({ id, val }) => {
     document.getElementById(id + '-hex').value = val.toUpperCase();
@@ -2291,7 +2293,7 @@ async function loadUsers() {
 }
 
 function bindSettingsModal() {
-  ['cfg-primary','cfg-accent','cfg-today'].forEach(prefix => {
+  ['cfg-primary','cfg-accent','cfg-today','cfg-month-divider','cfg-month-label'].forEach(prefix => {
     const preview = document.getElementById(prefix + '-preview');
     const hex = document.getElementById(prefix + '-hex');
     preview.addEventListener('click', async () => {
@@ -2345,16 +2347,18 @@ function bindSettingsModal() {
       return btn ? Number(btn.dataset.val) : null;
     };
     const settings = {
-      default_view:    document.getElementById('cfg-default-view').value,
-      week_start_day:  document.getElementById('cfg-week-start').value,
-      primary_color:   document.getElementById('cfg-primary-hex').value,
-      accent_color:    document.getElementById('cfg-accent-hex').value,
-      today_color:     document.getElementById('cfg-today-hex').value,
-      dim_past_events: document.getElementById('cfg-dim-past').checked,
-      text_contrast:   getActive('cfg-text-contrast') || 3,
-      line_contrast:   getActive('cfg-line-contrast') || 3,
-      hour_height:     getActive('cfg-hour-height')   || 44,
-      language:        document.getElementById('cfg-language').value,
+      default_view:        document.getElementById('cfg-default-view').value,
+      week_start_day:      document.getElementById('cfg-week-start').value,
+      primary_color:       document.getElementById('cfg-primary-hex').value,
+      accent_color:        document.getElementById('cfg-accent-hex').value,
+      today_color:         document.getElementById('cfg-today-hex').value,
+      month_divider_color: document.getElementById('cfg-month-divider-hex').value,
+      month_label_color:   document.getElementById('cfg-month-label-hex').value,
+      dim_past_events:     document.getElementById('cfg-dim-past').checked,
+      text_contrast:       getActive('cfg-text-contrast') || 3,
+      line_contrast:       getActive('cfg-line-contrast') || 3,
+      hour_height:         getActive('cfg-hour-height')   || 44,
+      language:            document.getElementById('cfg-language').value,
     };
     try {
       await api.put('/settings/', settings);

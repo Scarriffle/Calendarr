@@ -121,8 +121,9 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
     });
 
     // Full-height column divs (click targets + borders)
+    const monthsShort = t('months_short');
     let colsHtml = '';
-    rowCells.forEach(cell => {
+    rowCells.forEach((cell, idx) => {
       const key      = dateKey(cell);
       const isOther  = cell.getMonth() !== primaryMonth;
       const todayCls    = isToday(cell) ? 'today' : '';
@@ -130,12 +131,24 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       const selDate     = selectedDate || currentDate;
       const selectedCls = isSameDay(cell, selDate) ? 'month-selected' : '';
       const numCls      = isToday(cell) ? 'today' : '';
-      colsHtml += `<div class="month-col ${todayCls} ${otherCls} ${selectedCls}" data-date="${key}">
+      // First-of-month marker: show month abbreviation, push day number below
+      const isFirstOfMonth = cell.getDate() === 1;
+      const firstCls   = isFirstOfMonth ? 'first-of-month' : '';
+      // Add divider class on the cell BEFORE a month change (for right border styling)
+      // and on the cell AT a month change (for left border styling) — except at row start
+      const dividerCls = (isFirstOfMonth && idx > 0) ? 'month-divider-left' : '';
+      const monthLabel = isFirstOfMonth
+        ? `<div class="month-marker">${monthsShort[cell.getMonth()]}</div>`
+        : '';
+      colsHtml += `<div class="month-col ${todayCls} ${otherCls} ${selectedCls} ${firstCls} ${dividerCls}" data-date="${key}">
+        ${monthLabel}
         <div class="cell-day ${numCls}">${cell.getDate()}</div>
       </div>`;
     });
 
-    bodyHtml += `<div class="month-row">
+    // If the row starts on the 1st of a new month, draw a divider above the row
+    const rowDividerCls = rowCells[0].getDate() === 1 ? 'month-divider-top' : '';
+    bodyHtml += `<div class="month-row ${rowDividerCls}">
       <div class="month-kw-cell">${kw}</div>
       <div class="month-row-right">
         ${colsHtml}

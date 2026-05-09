@@ -97,6 +97,18 @@ def _migrate():
         except Exception:
             pass
 
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN month_divider_color VARCHAR(7) DEFAULT '#7090c0'"))
+            conn.commit()
+        except Exception:
+            pass
+
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN month_label_color VARCHAR(7) DEFAULT '#7090c0'"))
+            conn.commit()
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
