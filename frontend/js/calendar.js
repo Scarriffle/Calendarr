@@ -40,6 +40,38 @@ let state = {
   selectedEventColor: '',  // '' = use calendar color
 };
 
+// ── URL state ────────────────────────────────────────────
+// View + Date werden in der URL als #date=YYYY-MM-DD&view=<view> gespiegelt,
+// damit Reload/PWA-restore den letzten Stand wiederherstellen statt auf
+// heute zu springen.
+const VALID_VIEWS = ['month', 'week', 'day', 'quarter', 'agenda'];
+
+function readUrlState() {
+  const hash = window.location.hash.replace(/^#/, '');
+  if (!hash) return {};
+  const params = new URLSearchParams(hash);
+  const out = {};
+  const view = params.get('view');
+  if (view && VALID_VIEWS.includes(view)) out.view = view;
+  const date = params.get('date');
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const d = new Date(date + 'T00:00:00');
+    if (!isNaN(d.getTime())) out.date = d;
+  }
+  return out;
+}
+
+function writeUrlState() {
+  const d = state.currentDate;
+  const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const newHash = `date=${dateStr}&view=${state.currentView}`;
+  if (window.location.hash.replace(/^#/,'') !== newHash) {
+    // replaceState statt pushState: prev/next-Klicks sollen nicht jeden
+    // einzelnen Tag in den Browser-History-Stack drücken
+    window.history.replaceState(null, '', '#' + newHash);
+  }
+}
+
 // ── Public init ───────────────────────────────────────────
 export async function initCalendar() {
   const [settings, accounts, localCalendars, icalSubscriptions, googleAccounts, haAccounts] = await Promise.all([
@@ -61,6 +93,11 @@ export async function initCalendar() {
   state.dimPast = settings.dim_past_events;
   weekStartDay = settings.week_start_day || 'monday';
 
+  // URL state takes precedence over defaults (settings + today)
+  const urlState = readUrlState();
+  if (urlState.date) state.currentDate = urlState.date;
+  if (urlState.view) state.currentView = urlState.view;
+
   setLang(settings.language || 'de');
   applyTheme(settings);
   updateViewButtons();
@@ -78,6 +115,22 @@ export async function initCalendar() {
   bindProfileModal();
   bindSwipeNavigation();
   handleHAOAuthReturn();
+
+  // Browser-Back/Forward: URL-Hash → State synchronisieren
+  window.addEventListener('hashchange', () => {
+    const u = readUrlState();
+    let changed = false;
+    if (u.view && u.view !== state.currentView) {
+      state.currentView = u.view;
+      updateViewButtons();
+      changed = true;
+    }
+    if (u.date && !isSameDay(u.date, state.currentDate)) {
+      state.currentDate = u.date;
+      changed = true;
+    }
+    if (changed) fetchAndRender();
+  });
 }
 
 function handleHAOAuthReturn() {
@@ -91,7 +144,7 @@ function handleHAOAuthReturn() {
   };
   if (params.has('ha_connected')) {
     showToast('Home Assistant verbunden');
-    window.history.replaceState({}, '', window.location.pathname);
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     fetchAndRender(true);
     api.get('/homeassistant/accounts').then(accs => {
       state.haAccounts = accs || [];
@@ -101,7 +154,7 @@ function handleHAOAuthReturn() {
   } else if (params.has('ha_error')) {
     const code = params.get('ha_error');
     showToast(errMap[code] || `HA-Anmeldung fehlgeschlagen: ${code}`, true);
-    window.history.replaceState({}, '', window.location.pathname);
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
   }
 }
 
@@ -196,6 +249,7 @@ async function fetchAndRender(force = false, silent = false) {
     renderView();
     updateTitle();
     renderMiniCal();
+    writeUrlState();
     prefetchIfNeeded(start, end); // extend cache in background if approaching an edge
     return;
   }
@@ -224,6 +278,7 @@ async function fetchAndRender(force = false, silent = false) {
   renderView();
   updateTitle();
   renderMiniCal();
+  writeUrlState();
 }
 
 function getViewRange() {
