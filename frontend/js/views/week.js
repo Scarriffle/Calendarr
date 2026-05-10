@@ -63,8 +63,19 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
     const color = ev.color || ev.calendarColor || '#4285f4';
     const pastCls  = isPast(ev) ? 'past' : '';
     const multiCls = isMultiTimed ? 'multiday-timed' : '';
-    const cL = new Date(ev.start) < new Date(days[0]) ? 'continues-left' : '';
-    const cR = new Date(ev.end)   > (() => { const d = new Date(days[n-1]); d.setHours(24,0,0,0); return d; })() ? 'continues-right' : '';
+    // continues-left/right: compute on date-only basis for all-day events
+    let evStart = new Date(ev.start);
+    let evEnd   = new Date(ev.end);
+    if (ev.allDay) {
+      evStart.setHours(0, 0, 0, 0);
+      evEnd.setHours(0, 0, 0, 0);
+      if (evEnd > evStart) evEnd.setDate(evEnd.getDate() - 1);
+    }
+    const firstDay = new Date(days[0]);   firstDay.setHours(0, 0, 0, 0);
+    const lastDayMidnight = new Date(days[n-1]); lastDayMidnight.setHours(24, 0, 0, 0);
+    const lastDay = new Date(days[n-1]);  lastDay.setHours(0, 0, 0, 0);
+    const cL = evStart < firstDay ? 'continues-left' : '';
+    const cR = (ev.allDay ? evEnd > lastDay : evEnd > lastDayMidnight) ? 'continues-right' : '';
     const label = isMultiTimed && isSameDay(new Date(ev.start), days[colStart])
       ? `${fmtTime(new Date(ev.start))} ${ev.title}`
       : ev.title;
@@ -236,11 +247,28 @@ function renderNowLine(container, days, hourH = 60) {
 function layoutWeekAllDay(evs, days) {
   const items = [];
   evs.forEach(ev => {
+    // For all-day events, normalize to date-only with inclusive end-day
+    // (iCal stores exclusive end → subtract 1). For timed events, keep
+    // the original strict-overlap logic so events ending exactly at
+    // midnight don't bleed into the next day.
+    let ns, ne;
+    if (ev.allDay) {
+      ns = new Date(ev.start); ns.setHours(0, 0, 0, 0);
+      ne = new Date(ev.end);   ne.setHours(0, 0, 0, 0);
+      if (ne > ns) ne.setDate(ne.getDate() - 1);
+    }
+
     let colStart = -1, colEnd = -1;
     days.forEach((day, i) => {
       const ds = new Date(day); ds.setHours(0, 0, 0, 0);
-      const de = new Date(day); de.setHours(24, 0, 0, 0);
-      if (new Date(ev.start) < de && new Date(ev.end) > ds) {
+      let matches;
+      if (ev.allDay) {
+        matches = ds >= ns && ds <= ne;
+      } else {
+        const de = new Date(day); de.setHours(24, 0, 0, 0);
+        matches = new Date(ev.start) < de && new Date(ev.end) > ds;
+      }
+      if (matches) {
         if (colStart === -1) colStart = i;
         colEnd = i;
       }
