@@ -4,10 +4,15 @@ import sys
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+
+# How long the browser may keep static assets before revalidating.
+STATIC_MAX_AGE_SECONDS = 2 * 60 * 60  # 2 hours
+NO_CACHE = "no-cache, no-store, must-revalidate"
+STATIC_CACHE = f"public, max-age={STATIC_MAX_AGE_SECONDS}, must-revalidate"
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -112,6 +117,34 @@ def _migrate():
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
+
+
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    """Force ≤ 2h browser cache for static assets and disable cache for the
+    entry HTML / SW / version file. API responses are left alone (handlers
+    decide their own caching)."""
+    response = await call_next(request)
+    path = request.url.path
+
+    # Never cache: entry HTML, manifest, service worker, version marker
+    if (
+        path in ("/", "/index.html", "/manifest.json", "/sw.js")
+        or path == "/static/js/version.js"
+    ):
+        response.headers["Cache-Control"] = NO_CACHE
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    # 2h cache for the rest of the frontend (JS/CSS/icons/etc.)
+    elif path.startswith("/static/") or path.startswith("/icons/"):
+        response.headers["Cache-Control"] = STATIC_CACHE
+    # SPA fallback (everything else that isn't an API route) returns HTML;
+    # don't let the browser cache that either.
+    elif not path.startswith("/api/"):
+        response.headers["Cache-Control"] = NO_CACHE
+
+    return response
+
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users_router.router, prefix="/api/users", tags=["users"])

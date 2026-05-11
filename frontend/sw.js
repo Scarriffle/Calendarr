@@ -1,39 +1,21 @@
-// Calendarr Service Worker
-// Cache-first for static assets, network-first for /api/* (graceful offline)
+// Calendarr Service Worker — minimal-cache strategy
+//
+// Strategy: network-first for everything. The cache is only used as a
+// last-resort fallback when offline (so the app shell still opens). This
+// means every online request hits the network and respects the
+// server's Cache-Control headers (≤ 2h for static assets, no-cache for
+// the entry HTML / version files). New releases take effect on the next
+// reload, no manual SW unregister required.
 
-const CACHE_VERSION = 'calendarr-v11';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/static/css/app.css',
-  '/static/favicon.svg',
-  '/static/js/app.js',
-  '/static/js/api.js',
-  '/static/js/calendar.js',
-  '/static/js/color-picker.js',
-  '/static/js/date-picker.js',
-  '/static/js/i18n.js',
-  '/static/js/utils.js',
-  '/static/js/version.js',
-  '/static/js/views/agenda.js',
-  '/static/js/views/month.js',
-  '/static/js/views/quarter.js',
-  '/static/js/views/week.js',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/icon.svg',
-];
+const CACHE_VERSION  = 'calendarr-v12';
+const OFFLINE_SHELL  = ['/', '/index.html'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then(cache =>
-      // Use addAll with a fallback so a single missing file doesn't abort install
-      Promise.all(
-        STATIC_ASSETS.map(url =>
-          cache.add(url).catch(err => console.warn('[SW] skip', url, err))
-        )
-      )
+      Promise.all(OFFLINE_SHELL.map(url =>
+        cache.add(url).catch(err => console.warn('[SW] skip', url, err))
+      ))
     ).then(() => self.skipWaiting())
   );
 });
@@ -52,7 +34,8 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(req.url);
 
-  // Network-first for API routes — fail silently if offline
+  // API routes: always go to the network, no offline fallback (we'd just
+  // be returning stale account/event data otherwise).
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(req).catch(() =>
@@ -65,45 +48,29 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network-first for navigation (HTML) and the version-defining files —
-  // ensures users always get the freshest entry point so new releases
-  // take effect on the next reload without a manual SW unregister.
-  const isHtml = req.mode === 'navigate'
-    || url.pathname === '/'
-    || url.pathname === '/index.html';
-  const isVersionFile = url.pathname === '/static/js/version.js';
-
-  if (isHtml || isVersionFile) {
-    event.respondWith(
-      fetch(req).then(resp => {
-        if (resp && resp.status === 200) {
-          const clone = resp.clone();
-          caches.open(CACHE_VERSION).then(c => c.put(req, clone)).catch(() => {});
-        }
-        return resp;
-      }).catch(() =>
-        caches.match(req).then(c => c || caches.match('/index.html'))
-      )
-    );
-    return;
-  }
-
-  // Cache-first for everything else (static)
+  // Everything else: network-first. The browser's HTTP cache (driven by
+  // the server's Cache-Control headers) already throttles re-fetches —
+  // the SW just makes sure offline still works for the entry HTML.
   event.respondWith(
-    caches.match(req).then(cached => {
-      if (cached) return cached;
-      return fetch(req).then(resp => {
-        // Only cache successful, basic-origin responses
-        if (resp && resp.status === 200 && resp.type === 'basic') {
-          const clone = resp.clone();
-          caches.open(CACHE_VERSION).then(c => c.put(req, clone)).catch(() => {});
-        }
-        return resp;
-      }).catch(() => {
-        // Offline fallback for navigation requests
-        if (req.mode === 'navigate') return caches.match('/index.html');
-        return new Response('', { status: 503 });
-      });
+    fetch(req).then(resp => {
+      // Keep a fresh copy of navigation requests / index.html for offline
+      const isNavigation = req.mode === 'navigate'
+        || url.pathname === '/'
+        || url.pathname === '/index.html';
+      if (isNavigation && resp && resp.status === 200) {
+        const clone = resp.clone();
+        caches.open(CACHE_VERSION).then(c => c.put(req, clone)).catch(() => {});
+      }
+      return resp;
+    }).catch(() => {
+      // Offline fallback: only the HTML shell is served from cache, so the
+      // app at least renders and can show its own offline UI.
+      if (req.mode === 'navigate'
+          || url.pathname === '/'
+          || url.pathname === '/index.html') {
+        return caches.match(req).then(c => c || caches.match('/index.html'));
+      }
+      return new Response('', { status: 503 });
     })
   );
 });
