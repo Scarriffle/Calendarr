@@ -7,7 +7,7 @@
 // the entry HTML / version files). New releases take effect on the next
 // reload, no manual SW unregister required.
 
-const CACHE_VERSION  = 'calendarr-v13';
+const CACHE_VERSION  = 'calendarr-v14';
 const OFFLINE_SHELL  = ['/', '/index.html'];
 
 self.addEventListener('install', event => {
