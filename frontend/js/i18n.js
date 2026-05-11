@@ -442,15 +442,26 @@ export function t(key, vars = {}) {
   return val.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
 }
 
+// Look up a translation but return null if the key is undefined in both
+// the current language and German. Lets callers fall back to the existing
+// HTML default rather than displaying the raw key.
+function tOrNull(key) {
+  const dict = translations[currentLang] ?? translations.de;
+  const val = dict[key] ?? translations.de[key];
+  return typeof val === 'string' ? val : null;
+}
+
 export function applyLang() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
-    const v = t(el.dataset.i18n);
-    if (typeof v === 'string') el.textContent = v;
+    const v = tOrNull(el.dataset.i18n);
+    if (v != null) el.textContent = v;
   });
   document.querySelectorAll('[data-i18n-ph]').forEach(el => {
-    el.placeholder = t(el.dataset.i18nPh);
+    const v = tOrNull(el.dataset.i18nPh);
+    if (v != null) el.placeholder = v;
   });
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    el.title = t(el.dataset.i18nTitle);
+    const v = tOrNull(el.dataset.i18nTitle);
+    if (v != null) el.title = v;
   });
 }
