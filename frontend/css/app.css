@@ -981,44 +981,86 @@ a { color: var(--primary); text-decoration: none; }
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  width: 300px;
+  width: 340px;
   box-shadow: var(--shadow-lg);
 }
-.popup-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
-}
-.popup-color-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-.popup-header h4 { flex: 1; font-size: 15px; font-weight: 500; }
-.popup-action, .popup-close {
-  width: 34px; height: 34px;
-  font-size: 16px;
+
+/* Close-X tucked into the top-right corner so the title gets full width */
+.popup-close {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 28px; height: 28px;
   border-radius: 50%;
-  color: var(--text-2);
-  transition:
-    background var(--transition),
-    color var(--transition),
-    transform .1s ease,
-    box-shadow .15s ease;
-}
-.popup-action:hover {
-  background: rgba(66,133,244,.15);
-  background: color-mix(in srgb, var(--primary) 16%, transparent);
-  color: var(--primary);
-  box-shadow: 0 2px 8px rgba(66,133,244,.18);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 22%, transparent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; line-height: 1;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 1;
+  transition: background var(--transition), color var(--transition), transform .1s ease;
 }
 .popup-close:hover {
-  background: rgba(234,67,53,.15);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  background: rgba(234,67,53,.18);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
 }
-.popup-action svg, .popup-close svg { width: 16px; height: 16px; }
-.popup-close { font-size: 20px; }
-.popup-action:active, .popup-close:active { transform: scale(.92); }
+.popup-close:active { transform: scale(.92); }
+
+.popup-header {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 14px 44px 12px 16px;     /* right padding leaves room for close-X */
+  border-bottom: 1px solid var(--border);
+}
+.popup-color-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;                  /* visually align with the title's first line */
+}
+.popup-header h4 {
+  flex: 1; font-size: 15px; font-weight: 500;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 .popup-body { padding: 12px 16px; }
 .popup-time, .popup-location, .popup-calendar { font-size: 13px; color: var(--text-2); margin-bottom: 6px; }
 .popup-description { font-size: 13px; color: var(--text-1); margin-bottom: 6px; white-space: pre-wrap; }
+
+/* Footer with the three action buttons, each takes equal width */
+.popup-actions {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+}
+.popup-action-btn {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--transition), color var(--transition), transform .1s ease;
+}
+.popup-action-btn svg { width: 16px; height: 16px; fill: currentColor; }
+.popup-action-btn:hover {
+  background: rgba(66,133,244,.14);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+}
+.popup-action-btn.popup-action-danger:hover {
+  background: rgba(234,67,53,.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.popup-action-btn:active { transform: scale(.96); }
 .popup-copy-menu {
   border-top: 1px solid var(--border);
   padding: 4px 0;
@@ -1669,15 +1711,10 @@ a { color: var(--primary); text-decoration: none; }
   .topbar-left { gap: 0; }
   .topbar-right { gap: 0; }
 
-  /* Event-Popup: Buttons kompakt halten, kein 44px-Override ───── */
-  .event-popup .icon-btn {
-    min-width: 32px !important;
-    min-height: 32px !important;
-    width: 32px;
-    height: 32px;
-  }
-  .event-popup .popup-header { gap: 2px; padding: 10px 12px; }
-  .event-popup { width: min(92vw, 340px); max-width: 92vw; }
+  /* Event-Popup auf Mobile: an Viewport-Breite anpassen */
+  .event-popup { width: min(94vw, 360px); max-width: 94vw; }
+  .popup-actions { padding: 8px 8px 10px; }
+  .popup-action-btn { font-size: 11px; padding: 8px 4px; }
 
   /* Monatsansicht: Startzeit ausblenden — nur Titel anzeigen ──── */
   .month-event-time { display: none; }
