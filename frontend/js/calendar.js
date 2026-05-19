@@ -7,6 +7,14 @@ import { renderQuarter } from './views/quarter.js';
 import { openColorPicker } from './color-picker.js';
 import { openDatePicker, formatDtDisplay } from './date-picker.js';
 import { t, setLang, getLang } from './i18n.js';
+import { APP_VERSION } from './version.js';
+
+// Version sofort beim Modul-Load ueberall sichtbar setzen.
+document.title = `Calendarr ${APP_VERSION}`;
+document.addEventListener('DOMContentLoaded', () => {
+  const imp = document.getElementById('impressum-version');
+  if (imp) imp.textContent = `Calendarr ${APP_VERSION}`;
+});
 
 // Fetch avatar image as blob URL (with auth header)
 function fetchAvatarBlob() {
@@ -439,7 +447,7 @@ function updateTitle() {
   titleEl.innerHTML =
     `<span class="view-title-main">${main}</span>` +
     (year ? `<span class="view-title-year">${year}</span>` : '');
-  document.title = `Calendarr - ${fullText}`;
+  document.title = `Calendarr ${APP_VERSION} - ${fullText}`;
 }
 
 function updateViewButtons() {
