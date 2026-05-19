@@ -2045,6 +2045,24 @@ function openSettingsModal() {
     document.getElementById(id + '-hex').value = val.toUpperCase();
     document.getElementById(id + '-preview').style.background = val;
   });
+
+  // Optional colour overrides — empty hex input means "auto"
+  [
+    { id: 'cfg-text-color', val: s.text_color },
+    { id: 'cfg-line-color', val: s.line_color },
+    { id: 'cfg-bg-color',   val: s.bg_color },
+  ].forEach(({ id, val }) => {
+    const hex = document.getElementById(id + '-hex');
+    const prev = document.getElementById(id + '-preview');
+    if (!hex || !prev) return;
+    if (val) {
+      hex.value = String(val).toUpperCase();
+      prev.style.background = val;
+    } else {
+      hex.value = '';
+      prev.style.background = 'transparent';
+    }
+  });
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
   document.getElementById('cfg-language').value = getLang();
 
@@ -2376,6 +2394,32 @@ function bindSettingsModal() {
     });
   });
 
+  // Optional override colours (text / line / background) — empty = use default
+  [
+    { prefix: 'cfg-text-color', defaultColor: '#c8c8d8' },
+    { prefix: 'cfg-line-color', defaultColor: '#3a3a52' },
+    { prefix: 'cfg-bg-color',   defaultColor: '#0e0e14' },
+  ].forEach(({ prefix, defaultColor }) => {
+    const preview = document.getElementById(prefix + '-preview');
+    const hex = document.getElementById(prefix + '-hex');
+    const reset = document.getElementById(prefix + '-reset');
+    if (!preview || !hex || !reset) return;
+    preview.addEventListener('click', async () => {
+      const picked = await openColorPicker(preview, hex.value || defaultColor);
+      if (picked) { hex.value = picked.toUpperCase(); preview.style.background = picked; }
+    });
+    hex.addEventListener('change', () => {
+      let val = hex.value.trim();
+      if (!val) { preview.style.background = 'transparent'; return; }
+      if (!val.startsWith('#')) val = '#' + val;
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) { hex.value = val.toUpperCase(); preview.style.background = val; }
+    });
+    reset.addEventListener('click', () => {
+      hex.value = '';
+      preview.style.background = 'transparent';
+    });
+  });
+
   // Panel navigation
   document.querySelectorAll('.settings-nav-btn').forEach(btn => {
     btn.addEventListener('click', () => activateSettingsPanel(btn.dataset.panel));
@@ -2415,6 +2459,11 @@ function bindSettingsModal() {
       const btn = document.querySelector(`#${id} .contrast-btn.active`);
       return btn ? Number(btn.dataset.val) : null;
     };
+    // Optional override colours: empty input → null (use default)
+    const colourOrNull = (id) => {
+      const v = (document.getElementById(id).value || '').trim();
+      return /^#[0-9a-fA-F]{6}$/.test(v) ? v : null;
+    };
     const settings = {
       default_view:        document.getElementById('cfg-default-view').value,
       week_start_day:      document.getElementById('cfg-week-start').value,
@@ -2423,9 +2472,10 @@ function bindSettingsModal() {
       today_color:         document.getElementById('cfg-today-hex').value,
       month_divider_color: document.getElementById('cfg-month-divider-hex').value,
       month_label_color:   document.getElementById('cfg-month-label-hex').value,
+      text_color:          colourOrNull('cfg-text-color-hex'),
+      line_color:          colourOrNull('cfg-line-color-hex'),
+      bg_color:            colourOrNull('cfg-bg-color-hex'),
       dim_past_events:     document.getElementById('cfg-dim-past').checked,
-      text_contrast:       getActive('cfg-text-contrast') || 3,
-      line_contrast:       getActive('cfg-line-contrast') || 3,
       hour_height:         getActive('cfg-hour-height')   || 44,
       language:            document.getElementById('cfg-language').value,
     };

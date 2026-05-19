@@ -24,6 +24,9 @@ class SettingsUpdate(BaseModel):
     language: Optional[str] = None
     month_divider_color: Optional[str] = None
     month_label_color: Optional[str] = None
+    text_color: Optional[str] = None
+    line_color: Optional[str] = None
+    bg_color:   Optional[str] = None
 
 
 def _settings_dict(s: models.UserSettings) -> dict:
@@ -40,6 +43,9 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "language": s.language or "de",
         "month_divider_color": s.month_divider_color or "#7090c0",
         "month_label_color": s.month_label_color or "#7090c0",
+        "text_color": s.text_color,
+        "line_color": s.line_color,
+        "bg_color":   s.bg_color,
     }
 
 
@@ -76,8 +82,16 @@ def update_settings(
         settings = models.UserSettings(user_id=current_user.id)
         db.add(settings)
 
-    for field, value in data.model_dump(exclude_none=True).items():
-        setattr(settings, field, value)
+    # For these three override colours, an explicit null is meaningful
+    # ("reset to default") and must be persisted as NULL. All other fields
+    # keep the previous behaviour where a null/missing value is ignored.
+    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color"}
+    update_data = data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        if field in NULLABLE_OVERRIDES:
+            setattr(settings, field, value or None)
+        elif value is not None:
+            setattr(settings, field, value)
 
     db.commit()
     return {"ok": True}

@@ -83,14 +83,47 @@ export function applyTheme(settings) {
   root.style.setProperty('--accent',      settings.accent_color  || '#ea4335');
   root.style.setProperty('--today-color', settings.today_color   || '#4285f4');
 
-  const tc = TEXT_CONTRAST[settings.text_contrast || 3];
-  root.style.setProperty('--text-1', tc.t1);
-  root.style.setProperty('--text-2', tc.t2);
-  root.style.setProperty('--text-3', tc.t3);
+  // Text colour: a custom hex (settings.text_color) wins over the legacy
+  // 1–4 contrast step. We derive --text-2/--text-3 by darkening the
+  // chosen colour so the secondary/tertiary text stays in the same hue.
+  if (settings.text_color) {
+    root.style.setProperty('--text-1', settings.text_color);
+    root.style.setProperty('--text-2', shadeHex(settings.text_color, -0.25));
+    root.style.setProperty('--text-3', shadeHex(settings.text_color, -0.55));
+  } else {
+    const tc = TEXT_CONTRAST[settings.text_contrast || 3];
+    root.style.setProperty('--text-1', tc.t1);
+    root.style.setProperty('--text-2', tc.t2);
+    root.style.setProperty('--text-3', tc.t3);
+  }
 
-  const lc = LINE_CONTRAST[settings.line_contrast || 3];
-  root.style.setProperty('--border',       lc.border);
-  root.style.setProperty('--border-light', lc.light);
+  // Line colour: custom hex overrides the legacy contrast step.
+  if (settings.line_color) {
+    root.style.setProperty('--border',       settings.line_color);
+    root.style.setProperty('--border-light', shadeHex(settings.line_color, -0.25));
+  } else {
+    const lc = LINE_CONTRAST[settings.line_contrast || 3];
+    root.style.setProperty('--border',       lc.border);
+    root.style.setProperty('--border-light', lc.light);
+  }
+
+  // Background colour: optional. If set, also tint the topbar/sidebar
+  // and surface variants so the whole UI stays coherent.
+  if (settings.bg_color) {
+    root.style.setProperty('--bg-app',     settings.bg_color);
+    root.style.setProperty('--bg-topbar',  shadeHex(settings.bg_color, 0.10));
+    root.style.setProperty('--bg-sidebar', shadeHex(settings.bg_color, 0.10));
+    root.style.setProperty('--bg-surface', shadeHex(settings.bg_color, 0.18));
+    root.style.setProperty('--bg-hover',   shadeHex(settings.bg_color, 0.26));
+    root.style.setProperty('--bg-active',  shadeHex(settings.bg_color, 0.40));
+  } else {
+    root.style.removeProperty('--bg-app');
+    root.style.removeProperty('--bg-topbar');
+    root.style.removeProperty('--bg-sidebar');
+    root.style.removeProperty('--bg-surface');
+    root.style.removeProperty('--bg-hover');
+    root.style.removeProperty('--bg-active');
+  }
 
   const hh = settings.hour_height || 44;
   root.style.setProperty('--hour-h', hh + 'px');
@@ -104,4 +137,25 @@ function hexToRgba(hex, alpha) {
   const g = parseInt(hex.slice(3,5), 16);
   const b = parseInt(hex.slice(5,7), 16);
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Brighten (positive amount) or darken (negative) a hex colour.
+// Used to derive supporting shades (sidebar bg, hover bg, secondary text…)
+// from a single user-picked colour so the whole UI stays in the same family.
+function shadeHex(hex, amount) {
+  let r = parseInt(hex.slice(1,3), 16);
+  let g = parseInt(hex.slice(3,5), 16);
+  let b = parseInt(hex.slice(5,7), 16);
+  if (amount >= 0) {
+    r = Math.round(r + (255 - r) * amount);
+    g = Math.round(g + (255 - g) * amount);
+    b = Math.round(b + (255 - b) * amount);
+  } else {
+    const a = 1 + amount; // amount is negative: e.g. -0.25 → keep 75%
+    r = Math.round(r * a);
+    g = Math.round(g * a);
+    b = Math.round(b * a);
+  }
+  const h = n => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+  return '#' + h(r) + h(g) + h(b);
 }

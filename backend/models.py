@@ -84,6 +84,9 @@ class UserSettings(Base):
     language = Column(String(5), default="de")
     month_divider_color = Column(String(7), default="#7090c0")
     month_label_color = Column(String(7), default="#7090c0")
+    text_color = Column(String(7), nullable=True)   # Override für --text-1 (NULL = nutze text_contrast)
+    line_color = Column(String(7), nullable=True)   # Override für --border  (NULL = nutze line_contrast)
+    bg_color   = Column(String(7), nullable=True)   # Override für --bg-app  (NULL = Default)
 
     user = relationship("User", back_populates="settings")
 

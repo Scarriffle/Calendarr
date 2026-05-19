@@ -114,6 +114,24 @@ def _migrate():
         except Exception:
             pass
 
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN text_color VARCHAR(7)"))
+            conn.commit()
+        except Exception:
+            pass
+
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN line_color VARCHAR(7)"))
+            conn.commit()
+        except Exception:
+            pass
+
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN bg_color VARCHAR(7)"))
+            conn.commit()
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
