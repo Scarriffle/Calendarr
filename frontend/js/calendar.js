@@ -14,6 +14,8 @@ document.title = `Calendarr ${APP_VERSION}`;
 document.addEventListener('DOMContentLoaded', () => {
   const imp = document.getElementById('impressum-version');
   if (imp) imp.textContent = `Calendarr ${APP_VERSION}`;
+  const side = document.getElementById('sidebar-copyright');
+  if (side) side.innerHTML = `©&nbsp;2026&nbsp;Scarriffleservices&nbsp;·&nbsp;${APP_VERSION}`;
 });
 
 // Fetch avatar image as blob URL (with auth header)
