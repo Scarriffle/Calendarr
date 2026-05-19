@@ -154,7 +154,11 @@ const translations = {
     rec_every: 'Alle', rec_days: 'Tage', rec_weeks: 'Wochen', rec_months: 'Monate',
     rec_ends: 'Endet', rec_never: 'Nie', rec_after_count: 'Nach Anzahl',
     rec_on_date: 'Am Datum', rec_occurrences: 'Termine',
+<<<<<<< HEAD
     copy_to_calendar: 'Kopieren nach…', event_copied: 'Termin kopiert', copy: 'Kopieren',
+=======
+    copy_to_calendar: 'Kopieren nach…', event_copied: 'Termin kopiert',
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
     edit_before_copy: 'Vor dem Kopieren bearbeiten',
     event_updated: 'Termin aktualisiert', event_created: 'Termin erstellt',
     confirm_delete_event: '"{title}" wirklich löschen?',
@@ -365,7 +369,11 @@ const translations = {
     rec_every: 'Every', rec_days: 'days', rec_weeks: 'weeks', rec_months: 'months',
     rec_ends: 'Ends', rec_never: 'Never', rec_after_count: 'After count',
     rec_on_date: 'On date', rec_occurrences: 'occurrences',
+<<<<<<< HEAD
     copy_to_calendar: 'Copy to…', event_copied: 'Event copied', copy: 'Copy',
+=======
+    copy_to_calendar: 'Copy to…', event_copied: 'Event copied',
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
     edit_before_copy: 'Edit before copying',
     event_updated: 'Event updated', event_created: 'Event created',
     confirm_delete_event: 'Really delete "{title}"?',

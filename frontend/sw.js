@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // Calendarr Service Worker — minimal-cache strategy
 //
 // Strategy: network-first for everything. The cache is only used as a
@@ -9,13 +10,50 @@
 
 const CACHE_VERSION  = 'calendarr-v17';
 const OFFLINE_SHELL  = ['/', '/index.html'];
+=======
+// Calendarr Service Worker
+// Cache-first for static assets, network-first for /api/* (graceful offline)
+
+const CACHE_VERSION = 'calendarr-v11';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/static/css/app.css',
+  '/static/favicon.svg',
+  '/static/js/app.js',
+  '/static/js/api.js',
+  '/static/js/calendar.js',
+  '/static/js/color-picker.js',
+  '/static/js/date-picker.js',
+  '/static/js/i18n.js',
+  '/static/js/utils.js',
+  '/static/js/version.js',
+  '/static/js/views/agenda.js',
+  '/static/js/views/month.js',
+  '/static/js/views/quarter.js',
+  '/static/js/views/week.js',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/icon.svg',
+];
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then(cache =>
+<<<<<<< HEAD
       Promise.all(OFFLINE_SHELL.map(url =>
         cache.add(url).catch(err => console.warn('[SW] skip', url, err))
       ))
+=======
+      // Use addAll with a fallback so a single missing file doesn't abort install
+      Promise.all(
+        STATIC_ASSETS.map(url =>
+          cache.add(url).catch(err => console.warn('[SW] skip', url, err))
+        )
+      )
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
     ).then(() => self.skipWaiting())
   );
 });
@@ -34,8 +72,12 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(req.url);
 
+<<<<<<< HEAD
   // API routes: always go to the network, no offline fallback (we'd just
   // be returning stale account/event data otherwise).
+=======
+  // Network-first for API routes — fail silently if offline
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(req).catch(() =>
@@ -48,6 +90,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+<<<<<<< HEAD
   // Everything else: network-first. The browser's HTTP cache (driven by
   // the server's Cache-Control headers) already throttles re-fetches —
   // the SW just makes sure offline still works for the entry HTML.
@@ -71,6 +114,47 @@ self.addEventListener('fetch', event => {
         return caches.match(req).then(c => c || caches.match('/index.html'));
       }
       return new Response('', { status: 503 });
+=======
+  // Network-first for navigation (HTML) and the version-defining files —
+  // ensures users always get the freshest entry point so new releases
+  // take effect on the next reload without a manual SW unregister.
+  const isHtml = req.mode === 'navigate'
+    || url.pathname === '/'
+    || url.pathname === '/index.html';
+  const isVersionFile = url.pathname === '/static/js/version.js';
+
+  if (isHtml || isVersionFile) {
+    event.respondWith(
+      fetch(req).then(resp => {
+        if (resp && resp.status === 200) {
+          const clone = resp.clone();
+          caches.open(CACHE_VERSION).then(c => c.put(req, clone)).catch(() => {});
+        }
+        return resp;
+      }).catch(() =>
+        caches.match(req).then(c => c || caches.match('/index.html'))
+      )
+    );
+    return;
+  }
+
+  // Cache-first for everything else (static)
+  event.respondWith(
+    caches.match(req).then(cached => {
+      if (cached) return cached;
+      return fetch(req).then(resp => {
+        // Only cache successful, basic-origin responses
+        if (resp && resp.status === 200 && resp.type === 'basic') {
+          const clone = resp.clone();
+          caches.open(CACHE_VERSION).then(c => c.put(req, clone)).catch(() => {});
+        }
+        return resp;
+      }).catch(() => {
+        // Offline fallback for navigation requests
+        if (req.mode === 'navigate') return caches.match('/index.html');
+        return new Response('', { status: 503 });
+      });
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
     })
   );
 });

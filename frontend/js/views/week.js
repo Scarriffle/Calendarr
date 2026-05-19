@@ -63,6 +63,7 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
     const color = ev.color || ev.calendarColor || '#4285f4';
     const pastCls  = isPast(ev) ? 'past' : '';
     const multiCls = isMultiTimed ? 'multiday-timed' : '';
+<<<<<<< HEAD
     // continues-left/right: compute on date-only basis for all-day events
     let evStart = new Date(ev.start);
     let evEnd   = new Date(ev.end);
@@ -76,6 +77,10 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
     const lastDay = new Date(days[n-1]);  lastDay.setHours(0, 0, 0, 0);
     const cL = evStart < firstDay ? 'continues-left' : '';
     const cR = (ev.allDay ? evEnd > lastDay : evEnd > lastDayMidnight) ? 'continues-right' : '';
+=======
+    const cL = new Date(ev.start) < new Date(days[0]) ? 'continues-left' : '';
+    const cR = new Date(ev.end)   > (() => { const d = new Date(days[n-1]); d.setHours(24,0,0,0); return d; })() ? 'continues-right' : '';
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
     const label = isMultiTimed && isSameDay(new Date(ev.start), days[colStart])
       ? `${fmtTime(new Date(ev.start))} ${ev.title}`
       : ev.title;
@@ -247,6 +252,7 @@ function renderNowLine(container, days, hourH = 60) {
 function layoutWeekAllDay(evs, days) {
   const items = [];
   evs.forEach(ev => {
+<<<<<<< HEAD
     // For all-day events, normalize to date-only with inclusive end-day
     // (iCal stores exclusive end → subtract 1). For timed events, keep
     // the original strict-overlap logic so events ending exactly at
@@ -269,6 +275,13 @@ function layoutWeekAllDay(evs, days) {
         matches = new Date(ev.start) < de && new Date(ev.end) > ds;
       }
       if (matches) {
+=======
+    let colStart = -1, colEnd = -1;
+    days.forEach((day, i) => {
+      const ds = new Date(day); ds.setHours(0, 0, 0, 0);
+      const de = new Date(day); de.setHours(24, 0, 0, 0);
+      if (new Date(ev.start) < de && new Date(ev.end) > ds) {
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
         if (colStart === -1) colStart = i;
         colEnd = i;
       }

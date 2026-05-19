@@ -115,6 +115,7 @@ export async function initCalendar() {
   bindProfileModal();
   bindSwipeNavigation();
   handleHAOAuthReturn();
+<<<<<<< HEAD
 
   // Browser-Back/Forward: URL-Hash → State synchronisieren
   window.addEventListener('hashchange', () => {
@@ -131,6 +132,8 @@ export async function initCalendar() {
     }
     if (changed) fetchAndRender();
   });
+=======
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
 }
 
 function handleHAOAuthReturn() {
@@ -144,7 +147,11 @@ function handleHAOAuthReturn() {
   };
   if (params.has('ha_connected')) {
     showToast('Home Assistant verbunden');
+<<<<<<< HEAD
     window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+=======
+    window.history.replaceState({}, '', window.location.pathname);
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
     fetchAndRender(true);
     api.get('/homeassistant/accounts').then(accs => {
       state.haAccounts = accs || [];
@@ -154,7 +161,11 @@ function handleHAOAuthReturn() {
   } else if (params.has('ha_error')) {
     const code = params.get('ha_error');
     showToast(errMap[code] || `HA-Anmeldung fehlgeschlagen: ${code}`, true);
+<<<<<<< HEAD
     window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+=======
+    window.history.replaceState({}, '', window.location.pathname);
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
   }
 }
 
@@ -249,7 +260,10 @@ async function fetchAndRender(force = false, silent = false) {
     renderView();
     updateTitle();
     renderMiniCal();
+<<<<<<< HEAD
     writeUrlState();
+=======
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
     prefetchIfNeeded(start, end); // extend cache in background if approaching an edge
     return;
   }

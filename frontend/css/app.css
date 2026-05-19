@@ -975,11 +975,15 @@ a { color: var(--primary); text-decoration: none; }
 }
 .ctx-item:hover { background: var(--bg-hover); }
 
+<<<<<<< HEAD
 /* ── Event Popup ──────────────────────────────────────────
    Layout: Color-Dot + Title links, kleine Icon-Toolbar rechts oben.
    Icons sind im Ruhezustand transparent (nur das SVG selbst sichtbar),
    bekommen erst beim Hover einen runden farbigen Hintergrund. Wirkt
    modern und lässt dem Titel die meiste Breite. */
+=======
+/* ── Event Popup ────────────────────────────────────────── */
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
 .event-popup {
   position: fixed; z-index: 600;
   background: var(--bg-surface);
@@ -1697,12 +1701,24 @@ a { color: var(--primary); text-decoration: none; }
   .topbar-left { gap: 0; }
   .topbar-right { gap: 0; }
 
+<<<<<<< HEAD
   /* Event-Popup auf Mobile: an Viewport-Breite anpassen */
   .event-popup { width: min(94vw, 380px); max-width: 94vw; }
   .popup-header { padding: 10px 8px 10px 14px; }
   .popup-header h4 { font-size: 13.5px; }
   .popup-icon-btn { width: 32px; height: 32px; }
   .popup-icon-btn svg { width: 16px; height: 16px; }
+=======
+  /* Event-Popup: Buttons kompakt halten, kein 44px-Override ───── */
+  .event-popup .icon-btn {
+    min-width: 32px !important;
+    min-height: 32px !important;
+    width: 32px;
+    height: 32px;
+  }
+  .event-popup .popup-header { gap: 2px; padding: 10px 12px; }
+  .event-popup { width: min(92vw, 340px); max-width: 92vw; }
+>>>>>>> e744b1829e99db6b80922f75542ced329138e474
 
   /* Monatsansicht: Startzeit ausblenden — nur Titel anzeigen ──── */
   .month-event-time { display: none; }
