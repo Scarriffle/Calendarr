@@ -2394,7 +2394,19 @@ function bindSettingsModal() {
     });
   });
 
-  // Optional override colours (text / line / background) — empty = use default
+  // Optional override colours (text / line / background) — empty = use default.
+  // Live-apply to the page so the user sees the effect while typing, not only after Save.
+  const overrideFieldMap = {
+    'cfg-text-color': 'text_color',
+    'cfg-line-color': 'line_color',
+    'cfg-bg-color':   'bg_color',
+  };
+  const liveApplyOverride = (prefix, value) => {
+    const field = overrideFieldMap[prefix];
+    if (!field) return;
+    state.settings[field] = value || null;
+    applyTheme(state.settings);
+  };
   [
     { prefix: 'cfg-text-color', defaultColor: '#c8c8d8' },
     { prefix: 'cfg-line-color', defaultColor: '#3a3a52' },
@@ -2404,19 +2416,43 @@ function bindSettingsModal() {
     const hex = document.getElementById(prefix + '-hex');
     const reset = document.getElementById(prefix + '-reset');
     if (!preview || !hex || !reset) return;
+
+    const normalize = (raw) => {
+      let v = (raw || '').trim();
+      if (!v) return '';
+      if (!v.startsWith('#')) v = '#' + v;
+      return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toUpperCase() : null;
+    };
+
     preview.addEventListener('click', async () => {
       const picked = await openColorPicker(preview, hex.value || defaultColor);
-      if (picked) { hex.value = picked.toUpperCase(); preview.style.background = picked; }
+      if (picked) {
+        hex.value = picked.toUpperCase();
+        preview.style.background = picked;
+        liveApplyOverride(prefix, picked);
+      }
     });
+
+    const onTyped = () => {
+      const norm = normalize(hex.value);
+      if (norm === '') {
+        preview.style.background = 'transparent';
+        liveApplyOverride(prefix, null);
+      } else if (norm) {
+        preview.style.background = norm;
+        liveApplyOverride(prefix, norm);
+      }
+    };
+    hex.addEventListener('input', onTyped);
     hex.addEventListener('change', () => {
-      let val = hex.value.trim();
-      if (!val) { preview.style.background = 'transparent'; return; }
-      if (!val.startsWith('#')) val = '#' + val;
-      if (/^#[0-9a-fA-F]{6}$/.test(val)) { hex.value = val.toUpperCase(); preview.style.background = val; }
+      const norm = normalize(hex.value);
+      if (norm) hex.value = norm;
     });
+
     reset.addEventListener('click', () => {
       hex.value = '';
       preview.style.background = 'transparent';
+      liveApplyOverride(prefix, null);
     });
   });
 
@@ -2459,10 +2495,13 @@ function bindSettingsModal() {
       const btn = document.querySelector(`#${id} .contrast-btn.active`);
       return btn ? Number(btn.dataset.val) : null;
     };
-    // Optional override colours: empty input → null (use default)
+    // Optional override colours: empty input → null (use default).
+    // Tolerant: accepts both "ff0000" and "#ff0000".
     const colourOrNull = (id) => {
-      const v = (document.getElementById(id).value || '').trim();
-      return /^#[0-9a-fA-F]{6}$/.test(v) ? v : null;
+      let v = (document.getElementById(id).value || '').trim();
+      if (!v) return null;
+      if (!v.startsWith('#')) v = '#' + v;
+      return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toUpperCase() : null;
     };
     const settings = {
       default_view:        document.getElementById('cfg-default-view').value,
