@@ -1,5 +1,5 @@
 ﻿import { api } from './api.js';
-import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart } from './utils.js';
+import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart, DEFAULT_TEXT_COLOR, DEFAULT_LINE_COLOR, DEFAULT_BG_COLOR } from './utils.js';
 import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
@@ -2046,22 +2046,18 @@ function openSettingsModal() {
     document.getElementById(id + '-preview').style.background = val;
   });
 
-  // Optional colour overrides — empty hex input means "auto"
+  // Override-Farben — leeres Hex-Input bedeutet "Default verwenden",
+  // aber die Preview zeigt trotzdem die aktuell wirksame Farbe.
   [
-    { id: 'cfg-text-color', val: s.text_color },
-    { id: 'cfg-line-color', val: s.line_color },
-    { id: 'cfg-bg-color',   val: s.bg_color },
-  ].forEach(({ id, val }) => {
+    { id: 'cfg-text-color', val: s.text_color, fallback: DEFAULT_TEXT_COLOR },
+    { id: 'cfg-line-color', val: s.line_color, fallback: DEFAULT_LINE_COLOR },
+    { id: 'cfg-bg-color',   val: s.bg_color,   fallback: DEFAULT_BG_COLOR },
+  ].forEach(({ id, val, fallback }) => {
     const hex = document.getElementById(id + '-hex');
     const prev = document.getElementById(id + '-preview');
     if (!hex || !prev) return;
-    if (val) {
-      hex.value = String(val).toUpperCase();
-      prev.style.background = val;
-    } else {
-      hex.value = '';
-      prev.style.background = 'transparent';
-    }
+    hex.value = val ? String(val).toUpperCase() : '';
+    prev.style.background = val || fallback;
   });
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
   document.getElementById('cfg-language').value = getLang();
@@ -2408,9 +2404,9 @@ function bindSettingsModal() {
     applyTheme(state.settings);
   };
   [
-    { prefix: 'cfg-text-color', defaultColor: '#c8c8d8' },
-    { prefix: 'cfg-line-color', defaultColor: '#3a3a52' },
-    { prefix: 'cfg-bg-color',   defaultColor: '#0e0e14' },
+    { prefix: 'cfg-text-color', defaultColor: DEFAULT_TEXT_COLOR },
+    { prefix: 'cfg-line-color', defaultColor: DEFAULT_LINE_COLOR },
+    { prefix: 'cfg-bg-color',   defaultColor: DEFAULT_BG_COLOR },
   ].forEach(({ prefix, defaultColor }) => {
     const preview = document.getElementById(prefix + '-preview');
     const hex = document.getElementById(prefix + '-hex');
@@ -2436,7 +2432,7 @@ function bindSettingsModal() {
     const onTyped = () => {
       const norm = normalize(hex.value);
       if (norm === '') {
-        preview.style.background = 'transparent';
+        preview.style.background = defaultColor;
         liveApplyOverride(prefix, null);
       } else if (norm) {
         preview.style.background = norm;
@@ -2451,7 +2447,7 @@ function bindSettingsModal() {
 
     reset.addEventListener('click', () => {
       hex.value = '';
-      preview.style.background = 'transparent';
+      preview.style.background = defaultColor;
       liveApplyOverride(prefix, null);
     });
   });

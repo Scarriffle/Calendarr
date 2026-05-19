@@ -76,6 +76,12 @@ const LINE_CONTRAST = {
   4: { border: '#5a5a78', light: '#484860' },
 };
 
+// Defaults wenn kein Custom-Override gesetzt ist.
+// Bewusst hart "weiss auf schwarz" damit man nie unsichtbar landet.
+export const DEFAULT_TEXT_COLOR = '#FFFFFF';
+export const DEFAULT_LINE_COLOR = '#3A3A52';
+export const DEFAULT_BG_COLOR   = '#000000';
+
 export function applyTheme(settings) {
   const root = document.documentElement;
   root.style.setProperty('--primary',     settings.primary_color || '#4285f4');
@@ -83,53 +89,57 @@ export function applyTheme(settings) {
   root.style.setProperty('--accent',      settings.accent_color  || '#ea4335');
   root.style.setProperty('--today-color', settings.today_color   || '#4285f4');
 
-  // Text colour: a custom hex (settings.text_color) wins over the legacy
-  // 1–4 contrast step. We derive --text-2/--text-3 by darkening the
-  // chosen colour so the secondary/tertiary text stays in the same hue.
-  if (settings.text_color) {
-    root.style.setProperty('--text-1', settings.text_color);
-    root.style.setProperty('--text-2', shadeHex(settings.text_color, -0.25));
-    root.style.setProperty('--text-3', shadeHex(settings.text_color, -0.55));
-  } else {
-    const tc = TEXT_CONTRAST[settings.text_contrast || 3];
-    root.style.setProperty('--text-1', tc.t1);
-    root.style.setProperty('--text-2', tc.t2);
-    root.style.setProperty('--text-3', tc.t3);
+  // Effektive Farben bestimmen (Override > Default).
+  let textColor = settings.text_color || DEFAULT_TEXT_COLOR;
+  let lineColor = settings.line_color || DEFAULT_LINE_COLOR;
+  let bgColor   = settings.bg_color   || DEFAULT_BG_COLOR;
+
+  // Sicherheitsbremse: Wenn Schrift- und Hintergrundfarbe nicht genug
+  // Kontrast haben (passiert wenn man aus Versehen text=bg eingibt),
+  // erzwinge weiss-auf-schwarz, damit man nicht in einer unbedienbaren
+  // Seite landet.
+  if (contrastRatio(textColor, bgColor) < 2.5) {
+    textColor = DEFAULT_TEXT_COLOR;
+    bgColor   = DEFAULT_BG_COLOR;
   }
 
-  // Line colour: custom hex overrides the legacy contrast step.
-  if (settings.line_color) {
-    root.style.setProperty('--border',       settings.line_color);
-    root.style.setProperty('--border-light', shadeHex(settings.line_color, -0.25));
-  } else {
-    const lc = LINE_CONTRAST[settings.line_contrast || 3];
-    root.style.setProperty('--border',       lc.border);
-    root.style.setProperty('--border-light', lc.light);
-  }
+  root.style.setProperty('--text-1', textColor);
+  root.style.setProperty('--text-2', shadeHex(textColor, -0.25));
+  root.style.setProperty('--text-3', shadeHex(textColor, -0.55));
 
-  // Background colour: optional. If set, also tint the topbar/sidebar
-  // and surface variants so the whole UI stays coherent.
-  if (settings.bg_color) {
-    root.style.setProperty('--bg-app',     settings.bg_color);
-    root.style.setProperty('--bg-topbar',  shadeHex(settings.bg_color, 0.10));
-    root.style.setProperty('--bg-sidebar', shadeHex(settings.bg_color, 0.10));
-    root.style.setProperty('--bg-surface', shadeHex(settings.bg_color, 0.18));
-    root.style.setProperty('--bg-hover',   shadeHex(settings.bg_color, 0.26));
-    root.style.setProperty('--bg-active',  shadeHex(settings.bg_color, 0.40));
-  } else {
-    root.style.removeProperty('--bg-app');
-    root.style.removeProperty('--bg-topbar');
-    root.style.removeProperty('--bg-sidebar');
-    root.style.removeProperty('--bg-surface');
-    root.style.removeProperty('--bg-hover');
-    root.style.removeProperty('--bg-active');
-  }
+  root.style.setProperty('--border',       lineColor);
+  root.style.setProperty('--border-light', shadeHex(lineColor, -0.25));
+
+  root.style.setProperty('--bg-app',     bgColor);
+  root.style.setProperty('--bg-topbar',  shadeHex(bgColor, 0.10));
+  root.style.setProperty('--bg-sidebar', shadeHex(bgColor, 0.10));
+  root.style.setProperty('--bg-surface', shadeHex(bgColor, 0.18));
+  root.style.setProperty('--bg-hover',   shadeHex(bgColor, 0.26));
+  root.style.setProperty('--bg-active',  shadeHex(bgColor, 0.40));
 
   const hh = settings.hour_height || 44;
   root.style.setProperty('--hour-h', hh + 'px');
 
   root.style.setProperty('--month-divider-color', settings.month_divider_color || '#7090c0');
   root.style.setProperty('--month-label-color',   settings.month_label_color   || '#7090c0');
+}
+
+function luminance(hex) {
+  const c = (n) => {
+    const v = n / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const r = c(parseInt(hex.slice(1, 3), 16));
+  const g = c(parseInt(hex.slice(3, 5), 16));
+  const b = c(parseInt(hex.slice(5, 7), 16));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contrastRatio(c1, c2) {
+  try {
+    const l1 = luminance(c1);
+    const l2 = luminance(c2);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  } catch { return 21; }
 }
 
 function hexToRgba(hex, alpha) {
