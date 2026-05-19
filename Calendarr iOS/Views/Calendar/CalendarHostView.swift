@@ -6,12 +6,25 @@ struct CalendarHostView: View {
 
     @AppStorage("liquidGlass") private var liquidGlass = false
     @AppStorage("cacheMonths") private var cacheMonths = 3
+    @AppStorage("appLanguage") private var appLang = "system"
+    @AppStorage("backgroundColor") private var bgHex = "#000000"
 
     @State private var store = CalendarStore()
     @State private var showEditor = false
     @State private var editorDate: Date = .now
     @State private var editingEvent: CalEvent? = nil
     @State private var selectedEvent: CalEvent? = nil
+    @State private var visibleMonth: Date = .now
+
+    private var titleString: String {
+        if store.viewType == .month {
+            let f = DateFormatter()
+            f.locale = L10n.locale(appLang)
+            f.dateFormat = "LLLL yyyy"
+            return f.string(from: visibleMonth).capitalized(with: L10n.locale(appLang))
+        }
+        return store.titleForCurrentView(language: appLang)
+    }
 
     var body: some View {
         if liquidGlass {
@@ -30,6 +43,7 @@ struct CalendarHostView: View {
             errorBanner
             calendarContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(hex: bgHex))
                 .overlay(alignment: .top) {
                     if store.isLoading {
                         ProgressView().padding(.top, 10).transition(.opacity)
@@ -52,6 +66,7 @@ struct CalendarHostView: View {
         .onChange(of: store.currentDate) { _, _ in Task { await onNavigate() } }
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
+        .onChange(of: visibleMonth)      { _, new in Task { await ensureLoaded(around: new) } }
     }
 
     // MARK: – Liquid Glass variant
@@ -60,6 +75,7 @@ struct CalendarHostView: View {
         NavigationStack {
             calendarContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(hex: bgHex))
                 .overlay(alignment: .top) {
                     if store.isLoading {
                         ProgressView().padding(.top, 10).transition(.opacity)
@@ -74,12 +90,20 @@ struct CalendarHostView: View {
                         HStack(spacing: 2) {
                             Button { store.navigatePrev() } label: { Image(systemName: "chevron.left") }
                             Button { store.navigateNext() } label: { Image(systemName: "chevron.right") }
-                            Button("Heute") { store.moveToToday() }.font(.callout)
+                            Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
                         }
                     }
-                    ToolbarItem(placement: .principal) { viewPickerMenu }
+                    ToolbarItem(placement: .principal) {
+                        Text(titleString)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button { showMenu = true } label: { Image(systemName: "line.3.horizontal") }
+                        HStack(spacing: 8) {
+                            viewPickerMenu
+                            Button { showMenu = true } label: { Image(systemName: "line.3.horizontal") }
+                        }
                     }
                 }
         }
@@ -89,6 +113,7 @@ struct CalendarHostView: View {
         .onChange(of: store.currentDate) { _, _ in Task { await onNavigate() } }
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
+        .onChange(of: visibleMonth)      { _, new in Task { await ensureLoaded(around: new) } }
     }
 
     // MARK: – Top bar (flat mode)
@@ -106,17 +131,21 @@ struct CalendarHostView: View {
                         .font(.system(size: 17, weight: .medium))
                         .frame(width: 36, height: 36)
                 }
-                Button("Heute") { store.moveToToday() }
+                Button(L10n.t("nav.today", appLang)) { store.moveToToday() }
                     .font(.callout).padding(.horizontal, 6)
             }
             .padding(.leading, 8)
-            Spacer()
+            Spacer(minLength: 8)
+            Text(titleString)
+                .font(.headline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: 8)
             viewPickerMenu
-            Spacer()
             Button { showMenu = true } label: {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 18, weight: .medium))
-                    .frame(width: 44, height: 44)
+                    .frame(width: 40, height: 40)
             }
             .padding(.trailing, 4)
         }
@@ -128,18 +157,16 @@ struct CalendarHostView: View {
         Menu {
             ForEach(CalViewType.allCases, id: \.self) { vt in
                 Button { store.viewType = vt } label: {
-                    Label(vt.label, systemImage: vt.systemImage)
+                    Label(vt.label(appLang), systemImage: vt.systemImage)
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                Text(store.viewType.label).font(.headline)
-                Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
-            }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(.quaternary, in: Capsule())
+            Image(systemName: store.viewType.systemImage)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(width: 40, height: 40)
         }
+        .accessibilityLabel(L10n.t("view.change", appLang))
     }
 
     // MARK: – Error banner
@@ -165,24 +192,60 @@ struct CalendarHostView: View {
 
     @ViewBuilder
     private var calendarContent: some View {
-        let swipe = DragGesture(minimumDistance: 35, coordinateSpace: .global)
+        let swipe = DragGesture(minimumDistance: 14, coordinateSpace: .local)
             .onEnded { val in
                 let h = val.translation.width
                 let v = val.translation.height
-                guard abs(h) > abs(v) * 1.1, abs(h) > 50 else { return }
+                guard abs(h) > abs(v) * 1.2, abs(h) > 28 else { return }
                 withAnimation(.easeInOut(duration: 0.2)) {
                     if h < 0 { store.navigateNext() } else { store.navigatePrev() }
                 }
             }
         switch store.viewType {
         case .month:
-            MonthView(store: store, onDayTap: { editorDate = $0 }, onEventTap: { selectedEvent = $0 })
-                .simultaneousGesture(swipe)
+            // Month view uses vertical scroll – no horizontal swipe.
+            MonthView(store: store,
+                      onDayTap: { editorDate = $0 },
+                      onEventTap: { selectedEvent = $0 },
+                      onCreateEvent: { day in
+                          editingEvent = nil
+                          editorDate = day
+                          showEditor = true
+                      },
+                      onShowWeek: { day in
+                          store.currentDate = day
+                          store.viewType = .week
+                      },
+                      onShowDay: { day in
+                          store.currentDate = day
+                          store.viewType = .day
+                      },
+                      visibleMonth: $visibleMonth)
         case .week:
-            WeekView(store: store, onEventTap: { selectedEvent = $0 }, onTimeTap: { editorDate = $0 })
+            WeekView(store: store,
+                     onEventTap: { selectedEvent = $0 },
+                     onCreateEvent: { date in
+                         editingEvent = nil
+                         editorDate = date
+                         showEditor = true
+                     },
+                     onShowMonth: { date in
+                         store.currentDate = date
+                         store.viewType = .month
+                     },
+                     onShowDay: { date in
+                         store.currentDate = date
+                         store.viewType = .day
+                     })
                 .simultaneousGesture(swipe)
         case .day:
-            DayView(store: store, onEventTap: { selectedEvent = $0 }, onTimeTap: { editorDate = $0 })
+            DayView(store: store,
+                    onEventTap: { selectedEvent = $0 },
+                    onCreateEvent: { date in
+                        editingEvent = nil
+                        editorDate = date
+                        showEditor = true
+                    })
                 .simultaneousGesture(swipe)
         case .quarter:
             QuarterView(store: store, onEventTap: { selectedEvent = $0 })
@@ -262,6 +325,16 @@ struct CalendarHostView: View {
     private func recache() async {
         store.invalidateCache()
         await startup()
+    }
+
+    /// Called when the user scrolls into a new month – fetches a ±1 month window
+    /// around it on demand. `loadEvents` skips the network if cached.
+    private func ensureLoaded(around month: Date) async {
+        let cal = store.userCalendar
+        let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: month)) ?? month
+        let s = cal.date(byAdding: .month, value: -1, to: monthStart) ?? monthStart
+        let e = cal.date(byAdding: .month, value:  2, to: monthStart) ?? monthStart
+        await store.loadEvents(api: api, start: s, end: e)
     }
 }
 

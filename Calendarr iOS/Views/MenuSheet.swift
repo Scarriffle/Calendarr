@@ -4,6 +4,7 @@ struct MenuSheet: View {
     let api: CalendarrAPI
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
 
     var body: some View {
         NavigationStack {
@@ -30,7 +31,7 @@ struct MenuSheet: View {
                         }
                         if appState.isAdmin {
                             Spacer()
-                            Text("Admin")
+                            Text(L10n.t("menu.admin", appLang))
                                 .font(.caption2.weight(.semibold))
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Color.accentColor.opacity(0.15))
@@ -41,30 +42,29 @@ struct MenuSheet: View {
                     .padding(.vertical, 4)
                 }
 
-                // Navigation links – direct destination syntax (no value-based nav)
-                Section("Einstellungen") {
+                Section(L10n.t("menu.section.settings", appLang)) {
                     NavigationLink {
                         ProfileView(api: api)
                     } label: {
-                        Label("Profil", systemImage: "person.circle")
+                        Label(L10n.t("menu.profile", appLang), systemImage: "person.circle")
                     }
 
                     NavigationLink {
                         SettingsView(api: api)
                     } label: {
-                        Label("Darstellung", systemImage: "paintpalette")
+                        Label(L10n.t("menu.appearance", appLang), systemImage: "paintpalette")
                     }
 
                     NavigationLink {
                         AccountsView(api: api)
                     } label: {
-                        Label("Konten & Kalender", systemImage: "tray.2")
+                        Label(L10n.t("menu.accounts", appLang), systemImage: "tray.2")
                     }
 
                     NavigationLink {
                         ServerView()
                     } label: {
-                        Label("Server", systemImage: "server.rack")
+                        Label(L10n.t("menu.server", appLang), systemImage: "server.rack")
                     }
                 }
 
@@ -75,15 +75,15 @@ struct MenuSheet: View {
                             appState.logout()
                         }
                     } label: {
-                        Label("Abmelden", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label(L10n.t("menu.logout", appLang), systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 }
             }
-            .navigationTitle("Menü")
+            .navigationTitle(L10n.t("nav.menu", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Fertig") { dismiss() }
+                    Button(L10n.t("nav.done", appLang)) { dismiss() }
                 }
             }
         }

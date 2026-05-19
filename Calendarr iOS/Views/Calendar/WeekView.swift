@@ -3,7 +3,14 @@ import SwiftUI
 struct WeekView: View {
     let store: CalendarStore
     let onEventTap: (CalEvent) -> Void
-    let onTimeTap: (Date) -> Void
+    let onCreateEvent: (Date) -> Void
+    let onShowMonth: (Date) -> Void
+    let onShowDay: (Date) -> Void
+
+    @AppStorage("appLanguage") private var appLang = "system"
+    @AppStorage("todayColor")  private var todayHex = "#4285f4"
+    @AppStorage("textColor")   private var textHex = "#FFFFFF"
+    @AppStorage("lineColor")   private var lineHex = "#3A3A3C"
 
     private var cal: Calendar { store.userCalendar }
 
@@ -49,10 +56,10 @@ struct WeekView: View {
             ForEach(weekDays, id: \.self) { day in
                 Text(headerFmt.string(from: day).uppercased())
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(cal.isDateInToday(day) ? Color.accentColor : .secondary)
+                    .foregroundStyle(cal.isDateInToday(day) ? Color.accentColor : Color(hex: textHex).opacity(0.7))
                     .frame(maxWidth: .infinity, minHeight: 36)
                     .overlay(alignment: .trailing) {
-                        Rectangle().fill(Color(.separator)).frame(width: 0.5)
+                        Rectangle().fill(Color(hex: lineHex)).frame(width: 0.5)
                     }
             }
         }
@@ -104,28 +111,23 @@ struct WeekView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     ZStack(alignment: .topLeading) {
-                        // Background: time labels + vertical grid lines
+                        // Background: time labels + per-hour cells per day
                         HStack(alignment: .top, spacing: 0) {
                             timeLabels
                             ForEach(Array(weekDays.enumerated()), id: \.offset) { _, day in
                                 VStack(spacing: 0) {
-                                    ForEach(hours, id: \.self) { _ in
-                                        Rectangle()
-                                            .fill(Color(.separator).opacity(0.4))
-                                            .frame(height: 0.5)
-                                        Color.clear.frame(height: hourHeight - 0.5)
+                                    ForEach(hours, id: \.self) { hour in
+                                        HourSlot(day: day, hour: hour,
+                                                 hourHeight: hourHeight,
+                                                 language: appLang,
+                                                 onCreateEvent: onCreateEvent,
+                                                 onShowMonth: onShowMonth,
+                                                 onShowDay: onShowDay)
                                     }
                                 }
                                 .frame(width: colW)
-                                .contentShape(Rectangle())
-                                .onTapGesture { loc in
-                                    let h = Int(loc.y / hourHeight)
-                                    let m = Int((loc.y.truncatingRemainder(dividingBy: hourHeight)) / hourHeight * 60)
-                                    let date = cal.date(bySettingHour: h, minute: m, second: 0, of: day) ?? day
-                                    onTimeTap(date)
-                                }
                                 .overlay(alignment: .trailing) {
-                                    Rectangle().fill(Color(.separator)).frame(width: 0.5)
+                                    Rectangle().fill(Color(hex: lineHex)).frame(width: 0.5)
                                 }
                             }
                         }
@@ -144,10 +146,11 @@ struct WeekView: View {
                         // Current time line
                         if let ti = todayIndex {
                             let lineY = eventTop(Date.now)
+                            let nowColor = Color(hex: todayHex)
                             HStack(spacing: 0) {
                                 Spacer().frame(width: timeColumnWidth + CGFloat(ti) * colW - 4)
-                                Circle().fill(Color.red).frame(width: 8, height: 8)
-                                Rectangle().fill(Color.red).frame(width: colW - 4, height: 1.5)
+                                Circle().fill(nowColor).frame(width: 8, height: 8)
+                                Rectangle().fill(nowColor).frame(width: colW - 4, height: 1.5)
                             }
                             .offset(y: lineY - 0.75)
                         }
@@ -168,7 +171,7 @@ struct WeekView: View {
                     Color.clear.frame(height: hourHeight)
                     Text(String(format: "%02d:00", h))
                         .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color(hex: textHex).opacity(0.6))
                         .offset(y: -6)
                 }
             }
@@ -193,4 +196,40 @@ private func eventTop(_ date: Date) -> CGFloat {
     let h = CGFloat(cal.component(.hour, from: date))
     let m = CGFloat(cal.component(.minute, from: date))
     return h * hourHeight + m * hourHeight / 60
+}
+
+// One-hour slot with native long-press context menu.
+struct HourSlot: View {
+    let day: Date
+    let hour: Int
+    let hourHeight: CGFloat
+    let language: String
+    let onCreateEvent: (Date) -> Void
+    let onShowMonth: (Date) -> Void
+    let onShowDay: (Date) -> Void
+
+    @AppStorage("lineColor") private var lineHex = "#3A3A3C"
+
+    private var date: Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Rectangle().fill(Color(hex: lineHex).opacity(0.4)).frame(height: 0.5)
+            Color.clear.frame(height: hourHeight - 0.5)
+        }
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button { onCreateEvent(date) } label: {
+                Label(L10n.t("cal.new_event", language), systemImage: "plus")
+            }
+            Button { onShowMonth(date) } label: {
+                Label(L10n.t("cal.show_in_month_view", language), systemImage: "calendar")
+            }
+            Button { onShowDay(date) } label: {
+                Label(L10n.t("cal.show_in_day_view", language), systemImage: "sun.max")
+            }
+        }
+    }
 }

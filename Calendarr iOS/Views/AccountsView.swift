@@ -15,11 +15,13 @@ struct AccountsView: View {
     @State private var showAddHA = false
     @State private var errorAlert: String?
 
+    @AppStorage("appLanguage") private var appLang = "system"
+
     var body: some View {
         NavigationStack {
             Group {
                 if isLoading {
-                    ProgressView("Lade Konten…")
+                    ProgressView(L10n.t("accounts.loading", appLang))
                 } else {
                     List {
                         caldavSection
@@ -30,15 +32,15 @@ struct AccountsView: View {
                     }
                 }
             }
-            .navigationTitle("Konten")
+            .navigationTitle(L10n.t("accounts.title", appLang))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        Button("CalDAV-Konto") { showAddCalDAV = true }
-                        Button("Lokaler Kalender") { showAddLocal = true }
-                        Button("iCal-URL abonnieren") { showAddICal = true }
-                        Button("Home Assistant") { showAddHA = true }
+                        Button(L10n.t("accounts.add.caldav", appLang)) { showAddCalDAV = true }
+                        Button(L10n.t("accounts.add.local",  appLang)) { showAddLocal  = true }
+                        Button(L10n.t("accounts.add.ical",   appLang)) { showAddICal   = true }
+                        Button(L10n.t("accounts.add.ha",     appLang)) { showAddHA     = true }
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -56,8 +58,8 @@ struct AccountsView: View {
             .sheet(isPresented: $showAddHA) {
                 AddHASheet(api: api) { await load() }
             }
-            .alert("Fehler", isPresented: .constant(errorAlert != nil), actions: {
-                Button("OK") { errorAlert = nil }
+            .alert(L10n.t("common.error", appLang), isPresented: .constant(errorAlert != nil), actions: {
+                Button(L10n.t("common.ok", appLang)) { errorAlert = nil }
             }, message: {
                 Text(errorAlert ?? "")
             })
@@ -70,7 +72,7 @@ struct AccountsView: View {
     var caldavSection: some View {
         Section {
             if caldavAccounts.isEmpty {
-                Text("Keine CalDAV-Konten")
+                Text(L10n.t("accounts.caldav.empty", appLang))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(caldavAccounts) { acc in
@@ -91,17 +93,17 @@ struct AccountsView: View {
                     Task { await deleteCalDAV(offsets: offsets) }
                 }
             }
-            Button("CalDAV hinzufügen") { showAddCalDAV = true }
+            Button(L10n.t("accounts.caldav.add", appLang)) { showAddCalDAV = true }
                 .foregroundStyle(Color.accentColor)
         } header: {
-            Text("CalDAV-Konten")
+            Text(L10n.t("accounts.caldav.header", appLang))
         }
     }
 
     var localSection: some View {
         Section {
             if localCalendars.isEmpty {
-                Text("Keine lokalen Kalender")
+                Text(L10n.t("accounts.local.empty", appLang))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(localCalendars) { cal in
@@ -116,17 +118,17 @@ struct AccountsView: View {
                     Task { await deleteLocal(offsets: offsets) }
                 }
             }
-            Button("Lokalen Kalender erstellen") { showAddLocal = true }
+            Button(L10n.t("accounts.local.add", appLang)) { showAddLocal = true }
                 .foregroundStyle(Color.accentColor)
         } header: {
-            Text("Lokale Kalender")
+            Text(L10n.t("accounts.local.header", appLang))
         }
     }
 
     var icalSection: some View {
         Section {
             if icalSubs.isEmpty {
-                Text("Keine Abonnements")
+                Text(L10n.t("accounts.ical.empty", appLang))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(icalSubs) { sub in
@@ -136,7 +138,7 @@ struct AccountsView: View {
                             .frame(width: 12, height: 12)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(sub.name).font(.body)
-                            Text("Alle \(sub.refreshMinutes) Min.")
+                            Text(String(format: L10n.t("accounts.ical.every", appLang), sub.refreshMinutes))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -146,17 +148,17 @@ struct AccountsView: View {
                     Task { await deleteICal(offsets: offsets) }
                 }
             }
-            Button("iCal-URL abonnieren") { showAddICal = true }
+            Button(L10n.t("accounts.ical.add", appLang)) { showAddICal = true }
                 .foregroundStyle(Color.accentColor)
         } header: {
-            Text("iCal-Abonnements")
+            Text(L10n.t("accounts.ical.header", appLang))
         }
     }
 
     var googleSection: some View {
         Section {
             if googleAccounts.isEmpty {
-                Text("Keine Google-Konten")
+                Text(L10n.t("accounts.google.empty", appLang))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(googleAccounts) { acc in
@@ -170,18 +172,18 @@ struct AccountsView: View {
                     Task { await deleteGoogle(offsets: offsets) }
                 }
             }
-            Text("Google-Konten werden über den Browser verknüpft")
+            Text(L10n.t("accounts.google.hint", appLang))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {
-            Text("Google-Konten")
+            Text(L10n.t("accounts.google.header", appLang))
         }
     }
 
     var haSection: some View {
         Section {
             if haAccounts.isEmpty {
-                Text("Keine Home Assistant-Konten")
+                Text(L10n.t("accounts.ha.empty", appLang))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(haAccounts) { acc in
@@ -197,10 +199,10 @@ struct AccountsView: View {
                     Task { await deleteHA(offsets: offsets) }
                 }
             }
-            Button("Home Assistant hinzufügen") { showAddHA = true }
+            Button(L10n.t("accounts.ha.add", appLang)) { showAddHA = true }
                 .foregroundStyle(Color.accentColor)
         } header: {
-            Text("Home Assistant")
+            Text(L10n.t("accounts.ha.header", appLang))
         }
     }
 
@@ -259,6 +261,7 @@ struct AddCalDAVSheet: View {
     let api: CalendarrAPI
     let onDone: () async -> Void
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
 
     @State private var name = ""
     @State private var url = ""
@@ -271,19 +274,19 @@ struct AddCalDAVSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Konto-Details") {
-                    TextField("Anzeigename", text: $name)
-                    TextField("CalDAV-URL", text: $url)
+                Section(L10n.t("caldav.section", appLang)) {
+                    TextField(L10n.t("caldav.display_name", appLang), text: $name)
+                    TextField(L10n.t("caldav.url", appLang), text: $url)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
-                    TextField("Benutzername", text: $username)
+                    TextField(L10n.t("caldav.username", appLang), text: $username)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    SecureField("Passwort", text: $password)
+                    SecureField(L10n.t("caldav.password", appLang), text: $password)
                 }
-                Section("Farbe") {
-                    ColorPicker("Farbe", selection: $color, supportsOpacity: false)
+                Section(L10n.t("caldav.color_section", appLang)) {
+                    ColorPicker(L10n.t("caldav.color_label", appLang), selection: $color, supportsOpacity: false)
                 }
                 if !error.isEmpty {
                     Section {
@@ -291,14 +294,14 @@ struct AddCalDAVSheet: View {
                     }
                 }
             }
-            .navigationTitle("CalDAV-Konto")
+            .navigationTitle(L10n.t("caldav.title", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Abbrechen") { dismiss() }
+                    Button(L10n.t("common.cancel", appLang)) { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Verbinden") {
+                    Button(L10n.t("caldav.connect", appLang)) {
                         Task { await save() }
                     }
                     .bold()
@@ -326,6 +329,7 @@ struct AddLocalCalSheet: View {
     let api: CalendarrAPI
     let onDone: () async -> Void
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
 
     @State private var name = ""
     @State private var color = Color(hex: "#34a853")
@@ -336,19 +340,19 @@ struct AddLocalCalSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Name", text: $name)
-                    ColorPicker("Farbe", selection: $color, supportsOpacity: false)
+                    TextField(L10n.t("local.name", appLang), text: $name)
+                    ColorPicker(L10n.t("local.color", appLang), selection: $color, supportsOpacity: false)
                 }
                 if !error.isEmpty {
                     Section { Text(error).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle("Lokaler Kalender")
+            .navigationTitle(L10n.t("local.title", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.t("common.cancel", appLang)) { dismiss() } }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Erstellen") {
+                    Button(L10n.t("local.create", appLang)) {
                         Task { await save() }
                     }
                     .bold()
@@ -373,6 +377,7 @@ struct AddICalSheet: View {
     let api: CalendarrAPI
     let onDone: () async -> Void
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
 
     @State private var name = ""
     @State private var url = ""
@@ -381,21 +386,27 @@ struct AddICalSheet: View {
     @State private var isLoading = false
     @State private var error = ""
 
-    let refreshOptions = [(15, "Alle 15 Min."), (30, "Alle 30 Min."), (60, "Stündlich"), (360, "Alle 6 Std."), (1440, "Täglich")]
+    private var refreshOptions: [(Int, String)] {
+        [(15,   L10n.t("ical.refresh.15m", appLang)),
+         (30,   L10n.t("ical.refresh.30m", appLang)),
+         (60,   L10n.t("ical.refresh.1h",  appLang)),
+         (360,  L10n.t("ical.refresh.6h",  appLang)),
+         (1440, L10n.t("ical.refresh.1d",  appLang))]
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Abonnement") {
-                    TextField("Name", text: $name)
-                    TextField("iCal-URL", text: $url)
+                Section(L10n.t("ical.subscription", appLang)) {
+                    TextField(L10n.t("ical.name", appLang), text: $name)
+                    TextField(L10n.t("ical.url",  appLang), text: $url)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
-                    ColorPicker("Farbe", selection: $color, supportsOpacity: false)
+                    ColorPicker(L10n.t("ical.color", appLang), selection: $color, supportsOpacity: false)
                 }
-                Section("Aktualisierung") {
-                    Picker("Intervall", selection: $refreshMinutes) {
+                Section(L10n.t("ical.refresh_section", appLang)) {
+                    Picker(L10n.t("ical.interval", appLang), selection: $refreshMinutes) {
                         ForEach(refreshOptions, id: \.0) { opt in
                             Text(opt.1).tag(opt.0)
                         }
@@ -405,12 +416,12 @@ struct AddICalSheet: View {
                     Section { Text(error).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle("iCal abonnieren")
+            .navigationTitle(L10n.t("ical.title", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.t("common.cancel", appLang)) { dismiss() } }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Abonnieren") {
+                    Button(L10n.t("ical.subscribe", appLang)) {
                         Task { await save() }
                     }
                     .bold()
@@ -435,6 +446,7 @@ struct AddHASheet: View {
     let api: CalendarrAPI
     let onDone: () async -> Void
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
 
     @State private var name = ""
     @State private var url = ""
@@ -445,16 +457,16 @@ struct AddHASheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Home Assistant") {
-                    TextField("Anzeigename", text: $name)
-                    TextField("URL (z.B. http://homeassistant.local:8123)", text: $url)
+                Section(L10n.t("ha.section", appLang)) {
+                    TextField(L10n.t("ha.display_name",   appLang), text: $name)
+                    TextField(L10n.t("ha.url_placeholder", appLang), text: $url)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                 }
-                Section("Authentifizierung") {
-                    SecureField("Long-Lived Access Token", text: $token)
-                    Text("Token erstellen unter: Profil → Sicherheit → Long-Lived Access Tokens")
+                Section(L10n.t("ha.auth_section", appLang)) {
+                    SecureField(L10n.t("ha.token", appLang), text: $token)
+                    Text(L10n.t("ha.token_hint", appLang))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -462,12 +474,12 @@ struct AddHASheet: View {
                     Section { Text(error).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle("Home Assistant")
+            .navigationTitle(L10n.t("accounts.add.ha", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.t("common.cancel", appLang)) { dismiss() } }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Verbinden") {
+                    Button(L10n.t("ha.connect", appLang)) {
                         Task { await save() }
                     }
                     .bold()

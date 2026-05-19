@@ -13,6 +13,9 @@ struct AppSettings: Codable {
     var language: String = "de"
     var monthDividerColor: String = "#7090c0"
     var monthLabelColor: String = "#7090c0"
+    var textColor: String = "#FFFFFF"
+    var backgroundColor: String = "#000000"
+    var lineColor: String = "#3A3A3C"
 
     enum CodingKeys: String, CodingKey {
         case defaultView = "default_view"
@@ -27,6 +30,9 @@ struct AppSettings: Codable {
         case language
         case monthDividerColor = "month_divider_color"
         case monthLabelColor = "month_label_color"
+        case textColor = "text_color"
+        case backgroundColor = "background_color"
+        case lineColor = "line_color"
     }
 }
 

@@ -8,6 +8,7 @@ struct EventEditorSheet: View {
     let onSaved: () async -> Void
 
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
     @State private var title = ""
     @State private var isAllDay = false
     @State private var startDate = Date()
@@ -29,36 +30,36 @@ struct EventEditorSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Titel", text: $title)
+                    TextField(L10n.t("event.title_placeholder", appLang), text: $title)
                         .font(.body.weight(.medium))
                 }
 
                 Section {
-                    Toggle("Ganztägig", isOn: $isAllDay.animation())
+                    Toggle(L10n.t("event.allday", appLang), isOn: $isAllDay.animation())
                         .tint(Color.accentColor)
 
                     if isAllDay {
-                        DatePicker("Start", selection: $startDate, displayedComponents: .date)
-                        DatePicker("Ende", selection: $endDate, displayedComponents: .date)
+                        DatePicker(L10n.t("event.start", appLang), selection: $startDate, displayedComponents: .date)
+                        DatePicker(L10n.t("event.end",   appLang), selection: $endDate,   displayedComponents: .date)
                     } else {
-                        DatePicker("Start", selection: $startDate)
-                        DatePicker("Ende", selection: $endDate)
+                        DatePicker(L10n.t("event.start", appLang), selection: $startDate)
+                        DatePicker(L10n.t("event.end",   appLang), selection: $endDate)
                     }
                 }
 
                 Section {
-                    TextField("Ort", text: $location)
-                    TextField("Beschreibung", text: $notes, axis: .vertical)
+                    TextField(L10n.t("event.location",    appLang), text: $location)
+                    TextField(L10n.t("event.description", appLang), text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                 }
 
-                Section("Kalender") {
+                Section(L10n.t("event.calendar_section", appLang)) {
                     if store.writableCalendars.isEmpty {
-                        Text("Keine beschreibbaren Kalender vorhanden")
+                        Text(L10n.t("event.no_writable", appLang))
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     } else {
-                        Picker("Kalender", selection: $selectedCalendarId) {
+                        Picker(L10n.t("event.calendar_picker", appLang), selection: $selectedCalendarId) {
                             ForEach(store.writableCalendars) { cal in
                                 HStack {
                                     Circle()
@@ -72,9 +73,9 @@ struct EventEditorSheet: View {
                     }
                 }
 
-                Section("Farbe") {
+                Section(L10n.t("event.color_section", appLang)) {
                     HStack {
-                        Text("Terminfarbe")
+                        Text(L10n.t("event.color", appLang))
                         Spacer()
                         ColorPicker("", selection: Binding(
                             get: { Color(hex: color.isEmpty ? (selectedCal?.color ?? "#4285f4") : color) },
@@ -82,7 +83,7 @@ struct EventEditorSheet: View {
                         ), supportsOpacity: false)
                         .labelsHidden()
                         if !color.isEmpty {
-                            Button("Zurücksetzen") { color = "" }
+                            Button(L10n.t("event.reset_color", appLang)) { color = "" }
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -95,14 +96,18 @@ struct EventEditorSheet: View {
                     }
                 }
             }
-            .navigationTitle(isEditing ? "Termin bearbeiten" : "Neuer Termin")
+            .navigationTitle(isEditing
+                             ? L10n.t("event.edit_title", appLang)
+                             : L10n.t("event.new_title",  appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Abbrechen") { dismiss() }
+                    Button(L10n.t("common.cancel", appLang)) { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button(isEditing ? "Sichern" : "Hinzufügen") {
+                    Button(isEditing
+                           ? L10n.t("event.save", appLang)
+                           : L10n.t("event.add",  appLang)) {
                         Task { await save() }
                     }
                     .bold()

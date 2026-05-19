@@ -5,6 +5,7 @@ struct ServerView: View {
     @State private var showLogoutConfirm = false
     @State private var showChangeServer = false
     @State private var showImpressum = false
+    @AppStorage("appLanguage") private var appLang = "system"
 
     var serverHost: String {
         appState.serverURL
@@ -15,7 +16,7 @@ struct ServerView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Verbundener Server") {
+                Section(L10n.t("server.connected", appLang)) {
                     HStack {
                         Image(systemName: "server.rack")
                             .foregroundStyle(Color.accentColor)
@@ -36,7 +37,7 @@ struct ServerView: View {
                         Text(appState.username)
                         if appState.isAdmin {
                             Spacer()
-                            Text("Admin")
+                            Text(L10n.t("menu.admin", appLang))
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -54,7 +55,7 @@ struct ServerView: View {
                         HStack {
                             Image(systemName: "arrow.triangle.swap")
                                 .frame(width: 28)
-                            Text("Server wechseln")
+                            Text(L10n.t("server.switch", appLang))
                         }
                     }
                     .foregroundStyle(.primary)
@@ -65,48 +66,48 @@ struct ServerView: View {
                         HStack {
                             Image(systemName: "rectangle.portrait.and.arrow.right")
                                 .frame(width: 28)
-                            Text("Abmelden")
+                            Text(L10n.t("menu.logout", appLang))
                         }
                     }
                 }
 
-                Section("Info") {
+                Section(L10n.t("server.info", appLang)) {
                     Button {
                         showImpressum = true
                     } label: {
                         HStack {
                             Image(systemName: "info.circle")
                                 .frame(width: 28)
-                            Text("Impressum")
+                            Text(L10n.t("server.imprint", appLang))
                         }
                     }
                     .foregroundStyle(.secondary)
 
                     HStack {
-                        Text("Version")
+                        Text(L10n.t("server.version", appLang))
                         Spacer()
                         Text("1.0")
                             .foregroundStyle(.secondary)
                     }
                 }
             }
-            .navigationTitle("Server")
+            .navigationTitle(L10n.t("server.title", appLang))
             .navigationBarTitleDisplayMode(.large)
-            .confirmationDialog("Abmelden", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
-                Button("Abmelden", role: .destructive) {
+            .confirmationDialog(L10n.t("server.logout_title", appLang), isPresented: $showLogoutConfirm, titleVisibility: .visible) {
+                Button(L10n.t("menu.logout", appLang), role: .destructive) {
                     appState.logout()
                 }
-                Button("Abbrechen", role: .cancel) {}
+                Button(L10n.t("common.cancel", appLang), role: .cancel) {}
             } message: {
-                Text("Du wirst von \(serverHost) abgemeldet.")
+                Text(String(format: L10n.t("server.logout_msg", appLang), serverHost))
             }
-            .confirmationDialog("Server wechseln", isPresented: $showChangeServer, titleVisibility: .visible) {
-                Button("Server wechseln", role: .destructive) {
+            .confirmationDialog(L10n.t("server.switch", appLang), isPresented: $showChangeServer, titleVisibility: .visible) {
+                Button(L10n.t("server.switch", appLang), role: .destructive) {
                     appState.resetServer()
                 }
-                Button("Abbrechen", role: .cancel) {}
+                Button(L10n.t("common.cancel", appLang), role: .cancel) {}
             } message: {
-                Text("Verbindung zu \(serverHost) wird getrennt und alle lokalen Anmeldedaten werden gelöscht.")
+                Text(String(format: L10n.t("server.switch_msg", appLang), serverHost))
             }
             .sheet(isPresented: $showImpressum) {
                 ImpressumView()
@@ -117,34 +118,35 @@ struct ServerView: View {
 
 struct ImpressumView: View {
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Group {
-                        Text("Scarriffleservices")
+                        Text(L10n.t("imprint.company", appLang))
                             .font(.title2.bold())
-                        Text("Software & Webentwicklung")
+                        Text(L10n.t("imprint.role", appLang))
                             .foregroundStyle(.secondary)
                     }
 
                     Divider()
 
-                    Text("Diese Software wurde von Scarriffleservices mit grösster Sorgfalt entwickelt und bereitgestellt. Alle Rechte vorbehalten © 2026 Scarriffleservices.")
+                    Text(L10n.t("imprint.copyright", appLang))
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Datenspeicherung").font(.headline)
-                        Text("Alle Anwendungsdaten werden auf dem Server gespeichert und verarbeitet, auf dem diese Calendarr-Instanz betrieben wird. Der Speicherort hängt damit vom Betreiber des jeweiligen Servers ab. Bei Nutzung der Google Kalender-Anbindung werden Daten über die Google API ausgetauscht; für diese Daten gelten die Datenschutzbestimmungen von Google. Bei Nutzung der Home Assistant-Anbindung werden Daten mit der jeweiligen Home Assistant-Instanz ausgetauscht. Home Assistant ist ein Projekt der Open Home Foundation.")
+                        Text(L10n.t("imprint.storage.title", appLang)).font(.headline)
+                        Text(L10n.t("imprint.storage.body", appLang))
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Haftungsausschluss").font(.headline)
-                        Text("Trotz sorgfältiger Erstellung wird keine Haftung für die Richtigkeit, Vollständigkeit oder Aktualität der bereitgestellten Inhalte übernommen. Die Nutzung erfolgt auf eigene Verantwortung.")
+                        Text(L10n.t("imprint.disclaimer.title", appLang)).font(.headline)
+                        Text(L10n.t("imprint.disclaimer.body", appLang))
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Kontakt").font(.headline)
+                        Text(L10n.t("imprint.contact.title", appLang)).font(.headline)
                         Link("scarriffleservices@gmail.com", destination: URL(string: "mailto:scarriffleservices@gmail.com")!)
                     }
 
@@ -156,11 +158,11 @@ struct ImpressumView: View {
                 }
                 .padding(24)
             }
-            .navigationTitle("Impressum")
+            .navigationTitle(L10n.t("server.imprint", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Schliessen") { dismiss() }
+                    Button(L10n.t("common.close", appLang)) { dismiss() }
                 }
             }
         }

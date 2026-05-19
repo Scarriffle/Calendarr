@@ -4,13 +4,13 @@ import SwiftUI
 enum CalViewType: String, CaseIterable {
     case month, week, day, quarter, agenda
 
-    var label: String {
+    func label(_ lang: String) -> String {
         switch self {
-        case .month:   return "Monat"
-        case .week:    return "Woche"
-        case .day:     return "Tag"
-        case .quarter: return "Quartal"
-        case .agenda:  return "Termine"
+        case .month:   return L10n.t("view.month",   lang)
+        case .week:    return L10n.t("view.week",    lang)
+        case .day:     return L10n.t("view.day",     lang)
+        case .quarter: return L10n.t("view.quarter", lang)
+        case .agenda:  return L10n.t("view.agenda",  lang)
         }
     }
 
@@ -221,28 +221,29 @@ class CalendarStore {
         }
     }
 
-    func titleForCurrentView() -> String {
+    func titleForCurrentView(language: String) -> String {
         let cal = userCalendar
-        let fmt = DateFormatter()
+        let loc = L10n.locale(language)
+        let fmt = DateFormatter(); fmt.locale = loc
         switch viewType {
         case .month:
-            fmt.dateFormat = "MMMM yyyy"
-            return fmt.string(from: currentDate)
+            fmt.dateFormat = "LLLL yyyy"
+            return fmt.string(from: currentDate).capitalized(with: loc)
         case .quarter:
-            fmt.dateFormat = "MMM yyyy"
+            fmt.dateFormat = "LLL yyyy"
             let m3 = cal.date(byAdding: .month, value: 2, to: currentDate) ?? currentDate
             return "\(fmt.string(from: currentDate)) – \(fmt.string(from: m3))"
         case .week:
             let weekStart = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: currentDate))!
             let weekEnd = cal.date(byAdding: .day, value: 6, to: weekStart)!
             fmt.dateFormat = "d. MMM"
-            let ef = DateFormatter(); ef.dateFormat = "d. MMM yyyy"
+            let ef = DateFormatter(); ef.locale = loc; ef.dateFormat = "d. MMM yyyy"
             return "\(fmt.string(from: weekStart)) – \(ef.string(from: weekEnd))"
         case .day:
             fmt.dateFormat = "EEEE, d. MMMM yyyy"
             return fmt.string(from: currentDate)
         case .agenda:
-            return "Termine"
+            return L10n.t("view.agenda", language)
         }
     }
 }

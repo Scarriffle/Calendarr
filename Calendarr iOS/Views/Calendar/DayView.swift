@@ -3,7 +3,12 @@ import SwiftUI
 struct DayView: View {
     let store: CalendarStore
     let onEventTap: (CalEvent) -> Void
-    let onTimeTap: (Date) -> Void
+    let onCreateEvent: (Date) -> Void
+
+    @AppStorage("appLanguage") private var appLang = "system"
+    @AppStorage("todayColor")  private var todayHex = "#4285f4"
+    @AppStorage("textColor")   private var textHex = "#FFFFFF"
+    @AppStorage("lineColor")   private var lineHex = "#3A3A3C"
 
     private var cal: Calendar { store.userCalendar }
     private var allDayEvents: [CalEvent] { store.events(on: store.currentDate).filter(\.isAllDay) }
@@ -17,25 +22,18 @@ struct DayView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         ZStack(alignment: .topLeading) {
-                            // Background grid
+                            // Background grid with per-hour context menus
                             HStack(alignment: .top, spacing: 0) {
                                 timeLabels
                                 VStack(spacing: 0) {
-                                    ForEach(hours, id: \.self) { _ in
-                                        Rectangle()
-                                            .fill(Color(.separator).opacity(0.4))
-                                            .frame(height: 0.5)
-                                        Color.clear.frame(height: hourHeight - 0.5)
+                                    ForEach(hours, id: \.self) { hour in
+                                        DayHourSlot(day: store.currentDate, hour: hour,
+                                                    hourHeight: hourHeight,
+                                                    language: appLang,
+                                                    onCreateEvent: onCreateEvent)
                                     }
                                 }
                                 .frame(width: geo.size.width - timeColumnWidth)
-                                .contentShape(Rectangle())
-                                .onTapGesture { loc in
-                                    let h = Int(loc.y / hourHeight)
-                                    let m = Int((loc.y.truncatingRemainder(dividingBy: hourHeight)) / hourHeight * 60)
-                                    let date = cal.date(bySettingHour: h, minute: m, second: 0, of: store.currentDate) ?? store.currentDate
-                                    onTimeTap(date)
-                                }
                             }
 
                             // Events
@@ -52,10 +50,11 @@ struct DayView: View {
                             // Current time
                             if cal.isDateInToday(store.currentDate) {
                                 let lineY = nowLineY()
+                                let nowColor = Color(hex: todayHex)
                                 HStack(spacing: 0) {
                                     Spacer().frame(width: timeColumnWidth - 4)
-                                    Circle().fill(Color.red).frame(width: 8, height: 8)
-                                    Rectangle().fill(Color.red)
+                                    Circle().fill(nowColor).frame(width: 8, height: 8)
+                                    Rectangle().fill(nowColor)
                                         .frame(width: geo.size.width - timeColumnWidth - 4, height: 1.5)
                                 }
                                 .offset(y: lineY - 0.75)
@@ -98,7 +97,7 @@ struct DayView: View {
                     Color.clear.frame(height: hourHeight)
                     Text(String(format: "%02d:00", h))
                         .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color(hex: textHex).opacity(0.6))
                         .offset(y: -6)
                 }
             }
@@ -119,6 +118,34 @@ struct DayView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(.easeOut(duration: 0.3)) {
                 proxy.scrollTo("grid", anchor: UnitPoint(x: 0, y: CGFloat(max(h - 1, 0)) / 24.0))
+            }
+        }
+    }
+}
+
+// One-hour slot for the single-column day view.
+private struct DayHourSlot: View {
+    let day: Date
+    let hour: Int
+    let hourHeight: CGFloat
+    let language: String
+    let onCreateEvent: (Date) -> Void
+
+    @AppStorage("lineColor") private var lineHex = "#3A3A3C"
+
+    private var date: Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Rectangle().fill(Color(hex: lineHex).opacity(0.4)).frame(height: 0.5)
+            Color.clear.frame(height: hourHeight - 0.5)
+        }
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button { onCreateEvent(date) } label: {
+                Label(L10n.t("cal.new_event", language), systemImage: "plus")
             }
         }
     }

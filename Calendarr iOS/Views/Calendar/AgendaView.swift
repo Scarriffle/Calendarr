@@ -3,6 +3,7 @@ import SwiftUI
 struct AgendaView: View {
     let store: CalendarStore
     let onEventTap: (CalEvent) -> Void
+    @AppStorage("appLanguage") private var appLang = "system"
 
     private var cal: Calendar { store.userCalendar }
 
@@ -17,25 +18,27 @@ struct AgendaView: View {
         return dict.keys.sorted().map { ($0, dict[$0]!.sorted { $0.startDate < $1.startDate }) }
     }
 
-    private let dayFmt: DateFormatter = {
+    private var dayFmt: DateFormatter {
         let f = DateFormatter()
+        f.locale = L10n.locale(appLang)
         f.dateFormat = "EEEE, d. MMMM yyyy"
         return f
-    }()
+    }
 
-    private let timeFmt: DateFormatter = {
+    private var timeFmt: DateFormatter {
         let f = DateFormatter()
+        f.locale = L10n.locale(appLang)
         f.timeStyle = .short
         f.dateStyle = .none
         return f
-    }()
+    }
 
     var body: some View {
         if grouped.isEmpty {
             ContentUnavailableView(
-                "Keine Termine",
+                L10n.t("cal.no_events_title", appLang),
                 systemImage: "calendar",
-                description: Text("In den nächsten 90 Tagen sind keine Termine vorhanden.")
+                description: Text(L10n.t("cal.no_events_body", appLang))
             )
         } else {
             List {
@@ -43,7 +46,7 @@ struct AgendaView: View {
                     Section {
                         ForEach(evs) { ev in
                             Button { onEventTap(ev) } label: {
-                                AgendaEventRow(event: ev, timeFmt: timeFmt)
+                                AgendaEventRow(event: ev, timeFmt: timeFmt, allDayLabel: L10n.t("cal.allday", appLang))
                             }
                             .buttonStyle(.plain)
                         }
@@ -62,9 +65,10 @@ struct AgendaView: View {
 private struct AgendaEventRow: View {
     let event: CalEvent
     let timeFmt: DateFormatter
+    let allDayLabel: String
 
     var timeString: String {
-        if event.isAllDay { return "Ganztägig" }
+        if event.isAllDay { return allDayLabel }
         return timeFmt.string(from: event.startDate)
     }
 

@@ -21,11 +21,13 @@ struct ProfileView: View {
     @State private var disablePW = ""
     @State private var isSaving2FA = false
 
+    @AppStorage("appLanguage") private var appLang = "system"
+
     var body: some View {
         NavigationStack {
             Group {
                 if isLoading {
-                    ProgressView("Lade Profil…")
+                    ProgressView(L10n.t("profile.loading", appLang))
                 } else if let profile {
                     Form {
                         kontoSection(profile: profile)
@@ -34,7 +36,7 @@ struct ProfileView: View {
                     }
                 }
             }
-            .navigationTitle("Profil")
+            .navigationTitle(L10n.t("profile.title", appLang))
             .navigationBarTitleDisplayMode(.large)
             .overlay(alignment: .bottom) {
                 if showToast {
@@ -68,29 +70,31 @@ struct ProfileView: View {
     }
 
     func kontoSection(profile: UserProfile) -> some View {
-        Section("Konto") {
+        Section(L10n.t("profile.account", appLang)) {
             HStack {
-                Text("Benutzername")
+                Text(L10n.t("profile.username", appLang))
                 Spacer()
                 Text(profile.username)
                     .foregroundStyle(.secondary)
             }
             HStack {
-                Text("Rolle")
+                Text(L10n.t("profile.role", appLang))
                 Spacer()
-                Text(profile.isAdmin ? "Administrator" : "Benutzer")
+                Text(profile.isAdmin
+                     ? L10n.t("profile.role.admin", appLang)
+                     : L10n.t("profile.role.user", appLang))
                     .foregroundStyle(.secondary)
             }
             HStack {
-                Text("E-Mail")
+                Text(L10n.t("profile.email", appLang))
                 Spacer()
-                TextField("Keine E-Mail", text: $newEmail)
+                TextField(L10n.t("profile.no_email", appLang), text: $newEmail)
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(.secondary)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
             }
-            Button("E-Mail speichern") {
+            Button(L10n.t("profile.save_email", appLang)) {
                 Task { await saveEmail() }
             }
             .foregroundStyle(Color.accentColor)
@@ -98,11 +102,11 @@ struct ProfileView: View {
     }
 
     var passwordSection: some View {
-        Section("Passwort ändern") {
-            SecureField("Aktuelles Passwort", text: $currentPW)
-            SecureField("Neues Passwort", text: $newPW)
-            SecureField("Neues Passwort wiederholen", text: $confirmPW)
-            Button("Passwort ändern") {
+        Section(L10n.t("profile.change_password", appLang)) {
+            SecureField(L10n.t("profile.current_password", appLang), text: $currentPW)
+            SecureField(L10n.t("profile.new_password", appLang), text: $newPW)
+            SecureField(L10n.t("profile.new_password_repeat", appLang), text: $confirmPW)
+            Button(L10n.t("profile.change_password", appLang)) {
                 Task { await changePassword() }
             }
             .foregroundStyle(Color.accentColor)
@@ -111,14 +115,14 @@ struct ProfileView: View {
     }
 
     func twoFASection(profile: UserProfile) -> some View {
-        Section("Zwei-Faktor-Authentifizierung") {
+        Section(L10n.t("profile.twofa", appLang)) {
             if profile.totpEnabled {
                 HStack {
                     Image(systemName: "checkmark.shield.fill")
                         .foregroundStyle(.green)
-                    Text("2FA ist aktiviert")
+                    Text(L10n.t("profile.twofa.active", appLang))
                 }
-                Button("2FA deaktivieren") {
+                Button(L10n.t("profile.twofa.disable", appLang)) {
                     show2FADisable = true
                 }
                 .foregroundStyle(.red)
@@ -126,10 +130,10 @@ struct ProfileView: View {
                 HStack {
                     Image(systemName: "shield")
                         .foregroundStyle(.secondary)
-                    Text("2FA ist deaktiviert")
+                    Text(L10n.t("profile.twofa.inactive", appLang))
                         .foregroundStyle(.secondary)
                 }
-                Button("2FA einrichten") {
+                Button(L10n.t("profile.twofa.enable", appLang)) {
                     Task { await setup2FA() }
                 }
                 .foregroundStyle(Color.accentColor)
@@ -149,7 +153,7 @@ struct ProfileView: View {
     private func saveEmail() async {
         do {
             try await api.updateEmail(newEmail)
-            showNotice("E-Mail gespeichert")
+            showNotice(L10n.t("profile.email_saved", appLang))
         } catch {
             showNotice(error.localizedDescription)
         }
@@ -157,13 +161,13 @@ struct ProfileView: View {
 
     private func changePassword() async {
         guard newPW == confirmPW else {
-            showNotice("Passwörter stimmen nicht überein")
+            showNotice(L10n.t("profile.password_mismatch", appLang))
             return
         }
         do {
             try await api.changePassword(current: currentPW, new: newPW)
             currentPW = ""; newPW = ""; confirmPW = ""
-            showNotice("Passwort geändert")
+            showNotice(L10n.t("profile.password_changed", appLang))
         } catch {
             showNotice(error.localizedDescription)
         }
@@ -186,7 +190,7 @@ struct ProfileView: View {
         do {
             try await api.enable2FA(code: totpCode)
             show2FASetup = false
-            showNotice("2FA aktiviert")
+            showNotice(L10n.t("profile.twofa.enabled_toast", appLang))
             await load()
         } catch {
             showNotice(error.localizedDescription)
@@ -198,7 +202,7 @@ struct ProfileView: View {
         do {
             try await api.disable2FA(password: disablePW)
             show2FADisable = false
-            showNotice("2FA deaktiviert")
+            showNotice(L10n.t("profile.twofa.disabled_toast", appLang))
             await load()
         } catch {
             showNotice(error.localizedDescription)
@@ -222,15 +226,16 @@ struct TwoFASetupSheet: View {
     let isSaving: Bool
     let onEnable: () -> Void
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Scanne den QR-Code mit deiner Authenticator-App (z.B. Bitwarden, Google Authenticator).")
+                    Text(L10n.t("twofa.scan_hint", appLang))
                         .font(.body)
                 }
-                Section("QR-Code / Manueller Schlüssel") {
+                Section(L10n.t("twofa.qr_section", appLang)) {
                     if let url = URL(string: qrURL) {
                         AsyncImage(url: url) { phase in
                             switch phase {
@@ -259,17 +264,17 @@ struct TwoFASetupSheet: View {
                         .foregroundStyle(Color.accentColor)
                     }
                 }
-                Section("Bestätigung") {
-                    TextField("6-stelliger Code", text: $code)
+                Section(L10n.t("twofa.confirmation", appLang)) {
+                    TextField(L10n.t("twofa.code_placeholder", appLang), text: $code)
                         .keyboardType(.numberPad)
                 }
             }
-            .navigationTitle("2FA einrichten")
+            .navigationTitle(L10n.t("twofa.setup_title", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.t("common.cancel", appLang)) { dismiss() } }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Aktivieren") { onEnable() }
+                    Button(L10n.t("twofa.activate", appLang)) { onEnable() }
                         .bold()
                         .disabled(code.count < 6 || isSaving)
                 }
@@ -282,20 +287,21 @@ struct TwoFADisableSheet: View {
     @Binding var password: String
     let onDisable: () -> Void
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Passwort zum Deaktivieren") {
-                    SecureField("Passwort", text: $password)
+                Section(L10n.t("twofa.password_section", appLang)) {
+                    SecureField(L10n.t("twofa.password_placeholder", appLang), text: $password)
                 }
             }
-            .navigationTitle("2FA deaktivieren")
+            .navigationTitle(L10n.t("twofa.disable_title", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.t("common.cancel", appLang)) { dismiss() } }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Deaktivieren") { onDisable() }
+                    Button(L10n.t("twofa.disable", appLang)) { onDisable() }
                         .bold()
                         .foregroundStyle(.red)
                         .disabled(password.isEmpty)

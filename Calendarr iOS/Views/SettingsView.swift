@@ -7,14 +7,21 @@ struct SettingsView: View {
     @State private var isSaving = false
     @State private var toast = ""
     @State private var showToast = false
-    @AppStorage("liquidGlass") private var liquidGlass = false
-    @AppStorage("cacheMonths") private var cacheMonths = 3
+    @AppStorage("liquidGlass")       private var liquidGlass = false
+    @AppStorage("cacheMonths")       private var cacheMonths = 3
+    @AppStorage("appLanguage")       private var appLang = "system"
+    @AppStorage("monthDividerColor") private var dividerHex = "#7090c0"
+    @AppStorage("monthLabelColor")   private var labelHex = "#7090c0"
+    @AppStorage("todayColor")        private var todayHex = "#4285f4"
+    @AppStorage("textColor")         private var textHex = "#FFFFFF"
+    @AppStorage("backgroundColor")   private var bgHex = "#000000"
+    @AppStorage("lineColor")         private var lineHex = "#3A3A3C"
 
     var body: some View {
         NavigationStack {
             Group {
                 if isLoading {
-                    ProgressView("Lade Einstellungen…")
+                    ProgressView(L10n.t("settings.loading", appLang))
                 } else {
                     Form {
                         liquidGlassSection
@@ -28,7 +35,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Darstellung")
+            .navigationTitle(L10n.t("settings.title", appLang))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -38,7 +45,7 @@ struct SettingsView: View {
                         if isSaving {
                             ProgressView()
                         } else {
-                            Text("Speichern").bold()
+                            Text(L10n.t("settings.save", appLang)).bold()
                         }
                     }
                     .disabled(isSaving)
@@ -67,8 +74,8 @@ struct SettingsView: View {
             Toggle(isOn: $liquidGlass) {
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Liquid Glass")
-                        Text("Verwendet die neue iOS\u{202F}26 Glasoptik mit transparenter Navigationsleiste")
+                        Text(L10n.t("settings.liquidglass", appLang))
+                        Text(L10n.t("settings.liquidglass.desc", appLang))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -79,9 +86,9 @@ struct SettingsView: View {
             }
             .tint(Color.accentColor)
         } header: {
-            Text("App-Design")
+            Text(L10n.t("settings.appdesign", appLang))
         } footer: {
-            Text("Änderung wirkt sofort – kein Neustart nötig.")
+            Text(L10n.t("settings.liquidglass.footer", appLang))
                 .font(.caption)
         }
     }
@@ -93,8 +100,8 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Vorladen")
-                        Text("Events werden beim Start im Hintergrund für diesen Zeitraum geladen, danach ist Wischen sofort.")
+                        Text(L10n.t("settings.cache.title", appLang))
+                        Text(L10n.t("settings.cache.desc", appLang))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -103,19 +110,19 @@ struct SettingsView: View {
                         .foregroundStyle(.green)
                 }
 
-                Picker("Zeitraum", selection: $cacheMonths) {
-                    Text("±1 Monat").tag(1)
-                    Text("±3 Monate").tag(3)
-                    Text("±6 Monate").tag(6)
-                    Text("±1 Jahr").tag(12)
+                Picker(L10n.t("settings.cache.range", appLang), selection: $cacheMonths) {
+                    Text(L10n.t("settings.cache.1m", appLang)).tag(1)
+                    Text(L10n.t("settings.cache.3m", appLang)).tag(3)
+                    Text(L10n.t("settings.cache.6m", appLang)).tag(6)
+                    Text(L10n.t("settings.cache.1y", appLang)).tag(12)
                 }
                 .pickerStyle(.segmented)
             }
             .padding(.vertical, 4)
         } header: {
-            Text("Vorladen")
+            Text(L10n.t("settings.cache.header", appLang))
         } footer: {
-            Text("Mehr Monate = längerer initialer Ladevorgang, danach komplett ohne Wartezeiten navigierbar.")
+            Text(L10n.t("settings.cache.footer", appLang))
                 .font(.caption)
         }
     }
@@ -123,10 +130,11 @@ struct SettingsView: View {
     // MARK: – Sprache
 
     var spracheSection: some View {
-        Section("Sprache") {
-            Picker("Sprache", selection: $settings.language) {
-                Text("Deutsch").tag("de")
-                Text("English").tag("en")
+        Section(L10n.t("settings.language", appLang)) {
+            Picker(L10n.t("settings.language", appLang), selection: $appLang) {
+                Text(L10n.t("lang.system",  appLang)).tag("system")
+                Text(L10n.t("lang.german",  appLang)).tag("de")
+                Text(L10n.t("lang.english", appLang)).tag("en")
             }
         }
     }
@@ -134,12 +142,15 @@ struct SettingsView: View {
     // MARK: – Farben
 
     var farbenSection: some View {
-        Section("Farben") {
-            ColorPickerRow(label: "Primärfarbe", hex: $settings.primaryColor)
-            ColorPickerRow(label: "Akzentfarbe", hex: $settings.accentColor)
-            ColorPickerRow(label: "Heutige-Tag-Farbe", hex: $settings.todayColor)
-            ColorPickerRow(label: "Monatswechsel-Linie", hex: $settings.monthDividerColor)
-            ColorPickerRow(label: "Monatskürzel", hex: $settings.monthLabelColor)
+        Section(L10n.t("settings.colors", appLang)) {
+            ColorPickerRow(label: L10n.t("settings.color.primary",    appLang), hex: $settings.primaryColor)
+            ColorPickerRow(label: L10n.t("settings.color.accent",     appLang), hex: $settings.accentColor)
+            ColorPickerRow(label: L10n.t("settings.color.today",      appLang), hex: $todayHex)
+            ColorPickerRow(label: L10n.t("settings.color.text",       appLang), hex: $textHex)
+            ColorPickerRow(label: L10n.t("settings.color.background", appLang), hex: $bgHex)
+            ColorPickerRow(label: L10n.t("settings.color.line",       appLang), hex: $lineHex)
+            ColorPickerRow(label: L10n.t("settings.color.divider",    appLang), hex: $dividerHex)
+            ColorPickerRow(label: L10n.t("settings.color.label",      appLang), hex: $labelHex)
         }
     }
 
@@ -148,18 +159,18 @@ struct SettingsView: View {
     var schriftSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Schriftkontrast")
+                Text(L10n.t("settings.textcontrast", appLang))
                     .font(.headline)
-                Text("Helligkeit der Beschriftungen und Texte")
+                Text(L10n.t("settings.textcontrast.desc", appLang))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ContrastSelector(
                     value: $settings.textContrast,
                     options: [
-                        (1, "Dunkel"),
-                        (2, "Mittel"),
-                        (3, "Hell"),
-                        (4, "Maximum")
+                        (1, L10n.t("settings.contrast.dark",   appLang)),
+                        (2, L10n.t("settings.contrast.medium", appLang)),
+                        (3, L10n.t("settings.contrast.bright", appLang)),
+                        (4, L10n.t("settings.contrast.max",    appLang))
                     ]
                 )
             }
@@ -172,18 +183,18 @@ struct SettingsView: View {
     var linienSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Linienkontrast")
+                Text(L10n.t("settings.linecontrast", appLang))
                     .font(.headline)
-                Text("Sichtbarkeit von Trennlinien und Rahmen")
+                Text(L10n.t("settings.linecontrast.desc", appLang))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ContrastSelector(
                     value: $settings.lineContrast,
                     options: [
-                        (1, "Kaum"),
-                        (2, "Subtil"),
-                        (3, "Normal"),
-                        (4, "Stark")
+                        (1, L10n.t("settings.linecontrast.barely", appLang)),
+                        (2, L10n.t("settings.linecontrast.subtle", appLang)),
+                        (3, L10n.t("settings.linecontrast.normal", appLang)),
+                        (4, L10n.t("settings.linecontrast.strong", appLang))
                     ]
                 )
             }
@@ -194,19 +205,19 @@ struct SettingsView: View {
     // MARK: – Ansicht
 
     var ansichtSection: some View {
-        Section("Kalenderansicht") {
-            Picker("Standardansicht", selection: $settings.defaultView) {
-                Text("Monat").tag("month")
-                Text("Woche").tag("week")
-                Text("Tag").tag("day")
-                Text("Quartal").tag("quarter")
-                Text("Termine").tag("agenda")
+        Section(L10n.t("settings.calview", appLang)) {
+            Picker(L10n.t("settings.defaultview", appLang), selection: $settings.defaultView) {
+                Text(L10n.t("view.month",   appLang)).tag("month")
+                Text(L10n.t("view.week",    appLang)).tag("week")
+                Text(L10n.t("view.day",     appLang)).tag("day")
+                Text(L10n.t("view.quarter", appLang)).tag("quarter")
+                Text(L10n.t("view.agenda",  appLang)).tag("agenda")
             }
-            Picker("Erster Wochentag", selection: $settings.weekStartDay) {
-                Text("Montag").tag("monday")
-                Text("Sonntag").tag("sunday")
+            Picker(L10n.t("settings.firstweekday", appLang), selection: $settings.weekStartDay) {
+                Text(L10n.t("settings.monday", appLang)).tag("monday")
+                Text(L10n.t("settings.sunday", appLang)).tag("sunday")
             }
-            Toggle("Vergangene Termine ausgrauen", isOn: $settings.dimPastEvents)
+            Toggle(L10n.t("settings.dimpast", appLang), isOn: $settings.dimPastEvents)
                 .tint(Color.accentColor)
         }
     }
@@ -216,18 +227,18 @@ struct SettingsView: View {
     var stundenSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Stundenhöhe")
+                Text(L10n.t("settings.hourheight", appLang))
                     .font(.headline)
-                Text("Platz pro Stunde in der Wochen- & Tagesansicht")
+                Text(L10n.t("settings.hourheight.desc", appLang))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ContrastSelector(
                     value: $settings.hourHeight,
                     options: [
-                        (28, "Kompakt"),
-                        (44, "Normal"),
-                        (60, "Komfort"),
-                        (80, "Gross")
+                        (28, L10n.t("settings.hourheight.compact", appLang)),
+                        (44, L10n.t("settings.hourheight.normal",  appLang)),
+                        (60, L10n.t("settings.hourheight.comfort", appLang)),
+                        (80, L10n.t("settings.hourheight.large",   appLang))
                     ]
                 )
             }
@@ -240,15 +251,31 @@ struct SettingsView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        if let s = try? await api.getSettings() { settings = s }
+        if let s = try? await api.getSettings() {
+            settings = s
+            // Mirror server-side color settings so calendar views (which read AppStorage) see them.
+            dividerHex = s.monthDividerColor
+            labelHex   = s.monthLabelColor
+            todayHex   = s.todayColor
+            textHex    = s.textColor
+            bgHex      = s.backgroundColor
+            lineHex    = s.lineColor
+        }
     }
 
     private func save() async {
         isSaving = true
         defer { isSaving = false }
+        // Push local AppStorage colors back into the settings struct before saving.
+        settings.monthDividerColor = dividerHex
+        settings.monthLabelColor   = labelHex
+        settings.todayColor        = todayHex
+        settings.textColor         = textHex
+        settings.backgroundColor   = bgHex
+        settings.lineColor         = lineHex
         do {
             try await api.updateSettings(settings)
-            showNotice("Gespeichert")
+            showNotice(L10n.t("settings.saved", appLang))
         } catch {
             showNotice(error.localizedDescription)
         }
