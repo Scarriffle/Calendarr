@@ -108,23 +108,16 @@ struct MonthView: View {
         cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date))!
     }
 
-    /// Determine the visible month from the currently-scrolled week.
-    /// Instead of switching as soon as a few days of the next month appear,
-    /// we count the month affiliation of the visible week rows and keep the
-    /// month that occupies the majority of the viewport.
+    /// Determine the header month from the currently-scrolled week.
+    /// Rule: take the month of the topmost visible week's start day. This
+    /// means as long as the "1." of the next month is still visible in the
+    /// top row, the header keeps showing the previous month – and only flips
+    /// to the new month once its "1." has scrolled out of view above.
     private func publishVisibleMonth(from week: Date?) {
         guard let w = week else { return }
-
-        let visibleWeeks = (0..<6).compactMap { cal.date(byAdding: .weekOfYear, value: $0, to: w) }
-        let monthCounts = visibleWeeks.reduce(into: [Date: Int]()) { acc, weekStart in
-            guard let midWeek = cal.date(byAdding: .day, value: 3, to: weekStart) else { return }
-            let month = cal.date(from: cal.dateComponents([.year, .month], from: midWeek)) ?? midWeek
-            acc[month, default: 0] += 1
-        }
-
-        let selectedMonth = monthCounts.max { a, b in a.value < b.value }?.key
-        if let m = selectedMonth, visibleMonth != m {
-            visibleMonth = m
+        let month = cal.date(from: cal.dateComponents([.year, .month], from: w)) ?? w
+        if visibleMonth != month {
+            visibleMonth = month
         }
     }
 }
