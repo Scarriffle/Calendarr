@@ -15,6 +15,7 @@ struct CalendarHostView: View {
     @State private var editingEvent: CalEvent? = nil
     @State private var selectedEvent: CalEvent? = nil
     @State private var visibleMonth: Date = .now
+    @State private var showFilter = false
 
     private var titleString: String {
         if store.viewType == .month {
@@ -67,6 +68,9 @@ struct CalendarHostView: View {
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
         .onChange(of: visibleMonth)      { _, new in Task { await ensureLoaded(around: new) } }
+        .onReceive(NotificationCenter.default.publisher(for: .banishedCalendarsChanged)) { _ in
+            store.syncBanishedFromDefaults()
+        }
     }
 
     // MARK: – Liquid Glass variant
@@ -102,6 +106,11 @@ struct CalendarHostView: View {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack(spacing: 8) {
                             viewPickerMenu
+                            Button { showFilter = true } label: {
+                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                    .foregroundStyle(store.hiddenCalendarKeys.isEmpty ? .primary : Color.accentColor)
+                            }
+                            .accessibilityLabel(L10n.t("filter.button", appLang))
                             Button { showMenu = true } label: { Image(systemName: "line.3.horizontal") }
                         }
                     }
@@ -114,6 +123,9 @@ struct CalendarHostView: View {
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
         .onChange(of: visibleMonth)      { _, new in Task { await ensureLoaded(around: new) } }
+        .onReceive(NotificationCenter.default.publisher(for: .banishedCalendarsChanged)) { _ in
+            store.syncBanishedFromDefaults()
+        }
     }
 
     // MARK: – Top bar (flat mode)
@@ -142,6 +154,7 @@ struct CalendarHostView: View {
                 .minimumScaleFactor(0.7)
             Spacer(minLength: 8)
             viewPickerMenu
+            filterButton
             Button { showMenu = true } label: {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 18, weight: .medium))
@@ -151,6 +164,16 @@ struct CalendarHostView: View {
         }
         .frame(height: 48)
         .background(.bar)
+    }
+
+    private var filterButton: some View {
+        Button { showFilter = true } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(store.hiddenCalendarKeys.isEmpty ? .primary : Color.accentColor)
+                .frame(width: 40, height: 40)
+        }
+        .accessibilityLabel(L10n.t("filter.button", appLang))
     }
 
     private var viewPickerMenu: some View {
@@ -298,8 +321,8 @@ struct CalendarHostView: View {
     private var calendarSheets: CalendarSheets {
         CalendarSheets(store: store, showEditor: $showEditor,
                        editorDate: $editorDate, editingEvent: $editingEvent,
-                       selectedEvent: $selectedEvent, api: api,
-                       reload: { await onNavigate() })
+                       selectedEvent: $selectedEvent, showFilter: $showFilter,
+                       api: api, reload: { await onNavigate() })
     }
 
     // MARK: – Loading logic
@@ -327,13 +350,21 @@ struct CalendarHostView: View {
         await startup()
     }
 
-    /// Called when the user scrolls into a new month – fetches a ±1 month window
-    /// around it on demand. `loadEvents` skips the network if cached.
+    /// Called when the user scrolls into a new month – refreshes the visible range
+    /// immediately from cache, then fetches on demand if needed.
     private func ensureLoaded(around month: Date) async {
         let cal = store.userCalendar
         let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: month)) ?? month
         let s = cal.date(byAdding: .month, value: -1, to: monthStart) ?? monthStart
         let e = cal.date(byAdding: .month, value:  2, to: monthStart) ?? monthStart
+
+        // Only narrow the visible event set if the requested window is already cached.
+        // Otherwise keep the current events visible until the network fetch finishes,
+        // so previous/current/next month events don't disappear temporarily.
+        if store.isCached(start: s, end: e) {
+            store.refreshFromCache(start: s, end: e)
+        }
+
         await store.loadEvents(api: api, start: s, end: e)
     }
 }
@@ -346,6 +377,7 @@ private struct CalendarSheets: ViewModifier {
     @Binding var editorDate: Date
     @Binding var editingEvent: CalEvent?
     @Binding var selectedEvent: CalEvent?
+    @Binding var showFilter: Bool
     let api: CalendarrAPI
     let reload: () async -> Void
 
@@ -363,6 +395,9 @@ private struct CalendarSheets: ViewModifier {
                     if let u = updated { editingEvent = u; showEditor = true }
                     await reload()
                 }
+            }
+            .sheet(isPresented: $showFilter) {
+                CalendarFilterSheet(api: api, store: store)
             }
     }
 }

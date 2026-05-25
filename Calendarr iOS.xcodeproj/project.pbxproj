@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D0001A0CABCDEF0100AB5001 /* CalendarrWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		3927C7C02FB99D0F00EAD8ED /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -14,12 +18,44 @@
 			remoteGlobalIDString = C0000A01FB4E10100AB5001;
 			remoteInfo = "Calendarr iOS";
 		};
+		D0001A0DABCDEF0100AB5001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C0000301FB4E10100AB5001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D0001A01ABCDEF0100AB5001;
+			remoteInfo = CalendarrWidgets;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D0001A0BABCDEF0100AB5001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D0001A0CABCDEF0100AB5001 /* CalendarrWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		3927C7BC2FB99D0E00EAD8ED /* Calendarr iOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Calendarr iOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0000B01FC4E10100AB5001 /* Calendarr iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Calendarr iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CalendarrWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D0001A0FABCDEF0100AB5001 /* Exceptions for "CalendarrWidgets" folder in "CalendarrWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D0001A01ABCDEF0100AB5001 /* CalendarrWidgets */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3927C7BD2FB99D0F00EAD8ED /* Calendarr iOSTests */ = {
@@ -30,6 +66,19 @@
 		C0000D01FC4E10100AB5001 /* Calendarr iOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Calendarr iOS";
+			sourceTree = "<group>";
+		};
+		D0001A03ABCDEF0100AB5001 /* CalendarrWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D0001A0FABCDEF0100AB5001 /* Exceptions for "CalendarrWidgets" folder in "CalendarrWidgets" target */,
+			);
+			path = CalendarrWidgets;
+			sourceTree = "<group>";
+		};
+		D0001A04ABCDEF0100AB5001 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -49,6 +98,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D0001A06ABCDEF0100AB5001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -56,6 +112,8 @@
 			isa = PBXGroup;
 			children = (
 				C0000D01FC4E10100AB5001 /* Calendarr iOS */,
+				D0001A03ABCDEF0100AB5001 /* CalendarrWidgets */,
+				D0001A04ABCDEF0100AB5001 /* Shared */,
 				3927C7BD2FB99D0F00EAD8ED /* Calendarr iOSTests */,
 				C0000C01FB4E10100AB5001 /* Products */,
 			);
@@ -66,6 +124,7 @@
 			children = (
 				C0000B01FC4E10100AB5001 /* Calendarr iOS.app */,
 				3927C7BC2FB99D0E00EAD8ED /* Calendarr iOSTests.xctest */,
+				D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -103,13 +162,16 @@
 				C0000701FB4E10100AB5001 /* Sources */,
 				C0000801FB4E10100AB5001 /* Frameworks */,
 				C0000901FB4E10100AB5001 /* Resources */,
+				D0001A0BABCDEF0100AB5001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D0001A0EABCDEF0100AB5001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C0000D01FC4E10100AB5001 /* Calendarr iOS */,
+				D0001A04ABCDEF0100AB5001 /* Shared */,
 			);
 			name = "Calendarr iOS";
 			packageProductDependencies = (
@@ -117,6 +179,29 @@
 			productName = "Calendarr iOS";
 			productReference = C0000B01FC4E10100AB5001 /* Calendarr iOS.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D0001A01ABCDEF0100AB5001 /* CalendarrWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D0001A08ABCDEF0100AB5001 /* Build configuration list for PBXNativeTarget "CalendarrWidgets" */;
+			buildPhases = (
+				D0001A05ABCDEF0100AB5001 /* Sources */,
+				D0001A06ABCDEF0100AB5001 /* Frameworks */,
+				D0001A07ABCDEF0100AB5001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D0001A03ABCDEF0100AB5001 /* CalendarrWidgets */,
+				D0001A04ABCDEF0100AB5001 /* Shared */,
+			);
+			name = CalendarrWidgets;
+			packageProductDependencies = (
+			);
+			productName = CalendarrWidgets;
+			productReference = D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -134,6 +219,9 @@
 					};
 					C0000A01FB4E10100AB5001 = {
 						CreatedOnToolsVersion = 26.4.1;
+					};
+					D0001A01ABCDEF0100AB5001 = {
+						CreatedOnToolsVersion = 26.5;
 					};
 				};
 			};
@@ -153,6 +241,7 @@
 			projectRoot = "";
 			targets = (
 				C0000A01FB4E10100AB5001 /* Calendarr iOS */,
+				D0001A01ABCDEF0100AB5001 /* CalendarrWidgets */,
 				3927C7BB2FB99D0E00EAD8ED /* Calendarr iOSTests */,
 			);
 		};
@@ -167,6 +256,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C0000901FB4E10100AB5001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0001A07ABCDEF0100AB5001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -190,6 +286,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D0001A05ABCDEF0100AB5001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -197,6 +300,11 @@
 			isa = PBXTargetDependency;
 			target = C0000A01FB4E10100AB5001 /* Calendarr iOS */;
 			targetProxy = 3927C7C02FB99D0F00EAD8ED /* PBXContainerItemProxy */;
+		};
+		D0001A0EABCDEF0100AB5001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D0001A01ABCDEF0100AB5001 /* CalendarrWidgets */;
+			targetProxy = D0001A0DABCDEF0100AB5001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -206,22 +314,23 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.local.scarriffle.Calendarr-iOSTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Calendarr iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Calendarr iOS";
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
@@ -232,22 +341,23 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.local.scarriffle.Calendarr-iOSTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Calendarr iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Calendarr iOS";
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
@@ -379,14 +489,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Calendarr iOS/Calendarr iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_CFBundleName = Calendarr;
-				"INFOPLIST_KEY_ITSAppUsesNonExemptEncryption" = NO;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Scarriffleservices";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -398,7 +509,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios;
 				PRODUCT_NAME = "Calendarr iOS";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -420,14 +531,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Calendarr iOS/Calendarr iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_CFBundleName = Calendarr;
-				"INFOPLIST_KEY_ITSAppUsesNonExemptEncryption" = NO;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Scarriffleservices";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -439,7 +551,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios;
 				PRODUCT_NAME = "Calendarr iOS";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -451,6 +563,75 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		D0001A09ABCDEF0100AB5001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = CalendarrWidgets/CalendarrWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CalendarrWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Calendarr Widgets";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Scarriffleservices";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios.CalendarrWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		D0001A0AABCDEF0100AB5001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = CalendarrWidgets/CalendarrWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CalendarrWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Calendarr Widgets";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Scarriffleservices";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios.CalendarrWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -482,6 +663,15 @@
 			buildConfigurations = (
 				C0001701FB4E10100AB5001 /* Debug */,
 				C0001801FB4E10100AB5001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D0001A08ABCDEF0100AB5001 /* Build configuration list for PBXNativeTarget "CalendarrWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0001A09ABCDEF0100AB5001 /* Debug */,
+				D0001A0AABCDEF0100AB5001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

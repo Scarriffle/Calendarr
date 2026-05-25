@@ -1,7 +1,9 @@
 import SwiftUI
 
-private let weeksBack = 104
-private let weeksAhead = 104
+// Cover ~10 years back and ~77 years ahead, so the scrollable range goes well
+// past 2100 — enough room for any vacation that's actually getting planned.
+private let weeksBack = 520
+private let weeksAhead = 4000
 private let weekdayHeaderHeight: CGFloat = 28
 private let dayNumberRowHeight: CGFloat = 22
 private let laneHeight: CGFloat = 16
@@ -106,13 +108,24 @@ struct MonthView: View {
         cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date))!
     }
 
-    /// Treat the visible month as the one that "owns" Thursday of the current week —
-    /// matches ISO week-month conventions and avoids flicker on month boundaries.
+    /// Determine the visible month from the currently-scrolled week.
+    /// Instead of switching as soon as a few days of the next month appear,
+    /// we count the month affiliation of the visible week rows and keep the
+    /// month that occupies the majority of the viewport.
     private func publishVisibleMonth(from week: Date?) {
         guard let w = week else { return }
-        let thursday = cal.date(byAdding: .day, value: 3, to: w) ?? w
-        let m = cal.date(from: cal.dateComponents([.year, .month], from: thursday)) ?? thursday
-        if visibleMonth != m { visibleMonth = m }
+
+        let visibleWeeks = (0..<6).compactMap { cal.date(byAdding: .weekOfYear, value: $0, to: w) }
+        let monthCounts = visibleWeeks.reduce(into: [Date: Int]()) { acc, weekStart in
+            guard let midWeek = cal.date(byAdding: .day, value: 3, to: weekStart) else { return }
+            let month = cal.date(from: cal.dateComponents([.year, .month], from: midWeek)) ?? midWeek
+            acc[month, default: 0] += 1
+        }
+
+        let selectedMonth = monthCounts.max { a, b in a.value < b.value }?.key
+        if let m = selectedMonth, visibleMonth != m {
+            visibleMonth = m
+        }
     }
 }
 
