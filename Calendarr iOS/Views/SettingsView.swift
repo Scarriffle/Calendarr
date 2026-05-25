@@ -16,6 +16,8 @@ struct SettingsView: View {
     @AppStorage("textColor")         private var textHex = "#FFFFFF"
     @AppStorage("backgroundColor")   private var bgHex = "#000000"
     @AppStorage("lineColor")         private var lineHex = "#3A3A3C"
+    @AppStorage("primaryColor")      private var primaryHex = "#4285f4"
+    @AppStorage("accentColor")       private var accentHex = "#ea4335"
 
     var body: some View {
         NavigationStack {
@@ -65,6 +67,16 @@ struct SettingsView: View {
             .animation(.easeInOut, value: showToast)
         }
         .task { await load() }
+        // Live-update widgets the moment any appearance value changes, so the
+        // user sees the new colours without having to wait for the next event
+        // sync or save the settings.
+        .onChange(of: primaryHex) { _, _ in WidgetStore.republishAppearanceOnly() }
+        .onChange(of: accentHex)  { _, _ in WidgetStore.republishAppearanceOnly() }
+        .onChange(of: todayHex)   { _, _ in WidgetStore.republishAppearanceOnly() }
+        .onChange(of: textHex)    { _, _ in WidgetStore.republishAppearanceOnly() }
+        .onChange(of: bgHex)      { _, _ in WidgetStore.republishAppearanceOnly() }
+        .onChange(of: lineHex)    { _, _ in WidgetStore.republishAppearanceOnly() }
+        .onChange(of: appLang)    { _, _ in WidgetStore.republishAppearanceOnly() }
     }
 
     // MARK: – Liquid Glass
@@ -143,8 +155,8 @@ struct SettingsView: View {
 
     var farbenSection: some View {
         Section(L10n.t("settings.colors", appLang)) {
-            ColorPickerRow(label: L10n.t("settings.color.primary",    appLang), hex: $settings.primaryColor)
-            ColorPickerRow(label: L10n.t("settings.color.accent",     appLang), hex: $settings.accentColor)
+            ColorPickerRow(label: L10n.t("settings.color.primary",    appLang), hex: $primaryHex)
+            ColorPickerRow(label: L10n.t("settings.color.accent",     appLang), hex: $accentHex)
             ColorPickerRow(label: L10n.t("settings.color.today",      appLang), hex: $todayHex)
             ColorPickerRow(label: L10n.t("settings.color.text",       appLang), hex: $textHex)
             ColorPickerRow(label: L10n.t("settings.color.background", appLang), hex: $bgHex)
@@ -260,6 +272,8 @@ struct SettingsView: View {
             textHex    = s.textColor
             bgHex      = s.backgroundColor
             lineHex    = s.lineColor
+            primaryHex = s.primaryColor
+            accentHex  = s.accentColor
         }
     }
 
@@ -273,6 +287,8 @@ struct SettingsView: View {
         settings.textColor         = textHex
         settings.backgroundColor   = bgHex
         settings.lineColor         = lineHex
+        settings.primaryColor      = primaryHex
+        settings.accentColor       = accentHex
         do {
             try await api.updateSettings(settings)
             showNotice(L10n.t("settings.saved", appLang))

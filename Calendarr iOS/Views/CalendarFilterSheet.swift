@@ -1,0 +1,203 @@
+import SwiftUI
+
+/// Lets the user toggle which calendars contribute events to the displayed
+/// calendar views (and the home-screen widgets). Filtering is purely
+/// client-side: hidden keys live in UserDefaults via `CalendarStore`. No
+/// server roundtrip is required to toggle visibility.
+struct CalendarFilterSheet: View {
+    let api: CalendarrAPI
+    let store: CalendarStore
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
+
+    @State private var caldavAccounts: [CalDAVAccount] = []
+    @State private var localCalendars: [LocalCalendar] = []
+    @State private var icalSubs: [ICalSubscription] = []
+    @State private var googleAccounts: [GoogleAccount] = []
+    @State private var haAccounts: [HomeAssistantAccount] = []
+    @State private var isLoading = true
+    @State private var hidden: Set<String> = []
+    @State private var banished: Set<String> = []
+    /// All non-banished keys discovered during load — used by bulk show/hide.
+    @State private var allKeys: Set<String> = []
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView(L10n.t("filter.loading", appLang))
+                } else if allKeys.isEmpty {
+                    Text(L10n.t("filter.empty", appLang))
+                        .foregroundStyle(.secondary)
+                } else {
+                    List {
+                        let visibleLocals = localCalendars.filter {
+                            !banished.contains(CalendarStore.calendarKey(source: "local", calendarId: "\($0.id)"))
+                        }
+                        if !visibleLocals.isEmpty {
+                            Section(L10n.t("accounts.local.header", appLang)) {
+                                ForEach(visibleLocals) { cal in
+                                    row(name: cal.name, colorHex: cal.color,
+                                        key: CalendarStore.calendarKey(source: "local", calendarId: "\(cal.id)"))
+                                }
+                            }
+                        }
+                        ForEach(caldavAccounts) { acc in
+                            let cals = (acc.calendars ?? []).filter {
+                                !banished.contains(CalendarStore.calendarKey(source: "caldav", calendarId: "\($0.id)"))
+                            }
+                            if !cals.isEmpty {
+                                Section(acc.name) {
+                                    ForEach(cals) { cal in
+                                        row(name: cal.name,
+                                            colorHex: cal.color ?? acc.color,
+                                            key: CalendarStore.calendarKey(source: "caldav", calendarId: "\(cal.id)"))
+                                    }
+                                }
+                            }
+                        }
+                        let visibleSubs = icalSubs.filter {
+                            !banished.contains(CalendarStore.calendarKey(source: "ical", calendarId: "\($0.id)"))
+                        }
+                        if !visibleSubs.isEmpty {
+                            Section(L10n.t("accounts.ical.header", appLang)) {
+                                ForEach(visibleSubs) { sub in
+                                    row(name: sub.name, colorHex: sub.color,
+                                        key: CalendarStore.calendarKey(source: "ical", calendarId: "\(sub.id)"))
+                                }
+                            }
+                        }
+                        ForEach(googleAccounts) { acc in
+                            let cals = (acc.calendars ?? []).filter {
+                                !banished.contains(CalendarStore.calendarKey(source: "google", calendarId: "\($0.id)"))
+                            }
+                            if !cals.isEmpty {
+                                Section(acc.email) {
+                                    ForEach(cals) { cal in
+                                        row(name: cal.name,
+                                            colorHex: cal.color ?? "#4285f4",
+                                            key: CalendarStore.calendarKey(source: "google", calendarId: "\(cal.id)"))
+                                    }
+                                }
+                            }
+                        }
+                        ForEach(haAccounts) { acc in
+                            let cals = (acc.calendars ?? []).filter {
+                                !banished.contains(CalendarStore.calendarKey(source: "homeassistant", calendarId: "\($0.id)"))
+                            }
+                            if !cals.isEmpty {
+                                Section(acc.name) {
+                                    ForEach(cals) { cal in
+                                        row(name: cal.name,
+                                            colorHex: cal.color ?? "#46bdc6",
+                                            key: CalendarStore.calendarKey(source: "homeassistant", calendarId: "\(cal.id)"))
+                                    }
+                                }
+                            }
+                        }
+                        if !banished.isEmpty {
+                            Section {
+                                Text(L10n.t("filter.banished_footer", appLang))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(L10n.t("filter.title", appLang))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Menu {
+                        Button(L10n.t("filter.show_all", appLang)) {
+                            hidden = []
+                            store.setHiddenCalendars(hidden)
+                        }
+                        Button(L10n.t("filter.hide_all", appLang)) {
+                            hidden = allKeys
+                            store.setHiddenCalendars(hidden)
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .disabled(allKeys.isEmpty)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(L10n.t("nav.done", appLang)) { dismiss() }
+                }
+            }
+        }
+        .task { await load() }
+    }
+
+    @ViewBuilder
+    private func row(name: String, colorHex: String, key: String) -> some View {
+        let isVisible = !hidden.contains(key)
+        Button {
+            if isVisible { hidden.insert(key) } else { hidden.remove(key) }
+            store.setCalendarHidden(key, hidden: !isVisible)
+        } label: {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(Color(hex: colorHex))
+                    .frame(width: 14, height: 14)
+                    .opacity(isVisible ? 1.0 : 0.35)
+                Text(name)
+                    .foregroundStyle(isVisible ? .primary : .secondary)
+                    .strikethrough(!isVisible, color: .secondary)
+                Spacer()
+                Image(systemName: isVisible ? "eye" : "eye.slash")
+                    .foregroundStyle(isVisible ? Color.accentColor : .secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                hidden.remove(key)
+                banished.insert(key)
+                store.setCalendarBanished(key, banished: true)
+            } label: {
+                Label(L10n.t("filter.banish", appLang), systemImage: "archivebox")
+            }
+        }
+    }
+
+    private func load() async {
+        isLoading = true
+        hidden = store.hiddenCalendarKeys
+        banished = store.banishedCalendarKeys
+        async let c = (try? await api.getCalDAVAccounts()) ?? []
+        async let l = (try? await api.getLocalCalendars()) ?? []
+        async let i = (try? await api.getICalSubscriptions()) ?? []
+        async let g = (try? await api.getGoogleAccounts()) ?? []
+        async let h = (try? await api.getHomeAssistantAccounts()) ?? []
+        (caldavAccounts, localCalendars, icalSubs, googleAccounts, haAccounts) = await (c, l, i, g, h)
+
+        var keys = Set<String>()
+        for cal in localCalendars {
+            keys.insert(CalendarStore.calendarKey(source: "local", calendarId: "\(cal.id)"))
+        }
+        for acc in caldavAccounts {
+            for cal in acc.calendars ?? [] {
+                keys.insert(CalendarStore.calendarKey(source: "caldav", calendarId: "\(cal.id)"))
+            }
+        }
+        for sub in icalSubs {
+            keys.insert(CalendarStore.calendarKey(source: "ical", calendarId: "\(sub.id)"))
+        }
+        for acc in googleAccounts {
+            for cal in acc.calendars ?? [] {
+                keys.insert(CalendarStore.calendarKey(source: "google", calendarId: "\(cal.id)"))
+            }
+        }
+        for acc in haAccounts {
+            for cal in acc.calendars ?? [] {
+                keys.insert(CalendarStore.calendarKey(source: "homeassistant", calendarId: "\(cal.id)"))
+            }
+        }
+        allKeys = keys
+        isLoading = false
+    }
+}

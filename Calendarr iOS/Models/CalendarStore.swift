@@ -1,6 +1,13 @@
 import Foundation
 import SwiftUI
 
+extension Notification.Name {
+    /// Posted whenever the persistent "banished calendars" set is mutated from
+    /// outside the active `CalendarStore` (e.g. by `AccountsView`). The store
+    /// listens for this in `CalendarHostView` and refreshes its filter.
+    static let banishedCalendarsChanged = Notification.Name("banishedCalendarsChanged")
+}
+
 enum CalViewType: String, CaseIterable {
     case month, week, day, quarter, agenda
 
@@ -45,10 +52,111 @@ class CalendarStore {
     var weekStartsOnMonday = true
     var writableCalendars: [WritableCalendar] = []
 
+    /// Set of `"source:calendarId"` keys the user has chosen to hide from the
+    /// calendar views. Persisted in UserDefaults as a JSON array. Events whose
+    /// key matches one of these are filtered out before being rendered.
+    var hiddenCalendarKeys: Set<String> = CalendarStore.loadHiddenKeys()
+
+    /// "Banished" calendars – like `hiddenCalendarKeys` but expressing a
+    /// stronger user intent: the calendar should not even appear in the quick
+    /// show/hide list. Re-activation happens in AccountsView.
+    var banishedCalendarKeys: Set<String> = CalendarStore.loadBanishedKeys()
+
     // Cache bookkeeping
     private var cachedStart: Date? = nil
     private var cachedEnd: Date? = nil
     private var allCachedEvents: [CalEvent] = []
+
+    // MARK: – Hidden-calendar persistence
+
+    private static let hiddenKeysDefaultsKey = "hiddenCalendarKeys"
+
+    private static func loadHiddenKeys() -> Set<String> {
+        guard let raw = UserDefaults.standard.string(forKey: hiddenKeysDefaultsKey),
+              let data = raw.data(using: .utf8),
+              let arr = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
+        return Set(arr)
+    }
+
+    private func saveHiddenKeys() {
+        let arr = Array(hiddenCalendarKeys)
+        if let data = try? JSONEncoder().encode(arr),
+           let s = String(data: data, encoding: .utf8) {
+            UserDefaults.standard.set(s, forKey: Self.hiddenKeysDefaultsKey)
+        }
+    }
+
+    /// Toggle visibility of a single calendar and immediately refresh the
+    /// visible event list + widget snapshot.
+    func setCalendarHidden(_ key: String, hidden: Bool) {
+        if hidden { hiddenCalendarKeys.insert(key) } else { hiddenCalendarKeys.remove(key) }
+        saveHiddenKeys()
+        let (s, e) = rangeForCurrentView()
+        refreshFromCache(start: s, end: e)
+        publishWidgetSnapshot()
+    }
+
+    /// Replace the entire set (used by the filter sheet's bulk show/hide).
+    func setHiddenCalendars(_ keys: Set<String>) {
+        hiddenCalendarKeys = keys
+        saveHiddenKeys()
+        let (s, e) = rangeForCurrentView()
+        refreshFromCache(start: s, end: e)
+        publishWidgetSnapshot()
+    }
+
+    static func calendarKey(source: String, calendarId: String) -> String {
+        "\(source):\(calendarId)"
+    }
+
+    // MARK: – Banished-calendar persistence
+
+    private static let banishedKeysDefaultsKey = "banishedCalendarKeys"
+
+    static func loadBanishedKeys() -> Set<String> {
+        guard let raw = UserDefaults.standard.string(forKey: banishedKeysDefaultsKey),
+              let data = raw.data(using: .utf8),
+              let arr = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
+        return Set(arr)
+    }
+
+    static func saveBanishedKeys(_ keys: Set<String>) {
+        let arr = Array(keys)
+        if let data = try? JSONEncoder().encode(arr),
+           let s = String(data: data, encoding: .utf8) {
+            UserDefaults.standard.set(s, forKey: banishedKeysDefaultsKey)
+        }
+    }
+
+    /// Move a calendar to / out of the banished set. Also clears any quick
+    /// hidden flag for that key – once banished, the dual state is redundant.
+    /// Posts `.banishedCalendarsChanged` so other views in the navigation
+    /// stack (e.g. AccountsView) stay in sync.
+    func setCalendarBanished(_ key: String, banished: Bool) {
+        if banished {
+            banishedCalendarKeys.insert(key)
+            hiddenCalendarKeys.remove(key)
+        } else {
+            banishedCalendarKeys.remove(key)
+        }
+        Self.saveBanishedKeys(banishedCalendarKeys)
+        saveHiddenKeys()
+        NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+        let (s, e) = rangeForCurrentView()
+        refreshFromCache(start: s, end: e)
+        publishWidgetSnapshot()
+    }
+
+    /// Re-read the banished set from UserDefaults – called when an external
+    /// view (AccountsView) mutated it. Refreshes visible events + widgets.
+    func syncBanishedFromDefaults() {
+        banishedCalendarKeys = Self.loadBanishedKeys()
+        let (s, e) = rangeForCurrentView()
+        refreshFromCache(start: s, end: e)
+        publishWidgetSnapshot()
+    }
 
     var userCalendar: Calendar {
         var cal = Calendar.current
@@ -67,7 +175,10 @@ class CalendarStore {
     /// Call this after navigation without hitting the network.
     func refreshFromCache(start: Date, end: Date) {
         events = allCachedEvents.filter { ev in
-            ev.startDate < end && ev.endDate > start
+            let key = Self.calendarKey(source: ev.source, calendarId: ev.calendarId)
+            return ev.startDate < end && ev.endDate > start
+                && !hiddenCalendarKeys.contains(key)
+                && !banishedCalendarKeys.contains(key)
         }
     }
 
@@ -135,6 +246,53 @@ class CalendarStore {
             cachedStart = rangeStart
             cachedEnd   = rangeEnd
         }
+
+        publishWidgetSnapshot()
+    }
+
+    /// Write a slim snapshot of the next ~6 weeks into the App-Group container
+    /// so the widget extension can render without a network call. 42 days
+    /// covers the worst-case month grid (6 rows × 7 cols) for the calendar
+    /// widget. Also asks the system to refresh the widget timeline.
+    private func publishWidgetSnapshot() {
+        let cal = userCalendar
+        let now = Date()
+        // Include the week before today so widgets that show the current week
+        // (e.g. "This Week", "Up Next + Calendar") have data for Monday–today.
+        let from = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: now)) ?? now
+        let to = cal.date(byAdding: .day, value: 42, to: cal.startOfDay(for: now)) ?? from
+        let visible = allCachedEvents
+            .filter { ev in
+                let key = Self.calendarKey(source: ev.source, calendarId: ev.calendarId)
+                return ev.startDate < to && ev.endDate > from
+                    && !hiddenCalendarKeys.contains(key)
+                    && !banishedCalendarKeys.contains(key)
+            }
+            .sorted { $0.startDate < $1.startDate }
+            .prefix(500)
+            .map { ev in
+                WidgetEvent(id: ev.id,
+                            title: ev.title,
+                            start: ev.startDate,
+                            end: ev.endDate,
+                            isAllDay: ev.isAllDay,
+                            colorHex: ev.effectiveColor,
+                            location: ev.location)
+            }
+        let defaults = UserDefaults.standard
+        let snap = WidgetSnapshot(
+            writtenAt: now,
+            events: Array(visible),
+            todayColorHex:      defaults.string(forKey: "todayColor")       ?? "#4285f4",
+            textColorHex:       defaults.string(forKey: "textColor")        ?? "#FFFFFF",
+            backgroundColorHex: defaults.string(forKey: "backgroundColor")  ?? "#000000",
+            lineColorHex:       defaults.string(forKey: "lineColor")        ?? "#3A3A3C",
+            primaryColorHex:    defaults.string(forKey: "primaryColor")     ?? "#4285f4",
+            accentColorHex:     defaults.string(forKey: "accentColor")      ?? "#ea4335",
+            language:           defaults.string(forKey: "appLanguage")      ?? "system"
+        )
+        WidgetStore.write(snap)
+        WidgetTimelineNotifier.reload()
     }
 
     // MARK: – Writable calendars

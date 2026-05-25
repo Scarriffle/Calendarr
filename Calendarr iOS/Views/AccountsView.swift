@@ -14,6 +14,7 @@ struct AccountsView: View {
     @State private var showAddICal = false
     @State private var showAddHA = false
     @State private var errorAlert: String?
+    @State private var banishedKeys: Set<String> = CalendarStore.loadBanishedKeys()
 
     @AppStorage("appLanguage") private var appLang = "system"
 
@@ -24,6 +25,7 @@ struct AccountsView: View {
                     ProgressView(L10n.t("accounts.loading", appLang))
                 } else {
                     List {
+                        if !banishedKeys.isEmpty { banishedSection }
                         caldavSection
                         localSection
                         icalSection
@@ -180,6 +182,69 @@ struct AccountsView: View {
         }
     }
 
+    var banishedSection: some View {
+        Section {
+            ForEach(Array(banishedKeys).sorted(), id: \.self) { key in
+                let info = resolveBanished(key)
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Color(hex: info.colorHex))
+                        .frame(width: 12, height: 12)
+                        .opacity(0.5)
+                    Text(info.name)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(L10n.t("accounts.banished_unhide", appLang)) {
+                        banishedKeys.remove(key)
+                        CalendarStore.saveBanishedKeys(banishedKeys)
+                        NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+                    }
+                    .font(.callout)
+                    .foregroundStyle(Color.accentColor)
+                }
+            }
+        } header: {
+            Text(L10n.t("accounts.banished_header", appLang))
+        }
+    }
+
+    private func resolveBanished(_ key: String) -> (name: String, colorHex: String) {
+        let parts = key.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2, let id = Int(parts[1]) else {
+            return (L10n.t("accounts.banished_unknown", appLang), "#888888")
+        }
+        switch parts[0] {
+        case "local":
+            if let c = localCalendars.first(where: { $0.id == id }) {
+                return (c.name, c.color)
+            }
+        case "caldav":
+            for acc in caldavAccounts {
+                if let c = acc.calendars?.first(where: { $0.id == id }) {
+                    return ("\(acc.name) – \(c.name)", c.color ?? acc.color)
+                }
+            }
+        case "ical":
+            if let s = icalSubs.first(where: { $0.id == id }) {
+                return (s.name, s.color)
+            }
+        case "google":
+            for acc in googleAccounts {
+                if let c = acc.calendars?.first(where: { $0.id == id }) {
+                    return ("\(acc.email) – \(c.name)", c.color ?? "#4285f4")
+                }
+            }
+        case "homeassistant":
+            for acc in haAccounts {
+                if let c = acc.calendars?.first(where: { $0.id == id }) {
+                    return ("\(acc.name) – \(c.name)", c.color ?? "#46bdc6")
+                }
+            }
+        default: break
+        }
+        return (L10n.t("accounts.banished_unknown", appLang), "#888888")
+    }
+
     var haSection: some View {
         Section {
             if haAccounts.isEmpty {
@@ -210,6 +275,7 @@ struct AccountsView: View {
 
     private func load() async {
         isLoading = true
+        banishedKeys = CalendarStore.loadBanishedKeys()
         async let c = (try? await api.getCalDAVAccounts()) ?? []
         async let l = (try? await api.getLocalCalendars()) ?? []
         async let i = (try? await api.getICalSubscriptions()) ?? []

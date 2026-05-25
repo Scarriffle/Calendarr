@@ -234,6 +234,20 @@ private let strings: [String: [String: String]] = [
         "accounts.ha.header": "Home Assistant",
         "accounts.ha.empty": "Keine Home Assistant-Konten",
         "accounts.ha.add": "Home Assistant hinzufügen",
+        "profile.admin_note": "Hinweis: Die Benutzerverwaltung – sowohl das Erstellen als auch das Löschen von Benutzerkonten – erfolgt ausschließlich durch den Administrator des Servers.",
+
+        // Kalender-Filter (Sidebar)
+        "filter.title": "Kalender",
+        "filter.loading": "Lade Kalender…",
+        "filter.empty": "Keine Kalender vorhanden",
+        "filter.show_all": "Alle anzeigen",
+        "filter.hide_all": "Alle ausblenden",
+        "filter.button": "Kalender ein-/ausblenden",
+        "filter.banish": "Dauerhaft ausblenden",
+        "filter.banished_footer": "Dauerhaft ausgeblendete Kalender erscheinen unter »Konten & Kalender« und können dort wieder eingeblendet werden.",
+        "accounts.banished_header": "Ausgeblendete Kalender",
+        "accounts.banished_unhide": "Wieder einblenden",
+        "accounts.banished_unknown": "Unbekannter Kalender",
 
         // CalDAV add sheet
         "caldav.section": "Konto-Details",
@@ -474,6 +488,20 @@ private let strings: [String: [String: String]] = [
         "accounts.ha.header": "Home Assistant",
         "accounts.ha.empty": "No Home Assistant accounts",
         "accounts.ha.add": "Add Home Assistant",
+        "profile.admin_note": "Note: User management — both the creation and deletion of user accounts — is handled exclusively by the server administrator.",
+
+        // Calendar filter (sidebar)
+        "filter.title": "Calendars",
+        "filter.loading": "Loading calendars…",
+        "filter.empty": "No calendars available",
+        "filter.show_all": "Show all",
+        "filter.hide_all": "Hide all",
+        "filter.button": "Show/hide calendars",
+        "filter.banish": "Hide permanently",
+        "filter.banished_footer": "Permanently hidden calendars appear under “Accounts & Calendars”, where you can show them again.",
+        "accounts.banished_header": "Hidden calendars",
+        "accounts.banished_unhide": "Show again",
+        "accounts.banished_unknown": "Unknown calendar",
 
         // CalDAV add sheet
         "caldav.section": "Account details",

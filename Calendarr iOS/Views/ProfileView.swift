@@ -33,6 +33,7 @@ struct ProfileView: View {
                         kontoSection(profile: profile)
                         passwordSection
                         twoFASection(profile: profile)
+                        adminNoteSection
                     }
                 }
             }
@@ -138,6 +139,20 @@ struct ProfileView: View {
                 }
                 .foregroundStyle(Color.accentColor)
             }
+        }
+    }
+
+    var adminNoteSection: some View {
+        Section {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 1)
+                Text(L10n.t("profile.admin_note", appLang))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
         }
     }
 
