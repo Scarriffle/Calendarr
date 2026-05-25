@@ -171,13 +171,17 @@ class CalendarStore {
         return cs <= start && ce >= end
     }
 
-    /// Fast in-memory refresh of `events` for the current visible range.
-    /// Call this after navigation without hitting the network.
+    /// Republish the full cached event set, applying only visibility filters
+    /// (hidden + banished). We deliberately do NOT slice by the current view's
+    /// date window: the user's chosen cache range is already loaded, and
+    /// scrolling within it must not make events vanish. Per-day / per-range
+    /// rendering is the responsibility of `events(on:)` / `events(in:)`.
+    /// `start` / `end` are kept in the signature for call-site clarity.
     func refreshFromCache(start: Date, end: Date) {
+        _ = (start, end)
         events = allCachedEvents.filter { ev in
             let key = Self.calendarKey(source: ev.source, calendarId: ev.calendarId)
-            return ev.startDate < end && ev.endDate > start
-                && !hiddenCalendarKeys.contains(key)
+            return !hiddenCalendarKeys.contains(key)
                 && !banishedCalendarKeys.contains(key)
         }
     }
