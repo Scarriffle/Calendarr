@@ -136,7 +136,9 @@ struct CalendarFilterSheet: View {
         let isVisible = !hidden.contains(key)
         Button {
             if isVisible { hidden.insert(key) } else { hidden.remove(key) }
-            store.setCalendarHidden(key, hidden: !isVisible)
+            // New hidden state == was-visible (flip). Previous code passed the
+            // inverse, which persisted the opposite of what the UI showed.
+            store.setCalendarHidden(key, hidden: isVisible)
         } label: {
             HStack(spacing: 12) {
                 Circle()
@@ -158,6 +160,7 @@ struct CalendarFilterSheet: View {
                 hidden.remove(key)
                 banished.insert(key)
                 store.setCalendarBanished(key, banished: true)
+                pushBanishToServer(key: key, hidden: true)
             } label: {
                 Label(L10n.t("filter.banish", appLang), systemImage: "archivebox")
             }
@@ -174,6 +177,19 @@ struct CalendarFilterSheet: View {
         async let g = (try? await api.getGoogleAccounts()) ?? []
         async let h = (try? await api.getHomeAssistantAccounts()) ?? []
         (caldavAccounts, localCalendars, icalSubs, googleAccounts, haAccounts) = await (c, l, i, g, h)
+
+        // Reconcile banished state with the server's sidebar_hidden flags
+        // (server wins for CalDAV/Google/HA; local/ical keep their local state).
+        var b = store.banishedCalendarKeys
+        func applyServerHidden(_ source: String, _ id: Int, _ hidden: Bool) {
+            let key = CalendarStore.calendarKey(source: source, calendarId: "\(id)")
+            if hidden { b.insert(key) } else { b.remove(key) }
+        }
+        for acc in caldavAccounts { for cal in acc.calendars ?? [] { applyServerHidden("caldav", cal.id, cal.sidebarHidden) } }
+        for acc in googleAccounts { for cal in acc.calendars ?? [] { applyServerHidden("google", cal.id, cal.sidebarHidden) } }
+        for acc in haAccounts     { for cal in acc.calendars ?? [] { applyServerHidden("homeassistant", cal.id, cal.sidebarHidden) } }
+        store.setBanishedCalendars(b)
+        banished = b
 
         var keys = Set<String>()
         for cal in localCalendars {
@@ -199,5 +215,12 @@ struct CalendarFilterSheet: View {
         }
         allKeys = keys
         isLoading = false
+    }
+
+    /// For server-backed sources, persist the banish on the server too.
+    private func pushBanishToServer(key: String, hidden: Bool) {
+        guard let parsed = CalendarStore.parseCalendarKey(key),
+              CalendarStore.serverManagedSources.contains(parsed.source) else { return }
+        Task { try? await api.setCalendarSidebarHidden(source: parsed.source, calendarId: parsed.id, hidden: hidden) }
     }
 }

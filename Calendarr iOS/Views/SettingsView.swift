@@ -2,12 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     let api: CalendarrAPI
-    @State private var settings = AppSettings()
-    @State private var isLoading = true
-    @State private var isSaving = false
-    @State private var toast = ""
-    @State private var showToast = false
     @AppStorage("liquidGlass")       private var liquidGlass = false
+    @AppStorage("settingsSync")      private var settingsSync = false
     @AppStorage("cacheMonths")       private var cacheMonths = 3
     @AppStorage("appLanguage")       private var appLang = "system"
     @AppStorage("monthDividerColor") private var dividerHex = "#7090c0"
@@ -18,65 +14,52 @@ struct SettingsView: View {
     @AppStorage("lineColor")         private var lineHex = "#3A3A3C"
     @AppStorage("primaryColor")      private var primaryHex = "#4285f4"
     @AppStorage("accentColor")       private var accentHex = "#ea4335"
+    // Previously server-only; now AppStorage-backed so they persist and the
+    // calendar views actually apply them.
+    @AppStorage("textContrast")      private var textContrast = 3
+    @AppStorage("lineContrast")      private var lineContrast = 3
+    @AppStorage("hourHeight")        private var hourHeight = 60
+    @AppStorage("defaultView")       private var defaultView = "month"
+    @AppStorage("weekStartDay")      private var weekStartDay = "monday"
+    @AppStorage("dimPastEvents")     private var dimPastEvents = false
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView(L10n.t("settings.loading", appLang))
-                } else {
-                    Form {
-                        liquidGlassSection
-                        cacheSection
-                        spracheSection
-                        farbenSection
-                        schriftSection
-                        linienSection
-                        ansichtSection
-                        stundenSection
-                    }
-                }
+            Form {
+                liquidGlassSection
+                cacheSection
+                spracheSection
+                farbenSection
+                schriftSection
+                linienSection
+                ansichtSection
+                stundenSection
             }
             .navigationTitle(L10n.t("settings.title", appLang))
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        Task { await save() }
-                    } label: {
-                        if isSaving {
-                            ProgressView()
-                        } else {
-                            Text(L10n.t("settings.save", appLang)).bold()
-                        }
-                    }
-                    .disabled(isSaving)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if showToast {
-                    Text(toast)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(.regularMaterial)
-                        .clipShape(Capsule())
-                        .padding(.bottom, 20)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .animation(.easeInOut, value: showToast)
         }
-        .task { await load() }
-        // Live-update widgets the moment any appearance value changes, so the
-        // user sees the new colours without having to wait for the next event
-        // sync or save the settings.
-        .onChange(of: primaryHex) { _, _ in WidgetStore.republishAppearanceOnly() }
-        .onChange(of: accentHex)  { _, _ in WidgetStore.republishAppearanceOnly() }
-        .onChange(of: todayHex)   { _, _ in WidgetStore.republishAppearanceOnly() }
-        .onChange(of: textHex)    { _, _ in WidgetStore.republishAppearanceOnly() }
-        .onChange(of: bgHex)      { _, _ in WidgetStore.republishAppearanceOnly() }
-        .onChange(of: lineHex)    { _, _ in WidgetStore.republishAppearanceOnly() }
+        // Reflect the latest server values when opening the screen.
+        .task { await SettingsSync.pull(api: api) }
+        // Appearance changes update widgets live; synced values are also pushed
+        // to the server (debounced). `push` itself decides what actually gets
+        // sent based on the sync toggle, so every change can simply call it.
+        .onChange(of: primaryHex) { _, _ in WidgetStore.republishAppearanceOnly(); SettingsSync.push(api: api) }
+        .onChange(of: accentHex)  { _, _ in WidgetStore.republishAppearanceOnly(); SettingsSync.push(api: api) }
+        .onChange(of: todayHex)   { _, _ in WidgetStore.republishAppearanceOnly(); SettingsSync.push(api: api) }
+        .onChange(of: textHex)    { _, _ in WidgetStore.republishAppearanceOnly(); SettingsSync.push(api: api) }
+        .onChange(of: bgHex)      { _, _ in WidgetStore.republishAppearanceOnly(); SettingsSync.push(api: api) }
+        .onChange(of: lineHex)    { _, _ in WidgetStore.republishAppearanceOnly(); SettingsSync.push(api: api) }
+        .onChange(of: dividerHex) { _, _ in SettingsSync.push(api: api) }
+        .onChange(of: labelHex)   { _, _ in SettingsSync.push(api: api) }
+        .onChange(of: textContrast)  { _, _ in SettingsSync.push(api: api) }
+        .onChange(of: lineContrast)  { _, _ in SettingsSync.push(api: api) }
+        .onChange(of: hourHeight)    { _, _ in SettingsSync.push(api: api) }
+        .onChange(of: defaultView)   { _, _ in SettingsSync.push(api: api) }
+        .onChange(of: weekStartDay)  { _, _ in SettingsSync.push(api: api) }
+        .onChange(of: dimPastEvents) { _, _ in SettingsSync.push(api: api) }
         .onChange(of: appLang)    { _, _ in WidgetStore.republishAppearanceOnly() }
+        // Enabling sync adopts the server's appearance (server wins).
+        .onChange(of: settingsSync) { _, on in if on { Task { await SettingsSync.pull(api: api) } } }
     }
 
     // MARK: – Liquid Glass
@@ -97,10 +80,25 @@ struct SettingsView: View {
                 }
             }
             .tint(Color.accentColor)
+
+            Toggle(isOn: $settingsSync) {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t("settings.sync", appLang))
+                        Text(L10n.t("settings.sync.desc", appLang))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .foregroundStyle(.teal)
+                }
+            }
+            .tint(Color.accentColor)
         } header: {
             Text(L10n.t("settings.appdesign", appLang))
         } footer: {
-            Text(L10n.t("settings.liquidglass.footer", appLang))
+            Text(L10n.t("settings.sync.footer", appLang))
                 .font(.caption)
         }
     }
@@ -177,7 +175,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ContrastSelector(
-                    value: $settings.textContrast,
+                    value: $textContrast,
                     options: [
                         (1, L10n.t("settings.contrast.dark",   appLang)),
                         (2, L10n.t("settings.contrast.medium", appLang)),
@@ -201,7 +199,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ContrastSelector(
-                    value: $settings.lineContrast,
+                    value: $lineContrast,
                     options: [
                         (1, L10n.t("settings.linecontrast.barely", appLang)),
                         (2, L10n.t("settings.linecontrast.subtle", appLang)),
@@ -218,18 +216,18 @@ struct SettingsView: View {
 
     var ansichtSection: some View {
         Section(L10n.t("settings.calview", appLang)) {
-            Picker(L10n.t("settings.defaultview", appLang), selection: $settings.defaultView) {
+            Picker(L10n.t("settings.defaultview", appLang), selection: $defaultView) {
                 Text(L10n.t("view.month",   appLang)).tag("month")
                 Text(L10n.t("view.week",    appLang)).tag("week")
                 Text(L10n.t("view.day",     appLang)).tag("day")
                 Text(L10n.t("view.quarter", appLang)).tag("quarter")
                 Text(L10n.t("view.agenda",  appLang)).tag("agenda")
             }
-            Picker(L10n.t("settings.firstweekday", appLang), selection: $settings.weekStartDay) {
+            Picker(L10n.t("settings.firstweekday", appLang), selection: $weekStartDay) {
                 Text(L10n.t("settings.monday", appLang)).tag("monday")
                 Text(L10n.t("settings.sunday", appLang)).tag("sunday")
             }
-            Toggle(L10n.t("settings.dimpast", appLang), isOn: $settings.dimPastEvents)
+            Toggle(L10n.t("settings.dimpast", appLang), isOn: $dimPastEvents)
                 .tint(Color.accentColor)
         }
     }
@@ -245,7 +243,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ContrastSelector(
-                    value: $settings.hourHeight,
+                    value: $hourHeight,
                     options: [
                         (28, L10n.t("settings.hourheight.compact", appLang)),
                         (44, L10n.t("settings.hourheight.normal",  appLang)),
@@ -258,53 +256,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: – Actions
-
-    private func load() async {
-        isLoading = true
-        defer { isLoading = false }
-        if let s = try? await api.getSettings() {
-            settings = s
-            // Mirror server-side color settings so calendar views (which read AppStorage) see them.
-            dividerHex = s.monthDividerColor
-            labelHex   = s.monthLabelColor
-            todayHex   = s.todayColor
-            textHex    = s.textColor
-            bgHex      = s.backgroundColor
-            lineHex    = s.lineColor
-            primaryHex = s.primaryColor
-            accentHex  = s.accentColor
-        }
-    }
-
-    private func save() async {
-        isSaving = true
-        defer { isSaving = false }
-        // Push local AppStorage colors back into the settings struct before saving.
-        settings.monthDividerColor = dividerHex
-        settings.monthLabelColor   = labelHex
-        settings.todayColor        = todayHex
-        settings.textColor         = textHex
-        settings.backgroundColor   = bgHex
-        settings.lineColor         = lineHex
-        settings.primaryColor      = primaryHex
-        settings.accentColor       = accentHex
-        do {
-            try await api.updateSettings(settings)
-            showNotice(L10n.t("settings.saved", appLang))
-        } catch {
-            showNotice(error.localizedDescription)
-        }
-    }
-
-    private func showNotice(_ msg: String) {
-        toast = msg
-        withAnimation { showToast = true }
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            withAnimation { showToast = false }
-        }
-    }
 }
 
 // MARK: – Reusable Components

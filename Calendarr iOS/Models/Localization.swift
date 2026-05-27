@@ -64,6 +64,8 @@ private let strings: [String: [String: String]] = [
         "menu.server": "Server",
         "menu.logout": "Abmelden",
         "menu.admin": "Admin",
+        "menu.sync": "Mit Server synchronisieren",
+        "menu.sync.section": "Synchronisierung",
 
         // Settings – chrome
         "settings.title": "Darstellung",
@@ -76,6 +78,9 @@ private let strings: [String: [String: String]] = [
         "settings.liquidglass": "Liquid Glass",
         "settings.liquidglass.desc": "Verwendet die neue iOS\u{202F}26 Glasoptik mit transparenter Navigationsleiste",
         "settings.liquidglass.footer": "Änderung wirkt sofort – kein Neustart nötig.",
+        "settings.sync": "Einstellungen synchronisieren",
+        "settings.sync.desc": "Darstellung mit dem Server abgleichen",
+        "settings.sync.footer": "Wenn aktiv, werden Farben, Kontraste und Stundenhöhe mit dem Server abgeglichen (der Server hat Vorrang). Ansicht, erster Wochentag und das Ausgrauen vergangener Termine werden immer synchronisiert – auch wenn der Schalter aus ist.",
 
         "settings.cache.header": "Vorladen",
         "settings.cache.title": "Vorladen",
@@ -320,6 +325,8 @@ private let strings: [String: [String: String]] = [
         "menu.server": "Server",
         "menu.logout": "Sign out",
         "menu.admin": "Admin",
+        "menu.sync": "Sync with server",
+        "menu.sync.section": "Synchronization",
 
         "settings.title": "Appearance",
         "settings.loading": "Loading settings…",
@@ -330,6 +337,9 @@ private let strings: [String: [String: String]] = [
         "settings.liquidglass": "Liquid Glass",
         "settings.liquidglass.desc": "Uses the new iOS\u{202F}26 glass look with a translucent navigation bar",
         "settings.liquidglass.footer": "Takes effect immediately – no restart required.",
+        "settings.sync": "Sync settings",
+        "settings.sync.desc": "Keep appearance in sync with the server",
+        "settings.sync.footer": "When on, colors, contrasts and hour height sync with the server (the server wins). View, first weekday and dimming past events always sync – even when the switch is off.",
 
         "settings.cache.header": "Preloading",
         "settings.cache.title": "Preloading",

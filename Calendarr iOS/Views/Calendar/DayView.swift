@@ -5,14 +5,20 @@ struct DayView: View {
     let onEventTap: (CalEvent) -> Void
     let onCreateEvent: (Date) -> Void
 
-    @AppStorage("appLanguage") private var appLang = "system"
-    @AppStorage("todayColor")  private var todayHex = "#4285f4"
-    @AppStorage("textColor")   private var textHex = "#FFFFFF"
-    @AppStorage("lineColor")   private var lineHex = "#3A3A3C"
+    @AppStorage("appLanguage")   private var appLang = "system"
+    @AppStorage("todayColor")    private var todayHex = "#4285f4"
+    @AppStorage("textColor")     private var textHex = "#FFFFFF"
+    @AppStorage("lineColor")     private var lineHex = "#3A3A3C"
+    @AppStorage("textContrast")  private var textContrast = 3
+    @AppStorage("hourHeight")    private var hourHeightPref = 60   // observed for live re-layout
 
     private var cal: Calendar { store.userCalendar }
-    private var allDayEvents: [CalEvent] { store.events(on: store.currentDate).filter(\.isAllDay) }
-    private var timedEvents: [CalEvent] { store.events(on: store.currentDate).filter { !$0.isAllDay } }
+    private var allDayEvents: [CalEvent] {
+        store.events(on: store.currentDate).filter { $0.isAllDay || eventSpansMultipleDays($0) }
+    }
+    private var timedEvents: [CalEvent] {
+        store.events(on: store.currentDate).filter { !$0.isAllDay && !eventSpansMultipleDays($0) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -97,7 +103,7 @@ struct DayView: View {
                     Color.clear.frame(height: hourHeight)
                     Text(String(format: "%02d:00", h))
                         .font(.system(size: 10))
-                        .foregroundStyle(Color(hex: textHex).opacity(0.6))
+                        .foregroundStyle(Color(hex: textHex).opacity(secondaryTextOpacity(textContrast)))
                         .offset(y: -6)
                 }
             }
@@ -131,7 +137,8 @@ private struct DayHourSlot: View {
     let language: String
     let onCreateEvent: (Date) -> Void
 
-    @AppStorage("lineColor") private var lineHex = "#3A3A3C"
+    @AppStorage("lineColor")    private var lineHex = "#3A3A3C"
+    @AppStorage("lineContrast") private var lineContrast = 3
 
     private var date: Date {
         Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
@@ -139,7 +146,7 @@ private struct DayHourSlot: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(Color(hex: lineHex).opacity(0.4)).frame(height: 0.5)
+            Rectangle().fill(Color(hex: lineHex).opacity(gridLineOpacity(lineContrast))).frame(height: 0.5)
             Color.clear.frame(height: hourHeight - 0.5)
         }
         .contentShape(Rectangle())

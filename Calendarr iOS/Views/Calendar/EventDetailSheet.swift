@@ -40,6 +40,12 @@ struct EventDetailSheet: View {
         event.source == "local" || event.source == "caldav"
     }
 
+    /// Home Assistant events can't be edited in-app (no editor support), but
+    /// the server does support deleting them.
+    private var canDelete: Bool {
+        canEdit || event.source == "homeassistant"
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -86,7 +92,7 @@ struct EventDetailSheet: View {
                     }
                 }
 
-                if canEdit {
+                if canDelete {
                     Section {
                         Button(role: .destructive) {
                             showDeleteConfirm = true
@@ -115,7 +121,7 @@ struct EventDetailSheet: View {
                     }
                 }
             }
-            .confirmationDialog("Termin löschen?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            .alert("Termin löschen?", isPresented: $showDeleteConfirm) {
                 Button("Löschen", role: .destructive) {
                     Task { await deleteEvent() }
                 }
@@ -129,12 +135,20 @@ struct EventDetailSheet: View {
     private func deleteEvent() async {
         isDeleting = true
         do {
-            if event.source == "local" {
+            switch event.source {
+            case "local":
                 try await api.deleteLocalEvent(uid: event.id)
-            } else {
+            case "homeassistant":
+                // calendarId looks like "homeassistant-42" → numeric DB id 42
+                let calId = Int(event.calendarId.replacingOccurrences(of: "homeassistant-", with: "")) ?? 0
+                try await api.deleteHAEvent(calendarId: calId, uid: event.id)
+            default:
                 let calId = Int(event.calendarId)
                 try await api.deleteCalDAVEvent(uid: event.id, url: event.url, calendarId: calId)
             }
+            // Optimistically drop it from the cache so it vanishes immediately,
+            // regardless of how long the source takes to propagate the delete.
+            store.removeCachedEvent(id: event.id)
             await onDone(nil)
         } catch {
             isDeleting = false

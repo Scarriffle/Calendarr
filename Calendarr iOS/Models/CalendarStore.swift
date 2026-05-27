@@ -6,6 +6,11 @@ extension Notification.Name {
     /// outside the active `CalendarStore` (e.g. by `AccountsView`). The store
     /// listens for this in `CalendarHostView` and refreshes its filter.
     static let banishedCalendarsChanged = Notification.Name("banishedCalendarsChanged")
+
+    /// Posted when the user taps the manual "sync with server" button in the
+    /// menu. `CalendarHostView` responds by invalidating the cache and
+    /// re-fetching events from the server.
+    static let manualSyncRequested = Notification.Name("manualSyncRequested")
 }
 
 enum CalViewType: String, CaseIterable {
@@ -107,7 +112,16 @@ class CalendarStore {
     }
 
     static func calendarKey(source: String, calendarId: String) -> String {
-        "\(source):\(calendarId)"
+        // The events API returns `calendar_id` inconsistently: a raw numeric for
+        // CalDAV, but "<source>-<id>" for local / ical / google / homeassistant
+        // (e.g. "local-3", "google-5"). The filter UI keys off the numeric DB id,
+        // so strip any leading "<source>-" prefix to make event keys and filter
+        // keys comparable — otherwise local hiding/banishing silently does nothing
+        // for those sources.
+        var id = calendarId
+        let prefix = "\(source)-"
+        if id.hasPrefix(prefix) { id = String(id.dropFirst(prefix.count)) }
+        return "\(source):\(id)"
     }
 
     // MARK: – Banished-calendar persistence
@@ -149,6 +163,18 @@ class CalendarStore {
         publishWidgetSnapshot()
     }
 
+    /// Replace the whole banished set (used when reconciling with the server's
+    /// `sidebar_hidden` flags). Persists, notifies, refreshes.
+    func setBanishedCalendars(_ keys: Set<String>) {
+        guard keys != banishedCalendarKeys else { return }
+        banishedCalendarKeys = keys
+        Self.saveBanishedKeys(keys)
+        NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+        let (s, e) = rangeForCurrentView()
+        refreshFromCache(start: s, end: e)
+        publishWidgetSnapshot()
+    }
+
     /// Re-read the banished set from UserDefaults – called when an external
     /// view (AccountsView) mutated it. Refreshes visible events + widgets.
     func syncBanishedFromDefaults() {
@@ -157,6 +183,17 @@ class CalendarStore {
         refreshFromCache(start: s, end: e)
         publishWidgetSnapshot()
     }
+
+    /// Split a `"source:calendarId"` key back into its parts.
+    static func parseCalendarKey(_ key: String) -> (source: String, id: Int)? {
+        guard let colon = key.firstIndex(of: ":") else { return nil }
+        let source = String(key[..<colon])
+        guard let id = Int(key[key.index(after: colon)...]) else { return nil }
+        return (source, id)
+    }
+
+    /// Sources whose visibility is backed by the server's `sidebar_hidden`.
+    static let serverManagedSources: Set<String> = ["caldav", "google", "homeassistant"]
 
     var userCalendar: Calendar {
         var cal = Calendar.current
@@ -186,11 +223,23 @@ class CalendarStore {
         }
     }
 
+    /// Optimistically drop a just-deleted event from the cache so it disappears
+    /// from the UI immediately, without waiting for a server round-trip (HA
+    /// deletes can lag several seconds, and an immediate refetch could even
+    /// re-add it before the source propagated the deletion).
+    func removeCachedEvent(id: String) {
+        allCachedEvents.removeAll { $0.id == id }
+        events.removeAll { $0.id == id }
+        publishWidgetSnapshot()
+    }
+
     // MARK: – Network loading
 
-    /// Load events for a specific range – skips network if already cached.
-    func loadEvents(api: CalendarrAPI, start: Date, end: Date) async {
-        if isCached(start: start, end: end) {
+    /// Load events for a specific range. Skips the network if already cached,
+    /// unless `force` is set (used after create/edit to pull fresh server data
+    /// for the visible range, bypassing the cache).
+    func loadEvents(api: CalendarrAPI, start: Date, end: Date, force: Bool = false) async {
+        if !force, isCached(start: start, end: end) {
             refreshFromCache(start: start, end: end)
             return
         }

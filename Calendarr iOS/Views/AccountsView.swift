@@ -195,9 +195,7 @@ struct AccountsView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button(L10n.t("accounts.banished_unhide", appLang)) {
-                        banishedKeys.remove(key)
-                        CalendarStore.saveBanishedKeys(banishedKeys)
-                        NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+                        unbanish(key)
                     }
                     .font(.callout)
                     .foregroundStyle(Color.accentColor)
@@ -205,6 +203,25 @@ struct AccountsView: View {
             }
         } header: {
             Text(L10n.t("accounts.banished_header", appLang))
+        }
+    }
+
+    /// Re-show a banished calendar. For server-backed sources this clears the
+    /// server's sidebar_hidden (re-enabling the calendar); for local/ical it's
+    /// just the local set.
+    private func unbanish(_ key: String) {
+        banishedKeys.remove(key)
+        CalendarStore.saveBanishedKeys(banishedKeys)
+        NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+        if let parsed = CalendarStore.parseCalendarKey(key),
+           CalendarStore.serverManagedSources.contains(parsed.source) {
+            // The server excluded this calendar's events while hidden, so they
+            // aren't in the cache. Re-enable on the server, then force a refetch
+            // so the events actually reappear without a manual sync.
+            Task {
+                try? await api.setCalendarSidebarHidden(source: parsed.source, calendarId: parsed.id, hidden: false)
+                NotificationCenter.default.post(name: .manualSyncRequested, object: nil)
+            }
         }
     }
 
@@ -282,6 +299,22 @@ struct AccountsView: View {
         async let g = (try? await api.getGoogleAccounts()) ?? []
         async let h = (try? await api.getHomeAssistantAccounts()) ?? []
         (caldavAccounts, localCalendars, icalSubs, googleAccounts, haAccounts) = await (c, l, i, g, h)
+
+        // Reconcile banished list with the server's sidebar_hidden (server wins
+        // for CalDAV/Google/HA; local/ical keep their local state).
+        var b = banishedKeys
+        func applyServerHidden(_ source: String, _ id: Int, _ hidden: Bool) {
+            let key = CalendarStore.calendarKey(source: source, calendarId: "\(id)")
+            if hidden { b.insert(key) } else { b.remove(key) }
+        }
+        for acc in caldavAccounts { for cal in acc.calendars ?? [] { applyServerHidden("caldav", cal.id, cal.sidebarHidden) } }
+        for acc in googleAccounts { for cal in acc.calendars ?? [] { applyServerHidden("google", cal.id, cal.sidebarHidden) } }
+        for acc in haAccounts     { for cal in acc.calendars ?? [] { applyServerHidden("homeassistant", cal.id, cal.sidebarHidden) } }
+        if b != banishedKeys {
+            banishedKeys = b
+            CalendarStore.saveBanishedKeys(b)
+            NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+        }
         isLoading = false
     }
 

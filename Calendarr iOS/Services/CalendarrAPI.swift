@@ -365,4 +365,31 @@ class CalendarrAPI {
         ]
         _ = try await request("/api/homeassistant/events", method: "POST", body: body)
     }
+
+    /// Delete a Home Assistant calendar event.
+    /// `calendarId` is the numeric HA-calendar DB id; `uid` is the HA event uid.
+    func deleteHAEvent(calendarId: Int, uid: String) async throws {
+        // uid is a path segment and may contain "/" or other reserved chars.
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
+        let encUid = uid.addingPercentEncoding(withAllowedCharacters: allowed) ?? uid
+        _ = try await request("/api/homeassistant/events/\(calendarId)/\(encUid)", method: "DELETE")
+    }
+
+    // MARK: – Calendar visibility (sidebar_hidden)
+
+    /// Toggle a calendar's server-side visibility. Mirrors the web: hiding sets
+    /// `enabled=false, sidebar_hidden=true` (server then omits its events);
+    /// showing sets `enabled=true, sidebar_hidden=false`. Only CalDAV / Google /
+    /// Home Assistant have this flag; `local` / `ical` are a no-op.
+    func setCalendarSidebarHidden(source: String, calendarId: Int, hidden: Bool) async throws {
+        let path: String
+        switch source {
+        case "caldav":        path = "/api/caldav/calendars/\(calendarId)"
+        case "google":        path = "/api/google/calendars/\(calendarId)"
+        case "homeassistant": path = "/api/homeassistant/calendars/\(calendarId)"
+        default:              return
+        }
+        _ = try await request(path, method: "PUT",
+                              body: ["enabled": !hidden, "sidebar_hidden": hidden])
+    }
 }

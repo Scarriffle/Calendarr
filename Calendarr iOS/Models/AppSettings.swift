@@ -34,6 +34,33 @@ struct AppSettings: Codable {
         case backgroundColor = "background_color"
         case lineColor = "line_color"
     }
+
+    init() {}
+
+    /// Resilient decoding: the server only stores a subset of these fields
+    /// (e.g. it has no `text_color`/`background_color`/`line_color`, which are
+    /// iOS-only). Using `decodeIfPresent` with the property defaults means a
+    /// missing key no longer aborts the whole decode — otherwise the entire
+    /// settings sync silently breaks.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AppSettings()
+        defaultView       = try c.decodeIfPresent(String.self, forKey: .defaultView)       ?? d.defaultView
+        weekStartDay      = try c.decodeIfPresent(String.self, forKey: .weekStartDay)      ?? d.weekStartDay
+        primaryColor      = try c.decodeIfPresent(String.self, forKey: .primaryColor)      ?? d.primaryColor
+        accentColor       = try c.decodeIfPresent(String.self, forKey: .accentColor)       ?? d.accentColor
+        todayColor        = try c.decodeIfPresent(String.self, forKey: .todayColor)        ?? d.todayColor
+        dimPastEvents     = try c.decodeIfPresent(Bool.self,   forKey: .dimPastEvents)     ?? d.dimPastEvents
+        textContrast      = try c.decodeIfPresent(Int.self,    forKey: .textContrast)      ?? d.textContrast
+        lineContrast      = try c.decodeIfPresent(Int.self,    forKey: .lineContrast)      ?? d.lineContrast
+        hourHeight        = try c.decodeIfPresent(Int.self,    forKey: .hourHeight)        ?? d.hourHeight
+        language          = try c.decodeIfPresent(String.self, forKey: .language)          ?? d.language
+        monthDividerColor = try c.decodeIfPresent(String.self, forKey: .monthDividerColor) ?? d.monthDividerColor
+        monthLabelColor   = try c.decodeIfPresent(String.self, forKey: .monthLabelColor)   ?? d.monthLabelColor
+        textColor         = try c.decodeIfPresent(String.self, forKey: .textColor)         ?? d.textColor
+        backgroundColor   = try c.decodeIfPresent(String.self, forKey: .backgroundColor)   ?? d.backgroundColor
+        lineColor         = try c.decodeIfPresent(String.self, forKey: .lineColor)         ?? d.lineColor
+    }
 }
 
 struct CalDAVAccount: Codable, Identifiable {
@@ -124,10 +151,22 @@ struct HACalendar: Codable, Identifiable {
     var entityId: String
     var color: String?
     var enabled: Bool
+    var sidebarHidden: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, name, color, enabled
         case entityId = "entity_id"
+        case sidebarHidden = "sidebar_hidden"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id            = try c.decode(Int.self, forKey: .id)
+        name          = try c.decode(String.self, forKey: .name)
+        entityId      = try c.decodeIfPresent(String.self, forKey: .entityId) ?? ""
+        color         = try c.decodeIfPresent(String.self, forKey: .color)
+        enabled       = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        sidebarHidden = try c.decodeIfPresent(Bool.self, forKey: .sidebarHidden) ?? false
     }
 }
 

@@ -5,6 +5,7 @@ struct MenuSheet: View {
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) var dismiss
     @AppStorage("appLanguage") private var appLang = "system"
+    @State private var isSyncing = false
 
     var body: some View {
         NavigationStack {
@@ -68,6 +69,19 @@ struct MenuSheet: View {
                     }
                 }
 
+                Section(L10n.t("menu.sync.section", appLang)) {
+                    Button {
+                        Task { await syncNow() }
+                    } label: {
+                        HStack {
+                            Label(L10n.t("menu.sync", appLang), systemImage: "arrow.triangle.2.circlepath")
+                            Spacer()
+                            if isSyncing { ProgressView() }
+                        }
+                    }
+                    .disabled(isSyncing)
+                }
+
                 Section {
                     Button(role: .destructive) {
                         dismiss()
@@ -87,5 +101,15 @@ struct MenuSheet: View {
                 }
             }
         }
+    }
+
+    /// Manual sync: pull appearance/behaviour settings from the server, then
+    /// ask the calendar host to re-fetch events (cache-busting).
+    private func syncNow() async {
+        isSyncing = true
+        await SettingsSync.pull(api: api)
+        NotificationCenter.default.post(name: .manualSyncRequested, object: nil)
+        isSyncing = false
+        dismiss()
     }
 }

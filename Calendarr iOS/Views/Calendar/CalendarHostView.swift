@@ -8,6 +8,10 @@ struct CalendarHostView: View {
     @AppStorage("cacheMonths") private var cacheMonths = 3
     @AppStorage("appLanguage") private var appLang = "system"
     @AppStorage("backgroundColor") private var bgHex = "#000000"
+    @AppStorage("weekStartDay") private var weekStartDay = "monday"
+    @AppStorage("defaultView")  private var defaultView = "month"
+
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var store = CalendarStore()
     @State private var showEditor = false
@@ -16,6 +20,7 @@ struct CalendarHostView: View {
     @State private var selectedEvent: CalEvent? = nil
     @State private var visibleMonth: Date = .now
     @State private var showFilter = false
+    @State private var didApplyDefaultView = false
 
     private var titleString: String {
         if store.viewType == .month {
@@ -68,8 +73,15 @@ struct CalendarHostView: View {
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
         .onChange(of: visibleMonth)      { _, new in Task { await ensureLoaded(around: new) } }
+        .onChange(of: scenePhase)        { _, phase in if phase == .active { Task { await SettingsSync.pull(api: api) } } }
         .onReceive(NotificationCenter.default.publisher(for: .banishedCalendarsChanged)) { _ in
             store.syncBanishedFromDefaults()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .settingsDidChange)) { _ in
+            applyServerDrivenSettings(initial: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .manualSyncRequested)) { _ in
+            Task { await forceReload() }
         }
     }
 
@@ -123,8 +135,15 @@ struct CalendarHostView: View {
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
         .onChange(of: visibleMonth)      { _, new in Task { await ensureLoaded(around: new) } }
+        .onChange(of: scenePhase)        { _, phase in if phase == .active { Task { await SettingsSync.pull(api: api) } } }
         .onReceive(NotificationCenter.default.publisher(for: .banishedCalendarsChanged)) { _ in
             store.syncBanishedFromDefaults()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .settingsDidChange)) { _ in
+            applyServerDrivenSettings(initial: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .manualSyncRequested)) { _ in
+            Task { await forceReload() }
         }
     }
 
@@ -322,12 +341,19 @@ struct CalendarHostView: View {
         CalendarSheets(store: store, showEditor: $showEditor,
                        editorDate: $editorDate, editingEvent: $editingEvent,
                        selectedEvent: $selectedEvent, showFilter: $showFilter,
-                       api: api, reload: { await onNavigate() })
+                       api: api,
+                       reload: { await onNavigate() },
+                       reloadForce: { await reloadVisible(force: true) })
     }
 
     // MARK: – Loading logic
 
     private func startup() async {
+        // 0. Pull settings first so week-start / default-view are correct
+        //    before we compute the initial range and load events.
+        await SettingsSync.pull(api: api)
+        applyServerDrivenSettings(initial: true)
+
         await store.loadWritableCalendars(api: api)
         // 1. Load current view immediately (visible)
         let (s, e) = store.rangeForCurrentView()
@@ -335,6 +361,25 @@ struct CalendarHostView: View {
         // 2. Background prefetch for the configured range (non-blocking)
         Task(priority: .background) {
             await store.prefetchBackground(api: api, months: cacheMonths)
+        }
+        // 3. Periodic settings pull (tied to this .task's lifetime).
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(600))
+            if Task.isCancelled { break }
+            await SettingsSync.pull(api: api)
+        }
+    }
+
+    /// Apply the server-driven "always sync" settings to the live store.
+    /// `weekStartsOnMonday` is applied every time; the default view is applied
+    /// only once at startup so it never overrides the user's manual switches.
+    private func applyServerDrivenSettings(initial: Bool) {
+        store.weekStartsOnMonday = (weekStartDay != "sunday")
+        if initial, !didApplyDefaultView {
+            didApplyDefaultView = true
+            if let vt = CalViewType(rawValue: defaultView) {
+                store.viewType = vt
+            }
         }
     }
 
@@ -344,10 +389,29 @@ struct CalendarHostView: View {
         await store.loadEvents(api: api, start: s, end: e)
     }
 
+    /// Re-fetch the visible range. With `force` it bypasses the cache so a just
+    /// created/edited event shows up immediately (the server is authoritative).
+    private func reloadVisible(force: Bool) async {
+        let (s, e) = store.rangeForCurrentView()
+        await store.loadEvents(api: api, start: s, end: e, force: force)
+    }
+
     /// Called when cacheMonths setting changes – clear cache and re-prefetch.
     private func recache() async {
         store.invalidateCache()
         await startup()
+    }
+
+    /// Manual sync from the menu: drop the event cache and re-fetch from the
+    /// server (the periodic loop in `startup()` is untouched, so we don't spawn
+    /// a second one). Settings were already pulled by the menu action.
+    private func forceReload() async {
+        store.invalidateCache()
+        let (s, e) = store.rangeForCurrentView()
+        await store.loadEvents(api: api, start: s, end: e)
+        Task(priority: .background) {
+            await store.prefetchBackground(api: api, months: cacheMonths)
+        }
     }
 
     /// Called when the user scrolls into a new month – refreshes the visible range
@@ -380,19 +444,24 @@ private struct CalendarSheets: ViewModifier {
     @Binding var showFilter: Bool
     let api: CalendarrAPI
     let reload: () async -> Void
+    let reloadForce: () async -> Void
 
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $showEditor) {
                 EventEditorSheet(api: api, store: store,
                                  initialDate: editorDate, editingEvent: editingEvent) {
-                    editingEvent = nil; await reload()
+                    // Create/edit changed server state → bust the cache so the
+                    // new/updated event appears without a manual sync.
+                    editingEvent = nil; await reloadForce()
                 }
             }
             .sheet(item: $selectedEvent) { ev in
                 EventDetailSheet(event: ev, api: api, store: store) { updated in
                     selectedEvent = nil
                     if let u = updated { editingEvent = u; showEditor = true }
+                    // Delete already removed the event from the cache optimistically;
+                    // a light cache refresh is enough here.
                     await reload()
                 }
             }

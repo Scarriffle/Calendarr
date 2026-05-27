@@ -26,6 +26,7 @@ struct MonthView: View {
     @AppStorage("monthLabelColor")   private var labelHex = "#7090c0"
     @AppStorage("textColor")         private var textHex = "#FFFFFF"
     @AppStorage("lineColor")         private var lineHex = "#3A3A3C"
+    @AppStorage("textContrast")      private var textContrast = 3
 
     @State private var scrolledWeek: Date? = nil
     @State private var didInitialScroll = false
@@ -98,7 +99,7 @@ struct MonthView: View {
             ForEach(weekdayHeaders, id: \.self) { d in
                 Text(d)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color(hex: textHex).opacity(0.7))
+                    .foregroundStyle(Color(hex: textHex).opacity(secondaryTextOpacity(textContrast)))
                     .frame(maxWidth: .infinity, minHeight: weekdayHeaderHeight)
             }
         }
@@ -291,6 +292,9 @@ private struct DayCell: View {
     let onShowWeek: () -> Void
     let onShowDay: () -> Void
 
+    @AppStorage("textContrast") private var textContrast = 3
+    @AppStorage("lineContrast") private var lineContrast = 3
+
     private var cal: Calendar { Calendar.current }
     private var dayNum: Int { cal.component(.day, from: date) }
     private var isFirstOfMonth: Bool { dayNum == 1 }
@@ -330,14 +334,14 @@ private struct DayCell: View {
                 if extraCount > 0 {
                     Text("+\(extraCount)")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(textColor.opacity(0.6))
+                        .foregroundStyle(textColor.opacity(secondaryTextOpacity(textContrast)))
                         .padding(.leading, 4)
                 }
                 Spacer(minLength: 0)
                 if let wn = weekNumber {
                     Text("\(cwLabel) \(wn)")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(textColor.opacity(0.6))
+                        .foregroundStyle(textColor.opacity(secondaryTextOpacity(textContrast)))
                         .padding(.trailing, 4)
                 }
             }
@@ -345,11 +349,11 @@ private struct DayCell: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(alignment: .trailing) {
-            Rectangle().fill(lineColor.opacity(0.4)).frame(width: 0.5)
+            Rectangle().fill(lineColor.opacity(gridLineOpacity(lineContrast))).frame(width: 0.5)
         }
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(edge == .topHighlight ? dividerColor : lineColor.opacity(0.3))
+                .fill(edge == .topHighlight ? dividerColor : lineColor.opacity(gridLineOpacity(lineContrast)))
                 .frame(height: edge == .topHighlight ? 1.5 : 0.5)
         }
         .overlay(alignment: .bottom) {
@@ -377,6 +381,9 @@ private struct DayCell: View {
 
 private struct EventBar: View {
     let event: CalEvent
+    @AppStorage("dimPastEvents") private var dimPast = false
+
+    private var isPast: Bool { event.endDate < .now }
 
     var body: some View {
         HStack(spacing: 3) {
@@ -390,5 +397,6 @@ private struct EventBar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(hex: event.effectiveColor))
         .clipShape(RoundedRectangle(cornerRadius: 3))
+        .opacity(dimPast && isPast ? 0.5 : 1.0)
     }
 }

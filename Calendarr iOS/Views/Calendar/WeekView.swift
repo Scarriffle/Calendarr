@@ -7,10 +7,13 @@ struct WeekView: View {
     let onShowMonth: (Date) -> Void
     let onShowDay: (Date) -> Void
 
-    @AppStorage("appLanguage") private var appLang = "system"
-    @AppStorage("todayColor")  private var todayHex = "#4285f4"
-    @AppStorage("textColor")   private var textHex = "#FFFFFF"
-    @AppStorage("lineColor")   private var lineHex = "#3A3A3C"
+    @AppStorage("appLanguage")   private var appLang = "system"
+    @AppStorage("todayColor")    private var todayHex = "#4285f4"
+    @AppStorage("textColor")     private var textHex = "#FFFFFF"
+    @AppStorage("lineColor")     private var lineHex = "#3A3A3C"
+    @AppStorage("textContrast")  private var textContrast = 3
+    @AppStorage("lineContrast")  private var lineContrast = 3
+    @AppStorage("hourHeight")    private var hourHeightPref = 60   // observed for live re-layout
 
     private var cal: Calendar { store.userCalendar }
 
@@ -21,14 +24,16 @@ struct WeekView: View {
 
     private var timedEvents: [(Int, CalEvent)] {
         weekDays.enumerated().flatMap { idx, day in
-            store.events(on: day).filter { !$0.isAllDay }.map { (idx, $0) }
+            store.events(on: day)
+                .filter { !$0.isAllDay && !eventSpansMultipleDays($0) }
+                .map { (idx, $0) }
         }
     }
 
     private var allDayEvents: [CalEvent] {
         let s = weekDays.first ?? .now
         let e = cal.date(byAdding: .day, value: 1, to: weekDays.last ?? .now)!
-        return store.events(in: s, end: e).filter(\.isAllDay)
+        return store.events(in: s, end: e).filter { $0.isAllDay || eventSpansMultipleDays($0) }
     }
 
     private var todayIndex: Int? {
@@ -56,10 +61,10 @@ struct WeekView: View {
             ForEach(weekDays, id: \.self) { day in
                 Text(headerFmt.string(from: day).uppercased())
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(cal.isDateInToday(day) ? Color.accentColor : Color(hex: textHex).opacity(0.7))
+                    .foregroundStyle(cal.isDateInToday(day) ? Color.accentColor : Color(hex: textHex).opacity(secondaryTextOpacity(textContrast)))
                     .frame(maxWidth: .infinity, minHeight: 36)
                     .overlay(alignment: .trailing) {
-                        Rectangle().fill(Color(hex: lineHex)).frame(width: 0.5)
+                        Rectangle().fill(Color(hex: lineHex).opacity(gridLineOpacity(lineContrast))).frame(width: 0.5)
                     }
             }
         }
@@ -94,7 +99,7 @@ struct WeekView: View {
                 .padding(.horizontal, 1)
                 .frame(maxWidth: .infinity)
                 .overlay(alignment: .trailing) {
-                    Rectangle().fill(Color(.separator)).frame(width: 0.5)
+                    Rectangle().fill(Color(hex: lineHex).opacity(gridLineOpacity(lineContrast))).frame(width: 0.5)
                 }
             }
         }
@@ -127,7 +132,7 @@ struct WeekView: View {
                                 }
                                 .frame(width: colW)
                                 .overlay(alignment: .trailing) {
-                                    Rectangle().fill(Color(hex: lineHex)).frame(width: 0.5)
+                                    Rectangle().fill(Color(hex: lineHex).opacity(gridLineOpacity(lineContrast))).frame(width: 0.5)
                                 }
                             }
                         }
@@ -171,7 +176,7 @@ struct WeekView: View {
                     Color.clear.frame(height: hourHeight)
                     Text(String(format: "%02d:00", h))
                         .font(.system(size: 10))
-                        .foregroundStyle(Color(hex: textHex).opacity(0.6))
+                        .foregroundStyle(Color(hex: textHex).opacity(secondaryTextOpacity(textContrast)))
                         .offset(y: -6)
                 }
             }
@@ -208,7 +213,8 @@ struct HourSlot: View {
     let onShowMonth: (Date) -> Void
     let onShowDay: (Date) -> Void
 
-    @AppStorage("lineColor") private var lineHex = "#3A3A3C"
+    @AppStorage("lineColor")    private var lineHex = "#3A3A3C"
+    @AppStorage("lineContrast") private var lineContrast = 3
 
     private var date: Date {
         Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
@@ -216,7 +222,7 @@ struct HourSlot: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(Color(hex: lineHex).opacity(0.4)).frame(height: 0.5)
+            Rectangle().fill(Color(hex: lineHex).opacity(gridLineOpacity(lineContrast))).frame(height: 0.5)
             Color.clear.frame(height: hourHeight - 0.5)
         }
         .contentShape(Rectangle())
