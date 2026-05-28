@@ -4,11 +4,16 @@ struct EventDetailSheet: View {
     let event: CalEvent
     let api: CalendarrAPI
     let store: CalendarStore
-    let onDone: (CalEvent?) async -> Void
+    /// Called when the sheet should close.
+    /// - `editEvent`: non-nil when the user wants to edit this event
+    /// - `forceReload`: true when server data changed (create/copy) and the
+    ///   caller must bypass the cache to fetch fresh events
+    let onDone: (_ editEvent: CalEvent?, _ forceReload: Bool) async -> Void
 
     @Environment(\.dismiss) var dismiss
     @State private var showDeleteConfirm = false
     @State private var isDeleting = false
+    @State private var showCopySheet = false
 
     private let timeFmt: DateFormatter = {
         let f = DateFormatter()
@@ -92,6 +97,16 @@ struct EventDetailSheet: View {
                     }
                 }
 
+                if !store.writableCalendars.isEmpty {
+                    Section {
+                        Button {
+                            showCopySheet = true
+                        } label: {
+                            Label("Termin kopieren", systemImage: "doc.on.doc")
+                        }
+                    }
+                }
+
                 if canDelete {
                     Section {
                         Button(role: .destructive) {
@@ -110,13 +125,13 @@ struct EventDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Schliessen") {
-                        Task { await onDone(nil) }
+                        Task { await onDone(nil, false) }
                     }
                 }
                 if canEdit {
                     ToolbarItem(placement: .primaryAction) {
                         Button("Bearbeiten") {
-                            Task { await onDone(event) }
+                            Task { await onDone(event, false) }
                         }
                     }
                 }
@@ -128,6 +143,18 @@ struct EventDetailSheet: View {
                 Button("Abbrechen", role: .cancel) {}
             } message: {
                 Text("\"\(event.title)\" wird dauerhaft gelöscht.")
+            }
+            .sheet(isPresented: $showCopySheet) {
+                EventEditorSheet(
+                    api: api,
+                    store: store,
+                    initialDate: event.startDate,
+                    editingEvent: nil,
+                    copyFrom: event
+                ) {
+                    // Copy created a new server-side event → force reload so it appears
+                    await onDone(nil, true)
+                }
             }
         }
     }
@@ -149,7 +176,7 @@ struct EventDetailSheet: View {
             // Optimistically drop it from the cache so it vanishes immediately,
             // regardless of how long the source takes to propagate the delete.
             store.removeCachedEvent(id: event.id)
-            await onDone(nil)
+            await onDone(nil, false)
         } catch {
             isDeleting = false
         }

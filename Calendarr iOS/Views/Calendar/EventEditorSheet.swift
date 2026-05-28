@@ -5,6 +5,7 @@ struct EventEditorSheet: View {
     let store: CalendarStore
     let initialDate: Date
     let editingEvent: CalEvent?
+    let copyFrom: CalEvent?
     let onSaved: () async -> Void
 
     @Environment(\.dismiss) var dismiss
@@ -21,6 +22,7 @@ struct EventEditorSheet: View {
     @State private var error = ""
 
     private var isEditing: Bool { editingEvent != nil }
+    private var isCopying: Bool { copyFrom != nil && editingEvent == nil }
 
     private var selectedCal: WritableCalendar? {
         store.writableCalendars.first { $0.id == selectedCalendarId }
@@ -96,9 +98,11 @@ struct EventEditorSheet: View {
                     }
                 }
             }
-            .navigationTitle(isEditing
-                             ? L10n.t("event.edit_title", appLang)
-                             : L10n.t("event.new_title",  appLang))
+            .navigationTitle(
+                isEditing  ? L10n.t("event.edit_title",  appLang) :
+                isCopying  ? L10n.t("event.copy_title",  appLang) :
+                             L10n.t("event.new_title",   appLang)
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -116,6 +120,12 @@ struct EventEditorSheet: View {
             }
         }
         .onAppear { setup() }
+        .onChange(of: startDate) { oldStart, newStart in
+            guard newStart >= endDate else { return }
+            let duration = endDate.timeIntervalSince(oldStart)
+            let minDuration: TimeInterval = isAllDay ? 86400 : 3600
+            endDate = newStart.addingTimeInterval(max(duration, minDuration))
+        }
     }
 
     private func setup() {
@@ -128,6 +138,15 @@ struct EventEditorSheet: View {
             notes = ev.notes
             color = ev.color ?? ""
             selectedCalendarId = ev.calendarId
+        } else if let ev = copyFrom {
+            title = ev.title
+            isAllDay = ev.isAllDay
+            startDate = ev.startDate
+            endDate = ev.endDate
+            location = ev.location
+            notes = ev.notes
+            color = ev.color ?? ""
+            selectedCalendarId = store.writableCalendars.first?.id ?? ""
         } else {
             let cal = Calendar.current
             startDate = cal.date(bySettingHour: cal.component(.hour, from: initialDate),

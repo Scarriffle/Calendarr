@@ -11,10 +11,12 @@ struct CalendarrWidgetBundle: WidgetBundle {
         TwoWeeksWidget()
         UpcomingWidget()
         UpNextWidget()
+        CalendarDayWidget()
+        LockScreenWidget()
     }
 }
 
-// Shared chrome modifier — keeps every widget on the same theme.
+// Shared chrome modifier — keeps every home-screen widget on the same theme.
 private struct CalendarrWidgetChrome: ViewModifier {
     let snapshot: WidgetSnapshot?
 
@@ -137,5 +139,37 @@ struct UpNextWidget: Widget {
         .configurationDisplayName(WidgetL10n.t("widget.display.upnext_title", "system"))
         .description(WidgetL10n.t("widget.display.upnext_desc", "system"))
         .supportedFamilies([.systemMedium])
+    }
+}
+
+// MARK: – Calendar Day: date + week strip + events (medium)
+
+struct CalendarDayWidget: Widget {
+    let kind: String = "CalendarDayWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+            CalendarDayWidgetView(entry: entry).calendarrChrome(entry.snapshot)
+        }
+        .configurationDisplayName(WidgetL10n.t("widget.display.calday_title", "system"))
+        .description(WidgetL10n.t("widget.display.calday_desc", "system"))
+        .supportedFamilies([.systemMedium])
+    }
+}
+
+// MARK: – Lock Screen (circular, rectangular, inline)
+
+struct LockScreenWidget: Widget {
+    let kind: String = "LockScreenWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+            LockScreenWidgetView(entry: entry)
+                .containerBackground(for: .widget) { Color.clear }
+                .environment(\.locale, WidgetL10n.locale(entry.snapshot?.language ?? "system"))
+        }
+        .configurationDisplayName(WidgetL10n.t("widget.display.lockscreen_title", "system"))
+        .description(WidgetL10n.t("widget.display.lockscreen_desc", "system"))
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
