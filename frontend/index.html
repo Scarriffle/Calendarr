@@ -198,6 +198,17 @@
           </div>
           <div id="cal-list-items"></div>
         </div>
+
+        <!-- Groups -->
+        <div class="cal-list" id="group-list">
+          <div class="cal-list-header">
+            <span data-i18n="groups_title">Gruppen</span>
+            <button class="icon-btn mini-btn" id="btn-add-group" data-i18n-title="group_create" title="Gruppe erstellen">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v11h-2v-6H5v-2h6V5h2v11h6v2z"/></svg>
+            </button>
+          </div>
+          <div id="group-list-items"></div>
+        </div>
       </div>
       <button class="sidebar-copyright" id="sidebar-copyright" onclick="openImpressum()">©&nbsp;2026&nbsp;Scarriffleservices</button>
     </aside>
@@ -205,6 +216,10 @@
 
     <!-- MAIN VIEW -->
     <main class="main-view" id="main-view">
+      <div id="group-view-banner" class="group-view-banner hidden">
+        <span id="group-view-label"></span>
+        <button class="btn btn-ghost btn-sm" id="group-view-exit" data-i18n="group_exit">Gruppenansicht verlassen</button>
+      </div>
       <div id="view-container"></div>
     </main>
 
@@ -345,6 +360,32 @@
       <div style="flex:1"></div>
       <button class="btn btn-ghost" data-modal="modal-event">Abbrechen</button>
       <button class="btn btn-primary" id="ev-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Group Modal -->
+<div id="modal-group" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-header">
+      <h3 id="group-modal-title" data-i18n="group_create">Gruppe erstellen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-group">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label data-i18n="group_name">Name</label>
+        <input type="text" id="group-name" data-i18n-placeholder="group_name_ph" placeholder="Gruppenname" />
+      </div>
+      <div class="form-group">
+        <label data-i18n="group_members">Mitglieder</label>
+        <div id="group-member-picker" class="share-user-picker"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger hidden" id="group-delete" data-i18n="group_delete">Gruppe löschen</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" data-modal="modal-group" data-i18n="cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="group-save" data-i18n="save">Speichern</button>
     </div>
   </div>
 </div>

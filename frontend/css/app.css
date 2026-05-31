@@ -1801,3 +1801,26 @@ a { color: var(--primary); text-decoration: none; }
   color: var(--text-2);
   font-style: italic;
 }
+
+/* ── Groups ─────────────────────────────────────────────────── */
+.group-view-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(66, 133, 244, 0.12);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-1);
+}
+.group-item-active {
+  background: rgba(66, 133, 244, 0.15);
+  border-radius: 8px;
+}
+.group-item .cal-item-name { cursor: pointer; flex: 1; }
+.cal-list-empty {
+  padding: 6px 4px;
+  font-size: 13px;
+  color: var(--text-3);
+}

@@ -48,6 +48,8 @@ let state = {
   dimPast: false,
   editingEvent: null,      // null = new event
   selectedEventColor: '',  // '' = use calendar color
+  groups: [],
+  activeGroupId: null,     // when set, the calendar shows the combined group view
 };
 
 // ── URL state ────────────────────────────────────────────
@@ -123,8 +125,10 @@ export async function initCalendar() {
   bindHAAccountModal();
   bindSettingsModal();
   bindProfileModal();
+  bindGroupUI();
   bindSwipeNavigation();
   handleHAOAuthReturn();
+  loadGroups();
 
   // Browser-Back/Forward: URL-Hash → State synchronisieren
   window.addEventListener('hashchange', () => {
@@ -249,8 +253,42 @@ function prefetchIfNeeded(viewStart, viewEnd) {
 }
 
 // ── Data fetching ─────────────────────────────────────────
+function initials(name) {
+  if (!name) return '?';
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 async function fetchAndRender(force = false, silent = false) {
   const { start, end } = getViewRange();
+
+  // ── Combined group view ────────────────────────────────
+  // No client cache here; reload the combined events for the visible range.
+  if (state.activeGroupId) {
+    const fStart = new Date(start.getTime() - CACHE_BUF);
+    const fEnd   = new Date(end.getTime()   + CACHE_BUF);
+    if (!silent) showLoading();
+    try {
+      const resp = await api.get(
+        `/groups/${state.activeGroupId}/combined?start=${fStart.toISOString()}&end=${fEnd.toISOString()}`);
+      const evs = (resp.events || []).map(ev => {
+        // Prefix the title so every renderer shows who an event belongs to.
+        const ownerName = ev.owner && ev.owner.display_name;
+        const tag = ev.is_group_event ? '👥' : (ownerName ? `[${initials(ownerName)}]` : '');
+        return { ...ev, title: tag ? `${tag} ${ev.title}` : ev.title };
+      });
+      eventCache.start = null; eventCache.end = null; // invalidate normal cache
+      state.events = evs;
+    } catch (e) {
+      showToast(e.message, true);
+      state.events = [];
+    }
+    renderView();
+    updateTitle();
+    renderMiniCal();
+    return;
+  }
 
   // Cache hit: requested range is fully within what we already have
   if (!force && eventCache.start && eventCache.end &&
@@ -2156,6 +2194,151 @@ function renderShareUserPicker() {
       } catch (e) { showToast(e.message, true); }
     });
   });
+}
+
+// ── Groups ────────────────────────────────────────────────
+async function loadGroups() {
+  try {
+    state.groups = await api.get('/groups/') || [];
+  } catch (e) { state.groups = []; }
+  renderGroupList();
+}
+
+function renderGroupList() {
+  const el = document.getElementById('group-list-items');
+  if (!el) return;
+  if (!state.groups.length) {
+    el.innerHTML = `<div class="cal-list-empty">${t('groups_none')}</div>`;
+    return;
+  }
+  el.innerHTML = state.groups.map(g =>
+    `<div class="cal-item group-item ${g.id === state.activeGroupId ? 'group-item-active' : ''}" data-group-id="${g.id}">
+      <span class="cal-item-name" data-group-open="${g.id}">${escHtml(g.name)}</span>
+      <button class="icon-btn mini-btn" data-group-edit="${g.id}" title="${t('group_manage')}">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 4a6.96 6.96 0 00-.14-1.32l2.03-1.58-2-3.46-2.39.96a7 7 0 00-2.28-1.32L15.4 2h-4l-.76 2.96a7 7 0 00-2.28 1.32l-2.39-.96-2 3.46 2.03 1.58A6.96 6.96 0 003.86 12c0 .45.05.89.14 1.32L1.97 14.9l2 3.46 2.39-.96a7 7 0 002.28 1.32L9.4 22h4l.76-2.96a7 7 0 002.28-1.32l2.39.96 2-3.46-2.03-1.58c.09-.43.14-.87.14-1.32z"/></svg>
+      </button>
+    </div>`
+  ).join('');
+  el.querySelectorAll('[data-group-open]').forEach(s => {
+    s.addEventListener('click', () => enterGroupView(parseInt(s.dataset.groupOpen)));
+  });
+  el.querySelectorAll('[data-group-edit]').forEach(b => {
+    b.addEventListener('click', e => { e.stopPropagation(); openGroupModal(parseInt(b.dataset.groupEdit)); });
+  });
+}
+
+function enterGroupView(groupId) {
+  state.activeGroupId = groupId;
+  const g = state.groups.find(x => x.id === groupId);
+  document.getElementById('group-view-banner').classList.remove('hidden');
+  document.getElementById('group-view-label').textContent =
+    t('group_view_label', { name: g ? g.name : '' });
+  renderGroupList();
+  fetchAndRender(true);
+}
+
+function exitGroupView() {
+  state.activeGroupId = null;
+  document.getElementById('group-view-banner').classList.add('hidden');
+  renderGroupList();
+  fetchAndRender(true);
+}
+
+// Open the group modal in create mode (no id) or manage mode (existing group).
+async function openGroupModal(groupId) {
+  const modal = document.getElementById('modal-group');
+  modal.dataset.groupId = groupId ? String(groupId) : '';
+  const isEdit = !!groupId;
+  document.getElementById('group-modal-title').textContent =
+    isEdit ? t('group_manage') : t('group_create');
+  document.getElementById('group-delete').classList.toggle('hidden', !isEdit);
+
+  let detail = null, directory = [];
+  try { directory = await api.get('/users/directory') || []; } catch (e) { /* ignore */ }
+  if (isEdit) {
+    try { detail = await api.get(`/groups/${groupId}`); } catch (e) { showToast(e.message, true); }
+  }
+  const me = JSON.parse(localStorage.getItem('user') || '{}');
+  const existingMemberIds = new Set((detail ? detail.members : []).map(m => m.id));
+
+  document.getElementById('group-name').value = detail ? detail.name : '';
+  document.getElementById('group-name').disabled = isEdit; // rename not supported by API
+
+  // Member picker: current members are checked; the owner (me) is excluded.
+  modal.__directory = directory;
+  modal.__memberIds = new Set([...existingMemberIds].filter(id => id !== me.id));
+  renderGroupMemberPicker();
+
+  openModal('modal-group');
+}
+
+function renderGroupMemberPicker() {
+  const modal = document.getElementById('modal-group');
+  const dir = modal.__directory || [];
+  const picked = modal.__memberIds || new Set();
+  const picker = document.getElementById('group-member-picker');
+  picker.innerHTML = dir.length
+    ? dir.map(u =>
+        `<label class="share-user-item" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" data-member-id="${u.id}" ${picked.has(u.id) ? 'checked' : ''} />
+          <span>${escHtml(u.display_name || '')}</span>
+        </label>`
+      ).join('')
+    : `<span class="accounts-section-empty">${t('share_no_users')}</span>`;
+  picker.querySelectorAll('input[data-member-id]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = parseInt(cb.dataset.memberId);
+      if (cb.checked) picked.add(id); else picked.delete(id);
+    });
+  });
+}
+
+function bindGroupUI() {
+  const addBtn = document.getElementById('btn-add-group');
+  if (addBtn) addBtn.onclick = () => openGroupModal(null);
+  const exitBtn = document.getElementById('group-view-exit');
+  if (exitBtn) exitBtn.onclick = exitGroupView;
+
+  document.getElementById('group-save').onclick = async () => {
+    const modal = document.getElementById('modal-group');
+    const groupId = modal.dataset.groupId;
+    const memberIds = [...(modal.__memberIds || new Set())];
+    try {
+      if (groupId) {
+        // Manage mode: sync member additions/removals.
+        const detail = await api.get(`/groups/${groupId}`);
+        const me = JSON.parse(localStorage.getItem('user') || '{}');
+        const current = new Set(detail.members.map(m => m.id).filter(id => id !== me.id));
+        for (const id of memberIds) if (!current.has(id)) await api.post(`/groups/${groupId}/members`, { user_id: id });
+        for (const id of current) if (!memberIds.includes(id)) await api.delete(`/groups/${groupId}/members/${id}`);
+        showToast(t('group_saved'));
+      } else {
+        const name = document.getElementById('group-name').value.trim();
+        if (!name) { showToast(t('error_enter_title'), true); return; }
+        await api.post('/groups/', { name, member_ids: memberIds });
+        showToast(t('group_created'));
+      }
+      closeModal('modal-group');
+      await loadGroups();
+      // Refresh local calendars too (a new group creates a group calendar).
+      try { state.localCalendars = await api.get('/local/calendars') || state.localCalendars; } catch (e) {}
+      renderCalendarList();
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  document.getElementById('group-delete').onclick = async () => {
+    const modal = document.getElementById('modal-group');
+    const groupId = modal.dataset.groupId;
+    if (!groupId) return;
+    if (!confirm(t('group_delete_confirm'))) return;
+    try {
+      await api.delete(`/groups/${groupId}`);
+      if (state.activeGroupId === parseInt(groupId)) exitGroupView();
+      closeModal('modal-group');
+      await loadGroups();
+      showToast(t('group_deleted'));
+    } catch (e) { showToast(e.message, true); }
+  };
 }
 
 // ── Settings Modal ────────────────────────────────────────

@@ -105,16 +105,36 @@ def list_calendars(
         .filter(models.CalendarShare.user_id == current_user.id)
         .all()
     )
+    seen_ids = {c.id for c in own}
     for share in shares:
         cal = share.calendar
-        if cal is None:
+        if cal is None or cal.id in seen_ids:
             continue
+        seen_ids.add(cal.id)
         owner = db.query(models.User).filter(models.User.id == cal.user_id).first()
         result.append(_cal_dict(
             cal, owned=False,
             shared_by=owner.username if owner else None,
             permission=share.permission,
         ))
+
+    # Group calendars the user can reach via membership (read_write), so members
+    # can select the group calendar in the editor and see it in their list.
+    group_cals = (
+        db.query(models.LocalCalendar, models.Group.name)
+        .join(models.GroupCalendar, models.GroupCalendar.calendar_id == models.LocalCalendar.id)
+        .join(models.Group, models.Group.id == models.GroupCalendar.group_id)
+        .join(models.GroupMember, models.GroupMember.group_id == models.GroupCalendar.group_id)
+        .filter(models.GroupMember.user_id == current_user.id)
+        .all()
+    )
+    for cal, group_name in group_cals:
+        if cal.id in seen_ids:
+            continue
+        seen_ids.add(cal.id)
+        d = _cal_dict(cal, owned=False, shared_by=group_name, permission="read_write")
+        d["group"] = True
+        result.append(d)
     return result
 
 

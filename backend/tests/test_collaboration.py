@@ -134,6 +134,19 @@ def test_group_members_can_write_group_calendar(client):
     assert r.status_code == 200, r.text
 
 
+def test_group_calendar_listed_for_member(client):
+    admin = register_admin(client)
+    b_id, b_tok = create_user(client, admin, "bob")
+    group = client.post("/api/groups/", headers=auth(admin),
+                        json={"name": "Team", "member_ids": [b_id]}).json()
+    gcal = group["group_calendar_id"]
+    # Bob (member, not owner) sees the group calendar in his local list, flagged.
+    cals = client.get("/api/local/calendars", headers=auth(b_tok)).json()
+    gc = [c for c in cals if c["id"] == gcal]
+    assert gc and gc[0].get("group") is True
+    assert gc[0]["permission"] == "read_write" and gc[0]["owned"] is False
+
+
 def test_combined_view_marks_owner_and_group_event(client):
     admin = register_admin(client)
     b_id, b_tok = create_user(client, admin, "bob")
