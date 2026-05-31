@@ -15,12 +15,18 @@ private val zone: ZoneId = ZoneId.systemDefault()
 fun titleForView(viewType: CalViewType, date: LocalDate, lang: String): String {
     val loc = L10n.locale(lang)
     return when (viewType) {
-        CalViewType.MONTH ->
-            DateTimeFormatter.ofPattern("LLLL yyyy", loc).format(date)
+        CalViewType.MONTH -> {
+            // Use Month.getDisplayName (robust) instead of the "LLLL" pattern,
+            // which could drop the month name under desugared java.time.
+            val month = date.month.getDisplayName(TextStyle.FULL_STANDALONE, loc)
                 .replaceFirstChar { it.uppercase(loc) }
+            "$month ${date.year}"
+        }
         CalViewType.QUARTER -> {
-            val fmt = DateTimeFormatter.ofPattern("LLL yyyy", loc)
-            "${fmt.format(date)} – ${fmt.format(date.plusMonths(2))}"
+            val endM = date.plusMonths(2)
+            val m1 = date.month.getDisplayName(TextStyle.SHORT_STANDALONE, loc).replaceFirstChar { it.uppercase(loc) }
+            val m2 = endM.month.getDisplayName(TextStyle.SHORT_STANDALONE, loc).replaceFirstChar { it.uppercase(loc) }
+            "$m1 ${date.year} – $m2 ${endM.year}"
         }
         CalViewType.WEEK -> {
             val start = date

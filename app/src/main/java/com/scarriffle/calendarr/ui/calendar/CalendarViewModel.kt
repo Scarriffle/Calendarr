@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scarriffle.calendarr.data.CalendarRepository
 import com.scarriffle.calendarr.data.SettingsStore
-import com.scarriffle.calendarr.data.StartupState
 import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.domain.model.WritableCalendar
@@ -45,7 +44,6 @@ data class CalendarUiState(
 class CalendarViewModel @Inject constructor(
     private val repository: CalendarRepository,
     private val settingsStore: SettingsStore,
-    private val startupState: StartupState,
 ) : ViewModel() {
 
     private val zone: ZoneId = ZoneId.systemDefault()
@@ -188,7 +186,6 @@ class CalendarViewModel @Inject constructor(
 
     private fun markReady() {
         _ready.value = true
-        startupState.markReady()
     }
 
     private fun prefetchBackground() {

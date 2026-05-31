@@ -55,8 +55,8 @@ import java.time.temporal.IsoFields
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-private const val MONTHS_BACK = 18L
-private const val MONTHS_AHEAD = 18L
+private const val MONTHS_BACK = 120L   // 10 years back
+private const val MONTHS_AHEAD = 600L  // 50 years ahead
 private const val MAX_LANES = 4
 private val DAY_NUM_H = 22.dp
 private val LANE_H = 15.dp
