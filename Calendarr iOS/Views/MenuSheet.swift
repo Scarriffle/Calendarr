@@ -63,6 +63,12 @@ struct MenuSheet: View {
                     }
 
                     NavigationLink {
+                        GroupsView(api: api)
+                    } label: {
+                        Label(L10n.t("groups.title", appLang), systemImage: "person.2")
+                    }
+
+                    NavigationLink {
                         ServerView()
                     } label: {
                         Label(L10n.t("menu.server", appLang), systemImage: "server.rack")
