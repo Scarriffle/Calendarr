@@ -11,8 +11,10 @@ from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from sqlalchemy import func
+
 import models
-from auth import get_current_user, get_password_hash, verify_password
+from auth import create_access_token, get_current_user, get_password_hash, verify_password
 from database import DATA_DIR, get_db
 
 router = APIRouter()
@@ -26,6 +28,8 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 # ── Schemas ───────────────────────────────────────────────
 class ProfileUpdate(BaseModel):
     email: Optional[str] = None
+    display_name: Optional[str] = None
+    username: Optional[str] = None  # login name (stored lowercase)
 
 
 class PasswordChange(BaseModel):
@@ -47,6 +51,7 @@ def get_profile(current_user: models.User = Depends(get_current_user)):
     return {
         "id": current_user.id,
         "username": current_user.username,
+        "display_name": current_user.display_name or current_user.username,
         "email": current_user.email,
         "is_admin": current_user.is_admin,
         "has_avatar": current_user.avatar_filename is not None,
@@ -60,10 +65,33 @@ def update_profile(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    result = {"ok": True}
     if data.email is not None:
         current_user.email = data.email or None
+    if data.display_name is not None:
+        dn = data.display_name.strip()
+        current_user.display_name = dn or current_user.username
+    if data.username is not None:
+        new_login = data.username.strip().lower()
+        if not new_login:
+            raise HTTPException(422, "Login name cannot be empty")
+        if new_login != current_user.username:
+            taken = (
+                db.query(models.User)
+                .filter(func.lower(models.User.username) == new_login,
+                        models.User.id != current_user.id)
+                .first()
+            )
+            if taken:
+                raise HTTPException(400, "Username already taken")
+            current_user.username = new_login
+            db.commit()
+            # The JWT 'sub' is the login name — renaming it invalidates the old
+            # token, so hand back a fresh one for the client to store.
+            result["access_token"] = create_access_token({"sub": new_login})
+            return result
     db.commit()
-    return {"ok": True}
+    return result
 
 
 # ── Avatar ────────────────────────────────────────────────

@@ -149,7 +149,7 @@ def _group_detail(db: Session, group: models.Group, current_user: models.User) -
         u = db.query(models.User).filter(models.User.id == m.user_id).first()
         member_dicts.append({
             "id": m.user_id,
-            "display_name": u.username if u else None,
+            "display_name": (u.display_name or u.username) if u else None,
             "role": m.role,
         })
     return {
@@ -264,7 +264,7 @@ def combined_events(
         end_dt = end_dt.replace(tzinfo=timezone.utc)
 
     members = db.query(models.GroupMember).filter(models.GroupMember.group_id == group_id).all()
-    name_cache = {u.id: u.username for u in db.query(models.User).all()}
+    name_cache = {u.id: (u.display_name or u.username) for u in db.query(models.User).all()}
     visibility_cache: dict[int, str] = {}
 
     def visibility_for(user_id: int) -> str:

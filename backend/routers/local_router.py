@@ -134,7 +134,7 @@ def list_calendars(
         owner = db.query(models.User).filter(models.User.id == cal.user_id).first()
         d = _cal_dict(
             cal, owned=False,
-            shared_by=owner.username if owner else None,
+            shared_by=(owner.display_name or owner.username) if owner else None,
             permission=share.permission,
         )
         if cal.id in group_cal_map:
@@ -330,7 +330,7 @@ def list_shares(
         u = db.query(models.User).filter(models.User.id == s.user_id).first()
         out.append({
             "user_id": s.user_id,
-            "display_name": u.username if u else None,
+            "display_name": (u.display_name or u.username) if u else None,
             "permission": s.permission,
             "created_at": s.created_at,
         })
@@ -501,7 +501,7 @@ def export_calendar(
         .all()
     )
     # Resolve creator display names for ORGANIZER.
-    name_cache = {u.id: u.username for u in db.query(models.User).all()}
+    name_cache = {u.id: (u.display_name or u.username) for u in db.query(models.User).all()}
     ics = ical_io.build_ics(cal, events, name_cache=name_cache)
     safe_name = "".join(c for c in cal.name if c.isalnum() or c in (" ", "-", "_")).strip() or "calendar"
     return Response(

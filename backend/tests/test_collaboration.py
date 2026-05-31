@@ -225,6 +225,37 @@ def test_member_calendar_hidden_until_designated(client):
     assert any(e["title"] == "Bobs Termin" for e in seen2)
 
 
+def test_display_name_case_preserved_and_login_case_insensitive(client):
+    # Setup with mixed-case name: login name lowercased, display name kept.
+    r = client.post("/api/auth/setup", json={"username": "Guido", "password": "pw"})
+    assert r.status_code == 200, r.text
+    user = r.json()["user"]
+    assert user["username"] == "guido"
+    assert user["display_name"] == "Guido"
+
+    # Login is case-insensitive (typing the display name "GUIDO" works).
+    r2 = client.post("/api/auth/login", json={"username": "GUIDO", "password": "pw"})
+    assert r2.status_code == 200, r2.text
+    tok = r2.json()["access_token"]
+
+    # /me reflects the cased display name.
+    me = client.get("/api/auth/me", headers=auth(tok)).json()
+    assert me["display_name"] == "Guido" and me["username"] == "guido"
+
+
+def test_rename_login_name_returns_new_token(client):
+    admin = register_admin(client, "alice")
+    # Change display name (no token change).
+    r = client.put("/api/profile/", headers=auth(admin), json={"display_name": "Alice W."})
+    assert r.status_code == 200 and "access_token" not in r.json()
+    # Change login name -> fresh token, references survive (id is stable).
+    r2 = client.put("/api/profile/", headers=auth(admin), json={"username": "alice2"})
+    assert r2.status_code == 200 and r2.json().get("access_token")
+    new_tok = r2.json()["access_token"]
+    me = client.get("/api/auth/me", headers=auth(new_tok)).json()
+    assert me["username"] == "alice2" and me["display_name"] == "Alice W."
+
+
 def test_private_visibility_validation(client):
     admin = register_admin(client)
     r = client.put("/api/settings/", headers=auth(admin), json={"private_event_visibility": "bogus"})

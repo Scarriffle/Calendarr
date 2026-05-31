@@ -24,7 +24,13 @@ class ChangePasswordRequest(BaseModel):
 
 
 def _user_dict(u: models.User) -> dict:
-    return {"id": u.id, "username": u.username, "email": u.email, "is_admin": u.is_admin}
+    return {
+        "id": u.id,
+        "username": u.username,
+        "display_name": u.display_name or u.username,
+        "email": u.email,
+        "is_admin": u.is_admin,
+    }
 
 
 @router.get("/")
@@ -51,7 +57,7 @@ def user_directory(
         .order_by(models.User.username)
         .all()
     )
-    return [{"id": u.id, "display_name": u.username} for u in users]
+    return [{"id": u.id, "display_name": u.display_name or u.username} for u in users]
 
 
 @router.post("/")
@@ -64,6 +70,7 @@ def create_user(
         raise HTTPException(400, "Username already taken")
     user = models.User(
         username=req.username.lower(),
+        display_name=req.username.strip(),  # keep the original casing for display
         email=req.email,
         password_hash=get_password_hash(req.password),
         is_admin=req.is_admin,

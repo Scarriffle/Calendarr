@@ -334,7 +334,7 @@ def get_events(
         )
         .all()
     ) if readable_ids else []
-    name_cache = {u.id: u.username for u in db.query(models.User).all()}
+    name_cache = {u.id: (u.display_name or u.username) for u in db.query(models.User).all()}
     for local_cal in local_calendars:
         local_events = (
             db.query(models.LocalEvent)

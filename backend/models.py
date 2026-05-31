@@ -7,7 +7,10 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Login name: always lowercase, unique, used for authentication.
     username = Column(String(50), unique=True, nullable=False)
+    # Human-facing name with original casing; editable. Falls back to username.
+    display_name = Column(String(100), nullable=True)
     email = Column(String(100), unique=True, nullable=True)
     password_hash = Column(String(255), nullable=False)
     is_admin = Column(Boolean, default=False)
@@ -35,9 +38,9 @@ class User(Base):
     )
 
     @property
-    def display_name(self) -> str:
-        """No dedicated display-name column exists — fall back to the username."""
-        return self.username
+    def display(self) -> str:
+        """The name to show users: display_name if set, else the login name."""
+        return self.display_name or self.username
 
 
 class CalDAVAccount(Base):

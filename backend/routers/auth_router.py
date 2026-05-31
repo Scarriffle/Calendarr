@@ -32,7 +32,12 @@ class LoginRequest(BaseModel):
 
 
 def _user_dict(user: models.User) -> dict:
-    return {"id": user.id, "username": user.username, "is_admin": user.is_admin}
+    return {
+        "id": user.id,
+        "username": user.username,
+        "display_name": user.display_name or user.username,
+        "is_admin": user.is_admin,
+    }
 
 
 @router.get("/setup-required")
@@ -46,6 +51,7 @@ def setup(req: SetupRequest, db: Session = Depends(get_db)):
         raise HTTPException(400, "Setup already completed")
     user = models.User(
         username=req.username.lower(),
+        display_name=req.username.strip(),  # keep the original casing for display
         email=req.email,
         password_hash=get_password_hash(req.password),
         is_admin=True,
@@ -113,6 +119,7 @@ def me(current_user: models.User = Depends(get_current_user)):
     return {
         "id": current_user.id,
         "username": current_user.username,
+        "display_name": current_user.display_name or current_user.username,
         "email": current_user.email,
         "is_admin": current_user.is_admin,
         "has_avatar": current_user.avatar_filename is not None,

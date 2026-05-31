@@ -36,7 +36,7 @@ def resolve_creator(ev: models.LocalEvent, *, name_cache: Optional[dict] = None)
         if name_cache is not None:
             display = name_cache.get(ev.creator_id)
         if display is None and ev.creator is not None:
-            display = ev.creator.username
+            display = ev.creator.display_name or ev.creator.username
         if display is not None:
             return {"id": ev.creator_id, "display_name": display}
     if ev.creator_name_external:

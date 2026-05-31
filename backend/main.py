@@ -163,6 +163,18 @@ def _migrate():
             logging.info("Migration: added group_visible_calendar_id to user_settings")
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR(100)"))
+            conn.commit()
+            logging.info("Migration: added display_name to users")
+        except Exception:
+            pass
+        # Backfill display_name from username for existing rows (only where empty).
+        try:
+            conn.execute(text("UPDATE users SET display_name = username WHERE display_name IS NULL OR display_name = ''"))
+            conn.commit()
+        except Exception:
+            pass
 
 _migrate()
 
