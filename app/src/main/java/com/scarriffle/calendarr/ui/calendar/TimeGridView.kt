@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +46,8 @@ fun TimeGridView(
     onEventClick: (CalEvent) -> Unit,
 ) {
     val hourHeight = LocalAppSettings.current.hourHeight.coerceIn(28, 100).dp
+    val dimPast = LocalAppSettings.current.dimPastEvents
+    val now = java.time.Instant.now()
     val lang = LocalLang.current
     val today = LocalDate.now()
 
@@ -76,7 +79,7 @@ fun TimeGridView(
                 }
                 allDay.forEach { (_, evs) ->
                     Column(Modifier.weight(1f).padding(horizontal = 1.dp)) {
-                        evs.forEach { ev -> AllDayChip(ev, onClick = { onEventClick(ev) }) }
+                        evs.forEach { ev -> AllDayChip(ev, dimmed = dimPast && ev.endDate.isBefore(now), onClick = { onEventClick(ev) }) }
                     }
                 }
             }
@@ -117,6 +120,7 @@ fun TimeGridView(
                             index = index,
                             dayCount = days.size,
                             hourHeight = hourHeight,
+                            dimmed = dimPast && ev.endDate.isBefore(now),
                             onClick = { onEventClick(ev) },
                         )
                     }
@@ -133,6 +137,7 @@ private fun TimedEvent(
     index: Int,
     dayCount: Int,
     hourHeight: androidx.compose.ui.unit.Dp,
+    dimmed: Boolean,
     onClick: () -> Unit,
 ) {
     val startMin = if (localDate(event.startDate).isBefore(day)) 0 else minutesOfDay(event.startDate)
@@ -149,6 +154,7 @@ private fun TimedEvent(
             .columnSlot(index, dayCount)
             .height(height)
             .padding(horizontal = 1.dp, vertical = 0.5.dp)
+            .alpha(if (dimmed) 0.45f else 1f)
             .clip(RoundedCornerShape(4.dp))
             .background(color)
             .clickable(onClick = onClick)
@@ -188,12 +194,13 @@ private fun Modifier.columnSlot(index: Int, dayCount: Int): Modifier = layout { 
 }
 
 @Composable
-private fun AllDayChip(event: CalEvent, onClick: () -> Unit) {
+private fun AllDayChip(event: CalEvent, dimmed: Boolean, onClick: () -> Unit) {
     val color = colorFromHex(event.effectiveColor)
     Box(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 1.dp)
+            .alpha(if (dimmed) 0.45f else 1f)
             .clip(RoundedCornerShape(3.dp))
             .background(color)
             .clickable(onClick = onClick)

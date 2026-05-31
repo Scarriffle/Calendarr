@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,8 @@ fun AgendaView(
     onEventClick: (CalEvent) -> Unit,
 ) {
     val lang = LocalLang.current
+    val dimPast = com.scarriffle.calendarr.ui.LocalAppSettings.current.dimPastEvents
+    val now = java.time.Instant.now()
     val today = LocalDate.now()
     val days = (0 until 90).map { today.plusDays(it.toLong()) }
         .map { it to vm.eventsOn(it, state.events) }
@@ -72,7 +75,7 @@ fun AgendaView(
                 )
             }
             items(events, key = { "${date}-${it.id}" }) { ev ->
-                AgendaRow(ev, lang, onClick = { onEventClick(ev) })
+                AgendaRow(ev, lang, dimmed = dimPast && ev.endDate.isBefore(now), onClick = { onEventClick(ev) })
             }
         }
         item { Spacer(Modifier.height(80.dp)) }
@@ -80,11 +83,12 @@ fun AgendaView(
 }
 
 @Composable
-private fun AgendaRow(event: CalEvent, lang: String, onClick: () -> Unit) {
+private fun AgendaRow(event: CalEvent, lang: String, dimmed: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
+            .alpha(if (dimmed) 0.45f else 1f)
             .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)

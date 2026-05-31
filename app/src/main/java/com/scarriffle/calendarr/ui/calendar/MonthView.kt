@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -142,6 +143,8 @@ fun MonthView(
     }
 
     val eventsByWeek = remember(state.events, mondayFirst) { buildEventsByWeek(state.events, mondayFirst) }
+    val dimPast = settings.dimPastEvents
+    val now = java.time.Instant.now()
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
@@ -167,6 +170,8 @@ fun MonthView(
                     today = today,
                     weekEvents = eventsByWeek[weekStart] ?: emptyList(),
                     cellW = cellW,
+                    dimPast = dimPast,
+                    now = now,
                     lang = lang,
                     dividerColor = dividerColor,
                     gridColor = gridColor,
@@ -188,6 +193,8 @@ private fun WeekRow(
     today: LocalDate,
     weekEvents: List<CalEvent>,
     cellW: Dp,
+    dimPast: Boolean,
+    now: java.time.Instant,
     lang: String,
     dividerColor: Color,
     gridColor: Color,
@@ -235,7 +242,8 @@ private fun WeekRow(
         }
 
         packed.bars.forEach { bar ->
-            EventBar(bar = bar, cellW = cellW, onClick = { onEventClick(bar.event) })
+            val past = dimPast && bar.event.endDate.isBefore(now)
+            EventBar(bar = bar, cellW = cellW, dimmed = past, onClick = { onEventClick(bar.event) })
         }
 
         if (boundaryCol != null) {
@@ -251,7 +259,7 @@ private fun WeekRow(
 }
 
 @Composable
-private fun EventBar(bar: PlacedBar, cellW: Dp, onClick: () -> Unit) {
+private fun EventBar(bar: PlacedBar, cellW: Dp, dimmed: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
             .offset(
@@ -260,6 +268,7 @@ private fun EventBar(bar: PlacedBar, cellW: Dp, onClick: () -> Unit) {
             )
             .width(cellW * bar.span - 2.dp)
             .height(LANE_H)
+            .alpha(if (dimmed) 0.45f else 1f)
             .clip(RoundedCornerShape(3.dp))
             .background(bar.color)
             .clickable(onClick = onClick)
