@@ -1,5 +1,16 @@
 import SwiftUI
 
+private enum CalEditorContext: Identifiable {
+    case create(Date)
+    case edit(CalEvent)
+    var id: String {
+        switch self {
+        case .create(let d): return "new-\(d.timeIntervalSince1970)"
+        case .edit(let ev): return "edit-\(ev.id)"
+        }
+    }
+}
+
 struct CalendarHostView: View {
     let api: CalendarrAPI
     @Binding var showMenu: Bool
@@ -14,9 +25,7 @@ struct CalendarHostView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var store = CalendarStore()
-    @State private var showEditor = false
-    @State private var editorDate: Date = .now
-    @State private var editingEvent: CalEvent? = nil
+    @State private var editorContext: CalEditorContext? = nil
     @State private var selectedEvent: CalEvent? = nil
     @State private var visibleMonth: Date = .now
     @State private var showFilter = false
@@ -40,6 +49,19 @@ struct CalendarHostView: View {
         }
     }
 
+    // MARK: – Loading indicator
+
+    @ViewBuilder
+    private var loadingIndicator: some View {
+        if store.isLoading || store.isCachingBackground {
+            ProgressView()
+                .padding(14)
+                .background(.regularMaterial, in: Circle())
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+        }
+    }
+
     // MARK: – Flat variant
 
     private var flatVariant: some View {
@@ -51,22 +73,11 @@ struct CalendarHostView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(hex: bgHex))
                 .overlay(alignment: .top) {
-                    if store.isLoading {
-                        ProgressView().padding(.top, 10).transition(.opacity)
-                    }
+                    loadingIndicator.padding(.top, 12)
                 }
+                .animation(.easeInOut(duration: 0.2), value: store.isLoading || store.isCachingBackground)
         }
         .overlay(alignment: .bottomTrailing) { solidFAB }
-        // Subtle background cache indicator (top-leading)
-        .overlay(alignment: .topLeading) {
-            if store.isCachingBackground {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(6)
-                    .transition(.opacity)
-            }
-        }
         .modifier(calendarSheets)
         .task { await startup() }
         .onChange(of: store.currentDate) { _, _ in Task { await onNavigate() } }
@@ -93,10 +104,9 @@ struct CalendarHostView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(hex: bgHex))
                 .overlay(alignment: .top) {
-                    if store.isLoading {
-                        ProgressView().padding(.top, 10).transition(.opacity)
-                    }
+                    loadingIndicator.padding(.top, 12)
                 }
+                .animation(.easeInOut(duration: 0.2), value: store.isLoading || store.isCachingBackground)
                 .overlay(alignment: .top) {
                     if let err = store.lastError { errorBannerView(err).padding(.top, 8) }
                 }
@@ -247,13 +257,9 @@ struct CalendarHostView: View {
         case .month:
             // Month view uses vertical scroll – no horizontal swipe.
             MonthView(store: store,
-                      onDayTap: { editorDate = $0 },
+                      onDayTap: { store.currentDate = $0 },
                       onEventTap: { selectedEvent = $0 },
-                      onCreateEvent: { day in
-                          editingEvent = nil
-                          editorDate = day
-                          showEditor = true
-                      },
+                      onCreateEvent: { day in editorContext = .create(day) },
                       onShowWeek: { day in
                           store.currentDate = day
                           store.viewType = .week
@@ -266,11 +272,7 @@ struct CalendarHostView: View {
         case .week:
             WeekView(store: store,
                      onEventTap: { selectedEvent = $0 },
-                     onCreateEvent: { date in
-                         editingEvent = nil
-                         editorDate = date
-                         showEditor = true
-                     },
+                     onCreateEvent: { date in editorContext = .create(date) },
                      onShowMonth: { date in
                          store.currentDate = date
                          store.viewType = .month
@@ -283,11 +285,7 @@ struct CalendarHostView: View {
         case .day:
             DayView(store: store,
                     onEventTap: { selectedEvent = $0 },
-                    onCreateEvent: { date in
-                        editingEvent = nil
-                        editorDate = date
-                        showEditor = true
-                    })
+                    onCreateEvent: { date in editorContext = .create(date) })
                 .simultaneousGesture(swipe)
         case .quarter:
             QuarterView(store: store, onEventTap: { selectedEvent = $0 })
@@ -302,7 +300,7 @@ struct CalendarHostView: View {
     /// Standard solid FAB (flat mode)
     private var solidFAB: some View {
         Button {
-            editingEvent = nil; editorDate = .now; showEditor = true
+            editorContext = .create(.now)
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 22, weight: .semibold))
@@ -320,7 +318,7 @@ struct CalendarHostView: View {
     private var glassFAB: some View {
         if #available(iOS 26, *) {
             Button {
-                editingEvent = nil; editorDate = .now; showEditor = true
+                editorContext = .create(.now)
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 22, weight: .semibold))
@@ -338,8 +336,7 @@ struct CalendarHostView: View {
     // MARK: – Sheets modifier
 
     private var calendarSheets: CalendarSheets {
-        CalendarSheets(store: store, showEditor: $showEditor,
-                       editorDate: $editorDate, editingEvent: $editingEvent,
+        CalendarSheets(store: store, editorContext: $editorContext,
                        selectedEvent: $selectedEvent, showFilter: $showFilter,
                        api: api,
                        reload: { await onNavigate() },
@@ -437,9 +434,7 @@ struct CalendarHostView: View {
 
 private struct CalendarSheets: ViewModifier {
     let store: CalendarStore
-    @Binding var showEditor: Bool
-    @Binding var editorDate: Date
-    @Binding var editingEvent: CalEvent?
+    @Binding var editorContext: CalEditorContext?
     @Binding var selectedEvent: CalEvent?
     @Binding var showFilter: Bool
     let api: CalendarrAPI
@@ -448,21 +443,23 @@ private struct CalendarSheets: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $showEditor) {
+            // Use sheet(item:) so the editing event is captured atomically –
+            // avoiding the race where sheet(isPresented:) evaluates its content
+            // before the editingEvent state update propagates.
+            .sheet(item: $editorContext) { ctx in
+                let editingEv: CalEvent? = { if case .edit(let ev) = ctx { return ev }; return nil }()
+                let date: Date = { if case .create(let d) = ctx { return d }; return .now }()
                 EventEditorSheet(api: api, store: store,
-                                 initialDate: editorDate, editingEvent: editingEvent) {
-                    // Create/edit changed server state → bust the cache so the
-                    // new/updated event appears without a manual sync.
-                    editingEvent = nil; await reloadForce()
+                                 initialDate: date, editingEvent: editingEv) {
+                    editorContext = nil
+                    await reloadForce()
                 }
             }
             .sheet(item: $selectedEvent) { ev in
-                EventDetailSheet(event: ev, api: api, store: store) { updated in
+                EventDetailSheet(event: ev, api: api, store: store) { updated, needsForce in
                     selectedEvent = nil
-                    if let u = updated { editingEvent = u; showEditor = true }
-                    // Delete already removed the event from the cache optimistically;
-                    // a light cache refresh is enough here.
-                    await reload()
+                    if let u = updated { editorContext = .edit(u) }
+                    if needsForce { await reloadForce() } else { await reload() }
                 }
             }
             .sheet(isPresented: $showFilter) {

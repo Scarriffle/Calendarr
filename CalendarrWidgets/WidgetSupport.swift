@@ -64,8 +64,19 @@ enum WidgetL10n {
             "widget.display.upnext_desc":       "Nächste Termine mit Monatsübersicht.",
             "widget.display.calday_title":      "Tag & Termine",
             "widget.display.calday_desc":       "Datum, Wochenübersicht und nächste Termine.",
-            "widget.display.lockscreen_title":  "Sperrbildschirm",
-            "widget.display.lockscreen_desc":   "Datum und nächster Termin auf dem Sperrbildschirm."
+            "widget.display.lockscreen_title":  "Datum",
+            "widget.display.lockscreen_desc":   "Aktuelles Datum und nächster Termin.",
+            "widget.display.twomonth_title":    "Zwei Monate",
+            "widget.display.twomonth_desc":     "Aktueller und nächster Monat auf einen Blick.",
+            "widget.display.nownext_title":     "Jetzt & Nächstes",
+            "widget.display.nownext_desc":      "Aktueller Termin und nächste Ereignisse.",
+            "widget.cw":                        "KW",
+            "widget.running":                   "Läuft",
+            "widget.events_count":              "Termine",
+            "widget.display.lockscreen_count_title":    "Termine heute",
+            "widget.display.lockscreen_count_desc":     "Anzahl und Liste heutiger Termine.",
+            "widget.display.lockscreen_countdown_title": "Countdown",
+            "widget.display.lockscreen_countdown_desc":  "Zeit bis zum nächsten Termin."
         ],
         "en": [
             "widget.today":         "Today",
@@ -91,8 +102,19 @@ enum WidgetL10n {
             "widget.display.upnext_desc":       "Next events with month overview.",
             "widget.display.calday_title":      "Day & Events",
             "widget.display.calday_desc":       "Date, week overview and upcoming events.",
-            "widget.display.lockscreen_title":  "Lock Screen",
-            "widget.display.lockscreen_desc":   "Date and next event on the lock screen."
+            "widget.display.lockscreen_title":  "Date",
+            "widget.display.lockscreen_desc":   "Current date and next event.",
+            "widget.display.twomonth_title":    "Two Months",
+            "widget.display.twomonth_desc":     "Current and next month at a glance.",
+            "widget.display.nownext_title":     "Now & Next",
+            "widget.display.nownext_desc":      "Current event and upcoming events.",
+            "widget.cw":                        "W",
+            "widget.running":                   "Running",
+            "widget.events_count":              "Events",
+            "widget.display.lockscreen_count_title":    "Today's Events",
+            "widget.display.lockscreen_count_desc":     "Count and list of today's events.",
+            "widget.display.lockscreen_countdown_title": "Countdown",
+            "widget.display.lockscreen_countdown_desc":  "Time until your next event."
         ]
     ]
 }

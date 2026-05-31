@@ -12,7 +12,11 @@ struct CalendarrWidgetBundle: WidgetBundle {
         UpcomingWidget()
         UpNextWidget()
         CalendarDayWidget()
+        TwoMonthWidget()
+        NowNextEventsWidget()
         LockScreenWidget()
+        LockScreenCountWidget()
+        LockScreenCountdownWidget()
     }
 }
 
@@ -157,7 +161,37 @@ struct CalendarDayWidget: Widget {
     }
 }
 
-// MARK: – Lock Screen (circular, rectangular, inline)
+// MARK: – Two Month calendar grid (medium + large)
+
+struct TwoMonthWidget: Widget {
+    let kind: String = "TwoMonthWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+            TwoMonthWidgetView(entry: entry).calendarrChrome(entry.snapshot)
+        }
+        .configurationDisplayName(WidgetL10n.t("widget.display.twomonth_title", "system"))
+        .description(WidgetL10n.t("widget.display.twomonth_desc", "system"))
+        .supportedFamilies([.systemMedium, .systemLarge])
+    }
+}
+
+// MARK: – Now & Next events (medium)
+
+struct NowNextEventsWidget: Widget {
+    let kind: String = "NowNextEventsWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+            NowNextWidgetView(entry: entry).calendarrChrome(entry.snapshot)
+        }
+        .configurationDisplayName(WidgetL10n.t("widget.display.nownext_title", "system"))
+        .description(WidgetL10n.t("widget.display.nownext_desc", "system"))
+        .supportedFamilies([.systemMedium])
+    }
+}
+
+// MARK: – Lock Screen: date (circular, rectangular, inline)
 
 struct LockScreenWidget: Widget {
     let kind: String = "LockScreenWidget"
@@ -170,6 +204,40 @@ struct LockScreenWidget: Widget {
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.lockscreen_title", "system"))
         .description(WidgetL10n.t("widget.display.lockscreen_desc", "system"))
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
+    }
+}
+
+// MARK: – Lock Screen: today event count (circular, rectangular, inline)
+
+struct LockScreenCountWidget: Widget {
+    let kind: String = "LockScreenCountWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+            LockScreenCountWidgetView(entry: entry)
+                .containerBackground(for: .widget) { Color.clear }
+                .environment(\.locale, WidgetL10n.locale(entry.snapshot?.language ?? "system"))
+        }
+        .configurationDisplayName(WidgetL10n.t("widget.display.lockscreen_count_title", "system"))
+        .description(WidgetL10n.t("widget.display.lockscreen_count_desc", "system"))
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
+    }
+}
+
+// MARK: – Lock Screen: countdown to next event (circular, rectangular, inline)
+
+struct LockScreenCountdownWidget: Widget {
+    let kind: String = "LockScreenCountdownWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+            LockScreenCountdownWidgetView(entry: entry)
+                .containerBackground(for: .widget) { Color.clear }
+                .environment(\.locale, WidgetL10n.locale(entry.snapshot?.language ?? "system"))
+        }
+        .configurationDisplayName(WidgetL10n.t("widget.display.lockscreen_countdown_title", "system"))
+        .description(WidgetL10n.t("widget.display.lockscreen_countdown_desc", "system"))
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }

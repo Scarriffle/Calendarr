@@ -277,11 +277,13 @@ class CalendarStore {
     }
 
     /// Trigger a full cache reload (e.g. when cache-range setting changes).
+    /// Intentionally keeps `events` intact so the UI stays populated while
+    /// the network fetch runs; `refreshFromCache` will swap in fresh data
+    /// atomically once it arrives.
     func invalidateCache() {
         cachedStart = nil
         cachedEnd = nil
         allCachedEvents = []
-        events = []
     }
 
     private func mergeIntoCache(_ newEvents: [CalEvent], rangeStart: Date, rangeEnd: Date) {

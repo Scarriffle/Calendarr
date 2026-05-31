@@ -62,7 +62,7 @@ struct NowNextWidgetView: View {
 
     private func featuredCard(snapshot: WidgetSnapshot) -> some View {
         let ev        = featuredEvent
-        let baseColor = ev.map { Color(widgetHex: $0.colorHex) } ?? Color.accentColor.opacity(0.5)
+        let baseColor = ev.map { Color(widgetHex: $0.colorHex) } ?? Color(widgetHex: snapshot.primaryColorHex)
 
         return ZStack(alignment: .leading) {
             LinearGradient(

@@ -5,7 +5,7 @@ struct EventEditorSheet: View {
     let store: CalendarStore
     let initialDate: Date
     let editingEvent: CalEvent?
-    let copyFrom: CalEvent?
+    var copyFrom: CalEvent? = nil
     let onSaved: () async -> Void
 
     @Environment(\.dismiss) var dismiss
@@ -133,16 +133,27 @@ struct EventEditorSheet: View {
             title = ev.title
             isAllDay = ev.isAllDay
             startDate = ev.startDate
-            endDate = ev.endDate
+            // All-day end dates are stored as exclusive (day after last); subtract 1 for the picker.
+            endDate = ev.isAllDay
+                ? Calendar.current.date(byAdding: .day, value: -1, to: ev.endDate) ?? ev.endDate
+                : ev.endDate
             location = ev.location
             notes = ev.notes
             color = ev.color ?? ""
-            selectedCalendarId = ev.calendarId
+            // HA events use "homeassistant-42" in CalEvent but "ha-42" in WritableCalendar
+            if ev.source == "homeassistant" {
+                let num = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
+                selectedCalendarId = "ha-\(num)"
+            } else {
+                selectedCalendarId = ev.calendarId
+            }
         } else if let ev = copyFrom {
             title = ev.title
             isAllDay = ev.isAllDay
             startDate = ev.startDate
-            endDate = ev.endDate
+            endDate = ev.isAllDay
+                ? Calendar.current.date(byAdding: .day, value: -1, to: ev.endDate) ?? ev.endDate
+                : ev.endDate
             location = ev.location
             notes = ev.notes
             color = ev.color ?? ""
@@ -168,10 +179,19 @@ struct EventEditorSheet: View {
 
         do {
             if let ev = editingEvent {
-                if ev.source == "local" {
+                switch ev.source {
+                case "local":
                     try await api.updateLocalEvent(uid: ev.id, title: title, start: start, end: end,
                                                    isAllDay: isAllDay, location: location, description: notes, color: colorVal)
-                } else {
+                case "homeassistant":
+                    // No update API exists – delete the old event and recreate with new data.
+                    let rawId = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
+                    let haCalId = Int(rawId) ?? 0
+                    try await api.deleteHAEvent(calendarId: haCalId, uid: ev.id)
+                    try await api.createHAEvent(calendarId: haCalId, title: title,
+                                                start: start, end: end, isAllDay: isAllDay,
+                                                location: location, description: notes)
+                default: // caldav
                     let calId = Int(ev.calendarId)
                     try await api.updateCalDAVEvent(uid: ev.id, url: ev.url, calendarId: calId,
                                                     title: title, start: start, end: end, isAllDay: isAllDay,

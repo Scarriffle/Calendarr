@@ -53,8 +53,7 @@ struct MonthView: View {
             headerRow
             Divider()
             ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(weekStarts, id: \.self) { ws in
+                LazyVStack(spacing: 0) {                    ForEach(weekStarts, id: \.self) { ws in
                         WeekRow(weekStart: ws,
                                 store: store,
                                 dividerColor: Color(hex: dividerHex),
@@ -72,6 +71,7 @@ struct MonthView: View {
                 }
                 .scrollTargetLayout()
             }
+            .scrollIndicators(.hidden)
             .scrollPosition(id: $scrolledWeek, anchor: .top)
             .onAppear {
                 if !didInitialScroll {

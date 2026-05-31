@@ -213,6 +213,8 @@ private let strings: [String: [String: String]] = [
         "event.reset_color": "Zurücksetzen",
         "event.edit_title": "Termin bearbeiten",
         "event.new_title": "Neuer Termin",
+        "event.copy_title": "Termin kopieren",
+        "event.copy_to": "In Kalender kopieren",
         "event.save": "Sichern",
         "event.add": "Hinzufügen",
 
@@ -472,6 +474,8 @@ private let strings: [String: [String: String]] = [
         "event.reset_color": "Reset",
         "event.edit_title": "Edit event",
         "event.new_title": "New event",
+        "event.copy_title": "Copy event",
+        "event.copy_to": "Copy to calendar",
         "event.save": "Save",
         "event.add": "Add",
 

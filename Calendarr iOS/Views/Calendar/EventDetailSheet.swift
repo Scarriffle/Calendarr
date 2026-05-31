@@ -42,14 +42,10 @@ struct EventDetailSheet: View {
     }
 
     private var canEdit: Bool {
-        event.source == "local" || event.source == "caldav"
+        event.source == "local" || event.source == "caldav" || event.source == "homeassistant"
     }
 
-    /// Home Assistant events can't be edited in-app (no editor support), but
-    /// the server does support deleting them.
-    private var canDelete: Bool {
-        canEdit || event.source == "homeassistant"
-    }
+    private var canDelete: Bool { canEdit }
 
     var body: some View {
         NavigationStack {
