@@ -149,7 +149,7 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       if (monthChangeIdx > 0 && idx < monthChangeIdx) dividerClasses.push('month-divider-bottom');
       const dividerCls = dividerClasses.join(' ');
       const monthLabel = isFirstOfMonth
-        ? `<div class="month-marker">${monthsShort[cell.getMonth()]}</div>`
+        ? `<span class="month-marker">${monthsShort[cell.getMonth()]}</span>`
         : '';
       colsHtml += `<div class="month-col ${todayCls} ${otherCls} ${selectedCls} ${firstCls} ${dividerCls}" data-date="${key}">
         <div class="cell-day ${numCls}">${cell.getDate()}</div>

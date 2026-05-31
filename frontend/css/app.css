@@ -582,7 +582,8 @@ a { color: var(--primary); text-decoration: none; }
 .cell-day {
   font-size: 12px; font-weight: 500; color: var(--text-2);
   width: 26px; height: 26px;
-  display: flex; align-items: center; justify-content: center;
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: top;
   border-radius: 50%; flex-shrink: 0;
 }
 .cell-day.today { background: var(--today-color); color: #fff; font-weight: 700; }
@@ -591,13 +592,8 @@ a { color: var(--primary); text-decoration: none; }
 .month-col {
   position: relative; /* anchor for divider pseudo-elements */
 }
-.month-col.first-of-month {
-  display: flex;
-  flex-direction: row;       /* "1 JUN" inline — keeps the header height uniform */
-  align-items: center;
-  gap: 6px;
-  padding-top: 4px;
-}
+/* first-of-month keeps the normal block layout (number top-left); the month
+   label sits inline next to the number via .cell-day/.month-marker below. */
 /* Dividers via pseudo-elements so they render above events (z-index 2) */
 .month-col.month-divider-left::before {
   content: '';
@@ -641,14 +637,14 @@ a { color: var(--primary); text-decoration: none; }
   pointer-events: none;
 }
 .month-marker {
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .5px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: .3px;
   color: var(--month-label-color, #7090c0);
-  line-height: 1;
-  padding: 0;
-  margin: 0;
+  line-height: 26px;          /* align with the day-number circle */
+  margin-left: 4px;
+  vertical-align: top;
   position: relative;
   z-index: 3; /* above events overlay (z-index 2) */
 }
