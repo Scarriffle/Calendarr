@@ -669,12 +669,11 @@ function renderCalendarList() {
   }
 
   container.innerHTML = entries.map(e =>
-    `<div class="cal-item" draggable="true" data-key="${e.key}" data-source="${e.source}" ${e.dataId}>
+    `<div class="cal-item" draggable="true" data-key="${e.key}" data-source="${e.source}" ${e.dataId} title="${escHtml(e.name)} · ${escHtml(e.sourceLabel)}">
       <span class="cal-drag-handle" title="${t('drag_reorder')}">⠿</span>
       <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
       <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
-      <span class="cal-source">${escHtml(e.sourceLabel)}</span>
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
     </div>`
   ).join('');
