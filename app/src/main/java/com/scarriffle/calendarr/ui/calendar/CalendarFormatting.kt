@@ -12,21 +12,30 @@ import java.time.format.TextStyle
 
 private val zone: ZoneId = ZoneId.systemDefault()
 
+/** Localized month name with a hard fallback (guards against empty/numeric results). */
+private fun monthName(date: LocalDate, style: TextStyle, loc: java.util.Locale): String {
+    val name = date.month.getDisplayName(style, loc)
+    val safe = if (name.isBlank() || name.all { it.isDigit() }) {
+        date.month.getDisplayName(TextStyle.FULL, java.util.Locale.ENGLISH)
+    } else {
+        name
+    }
+    return safe.replaceFirstChar { it.uppercase(loc) }
+}
+
 fun titleForView(viewType: CalViewType, date: LocalDate, lang: String): String {
     val loc = L10n.locale(lang)
     return when (viewType) {
         CalViewType.MONTH -> {
-            // Use Month.getDisplayName (robust) instead of the "LLLL" pattern,
-            // which could drop the month name under desugared java.time.
-            val month = date.month.getDisplayName(TextStyle.FULL_STANDALONE, loc)
-                .replaceFirstChar { it.uppercase(loc) }
+            // Use the FORMAT month style (TextStyle.FULL). The standalone style
+            // (FULL_STANDALONE / the "LLLL" pattern) drops the name for some
+            // months under desugared java.time (e.g. December showed only "2026").
+            val month = monthName(date, TextStyle.FULL, loc)
             "$month ${date.year}"
         }
         CalViewType.QUARTER -> {
             val endM = date.plusMonths(2)
-            val m1 = date.month.getDisplayName(TextStyle.SHORT_STANDALONE, loc).replaceFirstChar { it.uppercase(loc) }
-            val m2 = endM.month.getDisplayName(TextStyle.SHORT_STANDALONE, loc).replaceFirstChar { it.uppercase(loc) }
-            "$m1 ${date.year} – $m2 ${endM.year}"
+            "${monthName(date, TextStyle.SHORT, loc)} ${date.year} – ${monthName(endM, TextStyle.SHORT, loc)} ${endM.year}"
         }
         CalViewType.WEEK -> {
             val start = date

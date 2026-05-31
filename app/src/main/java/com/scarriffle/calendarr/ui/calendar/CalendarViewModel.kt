@@ -64,9 +64,24 @@ class CalendarViewModel @Inject constructor(
     private var allCachedEvents: List<CalEvent> = emptyList()
 
     init {
-        loadVisible()
         loadWritableCalendars()
-        prefetchBackground()
+        initialLoad()
+    }
+
+    /**
+     * Load the full ±cacheMonths window once, behind the splash, and only then
+     * mark ready. Entering the app fully-loaded avoids the first-open jank of
+     * loading a big batch while the user is already scrolling.
+     */
+    private fun initialLoad() {
+        val months = settingsStore.cacheMonths.toLong()
+        val today = LocalDate.now().withDayOfMonth(1)
+        val start = instant(today.minusMonths(months))
+        val end = instant(today.plusMonths(months + 1))
+        viewModelScope.launch {
+            loadRange(start, end, background = false)
+            markReady()
+        }
     }
 
     private fun initialState(): CalendarUiState {
@@ -188,15 +203,6 @@ class CalendarViewModel @Inject constructor(
         _ready.value = true
     }
 
-    private fun prefetchBackground() {
-        val months = settingsStore.cacheMonths
-        val today = LocalDate.now().withDayOfMonth(1)
-        val start = instant(today.minusMonths(months.toLong()))
-        val end = instant(today.plusMonths((months + 1).toLong()))
-        if (isCached(start, end)) return
-        viewModelScope.launch { loadRange(start, end, background = true) }
-    }
-
     private fun isCached(start: Instant, end: Instant): Boolean {
         val cs = cachedStart ?: return false
         val ce = cachedEnd ?: return false
@@ -231,8 +237,7 @@ class CalendarViewModel @Inject constructor(
 
     fun syncWithServer() {
         invalidateCache()
-        loadVisible(force = true)
-        prefetchBackground()
+        initialLoad()
     }
 
     fun clearError() = _state.update { it.copy(error = null) }
@@ -280,8 +285,7 @@ class CalendarViewModel @Inject constructor(
 
     private fun afterMutation() {
         invalidateCache()
-        loadVisible(force = true)
-        prefetchBackground()
+        initialLoad()
     }
 
     fun saveEvent(
