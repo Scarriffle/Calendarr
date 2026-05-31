@@ -46,9 +46,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.scarriffle.calendarr.domain.model.AppSettings
 import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.ui.LocalAppSettings
+import com.scarriffle.calendarr.ui.components.ColorPickerDialog
 import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
-import com.scarriffle.calendarr.util.contrastingTextColor
+import com.scarriffle.calendarr.util.toHex
 
 private val PALETTE = listOf(
     "#4285f4", "#ea4335", "#34a853", "#fbbc05", "#46bdc6", "#9c27b0", "#ff7043", "#7090c0",
@@ -116,9 +117,11 @@ fun SettingsScreen(
                 Divider(Modifier.padding(vertical = 16.dp))
 
                 Section(tr("settings.colors"))
-                ColorChooser(tr("settings.color.primary"), settings.primaryColor) { update(settings.copy(primaryColor = it)) }
-                ColorChooser(tr("settings.color.accent"), settings.accentColor) { update(settings.copy(accentColor = it)) }
-                ColorChooser(tr("settings.color.today"), settings.todayColor) { update(settings.copy(todayColor = it)) }
+                ColorRow(tr("settings.color.primary"), settings.primaryColor) { update(settings.copy(primaryColor = it)) }
+                ColorRow(tr("settings.color.accent"), settings.accentColor) { update(settings.copy(accentColor = it)) }
+                ColorRow(tr("settings.color.today"), settings.todayColor) { update(settings.copy(todayColor = it)) }
+                ColorRow(tr("settings.color.divider"), settings.monthDividerColor) { update(settings.copy(monthDividerColor = it)) }
+                ColorRow(tr("settings.color.label"), settings.monthLabelColor) { update(settings.copy(monthLabelColor = it)) }
                 Divider(Modifier.padding(vertical = 16.dp))
 
                 Section(tr("settings.hourheight"))
@@ -182,35 +185,24 @@ private fun ChipRow(options: List<Pair<String, String>>, selected: String, onSel
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ColorChooser(label: String, current: String, onPick: (String) -> Unit) {
-    // Show the user's current colour even if it isn't one of the presets.
-    val swatches = remember(current) {
-        (if (PALETTE.any { it.equals(current, ignoreCase = true) }) PALETTE else listOf(current) + PALETTE)
+private fun ColorRow(label: String, current: String, onPick: (String) -> Unit) {
+    var showPicker by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(28.dp).clip(CircleShape).background(colorFromHex(current)).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape))
+        Spacer(Modifier.size(12.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(colorFromHex(current).toHex(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(18.dp).clip(CircleShape).background(colorFromHex(current)))
-            Spacer(Modifier.size(8.dp))
-            Text(label, style = MaterialTheme.typography.bodyMedium)
-        }
-        FlowRow(
-            Modifier.fillMaxWidth().padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            swatches.forEach { hex ->
-                val selected = hex.equals(current, ignoreCase = true)
-                Box(
-                    Modifier.size(34.dp).clip(CircleShape).background(colorFromHex(hex))
-                        .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onBackground, CircleShape) else Modifier)
-                        .clickable { onPick(hex) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) Icon(Icons.Filled.Check, contentDescription = null, tint = colorFromHex(hex).contrastingTextColor(), modifier = Modifier.size(18.dp))
-                }
-            }
-        }
+    if (showPicker) {
+        ColorPickerDialog(
+            initial = current,
+            title = label,
+            onDismiss = { showPicker = false },
+            onConfirm = { showPicker = false; onPick(it) },
+        )
     }
 }

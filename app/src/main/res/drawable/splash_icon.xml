@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The launcher icon inset so it sits comfortably inside the round splash mask. -->
+<!-- High-res logo inset so it sits comfortably inside the round splash mask. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@mipmap/ic_launcher"
+    android:drawable="@drawable/ic_splash_logo"
     android:inset="18%" />

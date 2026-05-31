@@ -49,6 +49,22 @@ fun weekdayLabels(mondayFirst: Boolean, lang: String): List<String> {
 fun timeLabel(instant: Instant, lang: String): String =
     DateTimeFormatter.ofPattern("HH:mm", L10n.locale(lang)).withZone(zone).format(instant)
 
+/** Opacity for secondary text (week number, overflow count) per text_contrast 1..4. */
+fun secondaryTextOpacity(contrast: Int): Float = when (contrast.coerceIn(1, 4)) {
+    1 -> 0.40f
+    2 -> 0.55f
+    3 -> 0.72f
+    else -> 0.92f
+}
+
+/** Opacity for regular grid lines per line_contrast 1..4. */
+fun gridLineOpacity(contrast: Int): Float = when (contrast.coerceIn(1, 4)) {
+    1 -> 0.15f
+    2 -> 0.30f
+    3 -> 0.50f
+    else -> 0.80f
+}
+
 fun localTime(instant: Instant): LocalTime = LocalTime.ofInstant(instant, zone)
 
 fun localDate(instant: Instant): LocalDate = LocalDate.ofInstant(instant, zone)

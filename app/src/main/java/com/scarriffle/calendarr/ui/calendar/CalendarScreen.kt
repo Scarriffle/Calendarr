@@ -2,9 +2,13 @@ package com.scarriffle.calendarr.ui.calendar
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -22,9 +26,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,15 +39,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.scarriffle.calendarr.domain.model.AppSettings
 import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.ui.LocalLang
 import com.scarriffle.calendarr.ui.accounts.AccountsScreen
-import com.scarriffle.calendarr.ui.event.EventDetailSheet
+import com.scarriffle.calendarr.ui.event.EventDetailScreen
 import com.scarriffle.calendarr.ui.event.EventEditorSheet
 import com.scarriffle.calendarr.ui.menu.MenuSheet
 import com.scarriffle.calendarr.ui.profile.ProfileScreen
@@ -77,57 +83,36 @@ fun CalendarScreen(
     // Continuous month scrolling
     val monthListState = rememberLazyListState()
     var todaySignal by remember { mutableIntStateOf(0) }
+    var monthJumpSignal by remember { mutableIntStateOf(0) }
+    var monthJumpTarget by remember { mutableStateOf<LocalDate?>(null) }
     var visibleMonth by remember { mutableStateOf(state.currentDate) }
     val isMonth = state.viewType == CalViewType.MONTH
     val barTitle = if (isMonth) titleForView(CalViewType.MONTH, visibleMonth, lang)
         else titleForView(state.viewType, state.currentDate, lang)
 
+    fun goPrev() {
+        if (isMonth) { monthJumpTarget = visibleMonth.minusMonths(1); monthJumpSignal++ } else vm.navigatePrev()
+    }
+    fun goNext() {
+        if (isMonth) { monthJumpTarget = visibleMonth.plusMonths(1); monthJumpSignal++ } else vm.navigateNext()
+    }
+    fun goToday() {
+        if (isMonth) todaySignal++ else vm.moveToToday()
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                },
-                navigationIcon = {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Filled.Menu, contentDescription = tr("nav.menu"))
-                    }
-                },
-                actions = {
-                    if (!isMonth) {
-                        IconButton(onClick = vm::navigatePrev) {
-                            Icon(Icons.Filled.ChevronLeft, contentDescription = null)
-                        }
-                    }
-                    IconButton(onClick = { if (isMonth) todaySignal++ else vm.moveToToday() }) {
-                        Icon(Icons.Filled.Today, contentDescription = tr("nav.today"))
-                    }
-                    if (!isMonth) {
-                        IconButton(onClick = vm::navigateNext) {
-                            Icon(Icons.Filled.ChevronRight, contentDescription = null)
-                        }
-                    }
-                    IconButton(onClick = { showFilter = true }) {
-                        Icon(Icons.Filled.FilterList, contentDescription = tr("filter.button"))
-                    }
-                    Box {
-                        IconButton(onClick = { viewMenuOpen = true }) {
-                            Icon(state.viewType.icon, contentDescription = tr("view.change"))
-                        }
-                        DropdownMenu(expanded = viewMenuOpen, onDismissRequest = { viewMenuOpen = false }) {
-                            CalViewType.entries.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(tr("view.${type.key}")) },
-                                    leadingIcon = { Icon(type.icon, contentDescription = null) },
-                                    onClick = {
-                                        viewMenuOpen = false
-                                        vm.setViewType(type)
-                                    },
-                                )
-                            }
-                        }
-                    }
-                },
+            CompactTopBar(
+                title = barTitle,
+                viewType = state.viewType,
+                viewMenuOpen = viewMenuOpen,
+                onMenu = { showMenu = true },
+                onPrev = { goPrev() },
+                onToday = { goToday() },
+                onNext = { goNext() },
+                onFilter = { showFilter = true },
+                onViewMenuToggle = { viewMenuOpen = it },
+                onSelectView = { vm.setViewType(it) },
             )
         },
         floatingActionButton = {
@@ -153,6 +138,8 @@ fun CalendarScreen(
                     vm = vm,
                     monthListState = monthListState,
                     scrollToTodaySignal = todaySignal,
+                    monthJumpSignal = monthJumpSignal,
+                    monthJumpTarget = monthJumpTarget,
                     onVisibleMonthChange = { visibleMonth = it },
                     onEventClick = { detailEvent = it },
                     onDayClick = { date -> vm.goToDate(date, CalViewType.DAY) },
@@ -186,20 +173,20 @@ fun CalendarScreen(
     }
 
     detailEvent?.let { ev ->
-        EventDetailSheet(
+        EventDetailScreen(
             event = ev,
-            onDismiss = { detailEvent = null },
+            onClose = { detailEvent = null },
             onEdit = {
                 detailEvent = null
                 editor = EditorRequest(ev, localDate(ev.startDate))
             },
-            onDelete = {
-                vm.deleteEvent(ev) {}
-                detailEvent = null
-            },
             onCopy = {
                 detailEvent = null
                 editor = EditorRequest(existing = null, date = localDate(ev.startDate), prefill = ev)
+            },
+            onDelete = {
+                vm.deleteEvent(ev) {}
+                detailEvent = null
             },
         )
     }
@@ -238,6 +225,8 @@ private fun CalendarBody(
     vm: CalendarViewModel,
     monthListState: androidx.compose.foundation.lazy.LazyListState,
     scrollToTodaySignal: Int,
+    monthJumpSignal: Int,
+    monthJumpTarget: LocalDate?,
     onVisibleMonthChange: (LocalDate) -> Unit,
     onEventClick: (CalEvent) -> Unit,
     onDayClick: (LocalDate) -> Unit,
@@ -249,6 +238,8 @@ private fun CalendarBody(
             vm = vm,
             listState = monthListState,
             scrollToTodaySignal = scrollToTodaySignal,
+            monthJumpSignal = monthJumpSignal,
+            monthJumpTarget = monthJumpTarget,
             onVisibleMonthChange = onVisibleMonthChange,
             onDayClick = onDayClick,
             onDayLongPress = onDayLongPress,
@@ -281,6 +272,66 @@ private fun ErrorBanner(message: String, onRetry: () -> Unit, onDismiss: () -> U
 private fun loadingPlaceholder() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun CompactTopBar(
+    title: String,
+    viewType: CalViewType,
+    viewMenuOpen: Boolean,
+    onMenu: () -> Unit,
+    onPrev: () -> Unit,
+    onToday: () -> Unit,
+    onNext: () -> Unit,
+    onFilter: () -> Unit,
+    onViewMenuToggle: (Boolean) -> Unit,
+    onSelectView: (CalViewType) -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Row(
+            Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CompactIcon(Icons.Filled.ChevronLeft, onPrev)
+            TextButton(onClick = onToday, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                Text(tr("nav.today"), fontSize = 13.sp)
+            }
+            CompactIcon(Icons.Filled.ChevronRight, onNext)
+            Text(
+                title,
+                modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            CompactIcon(Icons.Filled.FilterList, onFilter, tr("filter.button"))
+            Box {
+                CompactIcon(viewType.icon, { onViewMenuToggle(true) }, tr("view.change"))
+                DropdownMenu(expanded = viewMenuOpen, onDismissRequest = { onViewMenuToggle(false) }) {
+                    CalViewType.entries.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(tr("view.${type.key}")) },
+                            leadingIcon = { Icon(type.icon, contentDescription = null) },
+                            onClick = { onViewMenuToggle(false); onSelectView(type) },
+                        )
+                    }
+                }
+            }
+            CompactIcon(Icons.Filled.Menu, onMenu, tr("nav.menu"))
+        }
+    }
+}
+
+@Composable
+private fun CompactIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    contentDescription: String? = null,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(22.dp))
     }
 }
 

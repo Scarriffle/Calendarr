@@ -295,6 +295,8 @@ class CalendarViewModel @Inject constructor(
                     when (existing.source) {
                         "local" -> repository.updateLocalEvent(existing.id, title, start, end, isAllDay, location, description, color)
                         "caldav" -> repository.updateCalDAVEvent(existing.id, existing.url, calendar.numericId, title, start, end, isAllDay, location, description, color)
+                        "homeassistant" -> repository.updateHAEvent(calendar.numericId, existing.id, title, start, end, isAllDay, location, description)
+                        "google" -> repository.updateGoogleEvent(calendar.numericId, existing.id, title, start, end, isAllDay, location, description)
                         else -> createForSource(calendar, title, start, end, isAllDay, location, description, color)
                     }
                 } else {
@@ -325,6 +327,7 @@ class CalendarViewModel @Inject constructor(
                     "local" -> repository.deleteLocalEvent(event.id)
                     "caldav" -> repository.deleteCalDAVEvent(event.id, event.url, calendarNumericId(event))
                     "homeassistant" -> repository.deleteHAEvent(calendarNumericId(event) ?: 0, event.id)
+                    "google" -> repository.deleteGoogleEvent(calendarNumericId(event) ?: 0, event.id)
                     else -> Unit
                 }
             }

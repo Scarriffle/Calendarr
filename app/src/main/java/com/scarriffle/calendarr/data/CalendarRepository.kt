@@ -305,30 +305,55 @@ class CalendarRepository @Inject constructor(
         calendarDbId: Int, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String,
     ) = guarded {
-        api.createGoogleEvent(
-            jsonBody(
-                "calendar_db_id" to calendarDbId, "title" to title,
-                "start" to Dates.format(start, isAllDay), "end" to Dates.format(end, isAllDay),
-                "allDay" to isAllDay, "location" to location, "description" to description,
-            )
-        ).ensureSuccess()
+        api.createGoogleEvent(simpleEventBody("calendar_db_id", calendarDbId, title, start, end, isAllDay, location, description))
+            .ensureSuccess()
     }
+
+    suspend fun updateGoogleEvent(
+        gcalDbId: Int, eventId: String, title: String, start: Instant, end: Instant,
+        isAllDay: Boolean, location: String, description: String,
+    ) = guarded {
+        api.updateGoogleEvent(gcalDbId, eventId, simpleEventBody(null, null, title, start, end, isAllDay, location, description))
+            .ensureSuccess()
+    }
+
+    suspend fun deleteGoogleEvent(gcalDbId: Int, eventId: String) =
+        guarded { api.deleteGoogleEvent(gcalDbId, eventId).ensureSuccess() }
 
     suspend fun createHAEvent(
         calendarId: Int, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String,
     ) = guarded {
-        api.createHAEvent(
-            jsonBody(
-                "calendar_id" to calendarId, "title" to title,
-                "start" to Dates.format(start, isAllDay), "end" to Dates.format(end, isAllDay),
-                "allDay" to isAllDay, "location" to location, "description" to description,
-            )
-        ).ensureSuccess()
+        api.createHAEvent(simpleEventBody("calendar_id", calendarId, title, start, end, isAllDay, location, description))
+            .ensureSuccess()
+    }
+
+    suspend fun updateHAEvent(
+        calendarId: Int, uid: String, title: String, start: Instant, end: Instant,
+        isAllDay: Boolean, location: String, description: String,
+    ) = guarded {
+        api.updateHAEvent(calendarId, uid, simpleEventBody(null, null, title, start, end, isAllDay, location, description))
+            .ensureSuccess()
     }
 
     suspend fun deleteHAEvent(calendarId: Int, uid: String) =
         guarded { api.deleteHAEvent(calendarId, uid).ensureSuccess() }
+
+    /** Body for Google/HA events (no per-event colour). */
+    private fun simpleEventBody(
+        calKey: String?, calId: Int?, title: String, start: Instant, end: Instant,
+        isAllDay: Boolean, location: String, description: String,
+    ) = jsonBody(
+        buildMap {
+            if (calKey != null && calId != null) put(calKey, calId)
+            put("title", title)
+            put("start", Dates.format(start, isAllDay))
+            put("end", Dates.format(end, isAllDay))
+            put("allDay", isAllDay)
+            put("location", location)
+            put("description", description)
+        }
+    )
 
     private fun eventBody(
         calendarId: Int?, title: String, start: Instant, end: Instant,

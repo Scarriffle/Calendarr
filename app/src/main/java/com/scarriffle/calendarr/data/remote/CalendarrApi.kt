@@ -170,10 +170,30 @@ interface CalendarrApi {
     @POST("api/google/events")
     suspend fun createGoogleEvent(@Body body: RequestBody): Response<ResponseBody>
 
+    @PUT("api/google/events/{gcalDbId}/{eventId}")
+    suspend fun updateGoogleEvent(
+        @Path("gcalDbId") gcalDbId: Int,
+        @Path("eventId") eventId: String,
+        @Body body: RequestBody,
+    ): Response<ResponseBody>
+
+    @HTTP(method = "DELETE", path = "api/google/events/{gcalDbId}/{eventId}", hasBody = false)
+    suspend fun deleteGoogleEvent(
+        @Path("gcalDbId") gcalDbId: Int,
+        @Path("eventId") eventId: String,
+    ): Response<ResponseBody>
+
     @POST("api/homeassistant/events")
     suspend fun createHAEvent(@Body body: RequestBody): Response<ResponseBody>
 
-    @DELETE("api/homeassistant/events/{calendarId}/{uid}")
+    @PUT("api/homeassistant/events/{calendarId}/{uid}")
+    suspend fun updateHAEvent(
+        @Path("calendarId") calendarId: Int,
+        @Path("uid") uid: String,
+        @Body body: RequestBody,
+    ): Response<ResponseBody>
+
+    @HTTP(method = "DELETE", path = "api/homeassistant/events/{calendarId}/{uid}", hasBody = false)
     suspend fun deleteHAEvent(
         @Path("calendarId") calendarId: Int,
         @Path("uid") uid: String,
