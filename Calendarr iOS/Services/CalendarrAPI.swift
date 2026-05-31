@@ -400,6 +400,28 @@ class CalendarrAPI {
                               body: ["enabled": !hidden, "sidebar_hidden": hidden])
     }
 
+    // MARK: – Calendar colour
+
+    func updateLocalCalendarColor(id: Int, color: String) async throws {
+        _ = try await request("/api/local/calendars/\(id)", method: "PUT", body: ["color": color])
+    }
+
+    func updateICalColor(id: Int, color: String) async throws {
+        _ = try await request("/api/ical/subscriptions/\(id)", method: "PUT", body: ["color": color])
+    }
+
+    /// Set a per-calendar colour for server-managed sources (caldav/google/homeassistant).
+    func setCalendarColor(source: String, calendarId: Int, color: String) async throws {
+        let path: String
+        switch source {
+        case "caldav":        path = "/api/caldav/calendars/\(calendarId)"
+        case "google":        path = "/api/google/calendars/\(calendarId)"
+        case "homeassistant": path = "/api/homeassistant/calendars/\(calendarId)"
+        default:              return
+        }
+        _ = try await request(path, method: "PUT", body: ["color": color])
+    }
+
     // MARK: – Profile (display name / login name / email)
 
     /// Update profile fields. A login-name change returns a fresh token (the old

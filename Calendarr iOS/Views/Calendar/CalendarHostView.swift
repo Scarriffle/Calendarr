@@ -129,7 +129,7 @@ struct CalendarHostView: View {
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack(spacing: 8) {
-                            groupMenu
+                            if !groups.isEmpty { groupMenu }
                             viewPickerMenu
                             Button { showFilter = true } label: {
                                 Image(systemName: "line.3.horizontal.decrease.circle")
@@ -178,23 +178,25 @@ struct CalendarHostView: View {
                 }
                 Button(L10n.t("nav.today", appLang)) { store.moveToToday() }
                     .font(.callout).padding(.horizontal, 6)
+                    .lineLimit(1).fixedSize()
             }
-            .padding(.leading, 8)
-            Spacer(minLength: 8)
+            .padding(.leading, 6)
+            Spacer(minLength: 6)
             Text(titleString)
                 .font(.headline)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Spacer(minLength: 8)
-            groupMenu
+                .layoutPriority(1)
+            Spacer(minLength: 6)
+            if !groups.isEmpty { groupMenu }
             viewPickerMenu
             filterButton
             Button { showMenu = true } label: {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 18, weight: .medium))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 36, height: 36)
             }
-            .padding(.trailing, 4)
+            .padding(.trailing, 2)
         }
         .frame(height: 48)
         .background(.bar)
@@ -205,7 +207,7 @@ struct CalendarHostView: View {
             Image(systemName: "line.3.horizontal.decrease.circle")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(store.hiddenCalendarKeys.isEmpty ? .primary : Color.accentColor)
-                .frame(width: 40, height: 40)
+                .frame(width: 36, height: 36)
         }
         .accessibilityLabel(L10n.t("filter.button", appLang))
     }
@@ -228,7 +230,7 @@ struct CalendarHostView: View {
             Image(systemName: store.activeGroup == nil ? "person.2" : "person.2.fill")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(store.activeGroup == nil ? .primary : Color.accentColor)
-                .frame(width: 40, height: 40)
+                .frame(width: 36, height: 36)
         }
         .accessibilityLabel(L10n.t("groups.title", appLang))
     }
@@ -263,7 +265,7 @@ struct CalendarHostView: View {
             Image(systemName: store.viewType.systemImage)
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.primary)
-                .frame(width: 40, height: 40)
+                .frame(width: 36, height: 36)
         }
         .accessibilityLabel(L10n.t("view.change", appLang))
     }

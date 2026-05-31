@@ -131,16 +131,22 @@ struct AccountsView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(caldavAccounts) { acc in
-                    HStack {
-                        Circle()
-                            .fill(Color(hex: acc.color))
-                            .frame(width: 12, height: 12)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(acc.name).font(.body)
-                            Text(acc.url)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Circle().fill(Color(hex: acc.color)).frame(width: 12, height: 12)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(acc.name).font(.body)
+                                Text(acc.url).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                        ForEach(acc.calendars ?? []) { cal in
+                            HStack {
+                                CalendarColorDot(hex: cal.color ?? acc.color) { hex in
+                                    try? await api.setCalendarColor(source: "caldav", calendarId: cal.id, color: hex)
+                                }
+                                Text(cal.name).font(.callout)
+                            }
+                            .padding(.leading, 8)
                         }
                     }
                 }
@@ -163,9 +169,9 @@ struct AccountsView: View {
             } else {
                 ForEach(localCalendars) { cal in
                     HStack {
-                        Circle()
-                            .fill(Color(hex: cal.color))
-                            .frame(width: 12, height: 12)
+                        CalendarColorDot(hex: cal.color, editable: cal.owned) { hex in
+                            try? await api.updateLocalCalendarColor(id: cal.id, color: hex)
+                        }
                         Text(cal.name)
                         if cal.group {
                             Image(systemName: "person.2.fill").font(.caption2).foregroundStyle(.secondary)
@@ -213,9 +219,9 @@ struct AccountsView: View {
             } else {
                 ForEach(icalSubs) { sub in
                     HStack {
-                        Circle()
-                            .fill(Color(hex: sub.color))
-                            .frame(width: 12, height: 12)
+                        CalendarColorDot(hex: sub.color) { hex in
+                            try? await api.updateICalColor(id: sub.id, color: hex)
+                        }
                         VStack(alignment: .leading, spacing: 2) {
                             Text(sub.name).font(.body)
                             Text(String(format: L10n.t("accounts.ical.every", appLang), sub.refreshMinutes))
@@ -242,10 +248,20 @@ struct AccountsView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(googleAccounts) { acc in
-                    HStack {
-                        Image(systemName: "g.circle.fill")
-                            .foregroundStyle(.red)
-                        Text(acc.email)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "g.circle.fill").foregroundStyle(.red)
+                            Text(acc.email)
+                        }
+                        ForEach(acc.calendars ?? []) { cal in
+                            HStack {
+                                CalendarColorDot(hex: cal.color ?? "#4285f4") { hex in
+                                    try? await api.setCalendarColor(source: "google", calendarId: cal.id, color: hex)
+                                }
+                                Text(cal.name).font(.callout)
+                            }
+                            .padding(.leading, 8)
+                        }
                     }
                 }
                 .onDelete { offsets in
@@ -347,12 +363,20 @@ struct AccountsView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(haAccounts) { acc in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(acc.name).font(.body)
-                        Text(acc.url)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(acc.name).font(.body)
+                            Text(acc.url).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        ForEach(acc.calendars ?? []) { cal in
+                            HStack {
+                                CalendarColorDot(hex: cal.color ?? "#03a9f4") { hex in
+                                    try? await api.setCalendarColor(source: "homeassistant", calendarId: cal.id, color: hex)
+                                }
+                                Text(cal.name).font(.callout)
+                            }
+                            .padding(.leading, 8)
+                        }
                     }
                 }
                 .onDelete { offsets in
@@ -681,6 +705,31 @@ struct AddHASheet: View {
 
 struct IdentifiableInt: Identifiable { let id: Int }
 struct ExportedICS: Identifiable { let id = UUID(); let url: URL }
+
+/// A tappable colour swatch (ColorPicker) for a calendar. Persists via `onPick`
+/// when the chosen colour changes. Read-only fallback when `editable` is false.
+struct CalendarColorDot: View {
+    let hex: String
+    var editable: Bool = true
+    let onPick: (String) async -> Void
+    @State private var color: Color
+
+    init(hex: String, editable: Bool = true, onPick: @escaping (String) async -> Void) {
+        self.hex = hex; self.editable = editable; self.onPick = onPick
+        _color = State(initialValue: Color(hex: hex))
+    }
+
+    var body: some View {
+        if editable {
+            ColorPicker("", selection: $color, supportsOpacity: false)
+                .labelsHidden()
+                .frame(width: 26, height: 26)
+                .onChange(of: color) { _, c in Task { await onPick(c.toHex()) } }
+        } else {
+            Circle().fill(Color(hex: hex)).frame(width: 14, height: 14)
+        }
+    }
+}
 
 /// Wraps UIActivityViewController so an exported .ics can be shared/saved.
 struct ActivityView: UIViewControllerRepresentable {
