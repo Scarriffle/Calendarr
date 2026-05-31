@@ -219,6 +219,12 @@ class CalendarStore {
     /// `start` / `end` are kept in the signature for call-site clarity.
     func refreshFromCache(start: Date, end: Date) {
         _ = (start, end)
+        // In group overlay mode show everything (the per-calendar hide/banish
+        // toggles are for the personal view only).
+        if activeGroup != nil {
+            events = allCachedEvents
+            return
+        }
         events = allCachedEvents.filter { ev in
             let key = Self.calendarKey(source: ev.source, calendarId: ev.calendarId)
             return !hiddenCalendarKeys.contains(key)
@@ -242,20 +248,6 @@ class CalendarStore {
     /// unless `force` is set (used after create/edit to pull fresh server data
     /// for the visible range, bypassing the cache).
     func loadEvents(api: CalendarrAPI, start: Date, end: Date, force: Bool = false) async {
-        // Group overlay mode: always fetch the combined view for the range
-        // (no personal cache), decorating each event with its owner.
-        if let g = activeGroup {
-            isLoading = true
-            lastError = nil
-            defer { isLoading = false }
-            do {
-                let fetched = try await api.fetchGroupCombined(groupId: g.id, start: start, end: end)
-                events = fetched.map { decorateGroupEvent($0) }
-            } catch {
-                lastError = error.localizedDescription
-            }
-            return
-        }
         if !force, isCached(start: start, end: end) {
             refreshFromCache(start: start, end: end)
             return
@@ -264,12 +256,23 @@ class CalendarStore {
         lastError = nil
         defer { isLoading = false }
         do {
-            let fetched = try await api.fetchEvents(start: start, end: end)
+            let fetched = try await fetchForMode(api: api, start: start, end: end)
             mergeIntoCache(fetched, rangeStart: start, rangeEnd: end)
             refreshFromCache(start: start, end: end)
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Fetch events for the current mode (personal vs. group overlay). Group
+    /// events go through the same cache/prefetch/refresh path as personal ones,
+    /// so the whole visible grid is covered (no "only the middle weeks" gaps).
+    private func fetchForMode(api: CalendarrAPI, start: Date, end: Date) async throws -> [CalEvent] {
+        if let g = activeGroup {
+            let combined = try await api.fetchGroupCombined(groupId: g.id, start: start, end: end)
+            return combined.map { decorateGroupEvent($0) }
+        }
+        return try await api.fetchEvents(start: start, end: end)
     }
 
     /// Prefix a combined-view event with its owner (others) or 👥 + creator
@@ -298,7 +301,7 @@ class CalendarStore {
         isCachingBackground = true
         defer { isCachingBackground = false }
         do {
-            let fetched = try await api.fetchEvents(start: start, end: end)
+            let fetched = try await fetchForMode(api: api, start: start, end: end)
             mergeIntoCache(fetched, rangeStart: start, rangeEnd: end)
             // Refresh visible range from newly expanded cache
             let (vs, ve) = rangeForCurrentView()

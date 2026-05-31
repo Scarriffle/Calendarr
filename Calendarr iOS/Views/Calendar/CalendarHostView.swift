@@ -251,7 +251,9 @@ struct CalendarHostView: View {
 
     private func switchGroup(_ g: CalGroup?) {
         store.activeGroup = g
-        Task { await onNavigate() }
+        // The cache holds the previous mode's events — drop it and reload the
+        // visible range + prefetch a wide window so the whole grid is covered.
+        Task { await forceReload() }
     }
 
     private var viewPickerMenu: some View {
