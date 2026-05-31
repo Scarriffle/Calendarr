@@ -179,7 +179,12 @@ async def add_cache_headers(request: Request, call_next):
         response.headers["Cache-Control"] = NO_CACHE
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
-    # 2h cache for the rest of the frontend (JS/CSS/icons/etc.)
+    # JS/CSS must revalidate on every load so a deploy takes effect on the next
+    # reload (returns a cheap 304 when unchanged). Without this, a fresh
+    # no-cache index.html could pair with stale 2h-cached scripts.
+    elif path.startswith("/static/js/") or path.startswith("/static/css/"):
+        response.headers["Cache-Control"] = NO_CACHE
+    # 2h cache for the rest of the frontend (icons, fonts, images, …)
     elif path.startswith("/static/") or path.startswith("/icons/"):
         response.headers["Cache-Control"] = STATIC_CACHE
     # SPA fallback (everything else that isn't an API route) returns HTML;
