@@ -12,7 +12,7 @@ Die folgenden Ordner dienen NUR zur Referenz. NIEMALS Dateien darin verändern, 
 Alle Änderungen und neue Dateien kommen ausschliesslich in `../Calendarr Android/`.
 
 ## Server
-- Basis-URL (Prod): https://cal.scarriffle.com
+- Basis-URL (Prod): https://calendar.scarriffle.com
 - Auth: Erst Server-URL eingeben, dann Benutzername + Passwort
 - Credentials werden auf Android im EncryptedSharedPreferences gespeichert (Äquivalent zu Apple Keychain)
 

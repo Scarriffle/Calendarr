@@ -10,23 +10,27 @@ import com.scarriffle.calendarr.util.colorFromHex
 import com.scarriffle.calendarr.util.contrastingTextColor
 
 /**
- * The Calendarr UI is a dark theme whose accent colours follow the user's
- * synced [AppSettings] (mirrors the iOS appearance settings).
+ * The Calendarr brand accent — the green from the iOS `AccentColor` asset
+ * (#20A050). This drives the global control tint (buttons, FAB, switches,
+ * top bar) regardless of the server's per-calendar colours, matching iOS
+ * where the app tint is fixed and `primary_color` only styles calendar
+ * elements (e.g. the "today" highlight, read from [AppSettings]).
  */
+val BrandGreen = Color(0xFF20A050)
+
 @Composable
 fun CalendarrTheme(
     settings: AppSettings = AppSettings(),
     content: @Composable () -> Unit,
 ) {
-    val primary = colorFromHex(settings.primaryColor, Color(0xFF4285F4))
-    val accent = colorFromHex(settings.accentColor, Color(0xFFEA4335))
+    val primary = BrandGreen
 
     val colors = darkColorScheme(
         primary = primary,
         onPrimary = primary.contrastingTextColor(),
-        secondary = accent,
-        onSecondary = accent.contrastingTextColor(),
-        tertiary = accent,
+        secondary = primary,
+        onSecondary = primary.contrastingTextColor(),
+        tertiary = primary,
         background = Color(0xFF000000),
         onBackground = Color(0xFFF2F2F7),
         surface = Color(0xFF1C1C1E),

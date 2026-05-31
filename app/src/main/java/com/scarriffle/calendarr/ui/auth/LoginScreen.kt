@@ -26,10 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.scarriffle.calendarr.data.CredentialStore
+import com.scarriffle.calendarr.ui.components.PasswordField
 import com.scarriffle.calendarr.ui.tr
 
 @Composable
@@ -63,16 +63,10 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
+            PasswordField(
                 value = vm.password,
                 onValueChange = vm::onPasswordChange,
-                label = { Text(tr("auth.password")) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                ),
+                label = tr("auth.password"),
                 modifier = Modifier.fillMaxWidth(),
             )
             AnimatedVisibility(vm.showTotp) {

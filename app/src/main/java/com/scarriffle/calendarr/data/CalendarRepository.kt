@@ -79,7 +79,7 @@ class CalendarRepository @Inject constructor(
                 JSONObject(resp.errorBody()?.string() ?: "").optString("detail")
             }.getOrNull()
             if (detail == "2fa_required") throw TwoFactorRequiredException()
-            throw UnauthorizedException()
+            throw UnauthorizedException(detail?.takeIf { it.isNotBlank() } ?: "Benutzername oder Passwort falsch")
         }
         if (!resp.isSuccessful) throw ApiException(errorDetail(resp.errorBody(), resp.code()))
 

@@ -7,8 +7,8 @@ import retrofit2.Response
 /** Generic server error carrying the `detail` message when available. */
 open class ApiException(message: String) : Exception(message)
 
-/** Credentials rejected (HTTP 401, not a 2FA prompt). */
-class UnauthorizedException : ApiException("Benutzername oder Passwort falsch")
+/** Credentials rejected (HTTP 401, not a 2FA prompt). Carries the server detail. */
+class UnauthorizedException(message: String = "Benutzername oder Passwort falsch") : ApiException(message)
 
 /** Server requires a TOTP code to finish login (HTTP 401, detail "2fa_required"). */
 class TwoFactorRequiredException : ApiException("2FA-Code erforderlich")

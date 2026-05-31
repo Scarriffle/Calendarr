@@ -32,9 +32,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.scarriffle.calendarr.ui.components.PasswordField
 import com.scarriffle.calendarr.ui.tr
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,11 +105,11 @@ private fun PasswordSection(vm: ProfileViewModel) {
     var localError by remember { mutableStateOf<String?>(null) }
 
     SectionTitle(tr("profile.change_password"))
-    OutlinedTextField(value = current, onValueChange = { current = it }, label = { Text(tr("profile.current_password")) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+    PasswordField(value = current, onValueChange = { current = it }, label = tr("profile.current_password"), modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.size(8.dp))
-    OutlinedTextField(value = new1, onValueChange = { new1 = it }, label = { Text(tr("profile.new_password")) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+    PasswordField(value = new1, onValueChange = { new1 = it }, label = tr("profile.new_password"), modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.size(8.dp))
-    OutlinedTextField(value = new2, onValueChange = { new2 = it }, label = { Text(tr("profile.new_password_repeat")) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+    PasswordField(value = new2, onValueChange = { new2 = it }, label = tr("profile.new_password_repeat"), modifier = Modifier.fillMaxWidth())
     localError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     Spacer(Modifier.size(8.dp))
     Button(onClick = {
@@ -127,7 +127,7 @@ private fun TwoFactorSection(vm: ProfileViewModel) {
     Text(if (enabled) tr("profile.twofa.active") else tr("profile.twofa.inactive"), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     Spacer(Modifier.size(8.dp))
     if (enabled) {
-        OutlinedTextField(value = disablePw, onValueChange = { disablePw = it }, label = { Text(tr("twofa.password_placeholder")) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        PasswordField(value = disablePw, onValueChange = { disablePw = it }, label = tr("twofa.password_placeholder"), modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.size(8.dp))
         OutlinedButton(onClick = { vm.disable2fa(disablePw); disablePw = "" }) { Text(tr("profile.twofa.disable")) }
     } else {

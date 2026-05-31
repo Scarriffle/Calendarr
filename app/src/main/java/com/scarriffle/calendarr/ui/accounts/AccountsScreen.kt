@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.scarriffle.calendarr.ui.components.PasswordField
 import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
 
@@ -193,7 +194,7 @@ private fun CalDAVDialog(onDismiss: () -> Unit, onConfirm: (String, String, Stri
         Spacer(Modifier.size(8.dp))
         OutlinedTextField(user, { user = it }, label = { Text(tr("caldav.username")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.size(8.dp))
-        OutlinedTextField(pass, { pass = it }, label = { Text(tr("caldav.password")) }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        PasswordField(pass, { pass = it }, label = tr("caldav.password"), modifier = Modifier.fillMaxWidth())
     }
 }
 
