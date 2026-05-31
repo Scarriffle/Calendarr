@@ -414,6 +414,17 @@ class CalendarrAPI {
         return json?["access_token"] as? String
     }
 
+    // MARK: – Targeted settings (avoid overwriting the whole AppSettings)
+
+    func updatePrivateVisibility(_ value: String) async throws {
+        _ = try await request("/api/settings/", method: "PUT", body: ["private_event_visibility": value])
+    }
+
+    func updateGroupVisibleCalendar(_ calendarId: Int?) async throws {
+        _ = try await request("/api/settings/", method: "PUT",
+                              body: ["group_visible_calendar_id": calendarId as Any? ?? NSNull()])
+    }
+
     // MARK: – Sharing
 
     func getUserDirectory() async throws -> [DirectoryUser] {

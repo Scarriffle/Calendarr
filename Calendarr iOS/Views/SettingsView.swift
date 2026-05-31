@@ -23,9 +23,21 @@ struct SettingsView: View {
     @AppStorage("weekStartDay")      private var weekStartDay = "monday"
     @AppStorage("dimPastEvents")     private var dimPastEvents = false
 
+    // Profile chapter (server-backed; loaded on appear).
+    @State private var displayName = ""
+    @State private var loginName = ""
+    @State private var email = ""
+    @State private var privateVisibility = "busy"
+    @State private var groupVisibleId = 0      // 0 = none
+    @State private var ownLocalCals: [LocalCalendar] = []
+    @State private var profileMsg = ""
+
     var body: some View {
         NavigationStack {
             Form {
+                profilSection
+                privatsphaereSection
+                geteilterKalenderSection
                 liquidGlassSection
                 cacheSection
                 spracheSection
@@ -40,6 +52,7 @@ struct SettingsView: View {
         }
         // Reflect the latest server values when opening the screen.
         .task { await SettingsSync.pull(api: api) }
+        .task { await loadProfile() }
         // Appearance changes update widgets live; synced values are also pushed
         // to the server (debounced). `push` itself decides what actually gets
         // sent based on the sync toggle, so every change can simply call it.
@@ -60,6 +73,101 @@ struct SettingsView: View {
         .onChange(of: appLang)    { _, _ in WidgetStore.republishAppearanceOnly() }
         // Enabling sync adopts the server's appearance (server wins).
         .onChange(of: settingsSync) { _, on in if on { Task { await SettingsSync.pull(api: api) } } }
+    }
+
+    // MARK: – Profil
+
+    var profilSection: some View {
+        Section(L10n.t("settings.nav.profile", appLang)) {
+            HStack {
+                Text(L10n.t("profile.display_name", appLang))
+                Spacer()
+                TextField(L10n.t("profile.display_name", appLang), text: $displayName)
+                    .multilineTextAlignment(.trailing)
+            }
+            HStack {
+                Text(L10n.t("profile.login_name", appLang))
+                Spacer()
+                Text(loginName).foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("E-Mail")
+                Spacer()
+                TextField("E-Mail", text: $email)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.emailAddress)
+                    .autocapitalization(.none)
+            }
+            Button(L10n.t("event.save", appLang)) { Task { await saveProfile() } }
+            if !profileMsg.isEmpty {
+                Text(profileMsg).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: – Privatsphäre
+
+    var privatsphaereSection: some View {
+        Section {
+            Picker(L10n.t("settings.private_visibility", appLang), selection: $privateVisibility) {
+                Text(L10n.t("settings.private.busy", appLang)).tag("busy")
+                Text(L10n.t("settings.private.hidden", appLang)).tag("hidden")
+            }
+            .onChange(of: privateVisibility) { _, v in
+                Task { try? await api.updatePrivateVisibility(v) }
+            }
+        } header: {
+            Text(L10n.t("settings.privacy", appLang))
+        } footer: {
+            Text(L10n.t("settings.private_visibility.desc", appLang)).font(.caption)
+        }
+    }
+
+    // MARK: – Geteilter Kalender
+
+    var geteilterKalenderSection: some View {
+        Section {
+            Picker(L10n.t("settings.group_visible", appLang), selection: $groupVisibleId) {
+                Text(L10n.t("group.visible.none", appLang)).tag(0)
+                ForEach(ownLocalCals) { cal in
+                    Text(cal.name).tag(cal.id)
+                }
+            }
+            .onChange(of: groupVisibleId) { _, id in
+                Task { try? await api.updateGroupVisibleCalendar(id == 0 ? nil : id) }
+            }
+        } header: {
+            Text(L10n.t("settings.calendars", appLang))
+        } footer: {
+            Text(L10n.t("settings.group_visible.desc", appLang)).font(.caption)
+        }
+    }
+
+    private func loadProfile() async {
+        if let p = try? await api.getProfile() {
+            displayName = p.displayName ?? p.username
+            loginName = p.username
+            email = p.email ?? ""
+        }
+        if let s = try? await api.getSettings() {
+            privateVisibility = s.privateEventVisibility
+            groupVisibleId = s.groupVisibleCalendarId ?? 0
+        }
+        if let cals = try? await api.getLocalCalendars() {
+            ownLocalCals = cals.filter { $0.owned && !$0.group }
+        }
+    }
+
+    private func saveProfile() async {
+        do {
+            _ = try await api.updateProfile(displayName: displayName.isEmpty ? nil : displayName,
+                                            username: nil,
+                                            email: email.isEmpty ? "" : email)
+            UserDefaults.standard.set(displayName, forKey: "displayName")
+            profileMsg = L10n.t("settings.saved", appLang)
+        } catch {
+            profileMsg = error.localizedDescription
+        }
     }
 
     // MARK: – Liquid Glass
