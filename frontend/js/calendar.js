@@ -2293,6 +2293,16 @@ function renderGroupList() {
   });
 }
 
+// Open the new-event editor preselected to the active group's shared calendar.
+function openGroupEventModal() {
+  const g = state.groups.find(x => x.id === state.activeGroupId);
+  if (!g || !g.group_calendar_id) { showToast(t('groups_none'), true); return; }
+  openNewEventModal(state.selectedDate || state.currentDate);
+  const sel = document.getElementById('ev-calendar');
+  sel.value = `local-${g.group_calendar_id}`;
+  updatePrivateRow(false);
+}
+
 function enterGroupView(groupId) {
   state.activeGroupId = groupId;
   const g = state.groups.find(x => x.id === groupId);
@@ -2387,6 +2397,8 @@ function bindGroupUI() {
   if (addBtn) addBtn.onclick = () => openGroupModal(null);
   const exitBtn = document.getElementById('group-view-exit');
   if (exitBtn) exitBtn.onclick = exitGroupView;
+  const newEvtBtn = document.getElementById('group-view-new-event');
+  if (newEvtBtn) newEvtBtn.onclick = openGroupEventModal;
 
   document.getElementById('group-save').onclick = async () => {
     const modal = document.getElementById('modal-group');
