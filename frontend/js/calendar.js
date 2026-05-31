@@ -576,28 +576,38 @@ function renderCalendarList() {
     }).join('');
   }
 
-  // ── Local calendars (own + shared with me) ─────────────
-  if (state.localCalendars.length) {
+  // ── Local calendars: own ones, then a separate "shared with me" group ──
+  const ownLocal    = state.localCalendars.filter(c => c.owned !== false);
+  const sharedLocal = state.localCalendars.filter(c => c.owned === false && !c.group);
+
+  const renderLocalItem = (cal, withRemove) => {
+    const removeBtn = withRemove
+      ? `<button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="local" title="${t('remove_cal')}">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>`
+      : '';
+    return `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
+      <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="local" />
+      <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="local" title="${t('change_color')}"></div>
+      <span class="cal-item-name" data-source="local">${escHtml(cal.name)}</span>
+      ${removeBtn}
+    </div>`;
+  };
+
+  if (ownLocal.length) {
     html += `<div class="cal-account-name">${t('cal_local')}</div>`;
-    html += state.localCalendars.map(cal => {
-      const owned = cal.owned !== false;
-      // Shared calendars get an owner badge and no delete button (owner-only).
-      const sharedBadge = !owned
-        ? `<span class="cal-badge cal-badge-shared" title="${t('shared_by', { name: cal.shared_by || '' })}">${escHtml(cal.shared_by || '')}</span>`
-        : '';
-      const removeBtn = owned
-        ? `<button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="local" title="${t('remove_cal')}">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-          </button>`
-        : '';
-      return `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
+    html += ownLocal.map(c => renderLocalItem(c, true)).join('');
+  }
+  if (sharedLocal.length) {
+    html += `<div class="cal-account-name">${t('shared_with_me')}</div>`;
+    html += sharedLocal.map(cal =>
+      `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
         <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="local" />
         <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="local" title="${t('change_color')}"></div>
         <span class="cal-item-name" data-source="local">${escHtml(cal.name)}</span>
-        ${sharedBadge}
-        ${removeBtn}
-      </div>`;
-    }).join('');
+        <span class="cal-badge cal-badge-shared" title="${t('shared_by', { name: cal.shared_by || '' })}">${escHtml(cal.shared_by || '')}</span>
+      </div>`
+    ).join('');
   }
 
   // ── iCal subscriptions ─────────────────────────────────
@@ -677,8 +687,12 @@ function renderCalendarList() {
         cacheCalId = calId; // numeric integer in cached events
       } else if (source === 'local') {
         const calId = parseInt(cb.dataset.calId);
-        await api.put(`/local/calendars/${calId}`, { enabled: cb.checked });
         const cal = state.localCalendars.find(c => c.id === calId);
+        // `enabled` is the owner's property — only the owner may PUT it.
+        // For shared/group calendars just toggle visibility client-side.
+        if (cal && cal.owned !== false) {
+          await api.put(`/local/calendars/${calId}`, { enabled: cb.checked });
+        }
         if (cal) cal.enabled = cb.checked;
         cacheCalId = `local-${calId}`;
       } else if (source === 'ical') {
@@ -2341,6 +2355,25 @@ function bindGroupUI() {
   };
 }
 
+// Radio list of the user's OWN local calendars to pick the one visible to
+// group members (plus a "none" option). Selection is read on settings save.
+function renderGroupVisibleList(selectedId) {
+  const el = document.getElementById('cfg-group-visible-list');
+  if (!el) return;
+  const own = state.localCalendars.filter(c => c.owned !== false && !c.group);
+  const opt = (id, name, color) => {
+    const checked = (id === null && (selectedId == null)) || id === selectedId;
+    const dot = color ? `<span class="cal-item-dot" style="background:${color};width:12px;height:12px"></span>` : '';
+    return `<label class="cal-radio-item">
+      <input type="radio" name="cfg-group-visible" value="${id == null ? '' : id}" ${checked ? 'checked' : ''} />
+      ${dot}<span>${escHtml(name)}</span>
+    </label>`;
+  };
+  el.innerHTML =
+    opt(null, t('group_visible_none'), null) +
+    own.map(c => opt(c.id, c.name, c.color)).join('');
+}
+
 // ── Settings Modal ────────────────────────────────────────
 function openSettingsModal() {
   const s = state.settings;
@@ -2374,6 +2407,7 @@ function openSettingsModal() {
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
   document.getElementById('cfg-language').value = getLang();
   document.getElementById('cfg-private-visibility').value = s.private_event_visibility || 'busy';
+  renderGroupVisibleList(s.group_visible_calendar_id);
 
   // Set active contrast/hour-height buttons
   [
@@ -2854,6 +2888,8 @@ function bindSettingsModal() {
       language:            document.getElementById('cfg-language').value,
       private_event_visibility: document.getElementById('cfg-private-visibility').value,
     };
+    const gvSel = document.querySelector('input[name="cfg-group-visible"]:checked');
+    settings.group_visible_calendar_id = gvSel && gvSel.value ? parseInt(gvSel.value) : null;
     try {
       await api.put('/settings/', settings);
       state.settings = { ...state.settings, ...settings };

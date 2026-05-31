@@ -50,8 +50,13 @@ async function uploadRequest(path, formData) {
     return null;
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: t('unknown_error') }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    // Upload errors may be non-JSON (e.g. an nginx 413/502 HTML page); fall back
+    // to the HTTP status so the message is diagnostic, not "unknown error".
+    const err = await res.json().catch(() => null);
+    const detail = (err && err.detail)
+      ? err.detail
+      : (res.status === 413 ? t('upload_too_large') : `HTTP ${res.status} ${res.statusText || ''}`.trim());
+    throw new Error(detail);
   }
   if (res.status === 204) return null;
   return res.json();
