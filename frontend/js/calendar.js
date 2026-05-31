@@ -70,13 +70,19 @@ function readUrlState() {
     const d = new Date(date + 'T00:00:00');
     if (!isNaN(d.getTime())) out.date = d;
   }
+  out.settings = params.get('settings') === '1';
   return out;
 }
+
+// Tracks whether the settings modal is open, so a reload returns to settings
+// instead of the calendar view.
+let uiSettingsOpen = false;
 
 function writeUrlState() {
   const d = state.currentDate;
   const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const newHash = `date=${dateStr}&view=${state.currentView}`;
+  let newHash = `date=${dateStr}&view=${state.currentView}`;
+  if (uiSettingsOpen) newHash += '&settings=1';
   if (window.location.hash.replace(/^#/,'') !== newHash) {
     // replaceState statt pushState: prev/next-Klicks sollen nicht jeden
     // einzelnen Tag in den Browser-History-Stack drücken
@@ -129,6 +135,9 @@ export async function initCalendar() {
   bindSwipeNavigation();
   handleHAOAuthReturn();
   loadGroups();
+
+  // Reopen the settings modal after a reload if the URL says we were in it.
+  if (readUrlState().settings) openSettingsModal();
 
   // Browser-Back/Forward: URL-Hash → State synchronisieren
   window.addEventListener('hashchange', () => {
@@ -2292,17 +2301,19 @@ function renderGroupMemberPicker() {
   const picked = modal.__memberIds || new Set();
   const picker = document.getElementById('group-member-picker');
   picker.innerHTML = dir.length
-    ? dir.map(u =>
-        `<label class="group-member-item">
-          <input type="checkbox" data-member-id="${u.id}" ${picked.has(u.id) ? 'checked' : ''} />
-          <span class="group-member-name">${escHtml(u.display_name || '')}</span>
-        </label>`
-      ).join('')
+    ? dir.map(u => {
+        const on = picked.has(u.id);
+        return `<div class="pick-row ${on ? 'pick-row-sel' : ''}" data-member-id="${u.id}" role="checkbox" aria-checked="${on}">
+          <span class="pick-mark">${on ? '☑' : '☐'}</span>
+          <span class="pick-name">${escHtml(u.display_name || '')}</span>
+        </div>`;
+      }).join('')
     : `<span class="accounts-section-empty">${t('share_no_users')}</span>`;
-  picker.querySelectorAll('input[data-member-id]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const id = parseInt(cb.dataset.memberId);
-      if (cb.checked) picked.add(id); else picked.delete(id);
+  picker.querySelectorAll('.pick-row').forEach(rowEl => {
+    rowEl.addEventListener('click', () => {
+      const id = parseInt(rowEl.dataset.memberId);
+      if (picked.has(id)) picked.delete(id); else picked.add(id);
+      renderGroupMemberPicker();
     });
   });
 }
@@ -2360,22 +2371,36 @@ function bindGroupUI() {
 function renderGroupVisibleList(selectedId) {
   const el = document.getElementById('cfg-group-visible-list');
   if (!el) return;
+  el.dataset.selected = (selectedId == null) ? '' : String(selectedId);
   const own = state.localCalendars.filter(c => c.owned !== false && !c.group);
-  const opt = (id, name, color) => {
-    const checked = (id === null && (selectedId == null)) || id === selectedId;
-    const dot = color ? `<span class="cal-item-dot" style="background:${color};width:12px;height:12px"></span>` : '';
-    return `<label class="cal-radio-item">
-      <input type="radio" name="cfg-group-visible" value="${id == null ? '' : id}" ${checked ? 'checked' : ''} />
-      ${dot}<span>${escHtml(name)}</span>
-    </label>`;
+  const selVal = el.dataset.selected;
+  const row = (id, name, color) => {
+    const val = (id == null) ? '' : String(id);
+    const sel = val === selVal;
+    const dot = color
+      ? `<span class="pick-dot" style="background:${color}"></span>`
+      : `<span class="pick-dot pick-dot-empty"></span>`;
+    return `<div class="pick-row ${sel ? 'pick-row-sel' : ''}" data-pick="${val}" role="radio" aria-checked="${sel}">
+      <span class="pick-mark">${sel ? '●' : '○'}</span>
+      ${dot}
+      <span class="pick-name">${escHtml(name)}</span>
+    </div>`;
   };
   el.innerHTML =
-    opt(null, t('group_visible_none'), null) +
-    own.map(c => opt(c.id, c.name, c.color)).join('');
+    row(null, t('group_visible_none'), null) +
+    own.map(c => row(c.id, c.name, c.color)).join('');
+  el.querySelectorAll('.pick-row').forEach(r => {
+    r.addEventListener('click', () => {
+      el.dataset.selected = r.dataset.pick;
+      renderGroupVisibleList(r.dataset.pick === '' ? null : parseInt(r.dataset.pick));
+    });
+  });
 }
 
 // ── Settings Modal ────────────────────────────────────────
 function openSettingsModal() {
+  uiSettingsOpen = true;
+  writeUrlState();
   const s = state.settings;
   document.getElementById('cfg-default-view').value  = s.default_view   || 'month';
   document.getElementById('cfg-week-start').value    = s.week_start_day || 'monday';
@@ -2888,8 +2913,8 @@ function bindSettingsModal() {
       language:            document.getElementById('cfg-language').value,
       private_event_visibility: document.getElementById('cfg-private-visibility').value,
     };
-    const gvSel = document.querySelector('input[name="cfg-group-visible"]:checked');
-    settings.group_visible_calendar_id = gvSel && gvSel.value ? parseInt(gvSel.value) : null;
+    const gvVal = document.getElementById('cfg-group-visible-list')?.dataset.selected;
+    settings.group_visible_calendar_id = gvVal ? parseInt(gvVal) : null;
     try {
       await api.put('/settings/', settings);
       state.settings = { ...state.settings, ...settings };
@@ -3205,6 +3230,10 @@ function openModal(id) {
 }
 function closeModal(id) {
   document.getElementById(id).classList.add('hidden');
+  if (id === 'modal-settings') {
+    uiSettingsOpen = false;
+    writeUrlState();
+  }
 }
 
 // Close button bindings (added once)

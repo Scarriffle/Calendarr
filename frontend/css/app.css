@@ -1859,3 +1859,36 @@ a { color: var(--primary); text-decoration: none; }
 .cal-radio-item:last-child { border-bottom: none; }
 .cal-radio-item:hover { background: var(--bg-surface); }
 .cal-radio-item .cal-item-dot { border-radius: 50%; flex: 0 0 auto; }
+
+/* Picker rows (group-visible calendar radio + group member checkboxes).
+   Deliberately NOT <label> elements, so the global ".form-group label"
+   uppercase/grey styling never applies. */
+.cal-radio-list,
+#group-member-picker {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.pick-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 14px;
+  color: var(--text-1);
+}
+.pick-row:last-child { border-bottom: none; }
+.pick-row:hover { background: var(--bg-surface); }
+.pick-row-sel { background: rgba(66, 133, 244, 0.12); }
+.pick-mark { flex: 0 0 auto; width: 18px; text-align: center; color: var(--primary); }
+.pick-dot { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; }
+.pick-dot-empty { background: transparent; }
+.pick-name { flex: 1 1 auto; text-align: left; }

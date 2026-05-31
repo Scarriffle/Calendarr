@@ -386,8 +386,17 @@ def _import_ics_into(cal: models.LocalCalendar, raw: bytes, db: Session) -> dict
     parsed = ical_io.parse_ics(raw)
     imported = 0
     skipped = 0
+    errors = list(parsed["errors"])
+    # local_events.uid is globally unique. Dedupe against the DB AND within this
+    # file — e.g. Nextcloud exports recurring events as several VEVENTs sharing a
+    # UID (RECURRENCE-ID overrides), which would otherwise violate the constraint.
+    seen_uids: set[str] = set()
     for item in parsed["events"]:
         uid = item.get("uid") or str(uuid.uuid4())
+        if uid in seen_uids:
+            skipped += 1
+            continue
+        seen_uids.add(uid)
         existing = db.query(models.LocalEvent).filter(models.LocalEvent.uid == uid).first()
         if existing:
             skipped += 1
@@ -407,8 +416,12 @@ def _import_ics_into(cal: models.LocalCalendar, raw: bytes, db: Session) -> dict
         )
         db.add(ev)
         imported += 1
-    db.commit()
-    return {"imported": imported, "skipped": skipped, "errors": parsed["errors"]}
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise ValueError(f"Import fehlgeschlagen: {exc}")
+    return {"imported": imported, "skipped": skipped, "errors": errors}
 
 
 @router.post("/calendars/{calendar_id}/import")

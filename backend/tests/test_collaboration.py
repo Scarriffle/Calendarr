@@ -289,6 +289,39 @@ def test_import_dedupes_by_uid(client):
     assert imported and imported[0]["creator"]["display_name"] == "Max Mustermann (importiert)"
 
 
+DUP_UID_ICS = b"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Nextcloud
+BEGIN:VEVENT
+UID:recurring@nc
+SUMMARY:Standup
+DTSTART:20260601T090000Z
+DTEND:20260601T091500Z
+RRULE:FREQ=WEEKLY;BYDAY=MO
+END:VEVENT
+BEGIN:VEVENT
+UID:recurring@nc
+RECURRENCE-ID:20260608T090000Z
+SUMMARY:Standup verschoben
+DTSTART:20260608T100000Z
+DTEND:20260608T101500Z
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_import_handles_duplicate_uid_in_file(client):
+    """Nextcloud exports recurring events as multiple VEVENTs sharing a UID;
+    importing must not 500 on the unique constraint."""
+    admin = register_admin(client)
+    cal_id = _make_calendar(client, admin, "NC")
+    files = {"file": ("nc.ics", DUP_UID_ICS, "text/calendar")}
+    r = client.post(f"/api/local/calendars/{cal_id}/import", headers=auth(admin), files=files)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["imported"] == 1 and body["skipped"] == 1
+
+
 def test_export_contains_organizer_and_rrule(client):
     admin = register_admin(client)
     cal_id = _make_calendar(client, admin, "Export-Test")
