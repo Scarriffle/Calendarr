@@ -6,6 +6,7 @@ import com.scarriffle.calendarr.data.CalendarRepository
 import com.scarriffle.calendarr.data.SettingsStore
 import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
+import com.scarriffle.calendarr.domain.model.Group
 import com.scarriffle.calendarr.domain.model.WritableCalendar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,9 @@ data class CalendarUiState(
     val writableCalendars: List<WritableCalendar> = emptyList(),
     val hiddenKeys: Set<String> = emptySet(),
     val banishedKeys: Set<String> = emptySet(),
+    // Group overlay: when non-null the calendar shows the group's combined view.
+    val groups: List<Group> = emptyList(),
+    val activeGroup: Group? = null,
 )
 
 @HiltViewModel
@@ -68,6 +72,7 @@ class CalendarViewModel @Inject constructor(
 
     init {
         loadWritableCalendars()
+        loadGroups()
         initialLoad()
     }
 
@@ -193,14 +198,34 @@ class CalendarViewModel @Inject constructor(
         loadMutex.withLock {
             // Another load (e.g. the background prefetch) may have covered this range.
             if (isCached(start, end)) return
+            val group = _state.value.activeGroup
             val flag = if (background) "bg" else "fg"
             _state.update { if (flag == "bg") it.copy(isBackgroundCaching = true) else it.copy(isLoading = true, error = null) }
-            runCatching { repository.fetchEvents(start, end) }
+            runCatching {
+                if (group != null) decorateGroup(repository.fetchGroupCombined(group.id, start, end))
+                else repository.fetchEvents(start, end)
+            }
                 .onSuccess { mergeIntoCache(it, start, end); refreshFromCache() }
                 .onFailure { e -> if (!background) _state.update { it.copy(error = e.message) } }
             _state.update { it.copy(isLoading = false, isBackgroundCaching = false) }
         }
     }
+
+    /** Prefix combined-view events with the owner's / creator's first name (and 👥 for group events). */
+    private fun decorateGroup(events: List<CalEvent>): List<CalEvent> {
+        val me = currentUserId
+        return events.map { ev ->
+            val prefix = when {
+                ev.isGroupEvent && ev.creator != null && ev.creator.id != me -> "👥 ${firstName(ev.creator.displayName)}: "
+                ev.isGroupEvent -> "👥 "
+                ev.owner != null && ev.owner.id != me -> "${firstName(ev.owner.displayName)}: "
+                else -> ""
+            }
+            if (prefix.isEmpty()) ev else ev.copy(title = prefix + ev.title)
+        }
+    }
+
+    private fun firstName(s: String): String = s.trim().substringBefore(' ').ifBlank { s }
 
     private fun markReady() {
         _ready.value = true
@@ -222,11 +247,17 @@ class CalendarViewModel @Inject constructor(
     }
 
     private fun refreshFromCache() {
-        val hidden = _state.value.hiddenKeys
-        val banished = _state.value.banishedKeys
-        val visible = allCachedEvents.filter { ev ->
-            val key = calendarKey(ev.source, ev.calendarId)
-            key !in hidden && key !in banished
+        val st = _state.value
+        // In group mode the server already scopes + filters; show everything.
+        val visible = if (st.activeGroup != null) {
+            allCachedEvents
+        } else {
+            val hidden = st.hiddenKeys
+            val banished = st.banishedKeys
+            allCachedEvents.filter { ev ->
+                val key = calendarKey(ev.source, ev.calendarId)
+                key !in hidden && key !in banished
+            }
         }
         // Skip the state write (and resulting recomposition) when nothing changed.
         _state.update { if (it.events == visible) it else it.copy(events = visible) }
@@ -240,6 +271,7 @@ class CalendarViewModel @Inject constructor(
 
     fun syncWithServer() {
         invalidateCache()
+        loadGroups()
         initialLoad()
     }
 
@@ -273,6 +305,29 @@ class CalendarViewModel @Inject constructor(
         settingsStore.hiddenCalendarKeys = nextHidden
         _state.update { it.copy(banishedKeys = nextBanished, hiddenKeys = nextHidden) }
         refreshFromCache()
+    }
+
+    // ---- Groups ----
+
+    fun loadGroups() {
+        viewModelScope.launch {
+            runCatching { repository.getGroups() }
+                .onSuccess { gs ->
+                    _state.update { st ->
+                        // If the active group was deleted elsewhere, drop back to personal.
+                        val stillActive = st.activeGroup?.let { a -> gs.firstOrNull { it.id == a.id } }
+                        st.copy(groups = gs, activeGroup = stillActive)
+                    }
+                }
+        }
+    }
+
+    /** Flip between personal and a group's combined overlay; reloads the wide window. */
+    fun switchGroup(group: Group?) {
+        if (_state.value.activeGroup?.id == group?.id) return
+        _state.update { it.copy(activeGroup = group) }
+        invalidateCache()
+        initialLoad()
     }
 
     // ---- Writable calendars ----

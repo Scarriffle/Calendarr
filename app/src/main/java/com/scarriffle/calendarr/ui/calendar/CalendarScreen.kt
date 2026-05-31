@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -55,15 +56,17 @@ import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.ui.LocalLang
 import com.scarriffle.calendarr.ui.accounts.AccountsScreen
+import com.scarriffle.calendarr.domain.model.Group
 import com.scarriffle.calendarr.ui.event.EventDetailScreen
 import com.scarriffle.calendarr.ui.event.EventEditorSheet
+import com.scarriffle.calendarr.ui.groups.GroupsScreen
 import com.scarriffle.calendarr.ui.menu.MenuSheet
 import com.scarriffle.calendarr.ui.profile.ProfileScreen
 import com.scarriffle.calendarr.ui.settings.SettingsScreen
 import com.scarriffle.calendarr.ui.tr
 import java.time.LocalDate
 
-private enum class Overlay { NONE, PROFILE, SETTINGS, ACCOUNTS }
+private enum class Overlay { NONE, PROFILE, SETTINGS, ACCOUNTS, GROUPS }
 
 data class EditorRequest(val existing: CalEvent?, val date: LocalDate, val prefill: CalEvent? = null)
 
@@ -113,6 +116,9 @@ fun CalendarScreen(
                 viewType = state.viewType,
                 loading = state.isLoading || state.isBackgroundCaching,
                 viewMenuOpen = viewMenuOpen,
+                groups = state.groups,
+                activeGroup = state.activeGroup,
+                onSwitchGroup = { vm.switchGroup(it) },
                 onMenu = { showMenu = true },
                 onPrev = { goPrev() },
                 onToday = { goToday() },
@@ -135,6 +141,9 @@ fun CalendarScreen(
         Column(Modifier.fillMaxSize().padding(padding)) {
             state.error?.let { err ->
                 ErrorBanner(err, onRetry = { vm.loadVisible(force = true) }, onDismiss = vm::clearError)
+            }
+            state.activeGroup?.let { g ->
+                GroupBanner(group = g, onExit = { vm.switchGroup(null) })
             }
             Box(Modifier.fillMaxSize()) {
                 CalendarBody(
@@ -162,6 +171,7 @@ fun CalendarScreen(
             onProfile = { showMenu = false; overlay = Overlay.PROFILE },
             onAppearance = { showMenu = false; overlay = Overlay.SETTINGS },
             onAccounts = { showMenu = false; overlay = Overlay.ACCOUNTS },
+            onGroups = { showMenu = false; overlay = Overlay.GROUPS },
             onSync = { showMenu = false; vm.syncWithServer() },
             onLogout = { showMenu = false; onLogout() },
             onSwitchServer = { showMenu = false; onSwitchServer() },
@@ -230,6 +240,10 @@ fun CalendarScreen(
             onClose = { overlay = Overlay.NONE },
             onChanged = { vm.loadWritableCalendars(); vm.syncWithServer() },
         )
+        Overlay.GROUPS -> GroupsScreen(
+            onClose = { overlay = Overlay.NONE },
+            onChanged = { vm.loadGroups(); vm.loadWritableCalendars() },
+        )
         Overlay.NONE -> Unit
     }
 }
@@ -296,6 +310,9 @@ private fun CompactTopBar(
     viewType: CalViewType,
     loading: Boolean,
     viewMenuOpen: Boolean,
+    groups: List<Group>,
+    activeGroup: Group?,
+    onSwitchGroup: (Group?) -> Unit,
     onMenu: () -> Unit,
     onPrev: () -> Unit,
     onToday: () -> Unit,
@@ -331,6 +348,9 @@ private fun CompactTopBar(
                     strokeWidth = 2.dp,
                 )
             }
+            if (groups.isNotEmpty()) {
+                GroupSwitcher(groups = groups, activeGroup = activeGroup, onSwitchGroup = onSwitchGroup)
+            }
             CompactIcon(Icons.Filled.FilterList, onFilter, tr("filter.button"))
             Box {
                 CompactIcon(viewType.icon, { onViewMenuToggle(true) }, tr("view.change"))
@@ -357,6 +377,53 @@ private fun CompactIcon(
 ) {
     IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
         Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** Top-bar switcher: "My calendar" + each group; flips the calendar into the group overlay. */
+@Composable
+private fun GroupSwitcher(groups: List<Group>, activeGroup: Group?, onSwitchGroup: (Group?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Filled.People,
+                contentDescription = tr("groups.title"),
+                modifier = Modifier.size(22.dp),
+                tint = if (activeGroup != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(tr("group.switch.personal")) },
+                onClick = { open = false; onSwitchGroup(null) },
+            )
+            groups.forEach { g ->
+                DropdownMenuItem(
+                    text = { Text("${g.icon ?: "👥"} ${g.name}") },
+                    onClick = { open = false; onSwitchGroup(g) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupBanner(group: Group, onExit: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${tr("groups.view")}: ${group.icon ?: "👥"} ${group.name}",
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            TextButton(onClick = onExit) { Text(tr("group.switch.personal")) }
+        }
     }
 }
 

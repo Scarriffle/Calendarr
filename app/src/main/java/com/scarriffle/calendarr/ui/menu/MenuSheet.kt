@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.Divider
@@ -37,6 +38,7 @@ fun MenuSheet(
     onProfile: () -> Unit,
     onAppearance: () -> Unit,
     onAccounts: () -> Unit,
+    onGroups: () -> Unit,
     onSync: () -> Unit,
     onLogout: () -> Unit,
     onSwitchServer: () -> Unit,
@@ -52,6 +54,7 @@ fun MenuSheet(
             MenuRow(Icons.Filled.AccountCircle, tr("menu.profile"), onProfile)
             MenuRow(Icons.Filled.Palette, tr("menu.appearance"), onAppearance)
             MenuRow(Icons.Filled.CalendarMonth, tr("menu.accounts"), onAccounts)
+            MenuRow(Icons.Filled.People, tr("menu.groups"), onGroups)
             Divider(Modifier.padding(vertical = 4.dp))
             MenuRow(Icons.Filled.Sync, tr("menu.sync"), onSync)
             Divider(Modifier.padding(vertical = 4.dp))
