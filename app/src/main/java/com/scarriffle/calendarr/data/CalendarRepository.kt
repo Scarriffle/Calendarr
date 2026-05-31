@@ -46,6 +46,9 @@ class CalendarRepository @Inject constructor(
 ) {
     private val api get() = apiProvider.api()
 
+    /** Current logged-in user id (0 if unknown) — for creator/owner comparisons. */
+    val currentUserId: Int get() = credentialStore.userId
+
     private suspend fun <T> guarded(block: suspend () -> T): T = withContext(Dispatchers.IO) {
         try {
             block()
@@ -93,9 +96,11 @@ class CalendarRepository @Inject constructor(
         val user = json.optJSONObject("user")
         val uname = user?.optString("username") ?: username
         val isAdmin = user?.optBoolean("is_admin", false) ?: false
+        val uid = user?.optInt("id", 0) ?: 0
+        val displayName = user?.optString("display_name")?.takeIf { it.isNotBlank() } ?: uname
 
         credentialStore.serverUrl = ApiProvider.normalize(baseUrl)
-        credentialStore.saveLogin(token, uname, isAdmin)
+        credentialStore.saveLogin(token, uname, isAdmin, uid, displayName)
         apiProvider.invalidate()
         LoginResult(token, uname, isAdmin)
     }

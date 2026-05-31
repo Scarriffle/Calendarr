@@ -188,6 +188,7 @@ fun CalendarScreen(
         if (ev != null) {
             EventDetailScreen(
                 event = ev,
+                currentUserId = vm.currentUserId,
                 onClose = { detailEvent = null },
                 onEdit = {
                     detailEvent = null
@@ -210,8 +211,8 @@ fun CalendarScreen(
             request = req,
             writableCalendars = state.writableCalendars,
             onDismiss = { editor = null },
-            onSave = { cal, title, start, end, allDay, location, desc, color ->
-                vm.saveEvent(cal, req.existing, title, start, end, allDay, location, desc, color) { error ->
+            onSave = { cal, title, start, end, allDay, location, desc, color, isPrivate ->
+                vm.saveEvent(cal, req.existing, title, start, end, allDay, location, desc, color, isPrivate) { error ->
                     if (error == null) editor = null
                 }
             },

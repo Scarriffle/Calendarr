@@ -69,7 +69,7 @@ fun EventEditorSheet(
     request: EditorRequest,
     writableCalendars: List<WritableCalendar>,
     onDismiss: () -> Unit,
-    onSave: (WritableCalendar, String, Instant, Instant, Boolean, String, String, String?) -> Unit,
+    onSave: (WritableCalendar, String, Instant, Instant, Boolean, String, String, String?, Boolean) -> Unit,
 ) {
     val zone = ZoneId.systemDefault()
     val context = LocalContext.current
@@ -85,6 +85,7 @@ fun EventEditorSheet(
     var location by remember { mutableStateOf(template?.location ?: "") }
     var description by remember { mutableStateOf(template?.notes ?: "") }
     var color by remember { mutableStateOf(template?.color) }
+    var isPrivate by remember { mutableStateOf(template?.isPrivate ?: false) }
 
     val initialStart = template?.startDate
     val initialEnd = template?.endDate
@@ -230,6 +231,15 @@ fun EventEditorSheet(
             }
             Spacer(Modifier.size(12.dp))
 
+            // Private (local calendars only)
+            if (calendar?.source == "local") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(tr("event.private"), style = MaterialTheme.typography.bodyLarge)
+                    Switch(checked = isPrivate, onCheckedChange = { isPrivate = it })
+                }
+                Spacer(Modifier.size(12.dp))
+            }
+
             // Color
             Text(tr("event.color_section"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -270,7 +280,7 @@ fun EventEditorSheet(
                         start = startDate.atTime(startTime).atZone(zone).toInstant()
                         end = endDate.atTime(endTime).atZone(zone).toInstant()
                     }
-                    onSave(cal, title.trim(), start, end, allDay, location.trim(), description.trim(), color)
+                    onSave(cal, title.trim(), start, end, allDay, location.trim(), description.trim(), color, isPrivate && cal.source == "local")
                 },
                 enabled = writableCalendars.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),

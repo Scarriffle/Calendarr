@@ -48,6 +48,9 @@ class CalendarViewModel @Inject constructor(
 
     private val zone: ZoneId = ZoneId.systemDefault()
 
+    /** Current user id (for creator/owner comparisons in the UI). */
+    val currentUserId: Int get() = repository.currentUserId
+
     /** Serializes network loads so overlapping fetches don't thrash the UI. */
     private val loadMutex = Mutex()
 
@@ -298,20 +301,21 @@ class CalendarViewModel @Inject constructor(
         location: String,
         description: String,
         color: String?,
+        isPrivate: Boolean,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             val result = runCatching {
                 if (existing != null && existing.source == calendar.source) {
                     when (existing.source) {
-                        "local" -> repository.updateLocalEvent(existing.id, title, start, end, isAllDay, location, description, color)
+                        "local" -> repository.updateLocalEvent(existing.id, title, start, end, isAllDay, location, description, color, isPrivate)
                         "caldav" -> repository.updateCalDAVEvent(existing.id, existing.url, calendar.numericId, title, start, end, isAllDay, location, description, color)
                         "homeassistant" -> repository.updateHAEvent(calendar.numericId, existing.id, title, start, end, isAllDay, location, description)
                         "google" -> repository.updateGoogleEvent(calendar.numericId, existing.id, title, start, end, isAllDay, location, description)
-                        else -> createForSource(calendar, title, start, end, isAllDay, location, description, color)
+                        else -> createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate)
                     }
                 } else {
-                    createForSource(calendar, title, start, end, isAllDay, location, description, color)
+                    createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate)
                 }
             }
             result.onSuccess { afterMutation(); onResult(null) }
@@ -321,10 +325,10 @@ class CalendarViewModel @Inject constructor(
 
     private suspend fun createForSource(
         calendar: WritableCalendar, title: String, start: Instant, end: Instant,
-        isAllDay: Boolean, location: String, description: String, color: String?,
+        isAllDay: Boolean, location: String, description: String, color: String?, isPrivate: Boolean,
     ) {
         when (calendar.source) {
-            "local" -> repository.createLocalEvent(calendar.numericId, title, start, end, isAllDay, location, description, color)
+            "local" -> repository.createLocalEvent(calendar.numericId, title, start, end, isAllDay, location, description, color, isPrivate)
             "caldav" -> repository.createCalDAVEvent(calendar.numericId, title, start, end, isAllDay, location, description, color)
             "google" -> repository.createGoogleEvent(calendar.numericId, title, start, end, isAllDay, location, description)
             "homeassistant" -> repository.createHAEvent(calendar.numericId, title, start, end, isAllDay, location, description)

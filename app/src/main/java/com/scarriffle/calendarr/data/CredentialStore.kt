@@ -46,17 +46,27 @@ class CredentialStore @Inject constructor(
         get() = prefs.getBoolean(KEY_IS_ADMIN, false)
         set(value) = prefs.edit().putBoolean(KEY_IS_ADMIN, value).apply()
 
+    var userId: Int
+        get() = prefs.getInt(KEY_USER_ID, 0)
+        set(value) = prefs.edit().putInt(KEY_USER_ID, value).apply()
+
+    var displayName: String?
+        get() = prefs.getString(KEY_DISPLAY_NAME, null)
+        set(value) = prefs.edit().putString(KEY_DISPLAY_NAME, value).apply()
+
     /** True once a server URL has been entered (setup step complete). */
     val isConfigured: Boolean get() = !serverUrl.isNullOrBlank()
 
     /** True once we hold an auth token (logged in). */
     val isLoggedIn: Boolean get() = !token.isNullOrBlank()
 
-    fun saveLogin(token: String, username: String, isAdmin: Boolean) {
+    fun saveLogin(token: String, username: String, isAdmin: Boolean, userId: Int = 0, displayName: String? = null) {
         prefs.edit()
             .putString(KEY_TOKEN, token)
             .putString(KEY_USERNAME, username)
             .putBoolean(KEY_IS_ADMIN, isAdmin)
+            .putInt(KEY_USER_ID, userId)
+            .putString(KEY_DISPLAY_NAME, displayName ?: username)
             .apply()
     }
 
@@ -79,5 +89,7 @@ class CredentialStore @Inject constructor(
         const val KEY_TOKEN = "auth_token"
         const val KEY_USERNAME = "username"
         const val KEY_IS_ADMIN = "is_admin"
+        const val KEY_USER_ID = "user_id"
+        const val KEY_DISPLAY_NAME = "display_name"
     }
 }

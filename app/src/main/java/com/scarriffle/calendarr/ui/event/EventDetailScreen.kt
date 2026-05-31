@@ -23,7 +23,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -60,6 +62,7 @@ import com.scarriffle.calendarr.util.colorFromHex
 @Composable
 fun EventDetailScreen(
     event: CalEvent,
+    currentUserId: Int = 0,
     onClose: () -> Unit,
     onEdit: () -> Unit,
     onCopy: () -> Unit,
@@ -109,6 +112,12 @@ fun EventDetailScreen(
                 if (event.notes.isNotBlank()) DetailRow(Icons.Filled.Notes, event.notes)
                 if (event.calendarName.isNotBlank()) DetailRow(Icons.Filled.CalendarMonth, event.calendarName)
                 DetailRow(Icons.Filled.Dns, event.source.replaceFirstChar { it.uppercase() })
+                event.creator?.let { c ->
+                    if (c.id != currentUserId) {
+                        DetailRow(Icons.Filled.Person, "${tr("event.created_by")}: ${c.displayName}")
+                    }
+                }
+                if (event.isPrivate) DetailRow(Icons.Filled.Lock, tr("event.private"))
 
                 Spacer(Modifier.height(28.dp))
                 OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {

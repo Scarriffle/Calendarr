@@ -30,13 +30,16 @@ data class CalEvent(
     // Only set in the group combined view:
     val owner: EventPerson? = null,
     val isGroupEvent: Boolean = false,
+    val displayColor: String? = null,
 ) {
     /**
-     * Per-event override colour, then the calendar's colour, then a stable
+     * Group view supplies a server-resolved colour (display_color); otherwise
+     * per-event override colour, then the calendar's colour, then a stable
      * per-calendar palette colour (so events never collapse to one default).
      */
     val effectiveColor: String
-        get() = color?.takeIf { it.isNotBlank() }
+        get() = displayColor?.takeIf { it.isNotBlank() }
+            ?: color?.takeIf { it.isNotBlank() }
             ?: calendarColor.takeIf { it.isNotBlank() }
             ?: fallbackColorFor("$source:$calendarId")
 
@@ -113,6 +116,7 @@ data class CalEvent(
                 isPrivate = json.optBoolean("private", false),
                 owner = personFrom(json, "owner"),
                 isGroupEvent = json.optBoolean("is_group_event", false),
+                displayColor = json.strOrNull("display_color"),
             )
         }
     }
