@@ -25,9 +25,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -72,15 +74,19 @@ fun CalendarScreen(
     var editor by remember { mutableStateOf<EditorRequest?>(null) }
     var overlay by remember { mutableStateOf(Overlay.NONE) }
 
+    // Continuous month scrolling
+    val monthListState = rememberLazyListState()
+    var todaySignal by remember { mutableIntStateOf(0) }
+    var visibleMonth by remember { mutableStateOf(state.currentDate) }
+    val isMonth = state.viewType == CalViewType.MONTH
+    val barTitle = if (isMonth) titleForView(CalViewType.MONTH, visibleMonth, lang)
+        else titleForView(state.viewType, state.currentDate, lang)
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        titleForView(state.viewType, state.currentDate, lang),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Text(barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 navigationIcon = {
                     IconButton(onClick = { showMenu = true }) {
@@ -88,14 +94,18 @@ fun CalendarScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = vm::navigatePrev) {
-                        Icon(Icons.Filled.ChevronLeft, contentDescription = null)
+                    if (!isMonth) {
+                        IconButton(onClick = vm::navigatePrev) {
+                            Icon(Icons.Filled.ChevronLeft, contentDescription = null)
+                        }
                     }
-                    IconButton(onClick = vm::moveToToday) {
+                    IconButton(onClick = { if (isMonth) todaySignal++ else vm.moveToToday() }) {
                         Icon(Icons.Filled.Today, contentDescription = tr("nav.today"))
                     }
-                    IconButton(onClick = vm::navigateNext) {
-                        Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                    if (!isMonth) {
+                        IconButton(onClick = vm::navigateNext) {
+                            Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                        }
                     }
                     IconButton(onClick = { showFilter = true }) {
                         Icon(Icons.Filled.FilterList, contentDescription = tr("filter.button"))
@@ -121,7 +131,11 @@ fun CalendarScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { editor = EditorRequest(null, state.currentDate) }) {
+            FloatingActionButton(
+                onClick = { editor = EditorRequest(null, if (isMonth) visibleMonth else state.currentDate) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
                 Icon(Icons.Filled.Add, contentDescription = tr("cal.new_event"))
             }
         },
@@ -137,9 +151,12 @@ fun CalendarScreen(
                 CalendarBody(
                     state = state,
                     vm = vm,
+                    monthListState = monthListState,
+                    scrollToTodaySignal = todaySignal,
+                    onVisibleMonthChange = { visibleMonth = it },
                     onEventClick = { detailEvent = it },
                     onDayClick = { date -> vm.goToDate(date, CalViewType.DAY) },
-                    onEmptySlotClick = { date -> editor = EditorRequest(null, date) },
+                    onDayLongPress = { date -> editor = EditorRequest(null, date) },
                 )
             }
         }
@@ -215,12 +232,24 @@ fun CalendarScreen(
 private fun CalendarBody(
     state: CalendarUiState,
     vm: CalendarViewModel,
+    monthListState: androidx.compose.foundation.lazy.LazyListState,
+    scrollToTodaySignal: Int,
+    onVisibleMonthChange: (LocalDate) -> Unit,
     onEventClick: (CalEvent) -> Unit,
     onDayClick: (LocalDate) -> Unit,
-    onEmptySlotClick: (LocalDate) -> Unit,
+    onDayLongPress: (LocalDate) -> Unit,
 ) {
     when (state.viewType) {
-        CalViewType.MONTH -> MonthView(state, vm, onDayClick, onEventClick)
+        CalViewType.MONTH -> MonthView(
+            state = state,
+            vm = vm,
+            listState = monthListState,
+            scrollToTodaySignal = scrollToTodaySignal,
+            onVisibleMonthChange = onVisibleMonthChange,
+            onDayClick = onDayClick,
+            onDayLongPress = onDayLongPress,
+            onEventClick = onEventClick,
+        )
         CalViewType.WEEK -> WeekView(state, vm, onEventClick)
         CalViewType.DAY -> DayView(state, vm, onEventClick)
         CalViewType.QUARTER -> QuarterView(state, onDayClick)

@@ -23,10 +23,26 @@ data class CalEvent(
     val calendarColor: String,
     val source: String,
 ) {
-    /** Per-event override colour, falling back to the calendar's colour. */
-    val effectiveColor: String get() = color?.takeIf { it.isNotBlank() } ?: calendarColor
+    /**
+     * Per-event override colour, then the calendar's colour, then a stable
+     * per-calendar palette colour (so events never collapse to one default).
+     */
+    val effectiveColor: String
+        get() = color?.takeIf { it.isNotBlank() }
+            ?: calendarColor.takeIf { it.isNotBlank() }
+            ?: fallbackColorFor("$source:$calendarId")
 
     companion object {
+        private val FALLBACK_PALETTE = listOf(
+            "#34a853", "#4285f4", "#ea4335", "#fbbc05",
+            "#46bdc6", "#9c27b0", "#ff7043", "#7090c0",
+        )
+
+        private fun fallbackColorFor(key: String): String {
+            val idx = (key.hashCode().and(Int.MAX_VALUE)) % FALLBACK_PALETTE.size
+            return FALLBACK_PALETTE[idx]
+        }
+
         /** Parse one event object from the `/api/caldav/events` aggregate response. */
         fun fromJson(json: JSONObject): CalEvent? {
             val title = json.optString("title").takeIf { json.has("title") } ?: return null
@@ -63,7 +79,7 @@ data class CalEvent(
                 color = colorRaw.takeIf { it.isNotBlank() },
                 calendarId = calendarId,
                 calendarName = json.optString("calendar_name", ""),
-                calendarColor = json.optString("calendarColor", "#4285f4"),
+                calendarColor = json.optString("calendarColor", ""),
                 source = json.optString("source", "local"),
             )
         }

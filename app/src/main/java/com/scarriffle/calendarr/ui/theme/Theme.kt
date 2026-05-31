@@ -25,12 +25,22 @@ fun CalendarrTheme(
 ) {
     val primary = BrandGreen
 
+    val container = Color(0xFF14532D)
+    val onContainer = Color(0xFFB7F0C6)
     val colors = darkColorScheme(
         primary = primary,
         onPrimary = primary.contrastingTextColor(),
+        primaryContainer = container,
+        onPrimaryContainer = onContainer,
         secondary = primary,
         onSecondary = primary.contrastingTextColor(),
+        secondaryContainer = container,
+        onSecondaryContainer = onContainer,
         tertiary = primary,
+        onTertiary = primary.contrastingTextColor(),
+        tertiaryContainer = container,
+        onTertiaryContainer = onContainer,
+        surfaceTint = primary,
         background = Color(0xFF000000),
         onBackground = Color(0xFFF2F2F7),
         surface = Color(0xFF1C1C1E),

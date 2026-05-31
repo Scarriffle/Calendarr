@@ -5,8 +5,15 @@ import androidx.compose.ui.graphics.Color
 /** Parse a "#RRGGBB" (or "RRGGBB") hex string into a Compose [Color]. */
 fun colorFromHex(hex: String?, fallback: Color = Color(0xFF4285F4)): Color {
     if (hex.isNullOrBlank()) return fallback
-    val clean = hex.trim().removePrefix("#")
+    val clean = hex.trim().removePrefix("#").filter { it.isLetterOrDigit() }
     return when (clean.length) {
+        3 -> runCatching {
+            // #RGB shorthand -> expand each nibble
+            val r = clean[0].digitToInt(16) * 17
+            val g = clean[1].digitToInt(16) * 17
+            val b = clean[2].digitToInt(16) * 17
+            Color(r / 255f, g / 255f, b / 255f, 1f)
+        }.getOrDefault(fallback)
         6 -> runCatching {
             val v = clean.toLong(16)
             Color(

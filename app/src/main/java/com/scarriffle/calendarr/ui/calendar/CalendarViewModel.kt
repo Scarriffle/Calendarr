@@ -159,6 +159,21 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
+    /** On-demand load for a month the user scrolled to in the continuous calendar. */
+    fun ensureMonthLoaded(monthAnchor: LocalDate) {
+        val first = monthAnchor.withDayOfMonth(1)
+        val start = instant(first.minusMonths(1))
+        val end = instant(first.plusMonths(2))
+        if (isCached(start, end)) return
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            runCatching { repository.fetchEvents(start, end) }
+                .onSuccess { mergeIntoCache(it, start, end); refreshFromCache() }
+                .onFailure { e -> _state.update { it.copy(error = e.message) } }
+            _state.update { it.copy(isLoading = false) }
+        }
+    }
+
     private fun prefetchBackground() {
         val months = settingsStore.cacheMonths
         val today = LocalDate.now().withDayOfMonth(1)
