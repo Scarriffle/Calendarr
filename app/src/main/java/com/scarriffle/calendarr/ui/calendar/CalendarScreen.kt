@@ -1,5 +1,10 @@
 package com.scarriffle.calendarr.ui.calendar
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -105,6 +111,7 @@ fun CalendarScreen(
             CompactTopBar(
                 title = barTitle,
                 viewType = state.viewType,
+                loading = state.isLoading || state.isBackgroundCaching,
                 viewMenuOpen = viewMenuOpen,
                 onMenu = { showMenu = true },
                 onPrev = { goPrev() },
@@ -126,9 +133,6 @@ fun CalendarScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            if (state.isLoading || state.isBackgroundCaching) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
             state.error?.let { err ->
                 ErrorBanner(err, onRetry = { vm.loadVisible(force = true) }, onDismiss = vm::clearError)
             }
@@ -172,23 +176,33 @@ fun CalendarScreen(
         )
     }
 
-    detailEvent?.let { ev ->
-        EventDetailScreen(
-            event = ev,
-            onClose = { detailEvent = null },
-            onEdit = {
-                detailEvent = null
-                editor = EditorRequest(ev, localDate(ev.startDate))
-            },
-            onCopy = {
-                detailEvent = null
-                editor = EditorRequest(existing = null, date = localDate(ev.startDate), prefill = ev)
-            },
-            onDelete = {
-                vm.deleteEvent(ev) {}
-                detailEvent = null
-            },
-        )
+    // Keep the last event during the close animation.
+    var lastDetail by remember { mutableStateOf<CalEvent?>(null) }
+    detailEvent?.let { lastDetail = it }
+    AnimatedVisibility(
+        visible = detailEvent != null,
+        enter = slideInVertically(initialOffsetY = { it / 6 }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it / 6 }) + fadeOut(),
+    ) {
+        val ev = lastDetail
+        if (ev != null) {
+            EventDetailScreen(
+                event = ev,
+                onClose = { detailEvent = null },
+                onEdit = {
+                    detailEvent = null
+                    editor = EditorRequest(ev, localDate(ev.startDate))
+                },
+                onCopy = {
+                    detailEvent = null
+                    editor = EditorRequest(existing = null, date = localDate(ev.startDate), prefill = ev)
+                },
+                onDelete = {
+                    vm.deleteEvent(ev) {}
+                    detailEvent = null
+                },
+            )
+        }
     }
 
     editor?.let { req ->
@@ -279,6 +293,7 @@ private fun loadingPlaceholder() {
 private fun CompactTopBar(
     title: String,
     viewType: CalViewType,
+    loading: Boolean,
     viewMenuOpen: Boolean,
     onMenu: () -> Unit,
     onPrev: () -> Unit,
@@ -288,6 +303,7 @@ private fun CompactTopBar(
     onViewMenuToggle: (Boolean) -> Unit,
     onSelectView: (CalViewType) -> Unit,
 ) {
+    val twoLine = viewType == CalViewType.WEEK || viewType == CalViewType.DAY
     Surface(color = MaterialTheme.colorScheme.background) {
         Row(
             Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 2.dp),
@@ -302,10 +318,18 @@ private fun CompactTopBar(
                 title,
                 modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                 textAlign = TextAlign.Center,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleMedium,
+                fontSize = if (twoLine) 13.sp else 16.sp,
+                lineHeight = if (twoLine) 15.sp else 18.sp,
+                fontWeight = FontWeight.Medium,
             )
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp).padding(end = 2.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
             CompactIcon(Icons.Filled.FilterList, onFilter, tr("filter.button"))
             Box {
                 CompactIcon(viewType.icon, { onViewMenuToggle(true) }, tr("view.change"))

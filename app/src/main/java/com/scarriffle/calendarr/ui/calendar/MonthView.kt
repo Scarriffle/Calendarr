@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,11 +51,18 @@ import kotlinx.coroutines.flow.map
 
 private const val MONTHS_BACK = 18L
 private const val MONTHS_AHEAD = 18L
-private val ROW_HEIGHT = 82.dp
+private const val MAX_LANES = 4
+private val DAY_NUM_H = 22.dp
+private val LANE_H = 15.dp
+private val LANE_SPACE = 2.dp
+private val ROW_HEIGHT = DAY_NUM_H + (LANE_H + LANE_SPACE) * MAX_LANES + 6.dp
 
 private enum class DividerEdge { NONE, TOP, BOTTOM }
 
-/** Continuous, vertically scrolling month calendar (matches the iOS app). */
+/** One placed event bar within a week: which lane and which columns it spans. */
+private data class PlacedBar(val event: CalEvent, val lane: Int, val startCol: Int, val span: Int)
+
+/** Continuous, vertically scrolling month calendar with multi-day event bars (iOS-style). */
 @Composable
 fun MonthView(
     state: CalendarUiState,
@@ -79,6 +85,7 @@ fun MonthView(
     val labelColor = colorFromHex(settings.monthLabelColor, MaterialTheme.colorScheme.onSurfaceVariant)
     val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = gridLineOpacity(settings.lineContrast))
     val secondaryText = MaterialTheme.colorScheme.onBackground.copy(alpha = secondaryTextOpacity(settings.textContrast))
+    val todayColor = colorFromHex(settings.todayColor)
 
     val firstVisible = remember(mondayFirst) {
         startOfWeek(today.withDayOfMonth(1).minusMonths(MONTHS_BACK), mondayFirst)
@@ -113,7 +120,8 @@ fun MonthView(
             }
     }
 
-    val eventsByDay = remember(state.events) { buildEventsByDay(state.events) }
+    // One pass: bucket events into the weeks they overlap (keyed by week-start).
+    val eventsByWeek = remember(state.events, mondayFirst) { buildEventsByWeek(state.events, mondayFirst) }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
@@ -130,16 +138,17 @@ fun MonthView(
 
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             items(weekCount) { index ->
+                val weekStart = firstVisible.plusWeeks(index.toLong())
                 WeekRow(
-                    weekStart = firstVisible.plusWeeks(index.toLong()),
+                    weekStart = weekStart,
                     today = today,
-                    eventsByDay = eventsByDay,
+                    weekEvents = eventsByWeek[weekStart] ?: emptyList(),
                     lang = lang,
                     dividerColor = dividerColor,
                     gridColor = gridColor,
                     labelColor = labelColor,
                     secondaryText = secondaryText,
-                    todayColor = colorFromHex(settings.todayColor),
+                    todayColor = todayColor,
                     onDayClick = onDayClick,
                     onDayLongPress = onDayLongPress,
                     onEventClick = onEventClick,
@@ -153,7 +162,7 @@ fun MonthView(
 private fun WeekRow(
     weekStart: LocalDate,
     today: LocalDate,
-    eventsByDay: Map<LocalDate, List<CalEvent>>,
+    weekEvents: List<CalEvent>,
     lang: String,
     dividerColor: Color,
     gridColor: Color,
@@ -169,8 +178,13 @@ private fun WeekRow(
     val rowStartsNewMonth = days[0].dayOfMonth == 1
     val cwLabel = tr("cal.cw")
 
+    // Greedy first-fit lane packing for this week (memoized).
+    val packed = remember(weekStart, weekEvents) { packEvents(weekStart, weekEvents) }
+
     BoxWithConstraints(Modifier.fillMaxWidth().height(ROW_HEIGHT)) {
         val cellW = maxWidth / 7
+
+        // Layer 1: day cell backgrounds (borders, day number, KW, overflow count)
         Row(Modifier.fillMaxSize()) {
             days.forEachIndexed { idx, day ->
                 val edge = when {
@@ -178,13 +192,13 @@ private fun WeekRow(
                     rowStartsNewMonth -> DividerEdge.TOP
                     else -> DividerEdge.NONE
                 }
-                DayCell(
+                DayCellBackground(
                     day = day,
                     isToday = day == today,
                     isMonday = day.dayOfWeek == DayOfWeek.MONDAY,
                     weekNumber = day.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR),
                     cwLabel = cwLabel,
-                    events = eventsByDay[day] ?: emptyList(),
+                    overflow = packed.overflowPerCol[idx],
                     lang = lang,
                     edge = edge,
                     dividerColor = dividerColor,
@@ -194,11 +208,20 @@ private fun WeekRow(
                     todayColor = todayColor,
                     onClick = { onDayClick(day) },
                     onLongClick = { onDayLongPress(day) },
-                    onEventClick = onEventClick,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }
         }
+
+        // Layer 2: event bars (absolute, span multiple columns)
+        packed.bars.forEach { bar ->
+            EventBar(
+                bar = bar,
+                cellW = cellW,
+                onClick = { onEventClick(bar.event) },
+            )
+        }
+
         // Vertical connector at the month boundary column (the "step").
         if (boundaryCol != null) {
             Box(
@@ -212,15 +235,43 @@ private fun WeekRow(
     }
 }
 
+@Composable
+private fun EventBar(bar: PlacedBar, cellW: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
+    val color = colorFromHex(bar.event.effectiveColor)
+    Box(
+        Modifier
+            .offset(
+                x = cellW * bar.startCol + 1.dp,
+                y = DAY_NUM_H + (LANE_H + LANE_SPACE) * bar.lane,
+            )
+            .width(cellW * bar.span - 2.dp)
+            .height(LANE_H)
+            .clip(RoundedCornerShape(3.dp))
+            .background(color)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            bar.event.title,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = color.contrastingTextColor(),
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DayCell(
+private fun DayCellBackground(
     day: LocalDate,
     isToday: Boolean,
     isMonday: Boolean,
     weekNumber: Int,
     cwLabel: String,
-    events: List<CalEvent>,
+    overflow: Int,
     lang: String,
     edge: DividerEdge,
     dividerColor: Color,
@@ -230,7 +281,6 @@ private fun DayCell(
     todayColor: Color,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onEventClick: (CalEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isFirst = day.dayOfMonth == 1
@@ -241,86 +291,65 @@ private fun DayCell(
             .drawBehind {
                 val gridW = 0.5.dp.toPx()
                 val divW = 1.5.dp.toPx()
-                // top border (thick divider on a month boundary, otherwise thin grid)
                 if (edge == DividerEdge.TOP) {
                     drawLine(dividerColor, Offset(0f, 0f), Offset(size.width, 0f), divW)
                 } else {
                     drawLine(gridColor, Offset(0f, 0f), Offset(size.width, 0f), gridW)
                 }
-                // bottom border only when the month ends inside this row
                 if (edge == DividerEdge.BOTTOM) {
                     drawLine(dividerColor, Offset(0f, size.height), Offset(size.width, size.height), divW)
                 }
-                // right grid line
                 drawLine(gridColor, Offset(size.width, 0f), Offset(size.width, size.height), gridW)
             }
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 1.dp),
     ) {
-        Column(
-            Modifier.fillMaxSize().padding(top = 3.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Row(
+            Modifier.fillMaxWidth().height(DAY_NUM_H).padding(top = 3.dp),
+            horizontalArrangement = Arrangement_Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isFirst) {
-                    Text(
-                        day.month.getDisplayName(TextStyle.SHORT, com.scarriffle.calendarr.ui.L10n.locale(lang)).uppercase(),
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = labelColor,
-                        modifier = Modifier.padding(end = 2.dp),
-                    )
-                }
-                Box(contentAlignment = Alignment.Center) {
-                    if (isToday) {
-                        Box(Modifier.height(18.dp).width(18.dp).clip(RoundedCornerShape(9.dp)).background(todayColor))
-                    }
-                    Text(
-                        "${day.dayOfMonth}",
-                        fontSize = 11.sp,
-                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isToday) todayColor.contrastingTextColor() else onBg,
-                    )
-                }
+            if (isFirst) {
+                Text(
+                    day.month.getDisplayName(TextStyle.SHORT, com.scarriffle.calendarr.ui.L10n.locale(lang)).uppercase(),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = labelColor,
+                    modifier = Modifier.padding(end = 2.dp),
+                )
             }
-            events.take(3).forEach { ev -> EventChip(ev) { onEventClick(ev) } }
-            if (events.size > 3) {
-                Text("+${events.size - 3}", fontSize = 8.sp, color = secondaryText)
+            Box(contentAlignment = Alignment.Center) {
+                if (isToday) {
+                    Box(Modifier.height(18.dp).width(18.dp).clip(RoundedCornerShape(9.dp)).background(todayColor))
+                }
+                Text(
+                    "${day.dayOfMonth}",
+                    fontSize = 11.sp,
+                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isToday) todayColor.contrastingTextColor() else onBg,
+                )
             }
         }
-        // Calendar week number, bottom-right of the Monday cell.
+        if (overflow > 0) {
+            Text(
+                "+$overflow",
+                fontSize = 8.sp,
+                color = secondaryText,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 3.dp, bottom = 1.dp),
+            )
+        }
         if (isMonday) {
             Text(
                 "$cwLabel $weekNumber",
                 fontSize = 8.sp,
                 color = secondaryText,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 3.dp, bottom = 2.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 3.dp, bottom = 1.dp),
             )
         }
     }
 }
 
-@Composable
-private fun EventChip(event: CalEvent, onClick: () -> Unit) {
-    val color = colorFromHex(event.effectiveColor)
-    Surface(
-        color = color,
-        shape = RoundedCornerShape(3.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 1.dp, vertical = 0.5.dp)
-            .clickable(onClick = onClick),
-    ) {
-        Text(
-            event.title,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            fontSize = 8.sp,
-            color = color.contrastingTextColor(),
-            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
-        )
-    }
-}
+private val Arrangement_Center = androidx.compose.foundation.layout.Arrangement.Center
 
 private fun startOfWeek(date: LocalDate, mondayFirst: Boolean): LocalDate {
     val dow = date.dayOfWeek.value
@@ -328,20 +357,60 @@ private fun startOfWeek(date: LocalDate, mondayFirst: Boolean): LocalDate {
     return date.minusDays(offset.toLong())
 }
 
-/** Index events by each local day they overlap, for O(1) lookup while scrolling. */
-private fun buildEventsByDay(events: List<CalEvent>): Map<LocalDate, List<CalEvent>> {
+/** Result of packing one week: placed bars + per-column overflow count. */
+private class WeekLayout(val bars: List<PlacedBar>, val overflowPerCol: IntArray)
+
+/** Columns [startCol, startCol+span-1] this event occupies within the given week. */
+private fun columnRange(weekStart: LocalDate, ev: CalEvent): Pair<Int, Int> {
+    val weekEnd = weekStart.plusDays(7)
+    val evStartDay = maxOf(localDate(ev.startDate), weekStart)
+    // last day the event covers (end is exclusive): the day before the end instant
+    val lastDay = localDate(ev.endDate.minusSeconds(1))
+    val evEndDay = minOf(lastDay, weekEnd.minusDays(1))
+    val sc = ChronoUnit.DAYS.between(weekStart, evStartDay).toInt().coerceIn(0, 6)
+    val ec = ChronoUnit.DAYS.between(weekStart, evEndDay).toInt().coerceIn(0, 6)
+    return sc to (ec - sc + 1).coerceAtLeast(1)
+}
+
+/** Greedy first-fit lane packing (mirrors iOS packEvents). */
+private fun packEvents(weekStart: LocalDate, weekEvents: List<CalEvent>): WeekLayout {
+    val sorted = weekEvents.sortedWith(compareBy<CalEvent> { it.startDate }.thenByDescending { it.endDate })
+    val laneLastEnd = ArrayList<Int>()
+    val bars = ArrayList<PlacedBar>()
+    val overflow = IntArray(7)
+    for (ev in sorted) {
+        val (sc, span) = columnRange(weekStart, ev)
+        val lastCol = (sc + span - 1).coerceAtMost(6)
+        var assigned = -1
+        for (i in laneLastEnd.indices) {
+            if (laneLastEnd[i] < sc) { laneLastEnd[i] = lastCol; assigned = i; break }
+        }
+        if (assigned == -1 && laneLastEnd.size < MAX_LANES) {
+            laneLastEnd.add(lastCol); assigned = laneLastEnd.size - 1
+        }
+        if (assigned >= 0) {
+            bars.add(PlacedBar(ev, assigned, sc, span))
+        } else {
+            for (c in sc..lastCol) overflow[c]++
+        }
+    }
+    return WeekLayout(bars, overflow)
+}
+
+/** Bucket events into every week (week-start key) they overlap. */
+private fun buildEventsByWeek(events: List<CalEvent>, mondayFirst: Boolean): Map<LocalDate, List<CalEvent>> {
     val map = HashMap<LocalDate, MutableList<CalEvent>>()
     for (ev in events) {
-        val first = localDate(ev.startDate)
-        val last = localDate(ev.endDate.minusSeconds(1)).coerceAtLeast(first)
-        var d = first
+        val firstWeek = startOfWeek(localDate(ev.startDate), mondayFirst)
+        val lastDay = localDate(ev.endDate.minusSeconds(1)).let { if (it.isBefore(localDate(ev.startDate))) localDate(ev.startDate) else it }
+        val lastWeek = startOfWeek(lastDay, mondayFirst)
+        var w = firstWeek
         var guard = 0
-        while (!d.isAfter(last) && guard < 400) {
-            map.getOrPut(d) { mutableListOf() }.add(ev)
-            d = d.plusDays(1)
+        while (!w.isAfter(lastWeek) && guard < 120) {
+            map.getOrPut(w) { mutableListOf() }.add(ev)
+            w = w.plusWeeks(1)
             guard++
         }
     }
-    map.values.forEach { list -> list.sortBy { it.startDate } }
     return map
 }

@@ -26,10 +26,14 @@ fun titleForView(viewType: CalViewType, date: LocalDate, lang: String): String {
             val start = date
             val fmt = DateTimeFormatter.ofPattern("d. MMM", loc)
             val endFmt = DateTimeFormatter.ofPattern("d. MMM yyyy", loc)
-            "${fmt.format(start)} – ${endFmt.format(start.plusDays(6))}"
+            // Two lines for the compact top bar.
+            "${fmt.format(start)} –\n${endFmt.format(start.plusDays(6))}"
         }
-        CalViewType.DAY ->
-            DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", loc).format(date)
+        CalViewType.DAY -> {
+            val weekday = DateTimeFormatter.ofPattern("EEEE", loc).format(date)
+            val rest = DateTimeFormatter.ofPattern("d. MMMM yyyy", loc).format(date)
+            "$weekday\n$rest"
+        }
         CalViewType.AGENDA -> L10n.t("view.agenda", lang)
     }
 }

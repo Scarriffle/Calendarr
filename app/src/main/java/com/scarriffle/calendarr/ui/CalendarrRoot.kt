@@ -16,18 +16,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.scarriffle.calendarr.ui.auth.LoginScreen
 import com.scarriffle.calendarr.ui.auth.ServerSetupScreen
 import com.scarriffle.calendarr.ui.calendar.CalendarScreen
+import com.scarriffle.calendarr.ui.calendar.CalendarViewModel
 import com.scarriffle.calendarr.ui.theme.CalendarrTheme
+import kotlinx.coroutines.delay
 
 @Composable
 fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
     val route by vm.route.collectAsState()
     val settings by vm.settings.collectAsState()
-
-    var showSplash by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(1200)
-        showSplash = false
-    }
 
     CalendarrTheme(settings) {
         CompositionLocalProvider(
@@ -35,10 +31,22 @@ fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
             LocalAppSettings provides settings,
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                // Obtain the calendar VM early when logged in so events load *behind* the splash.
+                val calendarVm: CalendarViewModel? =
+                    if (route == AppRoute.MAIN) hiltViewModel() else null
+                val dataReady = calendarVm?.ready?.collectAsState()?.value ?: true
+
+                var minElapsed by remember { mutableStateOf(false) }
+                var timedOut by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { delay(450); minElapsed = true }
+                LaunchedEffect(Unit) { delay(6000); timedOut = true }
+
+                val showSplash = !minElapsed || (!dataReady && !timedOut)
                 if (showSplash) {
                     SplashScreen()
                     return@Surface
                 }
+
                 when (route) {
                     AppRoute.SETUP -> ServerSetupScreen(onConfigured = vm::onServerConfigured)
                     AppRoute.LOGIN -> LoginScreen(
@@ -47,6 +55,7 @@ fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
                         onBack = vm::switchServer,
                     )
                     AppRoute.MAIN -> CalendarScreen(
+                        vm = calendarVm!!,
                         onLogout = vm::logout,
                         onSwitchServer = vm::switchServer,
                         onSettingsChanged = vm::applyLocalSettings,

@@ -49,6 +49,10 @@ class CalendarViewModel @Inject constructor(
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<CalendarUiState> = _state.asStateFlow()
 
+    /** True once the first event load has completed — used to gate the splash. */
+    private val _ready = MutableStateFlow(false)
+    val ready: StateFlow<Boolean> = _ready.asStateFlow()
+
     // Cache bookkeeping
     private var cachedStart: Instant? = null
     private var cachedEnd: Instant? = null
@@ -143,6 +147,7 @@ class CalendarViewModel @Inject constructor(
         val (start, end) = rangeForCurrentView()
         if (!force && isCached(start, end)) {
             refreshFromCache()
+            _ready.value = true
             return
         }
         viewModelScope.launch {
@@ -156,6 +161,7 @@ class CalendarViewModel @Inject constructor(
                 .onFailure { e ->
                     _state.update { it.copy(isLoading = false, error = e.message) }
                 }
+            _ready.value = true
         }
     }
 
