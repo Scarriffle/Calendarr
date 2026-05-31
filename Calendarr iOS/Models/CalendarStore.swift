@@ -56,6 +56,9 @@ class CalendarStore {
     var lastError: String? = nil
     var weekStartsOnMonday = true
     var writableCalendars: [WritableCalendar] = []
+    // When set, the calendar shows the group's combined overlay instead of the
+    // user's own events. nil = personal view.
+    var activeGroup: CalGroup? = nil
 
     /// Set of `"source:calendarId"` keys the user has chosen to hide from the
     /// calendar views. Persisted in UserDefaults as a JSON array. Events whose
@@ -239,6 +242,20 @@ class CalendarStore {
     /// unless `force` is set (used after create/edit to pull fresh server data
     /// for the visible range, bypassing the cache).
     func loadEvents(api: CalendarrAPI, start: Date, end: Date, force: Bool = false) async {
+        // Group overlay mode: always fetch the combined view for the range
+        // (no personal cache), decorating each event with its owner.
+        if let g = activeGroup {
+            isLoading = true
+            lastError = nil
+            defer { isLoading = false }
+            do {
+                let fetched = try await api.fetchGroupCombined(groupId: g.id, start: start, end: end)
+                events = fetched.map { decorateGroupEvent($0) }
+            } catch {
+                lastError = error.localizedDescription
+            }
+            return
+        }
         if !force, isCached(start: start, end: end) {
             refreshFromCache(start: start, end: end)
             return
@@ -253,6 +270,21 @@ class CalendarStore {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Prefix a combined-view event with its owner (others) or 👥 + creator
+    /// (group calendar). Colour comes from the server's display_color.
+    private func decorateGroupEvent(_ ev: CalEvent) -> CalEvent {
+        var e = ev
+        let me = UserDefaults.standard.integer(forKey: "userId")
+        func first(_ s: String) -> String { s.split(separator: " ").first.map(String.init) ?? s }
+        if ev.isGroupEvent {
+            if let c = ev.creator, c.id != me { e.title = "👥 \(first(c.displayName)): \(ev.title)" }
+            else { e.title = "👥 \(ev.title)" }
+        } else if let o = ev.owner, o.id != me {
+            e.title = "\(first(o.displayName)): \(ev.title)"
+        }
+        return e
     }
 
     /// Background prefetch for ±months around today – called once on startup.

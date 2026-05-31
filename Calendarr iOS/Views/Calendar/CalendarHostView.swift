@@ -30,6 +30,7 @@ struct CalendarHostView: View {
     @State private var visibleMonth: Date = .now
     @State private var showFilter = false
     @State private var didApplyDefaultView = false
+    @State private var groups: [CalGroup] = []
 
     private var titleString: String {
         if store.viewType == .month {
@@ -67,6 +68,7 @@ struct CalendarHostView: View {
     private var flatVariant: some View {
         VStack(spacing: 0) {
             topBar
+            groupBanner
             Divider()
             errorBanner
             calendarContent
@@ -127,6 +129,7 @@ struct CalendarHostView: View {
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack(spacing: 8) {
+                            groupMenu
                             viewPickerMenu
                             Button { showFilter = true } label: {
                                 Image(systemName: "line.3.horizontal.decrease.circle")
@@ -137,6 +140,7 @@ struct CalendarHostView: View {
                         }
                     }
                 }
+                .safeAreaInset(edge: .top) { groupBanner }
         }
         .overlay(alignment: .bottomTrailing) { glassFAB }
         .modifier(calendarSheets)
@@ -182,6 +186,7 @@ struct CalendarHostView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Spacer(minLength: 8)
+            groupMenu
             viewPickerMenu
             filterButton
             Button { showMenu = true } label: {
@@ -203,6 +208,48 @@ struct CalendarHostView: View {
                 .frame(width: 40, height: 40)
         }
         .accessibilityLabel(L10n.t("filter.button", appLang))
+    }
+
+    // Group switcher: "Persönlich" + each group. Selecting a group flips the
+    // calendar into the combined overlay (like the web's group view).
+    private var groupMenu: some View {
+        Menu {
+            Button { switchGroup(nil) } label: {
+                Label(L10n.t("groups.personal", appLang),
+                      systemImage: store.activeGroup == nil ? "checkmark" : "person")
+            }
+            ForEach(groups) { g in
+                Button { switchGroup(g) } label: {
+                    Label("\(g.icon ?? "👥") \(g.name)",
+                          systemImage: store.activeGroup?.id == g.id ? "checkmark" : "person.2")
+                }
+            }
+        } label: {
+            Image(systemName: store.activeGroup == nil ? "person.2" : "person.2.fill")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(store.activeGroup == nil ? .primary : Color.accentColor)
+                .frame(width: 40, height: 40)
+        }
+        .accessibilityLabel(L10n.t("groups.title", appLang))
+    }
+
+    @ViewBuilder private var groupBanner: some View {
+        if let g = store.activeGroup {
+            HStack(spacing: 8) {
+                Text("\(L10n.t("groups.view_label", appLang)): \(g.icon ?? "👥") \(g.name)")
+                    .font(.subheadline).lineLimit(1)
+                Spacer()
+                Button(L10n.t("groups.exit", appLang)) { switchGroup(nil) }
+                    .font(.callout)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Color.accentColor.opacity(0.18))
+        }
+    }
+
+    private func switchGroup(_ g: CalGroup?) {
+        store.activeGroup = g
+        Task { await onNavigate() }
     }
 
     private var viewPickerMenu: some View {
@@ -352,6 +399,7 @@ struct CalendarHostView: View {
         applyServerDrivenSettings(initial: true)
 
         await store.loadWritableCalendars(api: api)
+        groups = (try? await api.getGroups()) ?? []
         // 1. Load current view immediately (visible)
         let (s, e) = store.rangeForCurrentView()
         await store.loadEvents(api: api, start: s, end: e)
