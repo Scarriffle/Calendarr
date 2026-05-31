@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AccountsView: View {
     let api: CalendarrAPI
@@ -15,6 +16,13 @@ struct AccountsView: View {
     @State private var showAddHA = false
     @State private var errorAlert: String?
     @State private var banishedKeys: Set<String> = CalendarStore.loadBanishedKeys()
+
+    // Sharing / import / export
+    @State private var shareCalId: Int?
+    @State private var showImporter = false
+    @State private var importTargetCalId: Int?
+    @State private var exportDoc: ExportedICS?
+    @State private var infoMessage: String?
 
     @AppStorage("appLanguage") private var appLang = "system"
 
@@ -65,8 +73,53 @@ struct AccountsView: View {
             }, message: {
                 Text(errorAlert ?? "")
             })
+            .sheet(item: Binding(get: { shareCalId.map { IdentifiableInt(id: $0) } },
+                                 set: { shareCalId = $0?.id })) { wrap in
+                SharingView(api: api, calendarId: wrap.id)
+            }
+            .sheet(item: $exportDoc) { doc in
+                ActivityView(items: [doc.url])
+            }
+            .fileImporter(isPresented: $showImporter,
+                          allowedContentTypes: [UTType(filenameExtension: "ics") ?? .data, .data],
+                          allowsMultipleSelection: false) { result in
+                Task { await handleImport(result) }
+            }
+            .alert(L10n.t("common.info", appLang), isPresented: .constant(infoMessage != nil), actions: {
+                Button(L10n.t("common.ok", appLang)) { infoMessage = nil }
+            }, message: { Text(infoMessage ?? "") })
         }
         .task { await load() }
+    }
+
+    private func exportCalendar(_ cal: LocalCalendar) async {
+        do {
+            let data = try await api.exportICS(calendarId: cal.id)
+            let safe = cal.name.components(separatedBy: CharacterSet.alphanumerics.inverted).joined(separator: "_")
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(safe.isEmpty ? "calendar" : safe).ics")
+            try data.write(to: url)
+            exportDoc = ExportedICS(url: url)
+        } catch {
+            errorAlert = error.localizedDescription
+        }
+    }
+
+    private func handleImport(_ result: Result<[URL], Error>) async {
+        guard let calId = importTargetCalId else { return }
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let r = try await api.importICS(calendarId: calId, fileURL: url)
+                infoMessage = String(format: L10n.t("ics.import_result", appLang), r.imported, r.skipped)
+            } catch {
+                errorAlert = error.localizedDescription
+            }
+        case .failure(let err):
+            errorAlert = err.localizedDescription
+        }
     }
 
     // MARK: – Sections
@@ -114,6 +167,31 @@ struct AccountsView: View {
                             .fill(Color(hex: cal.color))
                             .frame(width: 12, height: 12)
                         Text(cal.name)
+                        if cal.group {
+                            Image(systemName: "person.2.fill").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if !cal.owned, let by = cal.sharedBy {
+                            Text(String(format: L10n.t("accounts.shared_by", appLang), by))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Menu {
+                            if cal.owned && !cal.group {
+                                Button { shareCalId = cal.id } label: {
+                                    Label(L10n.t("share.title", appLang), systemImage: "person.crop.circle.badge.plus")
+                                }
+                            }
+                            if cal.owned || cal.permission == "read_write" {
+                                Button { importTargetCalId = cal.id; showImporter = true } label: {
+                                    Label(L10n.t("ics.import", appLang), systemImage: "square.and.arrow.down")
+                                }
+                            }
+                            Button { Task { await exportCalendar(cal) } } label: {
+                                Label(L10n.t("ics.export", appLang), systemImage: "square.and.arrow.up")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .onDelete { offsets in
@@ -596,5 +674,104 @@ struct AddHASheet: View {
             dismiss()
         } catch { self.error = error.localizedDescription }
         isLoading = false
+    }
+}
+
+// MARK: – Sharing / Import-Export helpers
+
+struct IdentifiableInt: Identifiable { let id: Int }
+struct ExportedICS: Identifiable { let id = UUID(); let url: URL }
+
+/// Wraps UIActivityViewController so an exported .ics can be shared/saved.
+struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
+}
+
+/// Manage who a local calendar is shared with (owner only).
+struct SharingView: View {
+    let api: CalendarrAPI
+    let calendarId: Int
+    @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
+
+    @State private var shares: [CalendarShare] = []
+    @State private var directory: [DirectoryUser] = []
+    @State private var search = ""
+    @State private var permission = "read"
+    @State private var error = ""
+
+    private var candidates: [DirectoryUser] {
+        let sharedIds = Set(shares.map { $0.userId })
+        return directory.filter { !sharedIds.contains($0.id) &&
+            (search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search)) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(L10n.t("share.current", appLang)) {
+                    if shares.isEmpty {
+                        Text(L10n.t("share.none", appLang)).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(shares) { s in
+                            HStack {
+                                Text(s.displayName ?? "—")
+                                Spacer()
+                                Text(s.permission == "read_write"
+                                     ? L10n.t("perm.read_write", appLang)
+                                     : L10n.t("perm.read", appLang))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .onDelete { offsets in
+                            Task { await removeShares(offsets) }
+                        }
+                    }
+                }
+                Section(L10n.t("share.add", appLang)) {
+                    Picker(L10n.t("share.permission", appLang), selection: $permission) {
+                        Text(L10n.t("perm.read", appLang)).tag("read")
+                        Text(L10n.t("perm.read_write", appLang)).tag("read_write")
+                    }
+                    TextField(L10n.t("share.search", appLang), text: $search)
+                        .autocapitalization(.none)
+                    ForEach(candidates) { u in
+                        Button { Task { await addShare(u.id) } } label: {
+                            HStack {
+                                Text(u.displayName)
+                                Spacer()
+                                Image(systemName: "plus.circle").foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                }
+                if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
+            }
+            .navigationTitle(L10n.t("share.title", appLang))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.t("common.done", appLang)) { dismiss() }
+                }
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        shares = (try? await api.getShares(calendarId: calendarId)) ?? []
+        directory = (try? await api.getUserDirectory()) ?? []
+    }
+    private func addShare(_ userId: Int) async {
+        do { try await api.addShare(calendarId: calendarId, userId: userId, permission: permission); await load() }
+        catch { self.error = error.localizedDescription }
+    }
+    private func removeShares(_ offsets: IndexSet) async {
+        for i in offsets { try? await api.removeShare(calendarId: calendarId, userId: shares[i].userId) }
+        await load()
     }
 }
