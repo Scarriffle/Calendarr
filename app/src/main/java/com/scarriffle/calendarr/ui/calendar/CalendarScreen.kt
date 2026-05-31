@@ -5,6 +5,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
@@ -36,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -243,6 +248,7 @@ fun CalendarScreen(
         Overlay.GROUPS -> GroupsScreen(
             onClose = { overlay = Overlay.NONE },
             onChanged = { vm.loadGroups(); vm.loadWritableCalendars() },
+            onOpenGroupView = { g -> overlay = Overlay.NONE; vm.switchGroup(g) },
         )
         Overlay.NONE -> Unit
     }
@@ -380,27 +386,42 @@ private fun CompactIcon(
     }
 }
 
-/** Top-bar switcher: "My calendar" + each group; flips the calendar into the group overlay. */
+/**
+ * Top-bar switcher: "My calendar" + each group; flips the calendar into the
+ * group overlay. Rendered as a tonal pill so it stands out from the flat icons
+ * (filled in the accent colour while a group overlay is active).
+ */
 @Composable
 private fun GroupSwitcher(groups: List<Group>, activeGroup: Group?, onSwitchGroup: (Group?) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val active = activeGroup != null
     Box {
-        IconButton(onClick = { open = true }, modifier = Modifier.size(40.dp)) {
+        Box(
+            Modifier
+                .padding(horizontal = 2.dp)
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { open = true },
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 Icons.Filled.People,
                 contentDescription = tr("groups.title"),
-                modifier = Modifier.size(22.dp),
-                tint = if (activeGroup != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(21.dp),
+                tint = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
                 text = { Text(tr("group.switch.personal")) },
+                trailingIcon = { if (!active) Icon(Icons.Filled.Check, contentDescription = null) },
                 onClick = { open = false; onSwitchGroup(null) },
             )
             groups.forEach { g ->
                 DropdownMenuItem(
                     text = { Text("${g.icon ?: "👥"} ${g.name}") },
+                    trailingIcon = { if (activeGroup?.id == g.id) Icon(Icons.Filled.Check, contentDescription = null) },
                     onClick = { open = false; onSwitchGroup(g) },
                 )
             }

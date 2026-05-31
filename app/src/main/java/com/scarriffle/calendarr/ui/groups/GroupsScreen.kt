@@ -21,8 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -66,6 +68,7 @@ private val GROUP_ICONS = listOf(
 fun GroupsScreen(
     onClose: () -> Unit,
     onChanged: () -> Unit,
+    onOpenGroupView: (Group) -> Unit = {},
     vm: GroupsViewModel = hiltViewModel(),
 ) {
     var createOpen by remember { mutableStateOf(false) }
@@ -97,16 +100,22 @@ fun GroupsScreen(
                 }
                 items(vm.groups, key = { it.id }) { g ->
                     Row(
-                        Modifier.fillMaxWidth().clickable { manageId = g.id }.padding(vertical = 12.dp),
+                        Modifier.fillMaxWidth().clickable { onOpenGroupView(g) }.padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(g.icon ?: "👥", style = MaterialTheme.typography.titleMedium)
-                        Text(g.name, modifier = Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            tr("groups.member_count", g.memberCount),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(g.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                tr("groups.member_count", g.memberCount),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = { manageId = g.id }) {
+                            Icon(Icons.Filled.Tune, contentDescription = tr("groups.manage"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(Icons.Filled.ChevronRight, contentDescription = tr("groups.view"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Divider()
                 }
