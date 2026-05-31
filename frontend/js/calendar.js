@@ -2279,9 +2279,9 @@ function renderGroupMemberPicker() {
   const picker = document.getElementById('group-member-picker');
   picker.innerHTML = dir.length
     ? dir.map(u =>
-        `<label class="share-user-item" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        `<label class="group-member-item">
           <input type="checkbox" data-member-id="${u.id}" ${picked.has(u.id) ? 'checked' : ''} />
-          <span>${escHtml(u.display_name || '')}</span>
+          <span class="group-member-name">${escHtml(u.display_name || '')}</span>
         </label>`
       ).join('')
     : `<span class="accounts-section-empty">${t('share_no_users')}</span>`;

@@ -1824,3 +1824,20 @@ a { color: var(--primary); text-decoration: none; }
   font-size: 13px;
   color: var(--text-3);
 }
+
+/* Group member picker rows — checkbox left, name left, one per line. */
+.group-member-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  text-transform: none;
+}
+.group-member-item:last-child { border-bottom: none; }
+.group-member-item:hover { background: var(--bg-surface); }
+.group-member-item input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
+.group-member-name { flex: 1 1 auto; color: var(--text-1); }
