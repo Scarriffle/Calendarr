@@ -115,6 +115,9 @@ export async function initCalendar() {
   const urlState = readUrlState();
   if (urlState.date) state.currentDate = urlState.date;
   if (urlState.view) state.currentView = urlState.view;
+  // Preserve the settings flag through the first writeUrlState() (fired by the
+  // initial fetchAndRender) so a reload reopens settings instead of stripping it.
+  uiSettingsOpen = urlState.settings === true;
 
   setLang(settings.language || 'de');
   applyTheme(settings);
@@ -137,7 +140,7 @@ export async function initCalendar() {
   loadGroups();
 
   // Reopen the settings modal after a reload if the URL says we were in it.
-  if (readUrlState().settings) openSettingsModal();
+  if (urlState.settings) openSettingsModal();
 
   // Browser-Back/Forward: URL-Hash → State synchronisieren
   window.addEventListener('hashchange', () => {
@@ -562,122 +565,121 @@ function renderMiniCal() {
 }
 
 // ── Calendar List ─────────────────────────────────────────
+const CAL_ORDER_KEY = 'cal_order';
+function loadCalOrder() {
+  try { return JSON.parse(localStorage.getItem(CAL_ORDER_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function saveCalOrder(keys) {
+  localStorage.setItem(CAL_ORDER_KEY, JSON.stringify(keys));
+}
+
+// Drag & drop reordering of the flat calendar list (persisted per device).
+function bindCalDragReorder(container) {
+  let dragKey = null;
+  container.querySelectorAll('.cal-item').forEach(item => {
+    item.addEventListener('dragstart', e => {
+      // Don't start a drag from interactive children (checkbox, color dot, buttons).
+      if (e.target.closest('input, button, .cal-item-dot')) { e.preventDefault(); return; }
+      dragKey = item.dataset.key;
+      e.dataTransfer.effectAllowed = 'move';
+      item.classList.add('cal-dragging');
+    });
+    item.addEventListener('dragend', () => {
+      dragKey = null;
+      item.classList.remove('cal-dragging');
+    });
+    item.addEventListener('dragover', e => { e.preventDefault(); });
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      const targetKey = item.dataset.key;
+      if (!dragKey || dragKey === targetKey) return;
+      const keys = [...container.querySelectorAll('.cal-item')].map(el => el.dataset.key);
+      const from = keys.indexOf(dragKey);
+      const to = keys.indexOf(targetKey);
+      if (from === -1 || to === -1) return;
+      keys.splice(to, 0, keys.splice(from, 1)[0]);
+      saveCalOrder(keys);
+      renderCalendarList();
+    });
+  });
+}
+
 function renderCalendarList() {
   const container = document.getElementById('cal-list-items');
-  let html = '';
+  // Eye-off (hide external calendar) and trash (delete local/ical) icons.
+  const EYE_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`;
+  const TRASH = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
 
-  // ── CalDAV accounts ────────────────────────────────────
-  if (state.accounts.length) {
-    html += state.accounts.map(acc => {
-      const visibleCals = acc.calendars.filter(c => !c.sidebar_hidden);
-      if (!visibleCals.length) return '';
-      return `<div class="cal-account-name">${escHtml(acc.name)}</div>` +
-        visibleCals.map(cal =>
-          `<div class="cal-item" data-cal-id="${cal.id}" data-source="caldav">
-            <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="caldav" />
-            <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="caldav" title="${t('change_color')}"></div>
-            <span class="cal-item-name" data-source="caldav">${escHtml(cal.name)}</span>
-            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="caldav" title="${t('hide_cal')}">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-            </button>
-          </div>`
-        ).join('');
-    }).join('');
-  }
+  // Build a single flat list of all calendars. The source/account is shown
+  // inline (small, grey) next to the name and section headers are gone, so the
+  // whole list can be freely reordered via drag & drop.
+  const entries = [];
+  state.accounts.forEach(acc => {
+    (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
+      entries.push({ key: `caldav:${cal.id}`, source: 'caldav', dataId: `data-cal-id="${cal.id}"`,
+        name: cal.name, color: cal.color || '#4285f4', enabled: cal.enabled,
+        sourceLabel: acc.name, remove: { icon: EYE_OFF, title: t('hide_cal') } });
+    });
+  });
+  state.localCalendars.filter(c => c.owned !== false && !c.group).forEach(cal => {
+    entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
+      name: cal.name, color: cal.color, enabled: cal.enabled,
+      sourceLabel: t('cal_local'), remove: { icon: TRASH, title: t('remove_cal') } });
+  });
+  state.localCalendars.filter(c => c.owned === false && !c.group).forEach(cal => {
+    entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
+      name: cal.name, color: cal.color, enabled: cal.enabled,
+      sourceLabel: `${t('shared_with_me')} · ${cal.shared_by || ''}`, remove: null });
+  });
+  state.icalSubscriptions.forEach(sub => {
+    entries.push({ key: `ical:${sub.id}`, source: 'ical', dataId: `data-sub-id="${sub.id}"`,
+      name: sub.name, color: sub.color, enabled: sub.enabled,
+      sourceLabel: t('cal_ical'), remove: { icon: TRASH, title: t('remove_ical_sub') } });
+  });
+  state.googleAccounts.forEach(acc => {
+    (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
+      entries.push({ key: `google:${cal.id}`, source: 'google', dataId: `data-cal-id="${cal.id}"`,
+        name: cal.name, color: cal.color || '#4285f4', enabled: cal.enabled,
+        sourceLabel: acc.email, remove: { icon: EYE_OFF, title: t('hide_cal') } });
+    });
+  });
+  state.haAccounts.forEach(acc => {
+    (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
+      entries.push({ key: `homeassistant:${cal.id}`, source: 'homeassistant', dataId: `data-cal-id="${cal.id}"`,
+        name: cal.name, color: cal.color || '#03a9f4', enabled: cal.enabled,
+        sourceLabel: acc.name, remove: { icon: EYE_OFF, title: t('hide_cal') } });
+    });
+  });
 
-  // ── Local calendars: own ones, then a separate "shared with me" group ──
-  const ownLocal    = state.localCalendars.filter(c => c.owned !== false);
-  const sharedLocal = state.localCalendars.filter(c => c.owned === false && !c.group);
+  // Apply the saved manual order (per device); unknown calendars append at end.
+  const order = loadCalOrder();
+  entries.sort((a, b) => {
+    const ia = order.indexOf(a.key), ib = order.indexOf(b.key);
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+  saveCalOrder(entries.map(e => e.key));
 
-  const renderLocalItem = (cal, withRemove) => {
-    const removeBtn = withRemove
-      ? `<button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="local" title="${t('remove_cal')}">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>`
-      : '';
-    return `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
-      <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="local" />
-      <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="local" title="${t('change_color')}"></div>
-      <span class="cal-item-name" data-source="local">${escHtml(cal.name)}</span>
-      ${removeBtn}
-    </div>`;
-  };
-
-  if (ownLocal.length) {
-    html += `<div class="cal-account-name">${t('cal_local')}</div>`;
-    html += ownLocal.map(c => renderLocalItem(c, true)).join('');
-  }
-  if (sharedLocal.length) {
-    html += `<div class="cal-account-name">${t('shared_with_me')}</div>`;
-    html += sharedLocal.map(cal =>
-      `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
-        <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="local" />
-        <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="local" title="${t('change_color')}"></div>
-        <span class="cal-item-name" data-source="local">${escHtml(cal.name)}</span>
-        <span class="cal-badge cal-badge-shared" title="${t('shared_by', { name: cal.shared_by || '' })}">${escHtml(cal.shared_by || '')}</span>
-      </div>`
-    ).join('');
-  }
-
-  // ── iCal subscriptions ─────────────────────────────────
-  if (state.icalSubscriptions.length) {
-    html += `<div class="cal-account-name">${t('cal_ical')}</div>`;
-    html += state.icalSubscriptions.map(sub =>
-      `<div class="cal-item" data-sub-id="${sub.id}" data-source="ical">
-        <input type="checkbox" ${sub.enabled ? 'checked' : ''} data-sub-id="${sub.id}" data-source="ical" />
-        <div class="cal-item-dot" style="background:${sub.color}" data-sub-id="${sub.id}" data-source="ical" title="${t('change_color')}"></div>
-        <span class="cal-item-name" data-source="ical">${escHtml(sub.name)}</span>
-        <button class="icon-btn mini-btn cal-item-remove" data-sub-id="${sub.id}" data-source="ical" title="${t('remove_ical_sub')}">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>
-      </div>`
-    ).join('');
-  }
-
-  // ── Google accounts ───────────────────────────────────
-  if (state.googleAccounts.length) {
-    html += state.googleAccounts.map(acc => {
-      const visibleCals = acc.calendars.filter(c => !c.sidebar_hidden);
-      if (!visibleCals.length) return `<div class="cal-account-name">${escHtml(acc.email)}</div>`;
-      return `<div class="cal-account-name">${escHtml(acc.email)}</div>` +
-        visibleCals.map(cal =>
-          `<div class="cal-item" data-cal-id="${cal.id}" data-source="google">
-            <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="google" />
-            <div class="cal-item-dot" style="background:${cal.color || '#4285f4'}" data-cal-id="${cal.id}" data-source="google" title="${t('change_color')}"></div>
-            <span class="cal-item-name" data-source="google">${escHtml(cal.name)}</span>
-            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="google" title="${t('hide_cal')}">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-            </button>
-          </div>`
-        ).join('');
-    }).join('');
-  }
-
-  // ── Home Assistant accounts ───────────────────────────
-  if (state.haAccounts.length) {
-    html += state.haAccounts.map(acc => {
-      const visibleCals = acc.calendars.filter(c => !c.sidebar_hidden);
-      if (!visibleCals.length) return `<div class="cal-account-name">${escHtml(acc.name)}</div>`;
-      return `<div class="cal-account-name">${escHtml(acc.name)}</div>` +
-        visibleCals.map(cal =>
-          `<div class="cal-item" data-cal-id="${cal.id}" data-source="homeassistant">
-            <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="homeassistant" />
-            <div class="cal-item-dot" style="background:${cal.color || '#03a9f4'}" data-cal-id="${cal.id}" data-source="homeassistant" title="${t('change_color')}"></div>
-            <span class="cal-item-name" data-source="homeassistant">${escHtml(cal.name)}</span>
-            <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="homeassistant" title="${t('hide_cal')}">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-            </button>
-          </div>`
-        ).join('');
-    }).join('');
-  }
-
-  if (!html) {
+  if (!entries.length) {
     container.innerHTML = `<div style="padding:8px 16px;font-size:12px;color:var(--text-3)">${t('error_no_calendars')}</div>`;
     return;
   }
 
-  container.innerHTML = html;
+  container.innerHTML = entries.map(e =>
+    `<div class="cal-item" draggable="true" data-key="${e.key}" data-source="${e.source}" ${e.dataId}>
+      <span class="cal-drag-handle" title="${t('drag_reorder')}">⠿</span>
+      <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
+      <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
+      <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
+      <span class="cal-source">${escHtml(e.sourceLabel)}</span>
+      ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
+    </div>`
+  ).join('');
+
+  bindCalDragReorder(container);
 
   // ── Checkbox handlers ──────────────────────────────────
   container.querySelectorAll('input[type=checkbox]').forEach(cb => {
@@ -2304,7 +2306,7 @@ function renderGroupMemberPicker() {
     ? dir.map(u => {
         const on = picked.has(u.id);
         return `<div class="pick-row ${on ? 'pick-row-sel' : ''}" data-member-id="${u.id}" role="checkbox" aria-checked="${on}">
-          <span class="pick-mark">${on ? '☑' : '☐'}</span>
+          <span class="pick-mark pick-check ${on ? 'on' : ''}">${on ? '✓' : ''}</span>
           <span class="pick-name">${escHtml(u.display_name || '')}</span>
         </div>`;
       }).join('')
@@ -2381,7 +2383,7 @@ function renderGroupVisibleList(selectedId) {
       ? `<span class="pick-dot" style="background:${color}"></span>`
       : `<span class="pick-dot pick-dot-empty"></span>`;
     return `<div class="pick-row ${sel ? 'pick-row-sel' : ''}" data-pick="${val}" role="radio" aria-checked="${sel}">
-      <span class="pick-mark">${sel ? '●' : '○'}</span>
+      <span class="pick-mark pick-radio ${sel ? 'on' : ''}"></span>
       ${dot}
       <span class="pick-name">${escHtml(name)}</span>
     </div>`;

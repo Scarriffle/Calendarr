@@ -1887,8 +1887,37 @@ a { color: var(--primary); text-decoration: none; }
 }
 .pick-row:last-child { border-bottom: none; }
 .pick-row:hover { background: var(--bg-surface); }
-.pick-row-sel { background: rgba(66, 133, 244, 0.12); }
-.pick-mark { flex: 0 0 auto; width: 18px; text-align: center; color: var(--primary); }
+.pick-row-sel { box-shadow: inset 3px 0 0 var(--accent); }
+.pick-mark {
+  flex: 0 0 auto;
+  width: 18px; height: 18px;
+  border: 2px solid var(--text-3);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; line-height: 1; color: #fff;
+}
+.pick-check { border-radius: 4px; }
+.pick-radio { border-radius: 50%; }
+.pick-mark.on { background: var(--accent); border-color: var(--accent); }
 .pick-dot { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; }
 .pick-dot-empty { background: transparent; }
 .pick-name { flex: 1 1 auto; text-align: left; }
+
+/* Flat calendar list: inline source label + drag handle. */
+.cal-source {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 8px;
+}
+.cal-drag-handle {
+  flex: 0 0 auto;
+  cursor: grab;
+  color: var(--text-3);
+  font-size: 14px;
+  user-select: none;
+}
+.cal-item.cal-dragging { opacity: .5; }
