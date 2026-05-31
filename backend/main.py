@@ -17,7 +17,7 @@ STATIC_CACHE = f"public, max-age={STATIC_MAX_AGE_SECONDS}, must-revalidate"
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import Base, engine
-from routers import auth_router, caldav_router, google_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
+from routers import auth_router, caldav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -132,6 +132,32 @@ def _migrate():
         except Exception:
             pass
 
+        # ── Collaboration features (sharing, groups, creator, private) ──
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN private_event_visibility VARCHAR(10) DEFAULT 'busy'"))
+            conn.commit()
+            logging.info("Migration: added private_event_visibility to user_settings")
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE local_events ADD COLUMN creator_id INTEGER"))
+            conn.commit()
+            logging.info("Migration: added creator_id to local_events")
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE local_events ADD COLUMN creator_name_external TEXT"))
+            conn.commit()
+            logging.info("Migration: added creator_name_external to local_events")
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE local_events ADD COLUMN is_private BOOLEAN DEFAULT 0"))
+            conn.commit()
+            logging.info("Migration: added is_private to local_events")
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
@@ -170,6 +196,7 @@ app.include_router(caldav_router.router, prefix="/api/caldav", tags=["caldav"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 app.include_router(profile_router.router, prefix="/api/profile", tags=["profile"])
 app.include_router(local_router.router, prefix="/api/local", tags=["local"])
+app.include_router(groups_router.router, prefix="/api/groups", tags=["groups"])
 app.include_router(ical_router.router, prefix="/api/ical", tags=["ical"])
 app.include_router(google_router.router, prefix="/api/google", tags=["google"])
 app.include_router(homeassistant_router.router, prefix="/api/homeassistant", tags=["homeassistant"])

@@ -35,6 +35,25 @@ def list_users(
     return [_user_dict(u) for u in db.query(models.User).all()]
 
 
+@router.get("/directory")
+def user_directory(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Lightweight list of all users (id + display_name) for sharing/group pickers.
+
+    Available to any authenticated user (unlike GET / which is admin-only).
+    Excludes the requesting user.
+    """
+    users = (
+        db.query(models.User)
+        .filter(models.User.id != current_user.id)
+        .order_by(models.User.username)
+        .all()
+    )
+    return [{"id": u.id, "display_name": u.username} for u in users]
+
+
 @router.post("/")
 def create_user(
     req: CreateUserRequest,

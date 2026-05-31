@@ -11,8 +11,10 @@ from sqlalchemy import or_
 
 import caldav_client
 import models
+import permissions
 from auth import get_current_user
 from database import get_db
+from local_events_util import build_local_event_dict, expand_recurring_local, resolve_creator
 from routers.ical_router import _refresh_if_needed, get_events_for_subscription
 
 logger = logging.getLogger(__name__)
@@ -80,101 +82,6 @@ def _account_dict(a: models.CalDAVAccount) -> dict:
             for c in a.calendars
         ],
     }
-
-
-def _expand_recurring_local(ev, local_cal, range_start, range_end):
-    """Expand a recurring LocalEvent into individual occurrences within the date range."""
-    results = []
-    # Parse excluded dates
-    excluded = set()
-    if ev.exdate:
-        for d in ev.exdate.split(","):
-            d = d.strip()
-            if d:
-                excluded.add(d)
-    try:
-        ev_start_str = ev.start.replace("Z", "+00:00")
-        ev_end_str = ev.end.replace("Z", "+00:00")
-
-        if ev.all_day:
-            ev_start = dt_date.fromisoformat(ev_start_str[:10])
-            ev_end = dt_date.fromisoformat(ev_end_str[:10])
-            duration = ev_end - ev_start
-            rule = rrulestr(f"RRULE:{ev.rrule}", dtstart=dt_datetime.combine(ev_start, dt_datetime.min.time()))
-            r_start = dt_datetime.combine(range_start if isinstance(range_start, dt_date) else range_start.date(), dt_datetime.min.time())
-            r_end = dt_datetime.combine(range_end if isinstance(range_end, dt_date) else range_end.date(), dt_datetime.min.time())
-            occurrences = rule.between(r_start - timedelta(days=1), r_end + timedelta(days=1), inc=True)
-            for occ in occurrences:
-                occ_start = occ.date()
-                occ_key = occ_start.strftime("%Y%m%d")
-                if occ_key in excluded:
-                    continue
-                occ_end = occ_start + duration
-                results.append({
-                    "id": ev.uid,
-                    "url": f"local://{ev.uid}",
-                    "title": ev.title,
-                    "start": occ_start.isoformat(),
-                    "end": occ_end.isoformat(),
-                    "allDay": True,
-                    "location": ev.location or "",
-                    "description": ev.description or "",
-                    "color": ev.color,
-                    "rrule": ev.rrule,
-                    "calendar_id": f"local-{local_cal.id}",
-                    "calendar_name": local_cal.name,
-                    "calendarColor": local_cal.color,
-                    "source": "local",
-                })
-        else:
-            ev_start = dt_datetime.fromisoformat(ev_start_str)
-            ev_end = dt_datetime.fromisoformat(ev_end_str)
-            if ev_start.tzinfo is None:
-                ev_start = ev_start.replace(tzinfo=dt_timezone.utc)
-            if ev_end.tzinfo is None:
-                ev_end = ev_end.replace(tzinfo=dt_timezone.utc)
-            duration = ev_end - ev_start
-            rule = rrulestr(f"RRULE:{ev.rrule}", dtstart=ev_start)
-            r_start = range_start if isinstance(range_start, dt_datetime) else dt_datetime.combine(range_start, dt_datetime.min.time(), tzinfo=dt_timezone.utc)
-            r_end = range_end if isinstance(range_end, dt_datetime) else dt_datetime.combine(range_end, dt_datetime.min.time(), tzinfo=dt_timezone.utc)
-            if r_start.tzinfo is None:
-                r_start = r_start.replace(tzinfo=dt_timezone.utc)
-            if r_end.tzinfo is None:
-                r_end = r_end.replace(tzinfo=dt_timezone.utc)
-            occurrences = rule.between(r_start - timedelta(days=1), r_end + timedelta(days=1), inc=True)
-            for occ in occurrences:
-                occ_key = occ.strftime("%Y%m%d")
-                if occ_key in excluded:
-                    continue
-                occ_end = occ + duration
-                results.append({
-                    "id": ev.uid,
-                    "url": f"local://{ev.uid}",
-                    "title": ev.title,
-                    "start": occ.isoformat(),
-                    "end": occ_end.isoformat(),
-                    "allDay": False,
-                    "location": ev.location or "",
-                    "description": ev.description or "",
-                    "color": ev.color,
-                    "rrule": ev.rrule,
-                    "calendar_id": f"local-{local_cal.id}",
-                    "calendar_name": local_cal.name,
-                    "calendarColor": local_cal.color,
-                    "source": "local",
-                })
-    except Exception as exc:
-        logger.warning("Error expanding recurring event %s: %s", ev.uid, exc)
-        # Fall back to single event
-        results.append({
-            "id": ev.uid, "url": f"local://{ev.uid}", "title": ev.title,
-            "start": ev.start, "end": ev.end, "allDay": ev.all_day,
-            "location": ev.location or "", "description": ev.description or "",
-            "color": ev.color, "rrule": ev.rrule,
-            "calendar_id": f"local-{local_cal.id}", "calendar_name": local_cal.name,
-            "calendarColor": local_cal.color, "source": "local",
-        })
-    return results
 
 
 def _normalize_url(url: str) -> str:
@@ -417,15 +324,17 @@ def get_events(
                     "Error fetching calendar %s: %s", calendar.id, exc
                 )
 
-    # ── Local calendar events ─────────────────────────────
+    # ── Local calendar events (own + shared + group calendars) ─────────────
+    readable_ids = permissions.readable_local_calendar_ids(db, current_user)
     local_calendars = (
         db.query(models.LocalCalendar)
         .filter(
-            models.LocalCalendar.user_id == current_user.id,
+            models.LocalCalendar.id.in_(readable_ids),
             models.LocalCalendar.enabled == True,
         )
         .all()
-    )
+    ) if readable_ids else []
+    name_cache = {u.id: u.username for u in db.query(models.User).all()}
     for local_cal in local_calendars:
         local_events = (
             db.query(models.LocalEvent)
@@ -441,25 +350,11 @@ def get_events(
             .all()
         )
         for ev in local_events:
+            creator = resolve_creator(ev, name_cache=name_cache)
             if ev.rrule:
-                all_events.extend(_expand_recurring_local(ev, local_cal, start_dt, end_dt))
+                all_events.extend(expand_recurring_local(ev, local_cal, start_dt, end_dt, creator=creator))
             else:
-                all_events.append({
-                    "id": ev.uid,
-                    "url": f"local://{ev.uid}",
-                    "title": ev.title,
-                    "start": ev.start,
-                    "end": ev.end,
-                    "allDay": ev.all_day,
-                    "location": ev.location or "",
-                    "description": ev.description or "",
-                    "color": ev.color,
-                    "rrule": None,
-                    "calendar_id": f"local-{local_cal.id}",
-                    "calendar_name": local_cal.name,
-                    "calendarColor": local_cal.color,
-                    "source": "local",
-                })
+                all_events.append(build_local_event_dict(ev, local_cal, rrule=None, creator=creator))
 
     # ── iCal subscription events ──────────────────────────
     ical_subs = (

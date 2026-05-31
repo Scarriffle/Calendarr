@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,7 @@ class SettingsUpdate(BaseModel):
     text_color: Optional[str] = None
     line_color: Optional[str] = None
     bg_color:   Optional[str] = None
+    private_event_visibility: Optional[str] = None
 
 
 def _settings_dict(s: models.UserSettings) -> dict:
@@ -46,6 +47,7 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "text_color": s.text_color,
         "line_color": s.line_color,
         "bg_color":   s.bg_color,
+        "private_event_visibility": s.private_event_visibility or "busy",
     }
 
 
@@ -81,6 +83,9 @@ def update_settings(
     if not settings:
         settings = models.UserSettings(user_id=current_user.id)
         db.add(settings)
+
+    if data.private_event_visibility is not None and data.private_event_visibility not in ("hidden", "busy"):
+        raise HTTPException(422, "private_event_visibility must be 'hidden' or 'busy'")
 
     # For these three override colours, an explicit null is meaningful
     # ("reset to default") and must be persisted as NULL. All other fields

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -33,6 +33,11 @@ class User(Base):
     homeassistant_accounts = relationship(
         "HomeAssistantAccount", back_populates="user", cascade="all, delete-orphan"
     )
+
+    @property
+    def display_name(self) -> str:
+        """No dedicated display-name column exists — fall back to the username."""
+        return self.username
 
 
 class CalDAVAccount(Base):
@@ -87,6 +92,9 @@ class UserSettings(Base):
     text_color = Column(String(7), nullable=True)   # Override für --text-1 (NULL = nutze text_contrast)
     line_color = Column(String(7), nullable=True)   # Override für --border  (NULL = nutze line_contrast)
     bg_color   = Column(String(7), nullable=True)   # Override für --bg-app  (NULL = Default)
+    # How this user's private events appear to other group members:
+    # 'hidden' = invisible, 'busy' = anonymous busy block (default).
+    private_event_visibility = Column(String(10), default="busy")
 
     user = relationship("User", back_populates="settings")
 
@@ -119,8 +127,15 @@ class LocalEvent(Base):
     color = Column(String(7), nullable=True)
     rrule = Column(Text, nullable=True)
     exdate = Column(Text, nullable=True)  # Comma-separated YYYYMMDD dates to exclude
+    # Creator: set server-side from the auth token on create, never from the client.
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    # For imported events without a local user (from the .ics ORGANIZER field).
+    creator_name_external = Column(Text, nullable=True)
+    # Private events are filtered for other group members per their visibility setting.
+    is_private = Column(Boolean, default=False)
 
     calendar = relationship("LocalCalendar", back_populates="events")
+    creator = relationship("User")
 
 
 class ICalSubscription(Base):
@@ -219,3 +234,74 @@ class HomeAssistantCalendar(Base):
     sidebar_hidden = Column(Boolean, default=False)
 
     account = relationship("HomeAssistantAccount", back_populates="calendars")
+
+
+# ── Collaboration: sharing & groups (local calendars only) ────────────────
+
+
+class CalendarShare(Base):
+    """A local calendar shared with another Calendarr user."""
+
+    __tablename__ = "calendar_shares"
+    __table_args__ = (
+        UniqueConstraint("calendar_id", "user_id", name="uq_calendar_share"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    calendar_id = Column(Integer, ForeignKey("local_calendars.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    permission = Column(String(20), default="read")  # 'read' | 'read_write'
+    created_at = Column(String(50), nullable=True)  # ISO 8601
+
+    calendar = relationship("LocalCalendar")
+    user = relationship("User")
+
+
+class Group(Base):
+    __tablename__ = "groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(String(50), nullable=True)  # ISO 8601
+
+    members = relationship(
+        "GroupMember", back_populates="group", cascade="all, delete-orphan"
+    )
+    group_calendar = relationship(
+        "GroupCalendar", back_populates="group", uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+
+class GroupMember(Base):
+    __tablename__ = "group_members"
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_group_member"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role = Column(String(10), default="member")  # 'owner' | 'member'
+    joined_at = Column(String(50), nullable=True)  # ISO 8601
+
+    group = relationship("Group", back_populates="members")
+    user = relationship("User")
+
+
+class GroupCalendar(Base):
+    """1:1 link between a group and its shared local calendar."""
+
+    __tablename__ = "group_calendars"
+    __table_args__ = (
+        UniqueConstraint("group_id", name="uq_group_calendar_group"),
+        UniqueConstraint("calendar_id", name="uq_group_calendar_calendar"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    calendar_id = Column(Integer, ForeignKey("local_calendars.id"), nullable=False)
+
+    group = relationship("Group", back_populates="group_calendar")
+    calendar = relationship("LocalCalendar")
