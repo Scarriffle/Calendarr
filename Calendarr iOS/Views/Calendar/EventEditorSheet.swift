@@ -18,6 +18,7 @@ struct EventEditorSheet: View {
     @State private var notes = ""
     @State private var selectedCalendarId: String = ""
     @State private var color = ""
+    @State private var isPrivate = false
     @State private var isSaving = false
     @State private var error = ""
 
@@ -72,6 +73,13 @@ struct EventEditorSheet: View {
                                 .tag(cal.id)
                             }
                         }
+                    }
+                }
+
+                if selectedCal?.source == "local" {
+                    Section {
+                        Toggle(L10n.t("event.private", appLang), isOn: $isPrivate)
+                            .tint(Color.accentColor)
                     }
                 }
 
@@ -140,6 +148,7 @@ struct EventEditorSheet: View {
             location = ev.location
             notes = ev.notes
             color = ev.color ?? ""
+            isPrivate = ev.isPrivate
             // HA events use "homeassistant-42" in CalEvent but "ha-42" in WritableCalendar
             if ev.source == "homeassistant" {
                 let num = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
@@ -157,6 +166,7 @@ struct EventEditorSheet: View {
             location = ev.location
             notes = ev.notes
             color = ev.color ?? ""
+            isPrivate = ev.isPrivate
             selectedCalendarId = store.writableCalendars.first?.id ?? ""
         } else {
             let cal = Calendar.current
@@ -182,7 +192,8 @@ struct EventEditorSheet: View {
                 switch ev.source {
                 case "local":
                     try await api.updateLocalEvent(uid: ev.id, title: title, start: start, end: end,
-                                                   isAllDay: isAllDay, location: location, description: notes, color: colorVal)
+                                                   isAllDay: isAllDay, location: location, description: notes, color: colorVal,
+                                                   isPrivate: isPrivate)
                 case "homeassistant":
                     // No update API exists – delete the old event and recreate with new data.
                     let rawId = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
@@ -202,7 +213,8 @@ struct EventEditorSheet: View {
                 case "local":
                     _ = try await api.createLocalEvent(calendarId: cal.numericId, title: title,
                                                        start: start, end: end, isAllDay: isAllDay,
-                                                       location: location, description: notes, color: colorVal)
+                                                       location: location, description: notes, color: colorVal,
+                                                       isPrivate: isPrivate)
                 case "google":
                     try await api.createGoogleEvent(calendarDbId: cal.numericId, title: title,
                                                     start: start, end: end, isAllDay: isAllDay,

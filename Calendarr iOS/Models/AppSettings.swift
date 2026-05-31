@@ -16,6 +16,8 @@ struct AppSettings: Codable {
     var textColor: String = "#FFFFFF"
     var backgroundColor: String = "#000000"
     var lineColor: String = "#3A3A3C"
+    var privateEventVisibility: String = "busy"   // 'hidden' | 'busy'
+    var groupVisibleCalendarId: Int? = nil
 
     enum CodingKeys: String, CodingKey {
         case defaultView = "default_view"
@@ -33,6 +35,8 @@ struct AppSettings: Codable {
         case textColor = "text_color"
         case backgroundColor = "background_color"
         case lineColor = "line_color"
+        case privateEventVisibility = "private_event_visibility"
+        case groupVisibleCalendarId = "group_visible_calendar_id"
     }
 
     init() {}
@@ -60,6 +64,8 @@ struct AppSettings: Codable {
         textColor         = try c.decodeIfPresent(String.self, forKey: .textColor)         ?? d.textColor
         backgroundColor   = try c.decodeIfPresent(String.self, forKey: .backgroundColor)   ?? d.backgroundColor
         lineColor         = try c.decodeIfPresent(String.self, forKey: .lineColor)         ?? d.lineColor
+        privateEventVisibility = try c.decodeIfPresent(String.self, forKey: .privateEventVisibility) ?? d.privateEventVisibility
+        groupVisibleCalendarId = try c.decodeIfPresent(Int.self, forKey: .groupVisibleCalendarId)
     }
 }
 
@@ -95,6 +101,27 @@ struct LocalCalendar: Codable, Identifiable {
     var name: String
     var color: String
     var enabled: Bool
+    var owned: Bool = true
+    var sharedBy: String? = nil
+    var permission: String? = nil
+    var group: Bool = false
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, color, enabled, owned, permission, group
+        case sharedBy = "shared_by"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id        = try c.decode(Int.self, forKey: .id)
+        name      = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        color     = try c.decodeIfPresent(String.self, forKey: .color) ?? "#34a853"
+        enabled   = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        owned     = try c.decodeIfPresent(Bool.self, forKey: .owned) ?? true
+        sharedBy  = try c.decodeIfPresent(String.self, forKey: .sharedBy)
+        permission = try c.decodeIfPresent(String.self, forKey: .permission)
+        group     = try c.decodeIfPresent(Bool.self, forKey: .group) ?? false
+    }
 }
 
 struct ICalSubscription: Codable, Identifiable {
@@ -173,6 +200,7 @@ struct HACalendar: Codable, Identifiable {
 struct UserProfile: Codable {
     let id: Int
     let username: String
+    var displayName: String?
     var email: String?
     let isAdmin: Bool
     let hasAvatar: Bool
@@ -180,9 +208,58 @@ struct UserProfile: Codable {
 
     enum CodingKeys: String, CodingKey {
         case id, username, email
+        case displayName = "display_name"
         case isAdmin = "is_admin"
         case hasAvatar = "has_avatar"
         case totpEnabled = "totp_enabled"
+    }
+}
+
+// MARK: - Sharing & groups
+
+struct DirectoryUser: Codable, Identifiable {
+    let id: Int
+    let displayName: String
+    enum CodingKeys: String, CodingKey { case id; case displayName = "display_name" }
+}
+
+struct CalendarShare: Codable, Identifiable {
+    let userId: Int
+    let displayName: String?
+    var permission: String
+    var id: Int { userId }
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case displayName = "display_name"
+        case permission
+    }
+}
+
+struct GroupMember: Codable, Identifiable {
+    let id: Int
+    let displayName: String?
+    var role: String
+    var color: String?
+    enum CodingKeys: String, CodingKey {
+        case id, role, color
+        case displayName = "display_name"
+    }
+}
+
+struct CalGroup: Codable, Identifiable {
+    let id: Int
+    var name: String
+    var icon: String?
+    var role: String?
+    var memberCount: Int?
+    var groupCalendarId: Int?
+    var groupCalendarColor: String?
+    var members: [GroupMember]?
+    enum CodingKeys: String, CodingKey {
+        case id, name, icon, role, members
+        case memberCount = "member_count"
+        case groupCalendarId = "group_calendar_id"
+        case groupCalendarColor = "group_calendar_color"
     }
 }
 

@@ -201,6 +201,7 @@ private let strings: [String: [String: String]] = [
         // Event editor
         "event.title_placeholder": "Titel",
         "event.allday": "Ganztägig",
+        "event.private": "Privat",
         "event.start": "Start",
         "event.end": "Ende",
         "event.location": "Ort",
@@ -462,6 +463,7 @@ private let strings: [String: [String: String]] = [
         // Event editor
         "event.title_placeholder": "Title",
         "event.allday": "All-day",
+        "event.private": "Private",
         "event.start": "Start",
         "event.end": "End",
         "event.location": "Location",

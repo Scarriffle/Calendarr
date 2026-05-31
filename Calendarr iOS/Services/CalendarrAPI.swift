@@ -72,6 +72,9 @@ class CalendarrAPI {
             throw APIError.decodingError
         }
         let admin = user["is_admin"] as? Bool ?? false
+        // Persist id + display name for creator/owner comparisons and display.
+        UserDefaults.standard.set(user["id"] as? Int ?? 0, forKey: "userId")
+        UserDefaults.standard.set(user["display_name"] as? String ?? uname, forKey: "displayName")
         return (token, uname, admin)
     }
 
@@ -225,7 +228,8 @@ class CalendarrAPI {
     }
 
     func createLocalEvent(calendarId: Int, title: String, start: Date, end: Date,
-                          isAllDay: Bool, location: String, description: String, color: String?) async throws -> CalEvent {
+                          isAllDay: Bool, location: String, description: String, color: String?,
+                          isPrivate: Bool = false) async throws -> CalEvent {
         var body: [String: Any] = [
             "calendar_id": calendarId,
             "title": title,
@@ -233,7 +237,8 @@ class CalendarrAPI {
             "end": formatISO(end, allDay: isAllDay),
             "allDay": isAllDay,
             "location": location,
-            "description": description
+            "description": description,
+            "private": isPrivate
         ]
         if let c = color, !c.isEmpty { body["color"] = c }
         let data = try await request("/api/local/events", method: "POST", body: body)
@@ -243,14 +248,16 @@ class CalendarrAPI {
     }
 
     func updateLocalEvent(uid: String, title: String, start: Date, end: Date,
-                          isAllDay: Bool, location: String, description: String, color: String?) async throws {
+                          isAllDay: Bool, location: String, description: String, color: String?,
+                          isPrivate: Bool = false) async throws {
         var body: [String: Any] = [
             "title": title,
             "start": formatISO(start, allDay: isAllDay),
             "end": formatISO(end, allDay: isAllDay),
             "allDay": isAllDay,
             "location": location,
-            "description": description
+            "description": description,
+            "private": isPrivate
         ]
         if let c = color { body["color"] = c }
         _ = try await request("/api/local/events/\(uid)", method: "PUT", body: body)
@@ -391,5 +398,135 @@ class CalendarrAPI {
         }
         _ = try await request(path, method: "PUT",
                               body: ["enabled": !hidden, "sidebar_hidden": hidden])
+    }
+
+    // MARK: – Profile (display name / login name / email)
+
+    /// Update profile fields. A login-name change returns a fresh token (the old
+    /// one becomes invalid) — the caller must store the returned token.
+    func updateProfile(displayName: String?, username: String?, email: String?) async throws -> String? {
+        var body: [String: Any] = [:]
+        if let d = displayName { body["display_name"] = d }
+        if let u = username { body["username"] = u }
+        if let e = email { body["email"] = e } else { body["email"] = NSNull() }
+        let data = try await request("/api/profile/", method: "PUT", body: body)
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return json?["access_token"] as? String
+    }
+
+    // MARK: – Sharing
+
+    func getUserDirectory() async throws -> [DirectoryUser] {
+        let data = try await request("/api/users/directory")
+        return (try? JSONDecoder().decode([DirectoryUser].self, from: data)) ?? []
+    }
+
+    func getShares(calendarId: Int) async throws -> [CalendarShare] {
+        let data = try await request("/api/local/calendars/\(calendarId)/shares")
+        return (try? JSONDecoder().decode([CalendarShare].self, from: data)) ?? []
+    }
+
+    func addShare(calendarId: Int, userId: Int, permission: String) async throws {
+        _ = try await request("/api/local/calendars/\(calendarId)/shares", method: "POST",
+                              body: ["user_id": userId, "permission": permission])
+    }
+
+    func removeShare(calendarId: Int, userId: Int) async throws {
+        _ = try await request("/api/local/calendars/\(calendarId)/shares/\(userId)", method: "DELETE")
+    }
+
+    // MARK: – Groups
+
+    func getGroups() async throws -> [CalGroup] {
+        let data = try await request("/api/groups/")
+        return (try? JSONDecoder().decode([CalGroup].self, from: data)) ?? []
+    }
+
+    func getGroup(id: Int) async throws -> CalGroup {
+        let data = try await request("/api/groups/\(id)")
+        guard let g = try? JSONDecoder().decode(CalGroup.self, from: data) else { throw APIError.decodingError }
+        return g
+    }
+
+    func createGroup(name: String, memberIds: [Int], icon: String?) async throws -> CalGroup {
+        var body: [String: Any] = ["name": name, "member_ids": memberIds]
+        if let icon { body["icon"] = icon }
+        let data = try await request("/api/groups/", method: "POST", body: body)
+        guard let g = try? JSONDecoder().decode(CalGroup.self, from: data) else { throw APIError.decodingError }
+        return g
+    }
+
+    func updateGroup(id: Int, name: String?, icon: String?) async throws {
+        var body: [String: Any] = [:]
+        if let name { body["name"] = name }
+        if let icon { body["icon"] = icon }
+        _ = try await request("/api/groups/\(id)", method: "PUT", body: body)
+    }
+
+    func deleteGroup(id: Int) async throws {
+        _ = try await request("/api/groups/\(id)", method: "DELETE")
+    }
+
+    func addGroupMember(groupId: Int, userId: Int) async throws {
+        _ = try await request("/api/groups/\(groupId)/members", method: "POST", body: ["user_id": userId])
+    }
+
+    func removeGroupMember(groupId: Int, userId: Int) async throws {
+        _ = try await request("/api/groups/\(groupId)/members/\(userId)", method: "DELETE")
+    }
+
+    func setGroupMemberColor(groupId: Int, userId: Int, color: String) async throws {
+        _ = try await request("/api/groups/\(groupId)/members/\(userId)/color", method: "PUT",
+                              body: ["color": color])
+    }
+
+    func fetchGroupCombined(groupId: Int, start: Date, end: Date) async throws -> [CalEvent] {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        iso.timeZone = TimeZone(abbreviation: "UTC")
+        let s = iso.string(from: start)
+        let e = iso.string(from: end)
+        let sEnc = s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s
+        let eEnc = e.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? e
+        let data = try await request("/api/groups/\(groupId)/combined?start=\(sEnc)&end=\(eEnc)")
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let arr = root["events"] as? [[String: Any]] else { return [] }
+        return arr.compactMap { CalEvent.from(json: $0) }
+    }
+
+    // MARK: – iCal import / export
+
+    /// Import a .ics file into a local calendar. Returns (imported, skipped, errors).
+    func importICS(calendarId: Int, fileURL: URL) async throws -> (imported: Int, skipped: Int, errors: [String]) {
+        guard let url = URL(string: baseURL + "/api/local/calendars/\(calendarId)/import") else { throw APIError.invalidURL }
+        let fileData = try Data(contentsOf: fileURL)
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var bodyData = Data()
+        let filename = fileURL.lastPathComponent.isEmpty ? "import.ics" : fileURL.lastPathComponent
+        bodyData.append("--\(boundary)\r\n".data(using: .utf8)!)
+        bodyData.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        bodyData.append("Content-Type: text/calendar\r\n\r\n".data(using: .utf8)!)
+        bodyData.append(fileData)
+        bodyData.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = bodyData
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 401 { throw APIError.unauthorized }
+        if status >= 400 {
+            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String ?? "Fehler \(status)"
+            throw APIError.serverError(msg)
+        }
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let errs = (json?["errors"] as? [String]) ?? []
+        return (json?["imported"] as? Int ?? 0, json?["skipped"] as? Int ?? 0, errs)
+    }
+
+    /// Export a local calendar as raw .ics bytes.
+    func exportICS(calendarId: Int) async throws -> Data {
+        return try await request("/api/local/calendars/\(calendarId)/export")
     }
 }

@@ -47,6 +47,11 @@ struct EventDetailSheet: View {
 
     private var canDelete: Bool { canEdit }
 
+    private var currentUserId: Int? {
+        let id = UserDefaults.standard.integer(forKey: "userId")
+        return id == 0 ? nil : id
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -89,6 +94,18 @@ struct EventDetailSheet: View {
                         Label("Quelle", systemImage: "server.rack")
                         Spacer()
                         Text(event.source.capitalized)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let creator = event.creator, creator.id != currentUserId {
+                        HStack {
+                            Label("Erstellt von", systemImage: "person")
+                            Spacer()
+                            Text(creator.displayName)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if event.isPrivate {
+                        Label("Privat", systemImage: "lock")
                             .foregroundStyle(.secondary)
                     }
                 }

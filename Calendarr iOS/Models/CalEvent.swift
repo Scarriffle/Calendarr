@@ -1,6 +1,23 @@
 import Foundation
 import SwiftUI
 
+/// Creator (or owner, in the group combined view) of an event.
+/// `id` is nil for imported events.
+struct EventPerson: Hashable {
+    let id: Int?
+    let displayName: String
+
+    static func from(_ json: Any?) -> EventPerson? {
+        guard let obj = json as? [String: Any],
+              let name = obj["display_name"] as? String, !name.isEmpty else { return nil }
+        let id: Int?
+        if let n = obj["id"] as? Int { id = n }
+        else if let s = obj["id"] as? String { id = Int(s) }
+        else { id = nil }
+        return EventPerson(id: id, displayName: name)
+    }
+}
+
 struct CalEvent: Identifiable, Hashable {
     let id: String
     let url: String
@@ -15,8 +32,15 @@ struct CalEvent: Identifiable, Hashable {
     var calendarName: String
     var calendarColor: String
     var source: String
+    var creator: EventPerson? = nil
+    var isPrivate: Bool = false
+    // Only set in the group combined view:
+    var owner: EventPerson? = nil
+    var isGroupEvent: Bool = false
+    var displayColor: String? = nil
 
-    var effectiveColor: String { color ?? calendarColor }
+    // Group view supplies a server-resolved colour; otherwise per-event then calendar colour.
+    var effectiveColor: String { displayColor ?? color ?? calendarColor }
 
     static func from(json: [String: Any]) -> CalEvent? {
         guard
@@ -49,7 +73,12 @@ struct CalEvent: Identifiable, Hashable {
             calendarId: json["calendar_id"].map { "\($0)" } ?? "",
             calendarName: json["calendar_name"] as? String ?? "",
             calendarColor: json["calendarColor"] as? String ?? "#4285f4",
-            source: json["source"] as? String ?? "local"
+            source: json["source"] as? String ?? "local",
+            creator: EventPerson.from(json["creator"]),
+            isPrivate: json["private"] as? Bool ?? false,
+            owner: EventPerson.from(json["owner"]),
+            isGroupEvent: json["is_group_event"] as? Bool ?? false,
+            displayColor: (json["display_color"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 }
