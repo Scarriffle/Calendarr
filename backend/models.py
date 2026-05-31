@@ -291,6 +291,7 @@ class GroupMember(Base):
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     role = Column(String(10), default="member")  # 'owner' | 'member'
+    color = Column(String(7), nullable=True)  # this member's colour within the group
     joined_at = Column(String(50), nullable=True)  # ISO 8601
 
     group = relationship("Group", back_populates="members")

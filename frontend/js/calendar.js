@@ -299,17 +299,16 @@ async function fetchAndRender(force = false, silent = false) {
         // cryptic initials); your own events stay unprefixed. Colour-code by
         // owner so each member reads as a group.
         let title = ev.title;
-        let color;
         if (ev.is_group_event) {
           // Group calendar: everyone adds; mark who added it.
           const cName = ev.creator && ev.creator.display_name;
           const cId = ev.creator && ev.creator.id;
           title = (cName && cId !== me.id) ? `👥 ${firstName(cName)}: ${ev.title}` : `👥 ${ev.title}`;
-          color = ownerColor(cId) || ev.color;
-        } else {
-          if (ownerName && !isMine) title = `${firstName(ownerName)}: ${ev.title}`;
-          color = ownerColor(ownerId) || ev.color;
+        } else if (ownerName && !isMine) {
+          title = `${firstName(ownerName)}: ${ev.title}`;
         }
+        // Server-defined colour (member colour / group colour) so web + apps match.
+        const color = ev.display_color || ownerColor(ownerId) || ev.color;
         return { ...ev, title, color };
       });
       eventCache.start = null; eventCache.end = null; // invalidate normal cache
@@ -1429,11 +1428,12 @@ function populateCalendarSelect(selectedId) {
       sel.appendChild(opt);
     });
   });
-  // Local calendars
+  // Local calendars (group calendars marked with 👥 so group events can be
+  // created from anywhere, not just the group view).
   state.localCalendars.filter(c => !c.sidebar_hidden).forEach(cal => {
     const opt = document.createElement('option');
     opt.value = `local-${cal.id}`;
-    opt.textContent = cal.name;
+    opt.textContent = cal.group ? `👥 ${cal.name}` : cal.name;
     if (`local-${cal.id}` === selectedId) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -2358,7 +2358,39 @@ async function openGroupModal(groupId) {
   modal.__memberIds = new Set([...existingMemberIds].filter(id => id !== me.id));
   renderGroupMemberPicker();
 
+  // Member colours (edit mode only): owner can recolour any member.
+  const colorsGroup = document.getElementById('group-colors-group');
+  if (isEdit && detail) {
+    colorsGroup.style.display = '';
+    renderGroupMemberColors(groupId, detail.members || []);
+  } else {
+    colorsGroup.style.display = 'none';
+  }
+
   openModal('modal-group');
+}
+
+function renderGroupMemberColors(groupId, members) {
+  const el = document.getElementById('group-member-colors');
+  if (!el) return;
+  el.innerHTML = members.map(m =>
+    `<div class="pick-row" style="cursor:default">
+      <span class="cal-item-dot group-color-dot" data-uid="${m.id}" data-color="${m.color || '#4285f4'}"
+            style="background:${m.color || '#4285f4'};cursor:pointer" title="${t('change_color')}"></span>
+      <span class="pick-name">${escHtml(m.display_name || '')}</span>
+    </div>`
+  ).join('');
+  el.querySelectorAll('.group-color-dot').forEach(dot => {
+    dot.addEventListener('click', async () => {
+      const picked = await openColorPicker(dot, dot.dataset.color);
+      if (!picked) return;
+      try {
+        await api.put(`/groups/${groupId}/members/${dot.dataset.uid}/color`, { color: picked });
+        dot.style.background = picked;
+        dot.dataset.color = picked;
+      } catch (e) { showToast(e.message, true); }
+    });
+  });
 }
 
 const GROUP_ICONS = ['👥', '👨‍👩‍👧', '🏠', '❤️', '🧑‍🤝‍🧑', '⚽', '🎓', '💼', '🎉', '🐶', '✈️', '🎵', '🍕', '📚', '🌳', '⭐'];

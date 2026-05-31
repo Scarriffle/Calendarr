@@ -25,6 +25,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 PALETTE = ["#4285f4", "#ea4335", "#fbbc04", "#34a853", "#ff6d00", "#46bdc6", "#8e24aa"]
+# Distinct per-member colours (server-defined so every client shows the same).
+MEMBER_PALETTE = ["#4285f4", "#ea4335", "#34a853", "#fbbc05", "#9c27b0", "#ff7043", "#46bdc6", "#7090c0"]
+
+
+def _next_member_color(db: Session, group_id: int) -> str:
+    n = db.query(models.GroupMember).filter(models.GroupMember.group_id == group_id).count()
+    return MEMBER_PALETTE[n % len(MEMBER_PALETTE)]
 
 
 def _now_iso() -> str:
@@ -86,6 +93,13 @@ def _group_calendar_id(db: Session, group_id: int) -> Optional[int]:
     return gc.calendar_id if gc else None
 
 
+def _group_calendar_color(db: Session, calendar_id: Optional[int]) -> Optional[str]:
+    if calendar_id is None:
+        return None
+    cal = db.query(models.LocalCalendar).filter(models.LocalCalendar.id == calendar_id).first()
+    return cal.color if cal else None
+
+
 @router.post("/")
 def create_group(
     data: GroupCreate,
@@ -98,15 +112,20 @@ def create_group(
     db.flush()
 
     # Creator is owner; add the requested members (deduped, excluding creator).
-    db.add(models.GroupMember(group_id=group.id, user_id=current_user.id, role="owner", joined_at=_now_iso()))
+    # Each member gets a distinct colour from the palette by join order.
+    db.add(models.GroupMember(group_id=group.id, user_id=current_user.id, role="owner",
+                              color=MEMBER_PALETTE[0], joined_at=_now_iso()))
     seen = {current_user.id}
+    idx = 1
     for uid in data.member_ids:
         if uid in seen:
             continue
         if not db.query(models.User).filter(models.User.id == uid).first():
             continue
-        db.add(models.GroupMember(group_id=group.id, user_id=uid, role="member", joined_at=_now_iso()))
+        db.add(models.GroupMember(group_id=group.id, user_id=uid, role="member",
+                                  color=MEMBER_PALETTE[idx % len(MEMBER_PALETTE)], joined_at=_now_iso()))
         seen.add(uid)
+        idx += 1
 
     # Auto-create the group calendar (a local calendar owned by the creator).
     cal = models.LocalCalendar(
@@ -139,13 +158,15 @@ def list_groups(
         if not group:
             continue
         member_count = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id).count()
+        gcal_id = _group_calendar_id(db, group.id)
         out.append({
             "id": group.id,
             "name": group.name,
             "icon": group.icon,
             "role": m.role,
             "member_count": member_count,
-            "group_calendar_id": _group_calendar_id(db, group.id),
+            "group_calendar_id": gcal_id,
+            "group_calendar_color": _group_calendar_color(db, gcal_id),
         })
     return out
 
@@ -153,20 +174,23 @@ def list_groups(
 def _group_detail(db: Session, group: models.Group, current_user: models.User) -> dict:
     members = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id).all()
     member_dicts = []
-    for m in members:
+    for i, m in enumerate(members):
         u = db.query(models.User).filter(models.User.id == m.user_id).first()
         member_dicts.append({
             "id": m.user_id,
             "display_name": (u.display_name or u.username) if u else None,
             "role": m.role,
+            "color": m.color or MEMBER_PALETTE[i % len(MEMBER_PALETTE)],
         })
+    gcal_id = _group_calendar_id(db, group.id)
     return {
         "id": group.id,
         "name": group.name,
         "icon": group.icon,
         "created_by": group.created_by,
         "members": member_dicts,
-        "group_calendar_id": _group_calendar_id(db, group.id),
+        "group_calendar_id": gcal_id,
+        "group_calendar_color": _group_calendar_color(db, gcal_id),
     }
 
 
@@ -211,7 +235,34 @@ def add_member(
         raise HTTPException(404, "User not found")
     if _membership(db, group_id, data.user_id):
         return {"ok": True}  # already a member
-    db.add(models.GroupMember(group_id=group_id, user_id=data.user_id, role="member", joined_at=_now_iso()))
+    db.add(models.GroupMember(group_id=group_id, user_id=data.user_id, role="member",
+                              color=_next_member_color(db, group_id), joined_at=_now_iso()))
+    db.commit()
+    return {"ok": True}
+
+
+class MemberColorUpdate(BaseModel):
+    color: str
+
+
+@router.put("/{group_id}/members/{user_id}/color")
+def set_member_color(
+    group_id: int,
+    user_id: int,
+    data: MemberColorUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    group = _get_group_or_404(db, group_id)
+    # Owner may recolour anyone; a member may recolour themselves.
+    if user_id != current_user.id:
+        _require_owner(db, group, current_user)
+    else:
+        _require_member(db, group, current_user)
+    m = _membership(db, group_id, user_id)
+    if not m:
+        raise HTTPException(404, "Member not found")
+    m.color = data.color
     db.commit()
     return {"ok": True}
 
@@ -300,6 +351,12 @@ def combined_events(
         return visibility_cache[user_id]
 
     group_cal_id = _group_calendar_id(db, group_id)
+    group_cal_color = _group_calendar_color(db, group_cal_id)
+    # Server-defined colours so every client renders members/group consistently.
+    member_color = {
+        m.user_id: (m.color or MEMBER_PALETTE[i % len(MEMBER_PALETTE)])
+        for i, m in enumerate(members)
+    }
     all_events: list[dict] = []
 
     def emit_calendar(cal: models.LocalCalendar, owner_id: int, is_group: bool):
@@ -337,6 +394,9 @@ def combined_events(
             for b in built:
                 if ev.is_private and creator_owner_id != current_user.id and visibility_for(creator_owner_id) == "busy":
                     b = _strip_busy(b)
+                # Colour to render with: the group calendar's colour for group
+                # events, otherwise the owning member's group colour.
+                b["display_color"] = group_cal_color if is_group else member_color.get(owner_id)
                 all_events.append(b)
 
     # Each member shares exactly one calendar into their groups, chosen in their

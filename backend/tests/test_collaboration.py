@@ -134,6 +134,37 @@ def test_group_members_can_write_group_calendar(client):
     assert r.status_code == 200, r.text
 
 
+def test_group_member_colors_and_display_color(client):
+    admin = register_admin(client)
+    b_id, b_tok = create_user(client, admin, "bob")
+    group = client.post("/api/groups/", headers=auth(admin),
+                        json={"name": "Team", "member_ids": [b_id]}).json()
+    gid = group["id"]
+    gcal = group["group_calendar_id"]
+
+    # Each member has a server-assigned colour; the group exposes its calendar colour.
+    detail = client.get(f"/api/groups/{gid}", headers=auth(admin)).json()
+    assert all(m.get("color") for m in detail["members"])
+    assert detail.get("group_calendar_color")
+
+    # Owner can recolour a member.
+    r = client.put(f"/api/groups/{gid}/members/{b_id}/color", headers=auth(admin),
+                   json={"color": "#123456"})
+    assert r.status_code == 200, r.text
+    detail2 = client.get(f"/api/groups/{gid}", headers=auth(admin)).json()
+    assert any(m["id"] == b_id and m["color"] == "#123456" for m in detail2["members"])
+
+    # Bob shares a calendar with an event; combined events carry display_color.
+    b_cal = _make_calendar(client, b_tok, "Bobs Kalender")
+    client.put("/api/settings/", headers=auth(b_tok), json={"group_visible_calendar_id": b_cal})
+    _make_event(client, b_tok, b_cal, "Bobs Termin")
+    _make_event(client, admin, gcal, "Gruppentermin")
+    evs = client.get(f"/api/groups/{gid}/combined", headers=auth(admin), params=RANGE).json()["events"]
+    by_title = {e["title"]: e for e in evs}
+    assert by_title["Bobs Termin"]["display_color"] == "#123456"  # Bob's member colour
+    assert by_title["Gruppentermin"]["display_color"] == detail2["group_calendar_color"]
+
+
 def test_group_calendar_listed_for_member(client):
     admin = register_admin(client)
     b_id, b_tok = create_user(client, admin, "bob")

@@ -181,6 +181,12 @@ def _migrate():
             logging.info("Migration: added icon to groups")
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE group_members ADD COLUMN color VARCHAR(7)"))
+            conn.commit()
+            logging.info("Migration: added color to group_members")
+        except Exception:
+            pass
 
 _migrate()
 
