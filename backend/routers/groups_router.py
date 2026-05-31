@@ -34,6 +34,12 @@ def _now_iso() -> str:
 class GroupCreate(BaseModel):
     name: str
     member_ids: List[int] = []
+    icon: Optional[str] = None
+
+
+class GroupUpdate(BaseModel):
+    name: Optional[str] = None
+    icon: Optional[str] = None
 
 
 class MemberAdd(BaseModel):
@@ -86,7 +92,8 @@ def create_group(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    group = models.Group(name=data.name, created_by=current_user.id, created_at=_now_iso())
+    group = models.Group(name=data.name, icon=(data.icon or None),
+                         created_by=current_user.id, created_at=_now_iso())
     db.add(group)
     db.flush()
 
@@ -135,6 +142,7 @@ def list_groups(
         out.append({
             "id": group.id,
             "name": group.name,
+            "icon": group.icon,
             "role": m.role,
             "member_count": member_count,
             "group_calendar_id": _group_calendar_id(db, group.id),
@@ -155,10 +163,28 @@ def _group_detail(db: Session, group: models.Group, current_user: models.User) -
     return {
         "id": group.id,
         "name": group.name,
+        "icon": group.icon,
         "created_by": group.created_by,
         "members": member_dicts,
         "group_calendar_id": _group_calendar_id(db, group.id),
     }
+
+
+@router.put("/{group_id}")
+def update_group(
+    group_id: int,
+    data: GroupUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    group = _get_group_or_404(db, group_id)
+    _require_owner(db, group, current_user)
+    if data.name is not None and data.name.strip():
+        group.name = data.name.strip()
+    if data.icon is not None:
+        group.icon = data.icon or None
+    db.commit()
+    return _group_detail(db, group, current_user)
 
 
 @router.get("/{group_id}")

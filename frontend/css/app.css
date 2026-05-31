@@ -1923,3 +1923,19 @@ a { color: var(--primary); text-decoration: none; }
   user-select: none;
 }
 .cal-item.cal-dragging { opacity: .5; }
+
+/* Group emoji + icon picker */
+.group-emoji { flex: 0 0 auto; font-size: 16px; cursor: pointer; line-height: 1; }
+.cal-shared-flag { flex: 0 0 auto; font-size: 12px; opacity: .8; }
+.group-icon-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.group-icon-opt {
+  width: 38px; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 18px; line-height: 1;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.group-icon-opt:hover { background: var(--bg-surface); }
+.group-icon-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }

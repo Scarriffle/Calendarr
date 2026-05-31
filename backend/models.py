@@ -268,6 +268,7 @@ class Group(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
+    icon = Column(String(16), nullable=True)  # emoji shown for the group
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(String(50), nullable=True)  # ISO 8601
 

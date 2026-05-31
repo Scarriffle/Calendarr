@@ -175,6 +175,12 @@ def _migrate():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE groups ADD COLUMN icon VARCHAR(16)"))
+            conn.commit()
+            logging.info("Migration: added icon to groups")
+        except Exception:
+            pass
 
 _migrate()
 

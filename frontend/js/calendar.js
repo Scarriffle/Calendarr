@@ -299,9 +299,17 @@ async function fetchAndRender(force = false, silent = false) {
         // cryptic initials); your own events stay unprefixed. Colour-code by
         // owner so each member reads as a group.
         let title = ev.title;
-        if (ev.is_group_event) title = `👥 ${ev.title}`;
-        else if (ownerName && !isMine) title = `${firstName(ownerName)}: ${ev.title}`;
-        const color = ev.is_group_event ? ev.color : (ownerColor(ownerId) || ev.color);
+        let color;
+        if (ev.is_group_event) {
+          // Group calendar: everyone adds; mark who added it.
+          const cName = ev.creator && ev.creator.display_name;
+          const cId = ev.creator && ev.creator.id;
+          title = (cName && cId !== me.id) ? `👥 ${firstName(cName)}: ${ev.title}` : `👥 ${ev.title}`;
+          color = ownerColor(cId) || ev.color;
+        } else {
+          if (ownerName && !isMine) title = `${firstName(ownerName)}: ${ev.title}`;
+          color = ownerColor(ownerId) || ev.color;
+        }
         return { ...ev, title, color };
       });
       eventCache.start = null; eventCache.end = null; // invalidate normal cache
@@ -652,10 +660,12 @@ function renderCalendarList() {
         sourceLabel: acc.name, remove: { icon: EYE_OFF, title: t('hide_cal') } });
     });
   });
+  const groupVisibleId = state.settings && state.settings.group_visible_calendar_id;
   state.localCalendars.filter(c => c.owned !== false && !c.group).forEach(cal => {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.name, color: cal.color, enabled: cal.enabled,
-      sourceLabel: t('cal_local'), remove: { icon: TRASH, title: t('remove_cal') } });
+      sourceLabel: t('cal_local'), groupVisible: cal.id === groupVisibleId,
+      remove: { icon: TRASH, title: t('remove_cal') } });
   });
   state.localCalendars.filter(c => c.owned === false && !c.group).forEach(cal => {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
@@ -704,6 +714,7 @@ function renderCalendarList() {
       <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
       <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
+      ${e.groupVisible ? `<span class="cal-shared-flag" title="${t('group_visible_flag')}">👥</span>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
     </div>`
   ).join('');
@@ -2267,9 +2278,10 @@ function renderGroupList() {
   }
   el.innerHTML = state.groups.map(g =>
     `<div class="cal-item group-item ${g.id === state.activeGroupId ? 'group-item-active' : ''}" data-group-id="${g.id}">
+      <span class="group-emoji" data-group-open="${g.id}">${escHtml(g.icon || '👥')}</span>
       <span class="cal-item-name" data-group-open="${g.id}">${escHtml(g.name)}</span>
       <button class="icon-btn mini-btn" data-group-edit="${g.id}" title="${t('group_manage')}">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 4a6.96 6.96 0 00-.14-1.32l2.03-1.58-2-3.46-2.39.96a7 7 0 00-2.28-1.32L15.4 2h-4l-.76 2.96a7 7 0 00-2.28 1.32l-2.39-.96-2 3.46 2.03 1.58A6.96 6.96 0 003.86 12c0 .45.05.89.14 1.32L1.97 14.9l2 3.46 2.39-.96a7 7 0 002.28 1.32L9.4 22h4l.76-2.96a7 7 0 002.28-1.32l2.39.96 2-3.46-2.03-1.58c.09-.43.14-.87.14-1.32z"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
       </button>
     </div>`
   ).join('');
@@ -2316,7 +2328,11 @@ async function openGroupModal(groupId) {
   const existingMemberIds = new Set((detail ? detail.members : []).map(m => m.id));
 
   document.getElementById('group-name').value = detail ? detail.name : '';
-  document.getElementById('group-name').disabled = isEdit; // rename not supported by API
+  document.getElementById('group-name').disabled = false;  // rename supported via PUT
+
+  // Icon picker
+  modal.__icon = (detail && detail.icon) || '👥';
+  renderGroupIconPicker();
 
   // Member picker: current members are checked; the owner (me) is excluded.
   modal.__directory = directory;
@@ -2324,6 +2340,23 @@ async function openGroupModal(groupId) {
   renderGroupMemberPicker();
 
   openModal('modal-group');
+}
+
+const GROUP_ICONS = ['👥', '👨‍👩‍👧', '🏠', '❤️', '🧑‍🤝‍🧑', '⚽', '🎓', '💼', '🎉', '🐶', '✈️', '🎵', '🍕', '📚', '🌳', '⭐'];
+function renderGroupIconPicker() {
+  const modal = document.getElementById('modal-group');
+  const sel = modal.__icon || '👥';
+  const picker = document.getElementById('group-icon-picker');
+  if (!picker) return;
+  picker.innerHTML = GROUP_ICONS.map(ic =>
+    `<button type="button" class="group-icon-opt ${ic === sel ? 'on' : ''}" data-icon="${ic}">${ic}</button>`
+  ).join('');
+  picker.querySelectorAll('.group-icon-opt').forEach(b => {
+    b.addEventListener('click', () => {
+      modal.__icon = b.dataset.icon;
+      renderGroupIconPicker();
+    });
+  });
 }
 
 function renderGroupMemberPicker() {
@@ -2360,8 +2393,12 @@ function bindGroupUI() {
     const groupId = modal.dataset.groupId;
     const memberIds = [...(modal.__memberIds || new Set())];
     try {
+      const name = document.getElementById('group-name').value.trim();
+      const icon = modal.__icon || '👥';
+      if (!name) { showToast(t('error_enter_title'), true); return; }
       if (groupId) {
-        // Manage mode: sync member additions/removals.
+        // Manage mode: update name/icon, then sync member additions/removals.
+        await api.put(`/groups/${groupId}`, { name, icon });
         const detail = await api.get(`/groups/${groupId}`);
         const me = JSON.parse(localStorage.getItem('user') || '{}');
         const current = new Set(detail.members.map(m => m.id).filter(id => id !== me.id));
@@ -2369,9 +2406,7 @@ function bindGroupUI() {
         for (const id of current) if (!memberIds.includes(id)) await api.delete(`/groups/${groupId}/members/${id}`);
         showToast(t('group_saved'));
       } else {
-        const name = document.getElementById('group-name').value.trim();
-        if (!name) { showToast(t('error_enter_title'), true); return; }
-        await api.post('/groups/', { name, member_ids: memberIds });
+        await api.post('/groups/', { name, member_ids: memberIds, icon });
         showToast(t('group_created'));
       }
       closeModal('modal-group');
