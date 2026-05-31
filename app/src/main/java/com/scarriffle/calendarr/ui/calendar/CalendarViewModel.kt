@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scarriffle.calendarr.data.CalendarRepository
 import com.scarriffle.calendarr.data.SettingsStore
+import com.scarriffle.calendarr.data.StartupState
 import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.domain.model.WritableCalendar
@@ -13,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -42,9 +45,13 @@ data class CalendarUiState(
 class CalendarViewModel @Inject constructor(
     private val repository: CalendarRepository,
     private val settingsStore: SettingsStore,
+    private val startupState: StartupState,
 ) : ViewModel() {
 
     private val zone: ZoneId = ZoneId.systemDefault()
+
+    /** Serializes network loads so overlapping fetches don't thrash the UI. */
+    private val loadMutex = Mutex()
 
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<CalendarUiState> = _state.asStateFlow()
@@ -147,21 +154,12 @@ class CalendarViewModel @Inject constructor(
         val (start, end) = rangeForCurrentView()
         if (!force && isCached(start, end)) {
             refreshFromCache()
-            _ready.value = true
+            markReady()
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            runCatching { repository.fetchEvents(start, end) }
-                .onSuccess { fetched ->
-                    mergeIntoCache(fetched, start, end)
-                    refreshFromCache()
-                    _state.update { it.copy(isLoading = false) }
-                }
-                .onFailure { e ->
-                    _state.update { it.copy(isLoading = false, error = e.message) }
-                }
-            _ready.value = true
+            loadRange(start, end, background = false)
+            markReady()
         }
     }
 
@@ -171,13 +169,26 @@ class CalendarViewModel @Inject constructor(
         val start = instant(first.minusMonths(1))
         val end = instant(first.plusMonths(2))
         if (isCached(start, end)) return
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
+        viewModelScope.launch { loadRange(start, end, background = false) }
+    }
+
+    /** Single serialized loader: avoids overlapping fetches that cause scroll jank. */
+    private suspend fun loadRange(start: Instant, end: Instant, background: Boolean) {
+        loadMutex.withLock {
+            // Another load (e.g. the background prefetch) may have covered this range.
+            if (isCached(start, end)) return
+            val flag = if (background) "bg" else "fg"
+            _state.update { if (flag == "bg") it.copy(isBackgroundCaching = true) else it.copy(isLoading = true, error = null) }
             runCatching { repository.fetchEvents(start, end) }
                 .onSuccess { mergeIntoCache(it, start, end); refreshFromCache() }
-                .onFailure { e -> _state.update { it.copy(error = e.message) } }
-            _state.update { it.copy(isLoading = false) }
+                .onFailure { e -> if (!background) _state.update { it.copy(error = e.message) } }
+            _state.update { it.copy(isLoading = false, isBackgroundCaching = false) }
         }
+    }
+
+    private fun markReady() {
+        _ready.value = true
+        startupState.markReady()
     }
 
     private fun prefetchBackground() {
@@ -186,15 +197,7 @@ class CalendarViewModel @Inject constructor(
         val start = instant(today.minusMonths(months.toLong()))
         val end = instant(today.plusMonths((months + 1).toLong()))
         if (isCached(start, end)) return
-        viewModelScope.launch {
-            _state.update { it.copy(isBackgroundCaching = true) }
-            runCatching { repository.fetchEvents(start, end) }
-                .onSuccess { fetched ->
-                    mergeIntoCache(fetched, start, end)
-                    refreshFromCache()
-                }
-            _state.update { it.copy(isBackgroundCaching = false) }
-        }
+        viewModelScope.launch { loadRange(start, end, background = true) }
     }
 
     private fun isCached(start: Instant, end: Instant): Boolean {
@@ -219,7 +222,8 @@ class CalendarViewModel @Inject constructor(
             val key = calendarKey(ev.source, ev.calendarId)
             key !in hidden && key !in banished
         }
-        _state.update { it.copy(events = visible) }
+        // Skip the state write (and resulting recomposition) when nothing changed.
+        _state.update { if (it.events == visible) it else it.copy(events = visible) }
     }
 
     private fun invalidateCache() {

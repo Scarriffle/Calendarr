@@ -5,20 +5,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.scarriffle.calendarr.ui.auth.LoginScreen
 import com.scarriffle.calendarr.ui.auth.ServerSetupScreen
 import com.scarriffle.calendarr.ui.calendar.CalendarScreen
-import com.scarriffle.calendarr.ui.calendar.CalendarViewModel
 import com.scarriffle.calendarr.ui.theme.CalendarrTheme
-import kotlinx.coroutines.delay
 
 @Composable
 fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
@@ -30,23 +24,9 @@ fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
             LocalLang provides L10n.resolved(settings.language),
             LocalAppSettings provides settings,
         ) {
+            // The system splash (installSplashScreen) covers startup until the
+            // first events are loaded, so there's no in-app splash here.
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                // Obtain the calendar VM early when logged in so events load *behind* the splash.
-                val calendarVm: CalendarViewModel? =
-                    if (route == AppRoute.MAIN) hiltViewModel() else null
-                val dataReady = calendarVm?.ready?.collectAsState()?.value ?: true
-
-                var minElapsed by remember { mutableStateOf(false) }
-                var timedOut by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { delay(450); minElapsed = true }
-                LaunchedEffect(Unit) { delay(6000); timedOut = true }
-
-                val showSplash = !minElapsed || (!dataReady && !timedOut)
-                if (showSplash) {
-                    SplashScreen()
-                    return@Surface
-                }
-
                 when (route) {
                     AppRoute.SETUP -> ServerSetupScreen(onConfigured = vm::onServerConfigured)
                     AppRoute.LOGIN -> LoginScreen(
@@ -55,7 +35,6 @@ fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
                         onBack = vm::switchServer,
                     )
                     AppRoute.MAIN -> CalendarScreen(
-                        vm = calendarVm!!,
                         onLogout = vm::logout,
                         onSwitchServer = vm::switchServer,
                         onSettingsChanged = vm::applyLocalSettings,
