@@ -53,7 +53,7 @@ import java.time.LocalDate
 
 private enum class Overlay { NONE, PROFILE, SETTINGS, ACCOUNTS }
 
-data class EditorRequest(val existing: CalEvent?, val date: LocalDate)
+data class EditorRequest(val existing: CalEvent?, val date: LocalDate, val prefill: CalEvent? = null)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,6 +196,10 @@ fun CalendarScreen(
             onDelete = {
                 vm.deleteEvent(ev) {}
                 detailEvent = null
+            },
+            onCopy = {
+                detailEvent = null
+                editor = EditorRequest(existing = null, date = localDate(ev.startDate), prefill = ev)
             },
         )
     }

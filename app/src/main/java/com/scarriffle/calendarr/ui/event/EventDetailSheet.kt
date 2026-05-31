@@ -5,12 +5,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
@@ -41,13 +45,14 @@ import com.scarriffle.calendarr.ui.calendar.eventDateRange
 import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EventDetailSheet(
     event: CalEvent,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onCopy: () -> Unit,
 ) {
     val lang = LocalLang.current
     var confirmDelete by remember { mutableStateOf(false) }
@@ -68,7 +73,7 @@ fun EventDetailSheet(
             Spacer(Modifier.size(16.dp))
             DetailRow(Icons.Filled.Schedule, eventDateRange(event, lang))
             if (event.calendarName.isNotBlank()) {
-                DetailRow(Icons.Filled.Notes, event.calendarName)
+                DetailRow(Icons.Filled.CalendarMonth, event.calendarName)
             }
             if (event.location.isNotBlank()) {
                 DetailRow(Icons.Filled.LocationOn, event.location)
@@ -77,13 +82,18 @@ fun EventDetailSheet(
                 DetailRow(Icons.Filled.Notes, event.notes)
             }
             Spacer(Modifier.size(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (canEdit) {
                     OutlinedButton(onClick = onEdit) {
                         Icon(Icons.Filled.Edit, contentDescription = null)
                         Spacer(Modifier.size(6.dp))
                         Text(tr("event.edit_title"))
                     }
+                }
+                OutlinedButton(onClick = onCopy) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                    Spacer(Modifier.size(6.dp))
+                    Text(tr("event.copy_title"))
                 }
                 if (canDelete) {
                     OutlinedButton(onClick = { confirmDelete = true }) {

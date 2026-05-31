@@ -7,6 +7,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -38,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,6 +48,7 @@ import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.ui.LocalAppSettings
 import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
+import com.scarriffle.calendarr.util.contrastingTextColor
 
 private val PALETTE = listOf(
     "#4285f4", "#ea4335", "#34a853", "#fbbc05", "#46bdc6", "#9c27b0", "#ff7043", "#7090c0",
@@ -120,19 +122,37 @@ fun SettingsScreen(
                 Divider(Modifier.padding(vertical = 16.dp))
 
                 Section(tr("settings.hourheight"))
-                Text("${settings.hourHeight} dp", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Slider(
-                    value = settings.hourHeight.toFloat(),
-                    onValueChange = { settings = settings.copy(hourHeight = it.toInt()) },
-                    onValueChangeFinished = { update(settings) },
-                    valueRange = 28f..100f,
+                ChipRow(
+                    options = listOf(
+                        "28" to tr("settings.hourheight.compact"),
+                        "44" to tr("settings.hourheight.normal"),
+                        "60" to tr("settings.hourheight.comfort"),
+                        "80" to tr("settings.hourheight.large"),
+                    ),
+                    selected = settings.hourHeight.toString(),
+                    onSelect = { update(settings.copy(hourHeight = it.toInt())) },
                 )
-                Spacer(Modifier.size(8.dp))
+                Spacer(Modifier.size(16.dp))
 
                 Section(tr("settings.textcontrast"))
-                ContrastStepper(settings.textContrast) { update(settings.copy(textContrast = it)) }
+                ChipRow(
+                    options = listOf(
+                        "1" to tr("settings.contrast.dark"), "2" to tr("settings.contrast.medium"),
+                        "3" to tr("settings.contrast.bright"), "4" to tr("settings.contrast.max"),
+                    ),
+                    selected = settings.textContrast.toString(),
+                    onSelect = { update(settings.copy(textContrast = it.toInt())) },
+                )
+                Spacer(Modifier.size(16.dp))
                 Section(tr("settings.linecontrast"))
-                ContrastStepper(settings.lineContrast) { update(settings.copy(lineContrast = it)) }
+                ChipRow(
+                    options = listOf(
+                        "1" to tr("settings.linecontrast.barely"), "2" to tr("settings.linecontrast.subtle"),
+                        "3" to tr("settings.linecontrast.normal"), "4" to tr("settings.linecontrast.strong"),
+                    ),
+                    selected = settings.lineContrast.toString(),
+                    onSelect = { update(settings.copy(lineContrast = it.toInt())) },
+                )
                 Divider(Modifier.padding(vertical = 16.dp))
 
                 Section(tr("settings.cache.title"))
@@ -162,29 +182,35 @@ private fun ChipRow(options: List<Pair<String, String>>, selected: String, onSel
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorChooser(label: String, current: String, onPick: (String) -> Unit) {
-    Column(Modifier.padding(vertical = 6.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PALETTE.forEach { hex ->
+    // Show the user's current colour even if it isn't one of the presets.
+    val swatches = remember(current) {
+        (if (PALETTE.any { it.equals(current, ignoreCase = true) }) PALETTE else listOf(current) + PALETTE)
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(18.dp).clip(CircleShape).background(colorFromHex(current)))
+            Spacer(Modifier.size(8.dp))
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+        }
+        FlowRow(
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            swatches.forEach { hex ->
                 val selected = hex.equals(current, ignoreCase = true)
                 Box(
-                    Modifier.size(28.dp).clip(CircleShape).background(colorFromHex(hex))
-                        .then(if (selected) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                    Modifier.size(34.dp).clip(CircleShape).background(colorFromHex(hex))
+                        .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onBackground, CircleShape) else Modifier)
                         .clickable { onPick(hex) },
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) Icon(Icons.Filled.Check, contentDescription = null, tint = colorFromHex(hex).contrastingTextColor(), modifier = Modifier.size(18.dp))
+                }
             }
         }
     }
-}
-
-@Composable
-private fun ContrastStepper(value: Int, onChange: (Int) -> Unit) {
-    Slider(
-        value = value.toFloat(),
-        onValueChange = { onChange(it.toInt().coerceIn(1, 4)) },
-        valueRange = 1f..4f,
-        steps = 2,
-    )
 }

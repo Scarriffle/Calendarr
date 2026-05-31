@@ -75,16 +75,19 @@ fun EventEditorSheet(
     val context = LocalContext.current
     val lang = LocalLang.current
     val existing = request.existing
+    // Fields are prefilled from the event being edited OR copied.
+    val template = existing ?: request.prefill
+    val isCopy = existing == null && request.prefill != null
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var title by remember { mutableStateOf(existing?.title ?: "") }
-    var allDay by remember { mutableStateOf(existing?.isAllDay ?: false) }
-    var location by remember { mutableStateOf(existing?.location ?: "") }
-    var description by remember { mutableStateOf(existing?.notes ?: "") }
-    var color by remember { mutableStateOf(existing?.color) }
+    var title by remember { mutableStateOf(template?.title ?: "") }
+    var allDay by remember { mutableStateOf(template?.isAllDay ?: false) }
+    var location by remember { mutableStateOf(template?.location ?: "") }
+    var description by remember { mutableStateOf(template?.notes ?: "") }
+    var color by remember { mutableStateOf(template?.color) }
 
-    val initialStart = existing?.startDate
-    val initialEnd = existing?.endDate
+    val initialStart = template?.startDate
+    val initialEnd = template?.endDate
     var startDate by remember {
         mutableStateOf(initialStart?.let { LocalDate.ofInstant(it, zone) } ?: request.date)
     }
@@ -95,7 +98,7 @@ fun EventEditorSheet(
         mutableStateOf(
             initialEnd?.let {
                 val d = LocalDate.ofInstant(it, zone)
-                if (existing?.isAllDay == true) d.minusDays(1) else d
+                if (template?.isAllDay == true) d.minusDays(1) else d
             } ?: request.date
         )
     }
@@ -103,7 +106,7 @@ fun EventEditorSheet(
         mutableStateOf(initialEnd?.let { LocalTime.ofInstant(it, zone).withSecond(0).withNano(0) } ?: LocalTime.of(10, 0))
     }
 
-    val preselected = existing?.let { ev ->
+    val preselected = template?.let { ev ->
         val id = calendarKey(ev.source, ev.calendarId).substringAfter(":").toIntOrNull()
         writableCalendars.firstOrNull { it.source == ev.source && it.numericId == id }
     }
@@ -139,7 +142,11 @@ fun EventEditorSheet(
                 .padding(bottom = 32.dp),
         ) {
             Text(
-                if (existing == null) tr("event.new_title") else tr("event.edit_title"),
+                when {
+                    existing != null -> tr("event.edit_title")
+                    isCopy -> tr("event.copy_title")
+                    else -> tr("event.new_title")
+                },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(vertical = 8.dp),

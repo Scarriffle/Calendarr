@@ -40,6 +40,8 @@ import com.scarriffle.calendarr.util.contrastingTextColor
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private const val MONTHS_BACK = 18L
 private const val MONTHS_AHEAD = 18L
@@ -85,15 +87,20 @@ fun MonthView(
     LaunchedEffect(scrollToTodaySignal) {
         if (scrollToTodaySignal > 0) listState.animateScrollToItem((todayIndex - 1).coerceAtLeast(0))
     }
-    // Track visible month + trigger on-demand loads.
+    // Track visible month + trigger on-demand loads (only when the month changes).
     LaunchedEffect(listState, weekCount) {
-        snapshotFlow { listState.firstVisibleItemIndex }.collect { idx ->
-            val weekStart = firstVisible.plusWeeks(idx.toLong())
-            val month = weekStart.plusDays(3) // mid-week → representative month
-            onVisibleMonthChange(month)
-            vm.ensureMonthLoaded(month)
-        }
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .map { firstVisible.plusWeeks(it.toLong()).plusDays(3).withDayOfMonth(1) }
+            .distinctUntilChanged()
+            .collect { month ->
+                onVisibleMonthChange(month)
+                vm.ensureMonthLoaded(month)
+            }
     }
+
+    // Precompute a day → events index once per event-list change (avoids
+    // filtering the whole list for every cell on every recomposition → smooth scroll).
+    val eventsByDay = remember(state.events) { buildEventsByDay(state.events) }
 
     Column(Modifier.fillMaxSize()) {
         // Fixed weekday header
@@ -116,8 +123,7 @@ fun MonthView(
                 WeekRow(
                     weekStart = weekStart,
                     today = today,
-                    events = state.events,
-                    vm = vm,
+                    eventsByDay = eventsByDay,
                     lang = lang,
                     onDayClick = onDayClick,
                     onDayLongPress = onDayLongPress,
@@ -133,8 +139,7 @@ fun MonthView(
 private fun WeekRow(
     weekStart: LocalDate,
     today: LocalDate,
-    events: List<CalEvent>,
-    vm: CalendarViewModel,
+    eventsByDay: Map<LocalDate, List<CalEvent>>,
     lang: String,
     onDayClick: (LocalDate) -> Unit,
     onDayLongPress: (LocalDate) -> Unit,
@@ -150,7 +155,7 @@ private fun WeekRow(
             DayCell(
                 day = day,
                 isToday = day == today,
-                events = vm.eventsOn(day, events),
+                events = eventsByDay[day] ?: emptyList(),
                 lang = lang,
                 onClick = { onDayClick(day) },
                 onLongClick = { onDayLongPress(day) },
@@ -245,4 +250,23 @@ private fun startOfWeek(date: LocalDate, mondayFirst: Boolean): LocalDate {
     val dow = date.dayOfWeek.value
     val offset = if (mondayFirst) dow - 1 else dow % 7
     return date.minusDays(offset.toLong())
+}
+
+/** Index events by each local day they overlap, for O(1) lookup while scrolling. */
+private fun buildEventsByDay(events: List<CalEvent>): Map<LocalDate, List<CalEvent>> {
+    val map = HashMap<LocalDate, MutableList<CalEvent>>()
+    for (ev in events) {
+        val first = localDate(ev.startDate)
+        // end is exclusive; the last covered day is the instant just before it
+        val last = localDate(ev.endDate.minusSeconds(1)).coerceAtLeast(first)
+        var d = first
+        var guard = 0
+        while (!d.isAfter(last) && guard < 400) {
+            map.getOrPut(d) { mutableListOf() }.add(ev)
+            d = d.plusDays(1)
+            guard++
+        }
+    }
+    map.values.forEach { list -> list.sortBy { it.startDate } }
+    return map
 }

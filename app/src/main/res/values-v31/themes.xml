@@ -1,10 +1,10 @@
 <resources>
-    <color name="splash_bg">#0B1220</color>
-
     <style name="Theme.Calendarr" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Dark window background avoids a white flash before Compose draws. -->
         <item name="android:windowBackground">@color/splash_bg</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
+        <!-- Android 12+ system splash screen -->
+        <item name="android:windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
     </style>
 </resources>
