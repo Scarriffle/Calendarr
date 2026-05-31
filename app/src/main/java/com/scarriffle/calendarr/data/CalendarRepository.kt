@@ -210,6 +210,27 @@ class CalendarRepository @Inject constructor(
     suspend fun deleteHomeAssistantAccount(id: Int) =
         guarded { api.deleteHomeAssistantAccount(id).ensureSuccess() }
 
+    /** Change a local calendar's colour. */
+    suspend fun updateLocalCalendarColor(id: Int, color: String) = guarded {
+        api.updateLocalCalendar(id, jsonBody("color" to color)).ensureSuccess()
+    }
+
+    /** Change an iCal subscription's colour. */
+    suspend fun updateICalColor(id: Int, color: String) = guarded {
+        api.updateICalSubscription(id, jsonBody("color" to color)).ensureSuccess()
+    }
+
+    /** Set a per-calendar colour for server-managed sources (caldav/google/homeassistant). */
+    suspend fun setCalendarColor(source: String, calendarId: Int, color: String) = guarded {
+        val body = jsonBody("color" to color)
+        when (source) {
+            "caldav" -> api.updateCalDAVCalendar(calendarId, body).ensureSuccess()
+            "google" -> api.updateGoogleCalendar(calendarId, body).ensureSuccess()
+            "homeassistant" -> api.updateHACalendar(calendarId, body).ensureSuccess()
+            else -> Unit
+        }
+    }
+
     /** Toggle a calendar's server-side visibility (caldav/google/homeassistant only). */
     suspend fun setCalendarSidebarHidden(source: String, calendarId: Int, hidden: Boolean) = guarded {
         val body = jsonBody("enabled" to !hidden, "sidebar_hidden" to hidden)

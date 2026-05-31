@@ -152,6 +152,9 @@ interface CalendarrApi {
     @POST("api/local/calendars")
     suspend fun addLocalCalendar(@Body body: RequestBody): LocalCalendar
 
+    @PUT("api/local/calendars/{id}")
+    suspend fun updateLocalCalendar(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
+
     @DELETE("api/local/calendars/{id}")
     suspend fun deleteLocalCalendar(@Path("id") id: Int): Response<ResponseBody>
 
@@ -162,6 +165,9 @@ interface CalendarrApi {
 
     @POST("api/ical/subscriptions")
     suspend fun addICalSubscription(@Body body: RequestBody): ICalSubscription
+
+    @PUT("api/ical/subscriptions/{id}")
+    suspend fun updateICalSubscription(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
 
     @DELETE("api/ical/subscriptions/{id}")
     suspend fun deleteICalSubscription(@Path("id") id: Int): Response<ResponseBody>

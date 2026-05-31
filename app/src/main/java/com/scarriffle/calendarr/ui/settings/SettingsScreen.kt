@@ -21,12 +21,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -85,6 +90,9 @@ fun SettingsScreen(
             },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)) {
+
+                ProfileChapter(vm)
+                Divider(Modifier.padding(vertical = 16.dp))
 
                 Section(tr("settings.calview"))
                 ChipRow(
@@ -173,6 +181,80 @@ fun SettingsScreen(
 @Composable
 private fun Section(title: String) {
     Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+}
+
+/** Server-backed "Profil" chapter: display name, login name, email, privacy, shared calendar. */
+@Composable
+private fun ProfileChapter(vm: SettingsViewModel) {
+    val savedLabel = tr("settings.saved")
+
+    Section(tr("settings.nav.profile"))
+    OutlinedTextField(
+        value = vm.displayName,
+        onValueChange = vm::onDisplayNameChange,
+        label = { Text(tr("profile.display_name")) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.size(8.dp))
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(tr("profile.login_name"), modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(vm.loginName, fontWeight = FontWeight.Medium)
+    }
+    Spacer(Modifier.size(8.dp))
+    OutlinedTextField(
+        value = vm.email,
+        onValueChange = vm::onEmailChange,
+        label = { Text(tr("profile.email")) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.size(8.dp))
+    Button(onClick = { vm.saveProfile(savedLabel) }) { Text(tr("event.save")) }
+    vm.profileMessage?.let {
+        Spacer(Modifier.size(8.dp))
+        Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+    }
+    Divider(Modifier.padding(vertical = 16.dp))
+
+    Section(tr("settings.privacy"))
+    ChipRow(
+        options = listOf("busy" to tr("settings.private.busy"), "hidden" to tr("settings.private.hidden")),
+        selected = vm.privateVisibility,
+        onSelect = vm::changePrivateVisibility,
+    )
+    Spacer(Modifier.size(6.dp))
+    Text(tr("settings.private_visibility.desc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Divider(Modifier.padding(vertical = 16.dp))
+
+    Section(tr("settings.group_visible"))
+    CalendarDropdown(vm)
+    Spacer(Modifier.size(6.dp))
+    Text(tr("settings.group_visible.desc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CalendarDropdown(vm: SettingsViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+    val noneLabel = tr("group.visible.none")
+    val selectedLabel = vm.ownLocalCalendars.firstOrNull { it.id == vm.groupVisibleId }?.name ?: noneLabel
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(tr("settings.group_visible")) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(text = { Text(noneLabel) }, onClick = { vm.changeGroupVisible(0); expanded = false })
+            vm.ownLocalCalendars.forEach { cal ->
+                DropdownMenuItem(text = { Text(cal.name) }, onClick = { vm.changeGroupVisible(cal.id); expanded = false })
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
