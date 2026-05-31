@@ -652,15 +652,53 @@
     <div class="settings-page-body">
       <div class="settings-nav-backdrop" id="settings-nav-backdrop"></div>
       <nav class="settings-nav">
-        <button class="settings-nav-btn active" data-panel="general" data-i18n="settings_nav_appearance">Darstellung</button>
-        <button class="settings-nav-btn" data-panel="accounts" data-i18n="settings_nav_accounts">Konten</button>
+        <button class="settings-nav-btn active" data-panel="profile" data-i18n="settings_nav_profile">Profil</button>
+        <button class="settings-nav-btn" data-panel="general" data-i18n="settings_nav_appearance">Darstellung</button>
+        <button class="settings-nav-btn" data-panel="view" data-i18n="settings_nav_view">Ansicht</button>
+        <button class="settings-nav-btn" data-panel="accounts" data-i18n="settings_nav_calendars">Kalender</button>
         <button class="settings-nav-btn hidden" data-panel="users" id="settings-nav-users" data-i18n="settings_nav_users">Benutzerverwaltung</button>
       </nav>
 
       <div class="settings-panels">
 
-        <!-- Einstellungen (merged: Darstellung + Ansicht & Raster + Ausgeblendete Kalender) -->
-        <div class="settings-panel active" id="settings-panel-general">
+        <!-- Profil: Name, Privatsphäre, geteilter Kalender -->
+        <div class="settings-panel active" id="settings-panel-profile">
+          <h4 class="panel-title" data-i18n="profile_account">Konto</h4>
+          <div class="form-group">
+            <label data-i18n="profile_display_name">Anzeigename</label>
+            <input type="text" id="cfg-display-name" data-i18n-placeholder="profile_display_name_ph" placeholder="Anzeigename" />
+          </div>
+          <div class="form-group">
+            <label data-i18n="profile_login_name">Login-Name</label>
+            <input type="text" id="cfg-login-name" spellcheck="false" autocapitalize="none" />
+            <p class="panel-desc" data-i18n="profile_login_name_desc">Klein geschrieben, fürs Anmelden. Groß-/Kleinschreibung egal.</p>
+          </div>
+          <div class="form-group">
+            <label>E-Mail</label>
+            <input type="email" id="cfg-email" placeholder="Keine E-Mail hinterlegt" />
+          </div>
+          <button class="btn btn-primary btn-sm" id="cfg-profile-save" data-i18n="save">Speichern</button>
+
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_privacy">Privatsphäre</h4>
+          <p class="panel-desc" data-i18n="settings_private_visibility_desc">Wie private Termine für andere Gruppenmitglieder erscheinen</p>
+          <div class="form-group">
+            <label data-i18n="settings_private_visibility">Private Termine für Gruppenmitglieder</label>
+            <select id="cfg-private-visibility">
+              <option value="busy" data-i18n="private_visibility_busy">Als „Beschäftigt“ anzeigen</option>
+              <option value="hidden" data-i18n="private_visibility_hidden">Ausblenden</option>
+            </select>
+          </div>
+
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_calendars">Geteilter Kalender</h4>
+          <p class="panel-desc" data-i18n="settings_group_visible_desc">Wähle, welcher deiner Kalender für deine Gruppenmitglieder sichtbar ist</p>
+          <div class="form-group">
+            <label data-i18n="settings_group_visible">Für Gruppen sichtbarer Kalender</label>
+            <div id="cfg-group-visible-list" class="cal-radio-list"></div>
+          </div>
+        </div>
+
+        <!-- Darstellung: Sprache, Farben, Stundenhöhe -->
+        <div class="settings-panel" id="settings-panel-general">
 
           <h4 class="panel-title" data-i18n="settings_language">Sprache</h4>
           <div class="form-group">
@@ -732,7 +770,19 @@
             </div>
           </div>
 
-          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_calendar_view">Kalenderansicht</h4>
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_hour_height">Stundenhöhe (Wochen- &amp; Tagesansicht)</h4>
+          <p class="panel-desc" data-i18n="settings_hour_height_desc">Wie viel Platz eine Stunde in der Zeitrasteransicht einnimmt</p>
+          <div class="contrast-selector" id="cfg-hour-height" data-setting="hour_height">
+            <button class="contrast-btn" data-val="28"><span class="hour-preview">━━</span><span class="contrast-lbl" data-i18n="hour_compact">Kompakt</span></button>
+            <button class="contrast-btn" data-val="44"><span class="hour-preview">━━━</span><span class="contrast-lbl" data-i18n="hour_normal">Normal</span></button>
+            <button class="contrast-btn" data-val="60"><span class="hour-preview">━━━━</span><span class="contrast-lbl" data-i18n="hour_comfort">Komfort</span></button>
+            <button class="contrast-btn" data-val="80"><span class="hour-preview">━━━━━</span><span class="contrast-lbl" data-i18n="hour_large">Gross</span></button>
+          </div>
+        </div>
+
+        <!-- Ansicht: Standardansicht, Wochenstart, vergangene Termine, ausgeblendete Kalender -->
+        <div class="settings-panel" id="settings-panel-view">
+          <h4 class="panel-title" data-i18n="settings_calendar_view">Kalenderansicht</h4>
           <div class="form-group">
             <label data-i18n="settings_default_view">Standardansicht</label>
             <select id="cfg-default-view">
@@ -757,39 +807,13 @@
             </label>
           </div>
 
-          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_privacy">Privatsphäre</h4>
-          <p class="panel-desc" data-i18n="settings_private_visibility_desc">Wie private Termine für andere Gruppenmitglieder erscheinen</p>
-          <div class="form-group">
-            <label data-i18n="settings_private_visibility">Private Termine für Gruppenmitglieder</label>
-            <select id="cfg-private-visibility">
-              <option value="busy" data-i18n="private_visibility_busy">Als „Beschäftigt“ anzeigen</option>
-              <option value="hidden" data-i18n="private_visibility_hidden">Ausblenden</option>
-            </select>
-          </div>
-
-          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_calendars">Kalender</h4>
-          <p class="panel-desc" data-i18n="settings_group_visible_desc">Wähle, welcher deiner Kalender für deine Gruppenmitglieder sichtbar ist</p>
-          <div class="form-group">
-            <label data-i18n="settings_group_visible">Für Gruppen sichtbarer Kalender</label>
-            <div id="cfg-group-visible-list" class="cal-radio-list"></div>
-          </div>
-
-          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_hour_height">Stundenhöhe (Wochen- &amp; Tagesansicht)</h4>
-          <p class="panel-desc" data-i18n="settings_hour_height_desc">Wie viel Platz eine Stunde in der Zeitrasteransicht einnimmt</p>
-          <div class="contrast-selector" id="cfg-hour-height" data-setting="hour_height">
-            <button class="contrast-btn" data-val="28"><span class="hour-preview">━━</span><span class="contrast-lbl" data-i18n="hour_compact">Kompakt</span></button>
-            <button class="contrast-btn" data-val="44"><span class="hour-preview">━━━</span><span class="contrast-lbl" data-i18n="hour_normal">Normal</span></button>
-            <button class="contrast-btn" data-val="60"><span class="hour-preview">━━━━</span><span class="contrast-lbl" data-i18n="hour_comfort">Komfort</span></button>
-            <button class="contrast-btn" data-val="80"><span class="hour-preview">━━━━━</span><span class="contrast-lbl" data-i18n="hour_large">Gross</span></button>
-          </div>
-
           <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_hidden_cals">Ausgeblendete Kalender</h4>
           <div id="hidden-cals-list"><span style="font-size:13px;color:var(--text-3)" data-i18n="settings_no_hidden_cals">Keine ausgeblendeten Kalender</span></div>
         </div>
 
         <!-- Konten (CalDAV, Lokal, iCal, Google) -->
         <div class="settings-panel" id="settings-panel-accounts">
-          <h4 class="panel-title" data-i18n="settings_nav_accounts">Konten</h4>
+          <h4 class="panel-title" data-i18n="settings_nav_calendars">Kalender</h4>
 
           <div class="accounts-section">
             <div class="accounts-section-heading" data-i18n="settings_accounts_caldav">CalDAV-Konten</div>

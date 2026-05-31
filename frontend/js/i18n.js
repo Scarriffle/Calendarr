@@ -60,6 +60,9 @@ const translations = {
     // Settings
     settings_title: 'Einstellungen',
     settings_nav_appearance: 'Darstellung',
+    settings_nav_profile: 'Profil',
+    settings_nav_view: 'Ansicht',
+    settings_nav_calendars: 'Kalender',
     settings_nav_google: 'Google Konten',
     settings_nav_users: 'Benutzerverwaltung',
     settings_colors: 'Farben',
@@ -329,6 +332,9 @@ const translations = {
     // Settings
     settings_title: 'Settings',
     settings_nav_appearance: 'Appearance',
+    settings_nav_profile: 'Profile',
+    settings_nav_view: 'View',
+    settings_nav_calendars: 'Calendars',
     settings_nav_google: 'Google Accounts',
     settings_nav_users: 'User Management',
     settings_colors: 'Colors',

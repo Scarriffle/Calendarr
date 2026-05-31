@@ -2553,6 +2553,14 @@ function openSettingsModal() {
   document.getElementById('cfg-private-visibility').value = s.private_event_visibility || 'busy';
   renderGroupVisibleList(s.group_visible_calendar_id);
 
+  // Profile chapter: name (from cached user) + email (fresh from /profile).
+  const pu = JSON.parse(localStorage.getItem('user') || '{}');
+  document.getElementById('cfg-display-name').value = pu.display_name || pu.username || '';
+  document.getElementById('cfg-login-name').value = pu.username || '';
+  api.get('/profile/').then(p => {
+    document.getElementById('cfg-email').value = p.email || '';
+  }).catch(() => {});
+
   // Set active contrast/hour-height buttons
   [
     { id: 'cfg-text-contrast', val: s.text_contrast || 3 },
@@ -3000,6 +3008,29 @@ function bindSettingsModal() {
       document.getElementById('new-username').value = '';
       document.getElementById('new-password').value = '';
       loadUsers();
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  // Profile chapter save (name/login/email → /profile, separate from settings).
+  const profileSaveBtn = document.getElementById('cfg-profile-save');
+  if (profileSaveBtn) profileSaveBtn.onclick = async () => {
+    const email = document.getElementById('cfg-email').value.trim();
+    const displayName = document.getElementById('cfg-display-name').value.trim();
+    const loginName = document.getElementById('cfg-login-name').value.trim();
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const body = { email: email || null };
+    if (displayName) body.display_name = displayName;
+    if (loginName && loginName.toLowerCase() !== (user.username || '')) body.username = loginName;
+    try {
+      const res = await api.put('/profile/', body);
+      if (res && res.access_token) localStorage.setItem('token', res.access_token);
+      const updated = { ...user };
+      if (displayName) updated.display_name = displayName;
+      if (body.username) updated.username = body.username.toLowerCase();
+      localStorage.setItem('user', JSON.stringify(updated));
+      const dd = document.getElementById('dropdown-username');
+      if (dd) dd.textContent = updated.display_name || updated.username || 'Benutzer';
+      showToast(t('profile_saved'));
     } catch (e) { showToast(e.message, true); }
   };
 
