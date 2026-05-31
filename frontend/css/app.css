@@ -535,8 +535,10 @@ a { color: var(--primary); text-decoration: none; }
   outline: none;
 }
 .cal-account-name { font-size: 11px; color: var(--text-3); padding: 4px 16px 2px; font-weight: 500; }
-.cal-item-remove { opacity: 0; }
-.cal-item:hover .cal-item-remove { opacity: 1; }
+/* Hide the remove/eye button until hover so the calendar name uses the full
+   width and only truncates while the button is visible. */
+.cal-item-remove { display: none; }
+.cal-item:hover .cal-item-remove { display: inline-flex; }
 
 /* ── Month View ─────────────────────────────────────────── */
 .month-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
