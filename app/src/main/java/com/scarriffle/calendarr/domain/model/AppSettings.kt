@@ -22,6 +22,9 @@ data class AppSettings(
     @Json(name = "language") val language: String = "de",
     @Json(name = "month_divider_color") val monthDividerColor: String = "#7090c0",
     @Json(name = "month_label_color") val monthLabelColor: String = "#7090c0",
+    // How this user's private events appear to other group members: 'hidden' | 'busy'.
+    @Json(name = "private_event_visibility") val privateEventVisibility: String = "busy",
+    @Json(name = "group_visible_calendar_id") val groupVisibleCalendarId: Int? = null,
 ) {
     val weekStartsOnMonday: Boolean get() = weekStartDay != "sunday"
 }

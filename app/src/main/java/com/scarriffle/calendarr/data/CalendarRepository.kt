@@ -10,6 +10,10 @@ import com.scarriffle.calendarr.data.remote.jsonBody
 import com.scarriffle.calendarr.domain.model.AppSettings
 import com.scarriffle.calendarr.domain.model.CalDAVAccount
 import com.scarriffle.calendarr.domain.model.CalEvent
+import com.scarriffle.calendarr.domain.model.CalendarShareEntry
+import com.scarriffle.calendarr.domain.model.DirectoryUser
+import com.scarriffle.calendarr.domain.model.Group
+import com.scarriffle.calendarr.domain.model.GroupMember
 import com.scarriffle.calendarr.domain.model.GoogleAccount
 import com.scarriffle.calendarr.domain.model.HomeAssistantAccount
 import com.scarriffle.calendarr.domain.model.ICalSubscription
@@ -115,6 +119,7 @@ class CalendarRepository @Inject constructor(
                 "language" to s.language,
                 "month_divider_color" to s.monthDividerColor,
                 "month_label_color" to s.monthLabelColor,
+                "private_event_visibility" to s.privateEventVisibility,
             )
         ).ensureSuccess()
     }
@@ -265,17 +270,174 @@ class CalendarRepository @Inject constructor(
     suspend fun createLocalEvent(
         calendarId: Int, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
+        isPrivate: Boolean = false,
     ) = guarded {
-        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color))
+        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate))
             .ensureSuccess()
     }
 
     suspend fun updateLocalEvent(
         uid: String, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
+        isPrivate: Boolean = false,
     ) = guarded {
-        api.updateLocalEvent(uid, eventBody(null, title, start, end, isAllDay, location, description, color))
+        api.updateLocalEvent(uid, eventBody(null, title, start, end, isAllDay, location, description, color, isPrivate))
             .ensureSuccess()
+    }
+
+    // ---- Sharing ----
+
+    suspend fun getUserDirectory(): List<DirectoryUser> = guarded {
+        val resp = api.getUserDirectory()
+        resp.ensureSuccess()
+        val arr = org.json.JSONArray(resp.body()?.string() ?: "[]")
+        buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                add(DirectoryUser(o.optInt("id"), o.optString("display_name")))
+            }
+        }
+    }
+
+    suspend fun getShares(calendarId: Int): List<CalendarShareEntry> = guarded {
+        val resp = api.getShares(calendarId)
+        resp.ensureSuccess()
+        val arr = org.json.JSONArray(resp.body()?.string() ?: "[]")
+        buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                add(CalendarShareEntry(o.optInt("user_id"), o.optString("display_name"), o.optString("permission")))
+            }
+        }
+    }
+
+    suspend fun addShare(calendarId: Int, userId: Int, permission: String) = guarded {
+        api.addShare(calendarId, jsonBody("user_id" to userId, "permission" to permission)).ensureSuccess()
+    }
+
+    suspend fun removeShare(calendarId: Int, userId: Int) = guarded {
+        api.removeShare(calendarId, userId).ensureSuccess()
+    }
+
+    // ---- iCal import/export ----
+
+    suspend fun importIcs(calendarId: Int, part: okhttp3.MultipartBody.Part): Triple<Int, Int, List<String>> = guarded {
+        val resp = api.importCalendar(calendarId, part)
+        resp.ensureSuccess()
+        val o = JSONObject(resp.body()?.string() ?: "{}")
+        val errors = o.optJSONArray("errors")
+        val errList = buildList<String> { if (errors != null) for (i in 0 until errors.length()) add(errors.optString(i)) }
+        Triple(o.optInt("imported"), o.optInt("skipped"), errList)
+    }
+
+    suspend fun exportIcs(calendarId: Int): ByteArray = guarded {
+        val resp = api.exportCalendar(calendarId)
+        resp.ensureSuccess()
+        resp.body()?.bytes() ?: ByteArray(0)
+    }
+
+    // ---- Groups ----
+
+    suspend fun getGroups(): List<Group> = guarded {
+        val resp = api.getGroups()
+        resp.ensureSuccess()
+        val arr = org.json.JSONArray(resp.body()?.string() ?: "[]")
+        buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                add(Group(
+                    id = o.optInt("id"),
+                    name = o.optString("name"),
+                    icon = if (o.isNull("icon")) null else o.optString("icon").ifBlank { null },
+                    role = o.optString("role", "member"),
+                    memberCount = o.optInt("member_count", 0),
+                    groupCalendarId = if (o.isNull("group_calendar_id")) null else o.optInt("group_calendar_id"),
+                    groupCalendarColor = if (o.isNull("group_calendar_color")) null else o.optString("group_calendar_color").ifBlank { null },
+                    members = emptyList(),
+                ))
+            }
+        }
+    }
+
+    suspend fun getGroup(id: Int): Group = guarded {
+        val resp = api.getGroup(id)
+        resp.ensureSuccess()
+        val o = JSONObject(resp.body()?.string() ?: "{}")
+        val membersArr = o.optJSONArray("members")
+        val members = buildList<GroupMember> {
+            if (membersArr != null) for (i in 0 until membersArr.length()) {
+                val m = membersArr.optJSONObject(i) ?: continue
+                add(GroupMember(
+                    m.optInt("id"), m.optString("display_name"), m.optString("role", "member"),
+                    if (m.isNull("color")) null else m.optString("color").ifBlank { null },
+                ))
+            }
+        }
+        Group(
+            id = o.optInt("id"),
+            name = o.optString("name"),
+            icon = if (o.isNull("icon")) null else o.optString("icon").ifBlank { null },
+            role = "",
+            memberCount = members.size,
+            groupCalendarId = if (o.isNull("group_calendar_id")) null else o.optInt("group_calendar_id"),
+            groupCalendarColor = if (o.isNull("group_calendar_color")) null else o.optString("group_calendar_color").ifBlank { null },
+            members = members,
+        )
+    }
+
+    suspend fun createGroup(name: String, memberIds: List<Int>, icon: String?) = guarded {
+        val arr = org.json.JSONArray()
+        memberIds.forEach { arr.put(it) }
+        api.createGroup(jsonBody("name" to name, "member_ids" to arr, "icon" to icon)).ensureSuccess()
+    }
+
+    suspend fun updateGroup(id: Int, name: String?, icon: String?) = guarded {
+        api.updateGroup(id, jsonBody("name" to name, "icon" to icon)).ensureSuccess()
+    }
+
+    suspend fun addGroupMember(groupId: Int, userId: Int) = guarded {
+        api.addGroupMember(groupId, jsonBody("user_id" to userId)).ensureSuccess()
+    }
+
+    suspend fun removeGroupMember(groupId: Int, userId: Int) = guarded {
+        api.removeGroupMember(groupId, userId).ensureSuccess()
+    }
+
+    suspend fun setGroupMemberColor(groupId: Int, userId: Int, color: String) = guarded {
+        api.setGroupMemberColor(groupId, userId, jsonBody("color" to color)).ensureSuccess()
+    }
+
+    suspend fun deleteGroup(id: Int) = guarded { api.deleteGroup(id).ensureSuccess() }
+
+    // ---- Profile & targeted settings ----
+
+    suspend fun updateProfile(displayName: String?, username: String?, email: String?): String? = guarded {
+        val resp = api.updateProfile(jsonBody("display_name" to displayName, "username" to username, "email" to email))
+        resp.ensureSuccess()
+        runCatching { JSONObject(resp.body()?.string() ?: "{}").optString("access_token").ifBlank { null } }.getOrNull()
+    }
+
+    suspend fun updatePrivateVisibility(value: String) = guarded {
+        api.updateSettings(jsonBody("private_event_visibility" to value)).ensureSuccess()
+    }
+
+    suspend fun updateGroupVisibleCalendar(calendarId: Int?) = guarded {
+        // Send explicit JSON null to clear (jsonBody drops Kotlin nulls).
+        api.updateSettings(jsonBody("group_visible_calendar_id" to (calendarId ?: org.json.JSONObject.NULL)))
+            .ensureSuccess()
+    }
+
+    suspend fun fetchGroupCombined(groupId: Int, start: Instant, end: Instant): List<CalEvent> = withContext(Dispatchers.IO) {
+        val resp = api.fetchGroupCombined(groupId, Dates.isoUtc(start), Dates.isoUtc(end))
+        resp.ensureSuccess()
+        val root = JSONObject(resp.body()?.string() ?: "{}")
+        val arr = root.optJSONArray("events") ?: return@withContext emptyList()
+        buildList {
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                CalEvent.fromJson(obj)?.let { add(it) }
+            }
+        }
     }
 
     suspend fun deleteLocalEvent(uid: String) = guarded { api.deleteLocalEvent(uid).ensureSuccess() }
@@ -358,6 +520,7 @@ class CalendarRepository @Inject constructor(
     private fun eventBody(
         calendarId: Int?, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
+        isPrivate: Boolean = false,
     ) = jsonBody(
         buildMap {
             calendarId?.let { put("calendar_id", it) }
@@ -368,6 +531,7 @@ class CalendarRepository @Inject constructor(
             put("location", location)
             put("description", description)
             if (!color.isNullOrBlank()) put("color", color)
+            put("private", isPrivate)
         }
     )
 }

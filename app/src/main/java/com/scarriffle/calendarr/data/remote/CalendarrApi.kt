@@ -7,6 +7,7 @@ import com.scarriffle.calendarr.domain.model.HomeAssistantAccount
 import com.scarriffle.calendarr.domain.model.ICalSubscription
 import com.scarriffle.calendarr.domain.model.LocalCalendar
 import com.scarriffle.calendarr.domain.model.UserProfile
+import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -14,9 +15,11 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.HTTP
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -47,6 +50,65 @@ interface CalendarrApi {
 
     @PUT("api/settings/")
     suspend fun updateSettings(@Body body: RequestBody): Response<ResponseBody>
+
+    @PUT("api/profile/")
+    suspend fun updateProfile(@Body body: RequestBody): Response<ResponseBody>
+
+    // ---- Sharing ----
+
+    @GET("api/users/directory")
+    suspend fun getUserDirectory(): Response<ResponseBody>
+
+    @GET("api/local/calendars/{id}/shares")
+    suspend fun getShares(@Path("id") id: Int): Response<ResponseBody>
+
+    @POST("api/local/calendars/{id}/shares")
+    suspend fun addShare(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
+
+    @DELETE("api/local/calendars/{id}/shares/{userId}")
+    suspend fun removeShare(@Path("id") id: Int, @Path("userId") userId: Int): Response<ResponseBody>
+
+    // ---- iCal import/export ----
+
+    @Multipart
+    @POST("api/local/calendars/{id}/import")
+    suspend fun importCalendar(@Path("id") id: Int, @Part part: MultipartBody.Part): Response<ResponseBody>
+
+    @GET("api/local/calendars/{id}/export")
+    suspend fun exportCalendar(@Path("id") id: Int): Response<ResponseBody>
+
+    // ---- Groups ----
+
+    @GET("api/groups/")
+    suspend fun getGroups(): Response<ResponseBody>
+
+    @GET("api/groups/{id}")
+    suspend fun getGroup(@Path("id") id: Int): Response<ResponseBody>
+
+    @POST("api/groups/")
+    suspend fun createGroup(@Body body: RequestBody): Response<ResponseBody>
+
+    @PUT("api/groups/{id}")
+    suspend fun updateGroup(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
+
+    @DELETE("api/groups/{id}")
+    suspend fun deleteGroup(@Path("id") id: Int): Response<ResponseBody>
+
+    @POST("api/groups/{id}/members")
+    suspend fun addGroupMember(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
+
+    @DELETE("api/groups/{id}/members/{userId}")
+    suspend fun removeGroupMember(@Path("id") id: Int, @Path("userId") userId: Int): Response<ResponseBody>
+
+    @PUT("api/groups/{id}/members/{userId}/color")
+    suspend fun setGroupMemberColor(@Path("id") id: Int, @Path("userId") userId: Int, @Body body: RequestBody): Response<ResponseBody>
+
+    @GET("api/groups/{id}/combined")
+    suspend fun fetchGroupCombined(
+        @Path("id") id: Int,
+        @Query("start") start: String,
+        @Query("end") end: String,
+    ): Response<ResponseBody>
 
     // ---- Profile ----
 

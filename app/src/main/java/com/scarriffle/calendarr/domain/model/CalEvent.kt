@@ -8,6 +8,9 @@ import java.time.Instant
  * A unified calendar event, blended from all server sources
  * (local, caldav, google, ical, homeassistant). Mirrors iOS `CalEvent`.
  */
+/** Creator (or owner, in the group combined view) of an event. id is null for imported events. */
+data class EventPerson(val id: Int?, val displayName: String)
+
 data class CalEvent(
     val id: String,
     val url: String,
@@ -22,6 +25,11 @@ data class CalEvent(
     val calendarName: String,
     val calendarColor: String,
     val source: String,
+    val creator: EventPerson? = null,
+    val isPrivate: Boolean = false,
+    // Only set in the group combined view:
+    val owner: EventPerson? = null,
+    val isGroupEvent: Boolean = false,
 ) {
     /**
      * Per-event override colour, then the calendar's colour, then a stable
@@ -52,6 +60,16 @@ data class CalEvent(
         private fun JSONObject.strOrNull(key: String): String? {
             if (!has(key) || isNull(key)) return null
             return optString(key, "").takeIf { it.isNotBlank() && it != "null" }
+        }
+
+        /** Parse a {id, display_name} person object (creator/owner). */
+        private fun personFrom(json: JSONObject?, key: String): EventPerson? {
+            val obj = json?.optJSONObject(key) ?: return null
+            val name = obj.strOrNull("display_name") ?: return null
+            val id = if (obj.isNull("id")) null else obj.opt("id")?.let {
+                when (it) { is Number -> it.toInt(); is String -> it.toIntOrNull(); else -> null }
+            }
+            return EventPerson(id, name)
         }
 
         /** Parse one event object from the `/api/caldav/events` aggregate response. */
@@ -91,6 +109,10 @@ data class CalEvent(
                 calendarName = json.strOrNull("calendar_name") ?: "",
                 calendarColor = json.strOrNull("calendarColor") ?: "",
                 source = json.strOrNull("source") ?: "local",
+                creator = personFrom(json, "creator"),
+                isPrivate = json.optBoolean("private", false),
+                owner = personFrom(json, "owner"),
+                isGroupEvent = json.optBoolean("is_group_event", false),
             )
         }
     }

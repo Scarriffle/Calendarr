@@ -29,6 +29,11 @@ data class LocalCalendar(
     val name: String = "",
     val color: String = "#34a853",
     val enabled: Boolean = true,
+    val type: String = "local",
+    val owned: Boolean = true,
+    @Json(name = "shared_by") val sharedBy: String? = null,
+    val permission: String? = null,
+    val group: Boolean = false,
 )
 
 @JsonClass(generateAdapter = false)
@@ -81,6 +86,7 @@ data class HACalendar(
 data class UserProfile(
     val id: Int,
     val username: String = "",
+    @Json(name = "display_name") val displayName: String? = null,
     val email: String? = null,
     @Json(name = "is_admin") val isAdmin: Boolean = false,
     @Json(name = "has_avatar") val hasAvatar: Boolean = false,
