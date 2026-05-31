@@ -116,6 +116,7 @@ def list_calendars(
         d = _cal_dict(c, owned=True)
         if c.id in group_cal_map:
             d["group"] = True
+            d["shared_by"] = group_cal_map[c.id]  # group name, for labelling
         result.append(d)
 
     seen_ids = {c.id for c in own}

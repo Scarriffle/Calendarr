@@ -593,10 +593,10 @@ a { color: var(--primary); text-decoration: none; }
 }
 .month-col.first-of-month {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-  padding-top: 8px;
+  flex-direction: row;       /* "1 JUN" inline — keeps the header height uniform */
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
 }
 /* Dividers via pseudo-elements so they render above events (z-index 2) */
 .month-col.month-divider-left::before {
@@ -647,8 +647,8 @@ a { color: var(--primary); text-decoration: none; }
   letter-spacing: .5px;
   color: var(--month-label-color, #7090c0);
   line-height: 1;
-  padding: 0 2px;
-  margin: 0 0 2px 4px;
+  padding: 0;
+  margin: 0;
   position: relative;
   z-index: 3; /* above events overlay (z-index 2) */
 }
@@ -657,10 +657,10 @@ a { color: var(--primary); text-decoration: none; }
   position: relative;
   z-index: 3;
 }
-/* Push events overlay down when row contains a first-of-month cell so the
-   day "1" (which sits below the month marker) isn't hidden by event bars */
+/* Month marker now sits inline next to the day number, so the header height is
+   uniform and the events overlay needs no extra offset for month-start weeks. */
 .month-row.has-month-marker .month-events-overlay {
-  top: 56px;
+  top: 30px;
 }
 /* Events overlay — pointer-events:none so clicks pass to columns */
 .month-events-overlay {

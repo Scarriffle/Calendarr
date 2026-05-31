@@ -672,6 +672,13 @@ function renderCalendarList() {
       name: cal.name, color: cal.color, enabled: cal.enabled,
       sourceLabel: `${t('shared_with_me')} · ${cal.shared_by || ''}`, remove: null });
   });
+  // Group calendars (owned by the creator or reached via membership) — shown so
+  // they can be toggled/recoloured; marked with the group emoji.
+  state.localCalendars.filter(c => c.group).forEach(cal => {
+    entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
+      name: cal.name, color: cal.color, enabled: cal.enabled,
+      sourceLabel: `${t('groups_title')} · ${cal.shared_by || ''}`, isGroupCal: true, remove: null });
+  });
   state.icalSubscriptions.forEach(sub => {
     entries.push({ key: `ical:${sub.id}`, source: 'ical', dataId: `data-sub-id="${sub.id}"`,
       name: sub.name, color: sub.color, enabled: sub.enabled,
@@ -714,6 +721,7 @@ function renderCalendarList() {
       <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
       <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
+      ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">👥</span>` : ''}
       ${e.groupVisible ? `<span class="cal-shared-flag" title="${t('group_visible_flag')}">👥</span>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
     </div>`
@@ -794,6 +802,7 @@ function renderCalendarList() {
       } else if (source === 'local') {
         const calId = parseInt(dot.dataset.calId);
         const cal = state.localCalendars.find(c => c.id === calId);
+        if (cal && cal.owned === false) { showToast(t('only_owner_color'), true); return; }
         const picked = await openColorPicker(dot, cal?.color || '#34a853');
         if (picked) {
           await api.put(`/local/calendars/${calId}`, { color: picked });

@@ -152,8 +152,8 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
         ? `<div class="month-marker">${monthsShort[cell.getMonth()]}</div>`
         : '';
       colsHtml += `<div class="month-col ${todayCls} ${otherCls} ${selectedCls} ${firstCls} ${dividerCls}" data-date="${key}">
-        ${monthLabel}
         <div class="cell-day ${numCls}">${cell.getDate()}</div>
+        ${monthLabel}
       </div>`;
     });
 
