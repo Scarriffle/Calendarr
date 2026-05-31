@@ -265,11 +265,17 @@ function prefetchIfNeeded(viewStart, viewEnd) {
 }
 
 // ── Data fetching ─────────────────────────────────────────
-function initials(name) {
-  if (!name) return '?';
-  const parts = String(name).trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+function firstName(name) {
+  if (!name) return '';
+  return String(name).trim().split(/\s+/)[0];
+}
+
+// Stable per-owner colour so each member's events read as a group in the
+// combined view (Google-Family style).
+const OWNER_PALETTE = ['#4285f4', '#ea4335', '#34a853', '#fbbc05', '#9c27b0', '#ff7043', '#46bdc6', '#7090c0'];
+function ownerColor(ownerId) {
+  if (ownerId == null) return null;
+  return OWNER_PALETTE[(Number(ownerId) >>> 0) % OWNER_PALETTE.length];
 }
 
 async function fetchAndRender(force = false, silent = false) {
@@ -284,11 +290,19 @@ async function fetchAndRender(force = false, silent = false) {
     try {
       const resp = await api.get(
         `/groups/${state.activeGroupId}/combined?start=${fStart.toISOString()}&end=${fEnd.toISOString()}`);
+      const me = JSON.parse(localStorage.getItem('user') || '{}');
       const evs = (resp.events || []).map(ev => {
-        // Prefix the title so every renderer shows who an event belongs to.
         const ownerName = ev.owner && ev.owner.display_name;
-        const tag = ev.is_group_event ? '👥' : (ownerName ? `[${initials(ownerName)}]` : '');
-        return { ...ev, title: tag ? `${tag} ${ev.title}` : ev.title };
+        const ownerId = ev.owner && ev.owner.id;
+        const isMine = ownerId != null && me.id != null && ownerId === me.id;
+        // Group events get a 👥 marker; others get the owner's first name (not
+        // cryptic initials); your own events stay unprefixed. Colour-code by
+        // owner so each member reads as a group.
+        let title = ev.title;
+        if (ev.is_group_event) title = `👥 ${ev.title}`;
+        else if (ownerName && !isMine) title = `${firstName(ownerName)}: ${ev.title}`;
+        const color = ev.is_group_event ? ev.color : (ownerColor(ownerId) || ev.color);
+        return { ...ev, title, color };
       });
       eventCache.start = null; eventCache.end = null; // invalidate normal cache
       state.events = evs;
