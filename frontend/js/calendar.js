@@ -575,34 +575,50 @@ function saveCalOrder(keys) {
 }
 
 // Drag & drop reordering of the flat calendar list (persisted per device).
+// The dragged row is moved live among its siblings during dragover, so the
+// list visibly "makes space" and you can see where it will land.
 function bindCalDragReorder(container) {
-  let dragKey = null;
+  // Find the row the cursor is currently above (by vertical midpoint), so we
+  // know before which sibling to insert the dragged row.
+  const rowAfter = (y) => {
+    const rows = [...container.querySelectorAll('.cal-item:not(.cal-dragging)')];
+    return rows.reduce((closest, row) => {
+      const box = row.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) return { offset, el: row };
+      return closest;
+    }, { offset: Number.NEGATIVE_INFINITY, el: null }).el;
+  };
+
   container.querySelectorAll('.cal-item').forEach(item => {
     item.addEventListener('dragstart', e => {
       // Don't start a drag from interactive children (checkbox, color dot, buttons).
       if (e.target.closest('input, button, .cal-item-dot')) { e.preventDefault(); return; }
-      dragKey = item.dataset.key;
       e.dataTransfer.effectAllowed = 'move';
-      item.classList.add('cal-dragging');
+      // Defer the class so the drag image is the full opaque row, then dim it.
+      requestAnimationFrame(() => item.classList.add('cal-dragging'));
     });
     item.addEventListener('dragend', () => {
-      dragKey = null;
       item.classList.remove('cal-dragging');
-    });
-    item.addEventListener('dragover', e => { e.preventDefault(); });
-    item.addEventListener('drop', e => {
-      e.preventDefault();
-      const targetKey = item.dataset.key;
-      if (!dragKey || dragKey === targetKey) return;
-      const keys = [...container.querySelectorAll('.cal-item')].map(el => el.dataset.key);
-      const from = keys.indexOf(dragKey);
-      const to = keys.indexOf(targetKey);
-      if (from === -1 || to === -1) return;
-      keys.splice(to, 0, keys.splice(from, 1)[0]);
-      saveCalOrder(keys);
-      renderCalendarList();
+      // Persist the final DOM order; no full re-render needed.
+      saveCalOrder([...container.querySelectorAll('.cal-item')].map(el => el.dataset.key));
     });
   });
+
+  // Live reorder: move the dragged row to the hovered position as the cursor
+  // moves. Bound once on the (stable) container to avoid stacking listeners on
+  // every re-render.
+  if (!container.__dragBound) {
+    container.__dragBound = true;
+    container.addEventListener('dragover', e => {
+      e.preventDefault();
+      const dragging = container.querySelector('.cal-dragging');
+      if (!dragging) return;
+      const after = rowAfter(e.clientY);
+      if (after == null) container.appendChild(dragging);
+      else if (after !== dragging) container.insertBefore(dragging, after);
+    });
+  }
 }
 
 function renderCalendarList() {
