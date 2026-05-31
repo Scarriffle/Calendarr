@@ -1764,3 +1764,40 @@ a { color: var(--primary); text-decoration: none; }
   }
 }
 
+
+/* ── Collaboration: sharing badges & user picker ───────────── */
+.cal-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.cal-badge-shared {
+  background: rgba(66, 133, 244, 0.15);
+  color: var(--primary);
+  border-color: transparent;
+}
+.share-user-picker {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.share-user-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.share-user-item:last-child { border-bottom: none; }
+.share-user-item:hover { background: var(--bg-surface); }
+.popup-creator {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  font-style: italic;
+}

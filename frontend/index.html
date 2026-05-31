@@ -319,6 +319,11 @@
         <label>Kalender</label>
         <select id="ev-calendar"></select>
       </div>
+      <div class="form-row" id="ev-private-row" style="display:none">
+        <label class="toggle-label">
+          <input type="checkbox" id="ev-private" /> <span data-i18n="event_private">Privat</span>
+        </label>
+      </div>
       <div class="form-group">
         <label>Ort</label>
         <input type="text" id="ev-location" placeholder="Ort hinzufügen" />
@@ -340,6 +345,34 @@
       <div style="flex:1"></div>
       <button class="btn btn-ghost" data-modal="modal-event">Abbrechen</button>
       <button class="btn btn-primary" id="ev-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Share Calendar Modal -->
+<div id="modal-share" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-header">
+      <h3 data-i18n="share_title">Kalender teilen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-share">&times;</button>
+    </div>
+    <div class="modal-body">
+      <h4 class="panel-title" data-i18n="share_current">Aktuelle Freigaben</h4>
+      <div id="share-current-list" class="accounts-list"></div>
+
+      <h4 class="panel-title" style="margin-top:20px" data-i18n="share_add">Benutzer hinzufügen</h4>
+      <div class="form-row" style="gap:8px;align-items:center">
+        <input type="text" id="share-user-search" data-i18n-placeholder="share_search" placeholder="Benutzer suchen…" style="flex:1" />
+        <select id="share-permission">
+          <option value="read" data-i18n="perm_read">Nur lesen</option>
+          <option value="read_write" data-i18n="perm_read_write">Lesen &amp; schreiben</option>
+        </select>
+      </div>
+      <div id="share-user-picker" class="share-user-picker"></div>
+    </div>
+    <div class="modal-footer">
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" data-modal="modal-share" data-i18n="done">Fertig</button>
     </div>
   </div>
 </div>
@@ -395,6 +428,7 @@
     <div class="popup-location" id="popup-location"></div>
     <div class="popup-description" id="popup-description"></div>
     <div class="popup-calendar" id="popup-calendar"></div>
+    <div class="popup-creator" id="popup-creator" style="display:none"></div>
   </div>
   <div id="popup-copy-menu" class="popup-copy-menu hidden"></div>
 </div>
@@ -670,6 +704,16 @@
               <input type="checkbox" id="cfg-dim-past" />
               <span data-i18n="settings_dim_past">Vergangene Termine ausgrauen</span>
             </label>
+          </div>
+
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_privacy">Privatsphäre</h4>
+          <p class="panel-desc" data-i18n="settings_private_visibility_desc">Wie private Termine für andere Gruppenmitglieder erscheinen</p>
+          <div class="form-group">
+            <label data-i18n="settings_private_visibility">Private Termine für Gruppenmitglieder</label>
+            <select id="cfg-private-visibility">
+              <option value="busy" data-i18n="private_visibility_busy">Als „Beschäftigt“ anzeigen</option>
+              <option value="hidden" data-i18n="private_visibility_hidden">Ausblenden</option>
+            </select>
           </div>
 
           <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_hour_height">Stundenhöhe (Wochen- &amp; Tagesansicht)</h4>

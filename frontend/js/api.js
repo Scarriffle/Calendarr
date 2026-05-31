@@ -57,12 +57,46 @@ async function uploadRequest(path, formData) {
   return res.json();
 }
 
+async function downloadRequest(path, fallbackName) {
+  const token = localStorage.getItem('token');
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE}${path}`, { method: 'GET', headers });
+  if (res.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.reload();
+    return null;
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: t('unknown_error') }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  // Derive filename from Content-Disposition if present.
+  let filename = fallbackName || 'calendar.ics';
+  const cd = res.headers.get('Content-Disposition') || '';
+  const m = cd.match(/filename="?([^"]+)"?/);
+  if (m) filename = m[1];
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   get:    (path)        => request('GET',    path),
   post:   (path, body)  => request('POST',   path, body),
   put:    (path, body)  => request('PUT',    path, body),
   delete: (path)        => request('DELETE', path),
   upload: (path, form)  => uploadRequest(path, form),
+  download: (path, name) => downloadRequest(path, name),
 
   login: (username, password, totp_code = null, remember_me = false) =>
     request('POST', '/auth/login', { username, password, totp_code, remember_me }),

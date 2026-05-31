@@ -538,19 +538,28 @@ function renderCalendarList() {
     }).join('');
   }
 
-  // ── Local calendars ────────────────────────────────────
+  // ── Local calendars (own + shared with me) ─────────────
   if (state.localCalendars.length) {
     html += `<div class="cal-account-name">${t('cal_local')}</div>`;
-    html += state.localCalendars.map(cal =>
-      `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
+    html += state.localCalendars.map(cal => {
+      const owned = cal.owned !== false;
+      // Shared calendars get an owner badge and no delete button (owner-only).
+      const sharedBadge = !owned
+        ? `<span class="cal-badge cal-badge-shared" title="${t('shared_by', { name: cal.shared_by || '' })}">${escHtml(cal.shared_by || '')}</span>`
+        : '';
+      const removeBtn = owned
+        ? `<button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="local" title="${t('remove_cal')}">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>`
+        : '';
+      return `<div class="cal-item" data-cal-id="${cal.id}" data-source="local">
         <input type="checkbox" ${cal.enabled ? 'checked' : ''} data-cal-id="${cal.id}" data-source="local" />
         <div class="cal-item-dot" style="background:${cal.color}" data-cal-id="${cal.id}" data-source="local" title="${t('change_color')}"></div>
         <span class="cal-item-name" data-source="local">${escHtml(cal.name)}</span>
-        <button class="icon-btn mini-btn cal-item-remove" data-cal-id="${cal.id}" data-source="local" title="${t('remove_cal')}">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>
-      </div>`
-    ).join('');
+        ${sharedBadge}
+        ${removeBtn}
+      </div>`;
+    }).join('');
   }
 
   // ── iCal subscriptions ─────────────────────────────────
@@ -1203,6 +1212,16 @@ function showEventPopup(ev, anchor) {
   document.getElementById('popup-description').style.display = ev.description ? '' : 'none';
   document.getElementById('popup-calendar').textContent = ev.calendar_name || '';
 
+  // Creator — only shown when it isn't the current user.
+  const creatorEl = document.getElementById('popup-creator');
+  const me = JSON.parse(localStorage.getItem('user') || '{}');
+  if (ev.creator && ev.creator.display_name && ev.creator.id !== me.id) {
+    creatorEl.textContent = t('created_by', { name: ev.creator.display_name });
+    creatorEl.style.display = '';
+  } else {
+    creatorEl.style.display = 'none';
+  }
+
   // Position near anchor
   const rect = anchor.getBoundingClientRect();
   const pw = 300, ph = 200;
@@ -1375,6 +1394,7 @@ function openNewEventModal(date) {
 
   toggleAlldayFields(false);
   populateCalendarSelect(null);
+  updatePrivateRow(false);
   resetColorPicker('');
   resetRecurrenceUI();
   document.getElementById('ev-delete').classList.add('hidden');
@@ -1410,6 +1430,7 @@ function openCopyEditModal(ev, targetCal) {
   if (targetCal.type === 'caldav') selectedId = targetCal.id;
   else                              selectedId = `${targetCal.type}-${targetCal.id}`;
   populateCalendarSelect(selectedId);
+  updatePrivateRow(ev.private);
 
   resetColorPicker(ev.color || '');
   resetRecurrenceUI();
@@ -1442,6 +1463,7 @@ function openEditEventModal(ev) {
   }
 
   populateCalendarSelect(ev.calendar_id);
+  updatePrivateRow(ev.private);
   resetColorPicker(ev.color || '');
 
   // Recurrence
@@ -1467,6 +1489,18 @@ function openEditEventModal(ev) {
 function toggleAlldayFields(allDay) {
   document.getElementById('ev-time-row').style.display = allDay ? 'none' : '';
   document.getElementById('ev-date-row').style.display = allDay ? '' : 'none';
+}
+
+// The "Privat" toggle only applies to local calendars; hide it otherwise.
+function updatePrivateRow(isPrivate) {
+  const calVal = document.getElementById('ev-calendar').value || '';
+  const isLocal = calVal.startsWith('local-');
+  const row = document.getElementById('ev-private-row');
+  row.style.display = isLocal ? '' : 'none';
+  if (isPrivate !== undefined) {
+    document.getElementById('ev-private').checked = !!isPrivate;
+  }
+  if (!isLocal) document.getElementById('ev-private').checked = false;
 }
 
 function resetColorPicker(color) {
@@ -1558,6 +1592,9 @@ function bindEventModal() {
   document.getElementById('ev-allday').addEventListener('change', e => {
     toggleAlldayFields(e.target.checked);
   });
+
+  // The "Privat" toggle is only relevant for local calendars.
+  document.getElementById('ev-calendar').addEventListener('change', () => updatePrivateRow());
 
   // Date/time pickers with auto-adjustment logic
   [
@@ -1684,6 +1721,7 @@ function bindEventModal() {
     const desc    = document.getElementById('ev-description').value.trim();
     const color   = state.selectedEventColor;
     const rrule   = buildRruleFromUI();
+    const isPrivate = isLocal && document.getElementById('ev-private').checked;
 
     let start, end;
     if (allDay) {
@@ -1711,7 +1749,7 @@ function bindEventModal() {
           );
         } else if (ev.source === 'local') {
           await api.put(`/local/events/${encodeURIComponent(ev.id)}`,
-            { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '' }
+            { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '', private: isPrivate }
           );
         } else if (ev.source === 'ical') {
           showToast(t('event_readonly'), true);
@@ -1733,6 +1771,7 @@ function bindEventModal() {
           location: loc, description: desc,
           color: color || null,
           rrule: rrule || null,
+          private: ev.source === 'local' ? isPrivate : ev.private,
         });
         showToast(t('event_updated'));
       } else if (isGoogle) {
@@ -1747,7 +1786,7 @@ function bindEventModal() {
         await api.post('/local/events', {
           calendar_id: calId, title, start, end, allDay,
           location: loc, description: desc, color: color || null,
-          rrule: rrule || null,
+          rrule: rrule || null, private: isPrivate,
         });
         showToast(t('event_created'));
       } else if (isHA) {
@@ -2025,6 +2064,100 @@ function bindICalSubModal() {
   };
 }
 
+// ── iCal Import ───────────────────────────────────────────
+// Open a file picker and import the chosen .ics into the given local calendar.
+function triggerIcsImport(calendarId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.ics,text/calendar';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      showToast(t('importing'));
+      const res = await api.upload(`/local/calendars/${calendarId}/import`, form);
+      showToast(t('import_result', { imported: res.imported, skipped: res.skipped }));
+      fetchAndRender(true);
+    } catch (e) { showToast(e.message, true); }
+  });
+  input.click();
+}
+
+// ── Sharing ───────────────────────────────────────────────
+async function openShareModal(calendarId) {
+  const modal = document.getElementById('modal-share');
+  modal.dataset.calId = String(calendarId);
+  const search = document.getElementById('share-user-search');
+  search.value = '';
+  search.oninput = renderShareUserPicker;
+  document.getElementById('share-permission').value = 'read';
+  openModal('modal-share');
+  await refreshShareModal(calendarId);
+}
+
+async function refreshShareModal(calendarId) {
+  // Load current shares + the user directory (for the picker).
+  let shares = [], users = [];
+  try { shares = await api.get(`/local/calendars/${calendarId}/shares`); } catch (e) { showToast(e.message, true); }
+  try { users = await api.get('/users/directory'); } catch (e) { /* ignore */ }
+
+  const sharedIds = new Set(shares.map(s => s.user_id));
+  const listEl = document.getElementById('share-current-list');
+  listEl.innerHTML = shares.length
+    ? shares.map(s =>
+        `<div class="accounts-row">
+          <span class="accounts-row-name">${escHtml(s.display_name || '')}</span>
+          <div class="accounts-row-actions">
+            <span class="cal-badge">${s.permission === 'read_write' ? t('perm_read_write') : t('perm_read')}</span>
+            <button class="btn btn-ghost btn-sm" data-share-remove="${s.user_id}">${t('remove')}</button>
+          </div>
+        </div>`
+      ).join('')
+    : `<span class="accounts-section-empty">${t('share_none')}</span>`;
+
+  listEl.querySelectorAll('[data-share-remove]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await api.delete(`/local/calendars/${calendarId}/shares/${btn.dataset.shareRemove}`);
+        await refreshShareModal(calendarId);
+      } catch (e) { showToast(e.message, true); }
+    });
+  });
+
+  // Store the directory (minus already-shared users) for the picker.
+  document.getElementById('modal-share').__users = users.filter(u => !sharedIds.has(u.id));
+  renderShareUserPicker();
+}
+
+function renderShareUserPicker() {
+  const modal = document.getElementById('modal-share');
+  const users = modal.__users || [];
+  const q = (document.getElementById('share-user-search').value || '').toLowerCase();
+  const filtered = users.filter(u => (u.display_name || '').toLowerCase().includes(q));
+  const picker = document.getElementById('share-user-picker');
+  picker.innerHTML = filtered.length
+    ? filtered.map(u =>
+        `<div class="share-user-item" data-user-id="${u.id}">${escHtml(u.display_name || '')}</div>`
+      ).join('')
+    : `<span class="accounts-section-empty">${t('share_no_users')}</span>`;
+  picker.querySelectorAll('.share-user-item').forEach(el => {
+    el.addEventListener('click', async () => {
+      const calId = parseInt(modal.dataset.calId);
+      const permission = document.getElementById('share-permission').value;
+      try {
+        await api.post(`/local/calendars/${calId}/shares`,
+                       { user_id: parseInt(el.dataset.userId), permission });
+        await refreshShareModal(calId);
+      } catch (e) { showToast(e.message, true); }
+    });
+  });
+}
+
 // ── Settings Modal ────────────────────────────────────────
 function openSettingsModal() {
   const s = state.settings;
@@ -2057,6 +2190,7 @@ function openSettingsModal() {
   });
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
   document.getElementById('cfg-language').value = getLang();
+  document.getElementById('cfg-private-visibility').value = s.private_event_visibility || 'busy';
 
   // Set active contrast/hour-height buttons
   [
@@ -2189,14 +2323,40 @@ function renderAllAccounts() {
     if (!state.localCalendars.length) {
       localList.innerHTML = `<span class="accounts-section-empty">${t('settings_no_local_cals')}</span>`;
     } else {
-      localList.innerHTML = state.localCalendars.map(cal =>
-        `<div class="accounts-row">
+      localList.innerHTML = state.localCalendars.map(cal => {
+        const owned = cal.owned !== false;
+        const sharedBadge = !owned
+          ? `<span class="cal-badge cal-badge-shared">${t('shared_by', { name: cal.shared_by || '' })}</span>`
+          : '';
+        const canWrite = owned || cal.permission === 'read_write';
+        const actions = [];
+        if (owned) actions.push(`<button class="btn btn-ghost btn-sm" data-local-share="${cal.id}">${t('share')}</button>`);
+        if (canWrite) actions.push(`<button class="btn btn-ghost btn-sm" data-local-import="${cal.id}">${t('import')}</button>`);
+        actions.push(`<button class="btn btn-ghost btn-sm" data-local-export="${cal.id}" data-local-name="${escHtml(cal.name)}">${t('export')}</button>`);
+        return `<div class="accounts-row">
           <div style="display:flex;align-items:center;gap:8px;min-width:0">
             <span class="accounts-local-dot" style="background:${cal.color || '#34a853'}"></span>
             <span class="accounts-row-name">${escHtml(cal.name)}</span>
+            ${sharedBadge}
           </div>
-        </div>`
-      ).join('');
+          <div class="accounts-row-actions">${actions.join('')}</div>
+        </div>`;
+      }).join('');
+
+      localList.querySelectorAll('[data-local-export]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await api.download(`/local/calendars/${btn.dataset.localExport}/export`,
+                               `${btn.dataset.localName || 'calendar'}.ics`);
+          } catch (e) { showToast(e.message, true); }
+        });
+      });
+      localList.querySelectorAll('[data-local-import]').forEach(btn => {
+        btn.addEventListener('click', () => triggerIcsImport(parseInt(btn.dataset.localImport)));
+      });
+      localList.querySelectorAll('[data-local-share]').forEach(btn => {
+        btn.addEventListener('click', () => openShareModal(parseInt(btn.dataset.localShare)));
+      });
     }
   }
 
@@ -2509,6 +2669,7 @@ function bindSettingsModal() {
       dim_past_events:     document.getElementById('cfg-dim-past').checked,
       hour_height:         getActive('cfg-hour-height')   || 44,
       language:            document.getElementById('cfg-language').value,
+      private_event_visibility: document.getElementById('cfg-private-visibility').value,
     };
     try {
       await api.put('/settings/', settings);
