@@ -2951,9 +2951,10 @@ function bindSettingsModal() {
 export function openProfileModal() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  // Username & email
+  // Names & email
   document.getElementById('profile-username').value = user.username || '';
-  document.getElementById('profile-display-name').textContent = user.username || '';
+  document.getElementById('profile-display-name-input').value = user.display_name || user.username || '';
+  document.getElementById('profile-display-name').textContent = user.display_name || user.username || '';
 
   // Load fresh profile data
   api.get('/profile/').then(profile => {
@@ -3021,11 +3022,26 @@ function renderProfileCalendars() {
 }
 
 function bindProfileModal() {
-  // Save profile info (email)
+  // Save profile info (display name, login name, email)
   document.getElementById('profile-save-info').onclick = async () => {
     const email = document.getElementById('profile-email').value.trim();
+    const displayName = document.getElementById('profile-display-name-input').value.trim();
+    const loginName = document.getElementById('profile-username').value.trim();
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const body = { email: email || null };
+    if (displayName) body.display_name = displayName;
+    if (loginName && loginName.toLowerCase() !== (user.username || '')) body.username = loginName;
     try {
-      await api.put('/profile/', { email: email || null });
+      const res = await api.put('/profile/', body);
+      // A login-name change returns a fresh token (the old one is now invalid).
+      if (res && res.access_token) localStorage.setItem('token', res.access_token);
+      // Keep the cached user (menu, "created by", etc.) in sync.
+      const updated = { ...user };
+      if (displayName) updated.display_name = displayName;
+      if (body.username) updated.username = body.username.toLowerCase();
+      localStorage.setItem('user', JSON.stringify(updated));
+      const dd = document.getElementById('dropdown-username');
+      if (dd) dd.textContent = updated.display_name || updated.username || 'Benutzer';
       showToast(t('profile_saved'));
     } catch (e) { showToast(e.message, true); }
   };

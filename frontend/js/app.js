@@ -60,7 +60,7 @@ async function launchApp() {
 
   // User dropdown menu
   const dropdown = document.getElementById('user-dropdown');
-  document.getElementById('dropdown-username').textContent = user.username || 'Benutzer';
+  document.getElementById('dropdown-username').textContent = user.display_name || user.username || 'Benutzer';
 
   avatar.addEventListener('click', e => {
     e.stopPropagation();

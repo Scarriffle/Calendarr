@@ -858,16 +858,21 @@
 
       <!-- Account Info -->
       <div class="settings-section">
-        <h4>Konto</h4>
+        <h4 data-i18n="profile_account">Konto</h4>
         <div class="form-group">
-          <label>Benutzername</label>
-          <input type="text" id="profile-username" disabled class="input-disabled" />
+          <label data-i18n="profile_display_name">Anzeigename</label>
+          <input type="text" id="profile-display-name-input" data-i18n-placeholder="profile_display_name_ph" placeholder="Anzeigename" />
+        </div>
+        <div class="form-group">
+          <label data-i18n="profile_login_name">Login-Name</label>
+          <input type="text" id="profile-username" spellcheck="false" autocapitalize="none" />
+          <p class="panel-desc" data-i18n="profile_login_name_desc">Klein geschrieben, fürs Anmelden. Groß-/Kleinschreibung egal.</p>
         </div>
         <div class="form-group">
           <label>E-Mail</label>
           <input type="email" id="profile-email" placeholder="Keine E-Mail hinterlegt" />
         </div>
-        <button class="btn btn-primary btn-sm" id="profile-save-info">Speichern</button>
+        <button class="btn btn-primary btn-sm" id="profile-save-info" data-i18n="save">Speichern</button>
       </div>
 
       <!-- Password -->
