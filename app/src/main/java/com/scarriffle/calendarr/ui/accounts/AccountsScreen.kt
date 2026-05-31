@@ -1,5 +1,7 @@
 package com.scarriffle.calendarr.ui.accounts
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,23 +15,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,14 +49,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.scarriffle.calendarr.domain.model.LocalCalendar
+import com.scarriffle.calendarr.ui.L10n
+import com.scarriffle.calendarr.ui.LocalLang
+import com.scarriffle.calendarr.ui.components.ColorPickerDialog
 import com.scarriffle.calendarr.ui.components.PasswordField
 import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
 
 private enum class AddType { LOCAL, CALDAV, ICAL, HA }
+
+/** What colour the picker dialog is currently editing. */
+private sealed interface ColorTarget {
+    val current: String
+    data class Local(val id: Int, override val current: String) : ColorTarget
+    data class ICal(val id: Int, override val current: String) : ColorTarget
+    data class Source(val source: String, val id: Int, override val current: String) : ColorTarget
+}
+
+private fun safeFileName(name: String): String {
+    val cleaned = name.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")
+    return (cleaned.ifBlank { "calendar" }) + ".ics"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +83,38 @@ fun AccountsScreen(
     onChanged: () -> Unit,
     vm: AccountsViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
+    val lang = LocalLang.current
     var addDialog by remember { mutableStateOf<AddType?>(null) }
+    var editingColor by remember { mutableStateOf<ColorTarget?>(null) }
+    var shareCalId by remember { mutableStateOf<Int?>(null) }
+
+    // Import: pick a document, read its bytes, upload to importTarget.
+    var importTarget by remember { mutableStateOf<Int?>(null) }
+    val openDoc = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val calId = importTarget
+        importTarget = null
+        if (uri != null && calId != null) {
+            val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            if (bytes != null) {
+                vm.importIcs(
+                    calId, bytes, "import.ics",
+                    result = { imported, skipped -> L10n.t("import.result", lang, imported, skipped) },
+                    onChanged = onChanged,
+                )
+            }
+        }
+    }
+
+    // Export: fetch bytes first, then let the user save them to a chosen location.
+    var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
+    val createDoc = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/calendar")) { uri ->
+        val bytes = pendingExport
+        pendingExport = null
+        if (uri != null && bytes != null) {
+            runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } }
+        }
+    }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Scaffold(
@@ -71,39 +132,69 @@ fun AccountsScreen(
                 return@Scaffold
             }
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
-                // Local
+                // Local (incl. shared-with-me and group calendars)
                 item { SectionHeader(tr("accounts.local.header"), tr("accounts.local.add")) { addDialog = AddType.LOCAL } }
                 if (vm.local.isEmpty()) item { EmptyRow(tr("accounts.local.empty")) }
                 items(vm.local, key = { "l${it.id}" }) { cal ->
-                    AccountRow(cal.name, cal.color) { vm.deleteLocal(cal.id, onChanged) }
+                    LocalCalendarRow(
+                        cal = cal,
+                        onColor = { editingColor = ColorTarget.Local(cal.id, cal.color) },
+                        onShare = { shareCalId = cal.id },
+                        onImport = { importTarget = cal.id; openDoc.launch(arrayOf("*/*")) },
+                        onExport = { vm.exportIcs(cal.id) { bytes -> pendingExport = bytes; createDoc.launch(safeFileName(cal.name)) } },
+                        onDelete = { vm.deleteLocal(cal.id, onChanged) },
+                    )
                 }
 
                 // CalDAV
                 item { SectionHeader(tr("accounts.caldav.header"), tr("accounts.caldav.add")) { addDialog = AddType.CALDAV } }
                 if (vm.caldav.isEmpty()) item { EmptyRow(tr("accounts.caldav.empty")) }
                 items(vm.caldav, key = { "c${it.id}" }) { acc ->
-                    AccountRow("${acc.name} (${acc.username})", acc.color) { vm.deleteCalDAV(acc.id, onChanged) }
+                    Column {
+                        AccountHeaderRow("${acc.name} (${acc.username})", acc.color) { vm.deleteCalDAV(acc.id, onChanged) }
+                        acc.calendars.orEmpty().forEach { cal ->
+                            ChildCalendarRow(cal.name, cal.color ?: acc.color) {
+                                editingColor = ColorTarget.Source("caldav", cal.id, cal.color ?: acc.color)
+                            }
+                        }
+                    }
                 }
 
                 // iCal
                 item { SectionHeader(tr("accounts.ical.header"), tr("accounts.ical.add")) { addDialog = AddType.ICAL } }
                 if (vm.ical.isEmpty()) item { EmptyRow(tr("accounts.ical.empty")) }
                 items(vm.ical, key = { "i${it.id}" }) { sub ->
-                    AccountRow(sub.name, sub.color) { vm.deleteICal(sub.id, onChanged) }
+                    EditableColorRow(sub.name, sub.color, onColor = { editingColor = ColorTarget.ICal(sub.id, sub.color) }) {
+                        vm.deleteICal(sub.id, onChanged)
+                    }
                 }
 
                 // Google
                 item { SectionHeaderNoAdd(tr("accounts.google.header")) }
                 if (vm.google.isEmpty()) item { EmptyRow(tr("accounts.google.hint")) }
                 items(vm.google, key = { "g${it.id}" }) { acc ->
-                    AccountRow(acc.email, "#4285f4") { vm.deleteGoogle(acc.id, onChanged) }
+                    Column {
+                        AccountHeaderRow(acc.email, "#4285f4") { vm.deleteGoogle(acc.id, onChanged) }
+                        acc.calendars.orEmpty().forEach { cal ->
+                            ChildCalendarRow(cal.name, cal.color ?: "#4285f4") {
+                                editingColor = ColorTarget.Source("google", cal.id, cal.color ?: "#4285f4")
+                            }
+                        }
+                    }
                 }
 
                 // Home Assistant
                 item { SectionHeader(tr("accounts.ha.header"), tr("accounts.ha.add")) { addDialog = AddType.HA } }
                 if (vm.homeAssistant.isEmpty()) item { EmptyRow(tr("accounts.ha.empty")) }
                 items(vm.homeAssistant, key = { "h${it.id}" }) { acc ->
-                    AccountRow(acc.name, "#46bdc6") { vm.deleteHA(acc.id, onChanged) }
+                    Column {
+                        AccountHeaderRow(acc.name, "#46bdc6") { vm.deleteHA(acc.id, onChanged) }
+                        acc.calendars.orEmpty().forEach { cal ->
+                            ChildCalendarRow(cal.name, cal.color ?: "#46bdc6") {
+                                editingColor = ColorTarget.Source("homeassistant", cal.id, cal.color ?: "#46bdc6")
+                            }
+                        }
+                    }
                 }
 
                 vm.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 12.dp)) } }
@@ -126,6 +217,34 @@ fun AccountsScreen(
             vm.addHA(n, u, t, onChanged); addDialog = null
         }
         null -> Unit
+    }
+
+    editingColor?.let { target ->
+        ColorPickerDialog(
+            initial = target.current,
+            title = tr("accounts.color"),
+            onDismiss = { editingColor = null },
+            onConfirm = { hex ->
+                when (target) {
+                    is ColorTarget.Local -> vm.setLocalColor(target.id, hex, onChanged)
+                    is ColorTarget.ICal -> vm.setICalColor(target.id, hex, onChanged)
+                    is ColorTarget.Source -> vm.setSourceColor(target.source, target.id, hex, onChanged)
+                }
+                editingColor = null
+            },
+        )
+    }
+
+    shareCalId?.let { id ->
+        SharingSheet(vm = vm, calendarId = id, onDismiss = { shareCalId = null })
+    }
+
+    vm.infoMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { vm.clearInfo() },
+            confirmButton = { TextButton(onClick = { vm.clearInfo() }) { Text(tr("common.ok")) } },
+            text = { Text(msg) },
+        )
     }
 }
 
@@ -155,16 +274,162 @@ private fun EmptyRow(text: String) {
     Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 6.dp))
 }
 
+/** Tappable colour swatch. */
 @Composable
-private fun AccountRow(name: String, color: String, onDelete: () -> Unit) {
+private fun ColorDot(hex: String, editable: Boolean, onClick: () -> Unit) {
+    val base = Modifier.size(if (editable) 18.dp else 14.dp).clip(CircleShape).background(colorFromHex(hex))
+    Box(if (editable) base.clickable(onClick = onClick) else base)
+}
+
+/** Account header (CalDAV/Google/HA) with a delete button; colour edited on the child rows. */
+@Composable
+private fun AccountHeaderRow(name: String, color: String, onDelete: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(14.dp).clip(CircleShape).background(colorFromHex(color)))
+        Text(name, modifier = Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Filled.Delete, contentDescription = tr("common.delete"), tint = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+/** A child calendar of a server-managed account: editable colour + name. */
+@Composable
+private fun ChildCalendarRow(name: String, color: String, onColor: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ColorDot(color, editable = true, onClick = onColor)
+        Text(name, modifier = Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** A simple row (iCal) with editable colour + delete. */
+@Composable
+private fun EditableColorRow(name: String, color: String, onColor: () -> Unit, onDelete: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        ColorDot(color, editable = true, onClick = onColor)
         Text(name, modifier = Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
         IconButton(onClick = onDelete) {
             Icon(Icons.Filled.Delete, contentDescription = tr("common.delete"), tint = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+/** Local calendar row: colour, group marker, "shared by", and an actions menu. */
+@Composable
+private fun LocalCalendarRow(
+    cal: LocalCalendar,
+    onColor: () -> Unit,
+    onShare: () -> Unit,
+    onImport: () -> Unit,
+    onExport: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        ColorDot(cal.color, editable = cal.owned, onClick = onColor)
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(cal.name, style = MaterialTheme.typography.bodyLarge)
+                if (cal.group) {
+                    Spacer(Modifier.size(6.dp))
+                    Icon(Icons.Filled.People, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                }
+            }
+            val by = cal.sharedBy
+            if (!cal.owned && by != null) {
+                Text(tr("accounts.shared_by", by), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Box {
+            IconButton(onClick = { menu = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = tr("accounts.action.share"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                if (cal.owned && !cal.group) {
+                    DropdownMenuItem(text = { Text(tr("accounts.action.share")) }, onClick = { menu = false; onShare() })
+                }
+                if (cal.owned || cal.permission == "read_write") {
+                    DropdownMenuItem(text = { Text(tr("accounts.action.import")) }, onClick = { menu = false; onImport() })
+                }
+                DropdownMenuItem(text = { Text(tr("accounts.action.export")) }, onClick = { menu = false; onExport() })
+                if (cal.owned) {
+                    DropdownMenuItem(text = { Text(tr("common.delete")) }, onClick = { menu = false; onDelete() })
+                }
+            }
+        }
+    }
+}
+
+/** Manage who a local calendar is shared with (owner only). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SharingSheet(vm: AccountsViewModel, calendarId: Int, onDismiss: () -> Unit) {
+    LaunchedEffect(calendarId) { vm.loadSharing(calendarId) }
+    var permission by remember { mutableStateOf("read") }
+    var search by remember { mutableStateOf("") }
+    val sharedIds = vm.shares.map { it.userId }.toSet()
+    val candidates = vm.directory.filter {
+        it.id !in sharedIds && (search.isBlank() || it.displayName.contains(search, ignoreCase = true))
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState()),
+        ) {
+            Text(tr("share.title"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.size(16.dp))
+
+            Text(tr("share.with"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            if (vm.shares.isEmpty()) {
+                Text(tr("share.none"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+            } else {
+                vm.shares.forEach { s ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(s.displayName, modifier = Modifier.weight(1f))
+                        Text(
+                            if (s.permission == "read_write") tr("share.permission.read_write") else tr("share.permission.read"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        IconButton(onClick = { vm.removeShare(calendarId, s.userId) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = tr("common.delete"), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+
+            Divider(Modifier.padding(vertical = 16.dp))
+
+            Text(tr("share.add"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.size(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = permission == "read", onClick = { permission = "read" }, label = { Text(tr("share.permission.read")) })
+                FilterChip(selected = permission == "read_write", onClick = { permission = "read_write" }, label = { Text(tr("share.permission.read_write")) })
+            }
+            Spacer(Modifier.size(8.dp))
+            OutlinedTextField(
+                value = search,
+                onValueChange = { search = it },
+                label = { Text(tr("share.search")) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.size(4.dp))
+            candidates.forEach { u ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { vm.addShare(calendarId, u.id, permission) }.padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(u.displayName, modifier = Modifier.weight(1f))
+                    Icon(Icons.Filled.Add, contentDescription = tr("share.add"), tint = MaterialTheme.colorScheme.primary)
+                }
+            }
         }
     }
 }

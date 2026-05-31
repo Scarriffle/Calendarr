@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scarriffle.calendarr.data.CalendarRepository
 import com.scarriffle.calendarr.domain.model.CalDAVAccount
+import com.scarriffle.calendarr.domain.model.CalendarShareEntry
+import com.scarriffle.calendarr.domain.model.DirectoryUser
 import com.scarriffle.calendarr.domain.model.GoogleAccount
 import com.scarriffle.calendarr.domain.model.HomeAssistantAccount
 import com.scarriffle.calendarr.domain.model.ICalSubscription
@@ -85,4 +87,69 @@ class AccountsViewModel @Inject constructor(
 
     fun deleteGoogle(id: Int, onChanged: () -> Unit) =
         mutate(onChanged) { repository.deleteGoogleAccount(id) }
+
+    // ---- Calendar colour ----
+
+    fun setLocalColor(id: Int, color: String, onChanged: () -> Unit) =
+        mutate(onChanged) { repository.updateLocalCalendarColor(id, color) }
+
+    fun setICalColor(id: Int, color: String, onChanged: () -> Unit) =
+        mutate(onChanged) { repository.updateICalColor(id, color) }
+
+    fun setSourceColor(source: String, calendarId: Int, color: String, onChanged: () -> Unit) =
+        mutate(onChanged) { repository.setCalendarColor(source, calendarId, color) }
+
+    // ---- Sharing ----
+
+    var shares by mutableStateOf<List<CalendarShareEntry>>(emptyList())
+        private set
+    var directory by mutableStateOf<List<DirectoryUser>>(emptyList())
+        private set
+
+    fun loadSharing(calendarId: Int) {
+        viewModelScope.launch {
+            shares = runCatching { repository.getShares(calendarId) }.getOrDefault(emptyList())
+            directory = runCatching { repository.getUserDirectory() }.getOrDefault(emptyList())
+        }
+    }
+
+    fun addShare(calendarId: Int, userId: Int, permission: String) {
+        viewModelScope.launch {
+            runCatching { repository.addShare(calendarId, userId, permission) }
+                .onSuccess { loadSharing(calendarId) }
+                .onFailure { error = it.message }
+        }
+    }
+
+    fun removeShare(calendarId: Int, userId: Int) {
+        viewModelScope.launch {
+            runCatching { repository.removeShare(calendarId, userId) }
+                .onSuccess { loadSharing(calendarId) }
+                .onFailure { error = it.message }
+        }
+    }
+
+    // ---- Import / export ----
+
+    var infoMessage by mutableStateOf<String?>(null)
+        private set
+
+    fun clearInfo() { infoMessage = null }
+    fun clearError() { error = null }
+
+    fun importIcs(calendarId: Int, bytes: ByteArray, filename: String, result: (Int, Int) -> String, onChanged: () -> Unit) {
+        viewModelScope.launch {
+            runCatching { repository.importIcsFile(calendarId, bytes, filename) }
+                .onSuccess { (imported, skipped, _) -> infoMessage = result(imported, skipped); load(); onChanged() }
+                .onFailure { error = it.message }
+        }
+    }
+
+    fun exportIcs(calendarId: Int, onBytes: (ByteArray) -> Unit) {
+        viewModelScope.launch {
+            runCatching { repository.exportIcs(calendarId) }
+                .onSuccess { onBytes(it) }
+                .onFailure { error = it.message }
+        }
+    }
 }

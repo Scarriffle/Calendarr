@@ -23,6 +23,8 @@ import com.scarriffle.calendarr.domain.model.WritableCalendar
 import com.scarriffle.calendarr.util.Dates
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import retrofit2.HttpException
 import java.time.Instant
@@ -354,6 +356,13 @@ class CalendarRepository @Inject constructor(
         val errors = o.optJSONArray("errors")
         val errList = buildList<String> { if (errors != null) for (i in 0 until errors.length()) add(errors.optString(i)) }
         Triple(o.optInt("imported"), o.optInt("skipped"), errList)
+    }
+
+    /** Build the multipart body from raw bytes and import (server form field: "file"). */
+    suspend fun importIcsFile(calendarId: Int, bytes: ByteArray, filename: String): Triple<Int, Int, List<String>> {
+        val body = bytes.toRequestBody("text/calendar".toMediaTypeOrNull())
+        val part = okhttp3.MultipartBody.Part.createFormData("file", filename, body)
+        return importIcs(calendarId, part)
     }
 
     suspend fun exportIcs(calendarId: Int): ByteArray = guarded {
