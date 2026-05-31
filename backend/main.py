@@ -157,6 +157,12 @@ def _migrate():
             logging.info("Migration: added is_private to local_events")
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN group_visible_calendar_id INTEGER"))
+            conn.commit()
+            logging.info("Migration: added group_visible_calendar_id to user_settings")
+        except Exception:
+            pass
 
 _migrate()
 

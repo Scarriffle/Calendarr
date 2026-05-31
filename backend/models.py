@@ -95,6 +95,9 @@ class UserSettings(Base):
     # How this user's private events appear to other group members:
     # 'hidden' = invisible, 'busy' = anonymous busy block (default).
     private_event_visibility = Column(String(10), default="busy")
+    # The single local calendar this user shares into all their groups
+    # (combined view shows only this calendar per member). NULL = share nothing.
+    group_visible_calendar_id = Column(Integer, nullable=True)
 
     user = relationship("User", back_populates="settings")
 

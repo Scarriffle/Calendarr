@@ -155,8 +155,9 @@ def test_combined_view_marks_owner_and_group_event(client):
     gid = group["id"]
     gcal = group["group_calendar_id"]
 
-    # Bob's own calendar + event.
+    # Bob's own calendar + event; Bob designates it as his group-visible calendar.
     b_cal = _make_calendar(client, b_tok, "Bobs Kalender")
+    client.put("/api/settings/", headers=auth(b_tok), json={"group_visible_calendar_id": b_cal})
     _make_event(client, b_tok, b_cal, "Bobs Termin")
     # A group-calendar event.
     _make_event(client, admin, gcal, "Gruppentermin")
@@ -185,6 +186,7 @@ def test_private_visibility_hidden_and_busy(client):
     gid = group["id"]
 
     b_cal = _make_calendar(client, b_tok, "Bobs Kalender")
+    client.put("/api/settings/", headers=auth(b_tok), json={"group_visible_calendar_id": b_cal})
     _make_event(client, b_tok, b_cal, "Geheimes", private=True,
                 start="2026-06-15T10:00:00+00:00", end="2026-06-15T11:00:00+00:00")
 
@@ -202,6 +204,25 @@ def test_private_visibility_hidden_and_busy(client):
     client.put("/api/settings/", headers=auth(b_tok), json={"private_event_visibility": "hidden"})
     seen2 = _combined_titles(client, admin, gid)
     assert not any(e["start"].startswith("2026-06-15") for e in seen2)
+
+
+def test_member_calendar_hidden_until_designated(client):
+    admin = register_admin(client)
+    b_id, b_tok = create_user(client, admin, "bob")
+    group = client.post("/api/groups/", headers=auth(admin),
+                        json={"name": "Team", "member_ids": [b_id]}).json()
+    gid = group["id"]
+    b_cal = _make_calendar(client, b_tok, "Bobs Kalender")
+    _make_event(client, b_tok, b_cal, "Bobs Termin")
+
+    # Not designated yet -> admin doesn't see Bob's calendar in the combined view.
+    seen = _combined_titles(client, admin, gid)
+    assert not any(e["title"] == "Bobs Termin" for e in seen)
+
+    # After Bob designates it, it appears.
+    client.put("/api/settings/", headers=auth(b_tok), json={"group_visible_calendar_id": b_cal})
+    seen2 = _combined_titles(client, admin, gid)
+    assert any(e["title"] == "Bobs Termin" for e in seen2)
 
 
 def test_private_visibility_validation(client):

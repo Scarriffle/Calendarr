@@ -28,6 +28,7 @@ class SettingsUpdate(BaseModel):
     line_color: Optional[str] = None
     bg_color:   Optional[str] = None
     private_event_visibility: Optional[str] = None
+    group_visible_calendar_id: Optional[int] = None
 
 
 def _settings_dict(s: models.UserSettings) -> dict:
@@ -48,6 +49,7 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "line_color": s.line_color,
         "bg_color":   s.bg_color,
         "private_event_visibility": s.private_event_visibility or "busy",
+        "group_visible_calendar_id": s.group_visible_calendar_id,
     }
 
 
@@ -90,7 +92,7 @@ def update_settings(
     # For these three override colours, an explicit null is meaningful
     # ("reset to default") and must be persisted as NULL. All other fields
     # keep the previous behaviour where a null/missing value is ignored.
-    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color"}
+    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "group_visible_calendar_id"}
     update_data = data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if field in NULLABLE_OVERRIDES:

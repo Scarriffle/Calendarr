@@ -313,16 +313,26 @@ def combined_events(
                     b = _strip_busy(b)
                 all_events.append(b)
 
-    # Each member's own local calendars (excluding the group calendar to avoid dupes).
+    # Each member shares exactly one calendar into their groups, chosen in their
+    # settings (group_visible_calendar_id). Only that calendar is overlaid.
     for m in members:
-        member_cals = (
-            db.query(models.LocalCalendar)
-            .filter(models.LocalCalendar.user_id == m.user_id)
-            .all()
+        settings = (
+            db.query(models.UserSettings)
+            .filter(models.UserSettings.user_id == m.user_id)
+            .first()
         )
-        for cal in member_cals:
-            if group_cal_id is not None and cal.id == group_cal_id:
-                continue
+        visible_id = settings.group_visible_calendar_id if settings else None
+        if visible_id is None or visible_id == group_cal_id:
+            continue
+        cal = (
+            db.query(models.LocalCalendar)
+            .filter(
+                models.LocalCalendar.id == visible_id,
+                models.LocalCalendar.user_id == m.user_id,  # must be the member's own
+            )
+            .first()
+        )
+        if cal:
             emit_calendar(cal, m.user_id, is_group=False)
 
     # The group calendar itself.
