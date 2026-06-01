@@ -228,8 +228,7 @@ class CalendarViewModel @Inject constructor(
             val serverTitle = ev.displayTitle?.takeIf { it.isNotEmpty() }
             if (serverTitle != null) return@map ev.copy(title = serverTitle)
             val prefix = when {
-                ev.isGroupEvent && ev.creator != null && ev.creator.id != me -> "👥 ${firstName(ev.creator.displayName)}: "
-                ev.isGroupEvent -> "👥 "
+                ev.isGroupEvent && ev.creator != null && ev.creator.id != me -> "${firstName(ev.creator.displayName)}: "
                 ev.owner != null && ev.owner.id != me -> "${firstName(ev.owner.displayName)}: "
                 else -> ""
             }

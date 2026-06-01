@@ -64,6 +64,7 @@ import com.scarriffle.calendarr.ui.accounts.AccountsScreen
 import com.scarriffle.calendarr.domain.model.Group
 import com.scarriffle.calendarr.ui.event.EventDetailScreen
 import com.scarriffle.calendarr.ui.event.EventEditorSheet
+import com.scarriffle.calendarr.ui.groups.GroupIcon
 import com.scarriffle.calendarr.ui.groups.GroupsScreen
 import com.scarriffle.calendarr.ui.menu.MenuSheet
 import com.scarriffle.calendarr.ui.profile.ProfileScreen
@@ -420,7 +421,8 @@ private fun GroupSwitcher(groups: List<Group>, activeGroup: Group?, onSwitchGrou
             )
             groups.forEach { g ->
                 DropdownMenuItem(
-                    text = { Text("${g.icon ?: "👥"} ${g.name}") },
+                    text = { Text(g.name) },
+                    leadingIcon = { GroupIcon(g.icon) },
                     trailingIcon = { if (activeGroup?.id == g.id) Icon(Icons.Filled.Check, contentDescription = null) },
                     onClick = { open = false; onSwitchGroup(g) },
                 )
@@ -436,8 +438,9 @@ private fun GroupBanner(group: Group, onExit: () -> Unit) {
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            GroupIcon(group.icon, modifier = Modifier.padding(end = 6.dp))
             Text(
-                "${tr("groups.view")}: ${group.icon ?: "👥"} ${group.name}",
+                "${tr("groups.view")}: ${group.name}",
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

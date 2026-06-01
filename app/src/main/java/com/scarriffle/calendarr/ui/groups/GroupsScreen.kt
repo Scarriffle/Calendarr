@@ -21,10 +21,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -51,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -59,9 +72,49 @@ import com.scarriffle.calendarr.ui.components.ColorPickerDialog
 import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
 
-private val GROUP_ICONS = listOf(
-    "👥", "👨‍👩‍👧", "🏠", "❤️", "🧑‍🤝‍🧑", "⚽", "🎓", "💼", "🎉", "🐶", "✈️", "🎵", "🍕", "📚", "🌳", "⭐",
-)
+/**
+ * Cross-platform group-icon keys (stored server-side) rendered as native
+ * Material icons — consistent everywhere instead of OS-emoji that vary by
+ * platform. Mirrors iOS GroupIcons / the web SVG set.
+ */
+object GroupIcons {
+    val keys = listOf(
+        "people", "home", "heart", "work", "school", "sports",
+        "party", "pet", "travel", "music", "food", "star",
+    )
+
+    fun vector(key: String?): ImageVector = when (key) {
+        "people" -> Icons.Filled.People
+        "home" -> Icons.Filled.Home
+        "heart" -> Icons.Filled.Favorite
+        "work" -> Icons.Filled.Work
+        "school" -> Icons.Filled.School
+        "sports" -> Icons.Filled.DirectionsRun
+        "party" -> Icons.Filled.Celebration
+        "pet" -> Icons.Filled.Pets
+        "travel" -> Icons.Filled.Flight
+        "music" -> Icons.Filled.MusicNote
+        "food" -> Icons.Filled.Restaurant
+        "star" -> Icons.Filled.Star
+        else -> Icons.Filled.People
+    }
+
+    fun isKey(s: String?): Boolean = s != null && s in keys
+}
+
+/** Render a group's icon: native Material icon for keys, legacy emoji fallback. */
+@Composable
+fun GroupIcon(icon: String?, modifier: Modifier = Modifier, tint: androidx.compose.ui.graphics.Color? = null) {
+    if (GroupIcons.isKey(icon)) {
+        Icon(GroupIcons.vector(icon), contentDescription = null, modifier = modifier,
+            tint = tint ?: androidx.compose.material3.LocalContentColor.current)
+    } else if (!icon.isNullOrEmpty()) {
+        Text(icon, modifier = modifier)
+    } else {
+        Icon(Icons.Filled.People, contentDescription = null, modifier = modifier,
+            tint = tint ?: androidx.compose.material3.LocalContentColor.current)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,7 +156,7 @@ fun GroupsScreen(
                         Modifier.fillMaxWidth().clickable { onOpenGroupView(g) }.padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(g.icon ?: "👥", style = MaterialTheme.typography.titleMedium)
+                        GroupIcon(g.icon, tint = MaterialTheme.colorScheme.onSurface)
                         Column(Modifier.weight(1f).padding(start = 12.dp)) {
                             Text(g.name, style = MaterialTheme.typography.bodyLarge)
                             Text(
@@ -155,7 +208,7 @@ private fun GroupEditSheet(
 ) {
     val me = vm.currentUserId
     var name by remember { mutableStateOf(existing?.name ?: "") }
-    var icon by remember { mutableStateOf(existing?.icon ?: "👥") }
+    var icon by remember { mutableStateOf(if (GroupIcons.isKey(existing?.icon)) existing!!.icon!! else "people") }
     var selected by remember { mutableStateOf(setOf<Int>()) }
     var existingMembers by remember { mutableStateOf(setOf<Int>()) }
     var detail by remember { mutableStateOf<Group?>(null) }
@@ -170,7 +223,7 @@ private fun GroupEditSheet(
         detail = g
         if (g != null) {
             name = g.name
-            icon = g.icon ?: "👥"
+            icon = if (GroupIcons.isKey(g.icon)) g.icon!! else "people"
             val members = g.members.map { it.id }.filter { it != me }.toSet()
             existingMembers = members
             selected = members
@@ -199,7 +252,7 @@ private fun GroupEditSheet(
             Text(tr("groups.icon"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.size(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                GROUP_ICONS.forEach { ic ->
+                GroupIcons.keys.forEach { ic ->
                     val sel = ic == icon
                     Box(
                         Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
@@ -207,7 +260,11 @@ private fun GroupEditSheet(
                             .clickable { icon = ic },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(ic, style = MaterialTheme.typography.titleLarge)
+                        Icon(
+                            GroupIcons.vector(ic),
+                            contentDescription = ic,
+                            tint = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
