@@ -50,6 +50,8 @@ let state = {
   selectedEventColor: '',  // '' = use calendar color
   groups: [],
   activeGroupId: null,     // when set, the calendar shows the combined group view
+  activeGroupDetail: null, // full detail (members + colours) of the active group
+  hiddenGroupMembers: new Set(), // member ids / 'gc' hidden in the group overlay
 };
 
 // ── URL state ────────────────────────────────────────────
@@ -456,6 +458,16 @@ function renderView() {
 }
 
 function filterEvents(events) {
+  // Group overlay: hide individual members' calendars / the group calendar
+  // (Outlook-style), filtered client-side by event owner.
+  const hidden = state.hiddenGroupMembers;
+  if (state.activeGroupId && hidden && hidden.size) {
+    return events.filter(ev => {
+      if (ev.is_group_event) return !hidden.has('gc');
+      const oid = ev.owner && ev.owner.id;
+      return oid == null || !hidden.has(oid);
+    });
+  }
   // If dimPast is enabled, events are still shown but CSS handles opacity via .past class
   return events;
 }
@@ -2316,21 +2328,66 @@ function openGroupEventModal() {
   updatePrivateRow(false);
 }
 
-function enterGroupView(groupId) {
+async function enterGroupView(groupId) {
   state.activeGroupId = groupId;
+  state.hiddenGroupMembers = new Set();
+  state.activeGroupDetail = null;
   const g = state.groups.find(x => x.id === groupId);
   document.getElementById('group-view-banner').classList.remove('hidden');
   document.getElementById('group-view-label').textContent =
     t('group_view_label', { name: g ? g.name : '' });
   renderGroupList();
+  // Load the member list (with server colours) for the per-member filter.
+  try { state.activeGroupDetail = await api.get(`/groups/${groupId}`); } catch (e) { /* ignore */ }
+  renderGroupMemberFilter();
   fetchAndRender(true);
 }
 
 function exitGroupView() {
   state.activeGroupId = null;
+  state.activeGroupDetail = null;
+  state.hiddenGroupMembers = new Set();
   document.getElementById('group-view-banner').classList.add('hidden');
+  renderGroupMemberFilter();
   renderGroupList();
   fetchAndRender(true);
+}
+
+// Per-member filter bar shown under the group banner: tap a member (or the
+// group calendar) to hide/show their events in the combined overlay.
+function renderGroupMemberFilter() {
+  const banner = document.getElementById('group-view-banner');
+  if (!banner) return;
+  let bar = document.getElementById('group-members-filter');
+  if (!state.activeGroupId || !state.activeGroupDetail) {
+    if (bar) bar.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'group-members-filter';
+    bar.className = 'group-members-filter';
+    banner.insertAdjacentElement('afterend', bar);
+  }
+  const g = state.activeGroupDetail;
+  const chip = (key, name, color) => {
+    const off = state.hiddenGroupMembers.has(key);
+    return `<button class="gmf-chip${off ? ' gmf-off' : ''}" data-gmf="${key}">
+      <span class="gmf-dot" style="background:${color || '#4285f4'}"></span>${escHtml(name)}</button>`;
+  };
+  const parts = (g.members || []).map(m => chip(String(m.id), m.display_name || '—', m.color));
+  parts.push(chip('gc', t('group_calendar'), g.group_calendar_color));
+  bar.innerHTML = parts.join('');
+  bar.querySelectorAll('[data-gmf]').forEach(b => {
+    b.addEventListener('click', () => {
+      const raw = b.dataset.gmf;
+      const key = raw === 'gc' ? 'gc' : parseInt(raw);
+      if (state.hiddenGroupMembers.has(key)) state.hiddenGroupMembers.delete(key);
+      else state.hiddenGroupMembers.add(key);
+      renderGroupMemberFilter();
+      renderView();
+    });
+  });
 }
 
 // Open the group modal in create mode (no id) or manage mode (existing group).
