@@ -14,7 +14,13 @@ import models
 import permissions
 from auth import get_current_user
 from database import get_db
-from local_events_util import build_local_event_dict, expand_recurring_local, resolve_creator
+from local_events_util import (
+    apply_event_privacy,
+    build_local_event_dict,
+    expand_recurring_local,
+    private_visibility_for,
+    resolve_creator,
+)
 from routers.ical_router import _refresh_if_needed, get_events_for_subscription
 
 logger = logging.getLogger(__name__)
@@ -335,6 +341,14 @@ def get_events(
         .all()
     ) if readable_ids else []
     name_cache = {u.id: (u.display_name or u.username) for u in db.query(models.User).all()}
+    # Cache each owner's private-event visibility (one lookup per owner, not per event).
+    vis_cache: dict = {}
+
+    def vis_for(uid: int) -> str:
+        if uid not in vis_cache:
+            vis_cache[uid] = private_visibility_for(db, uid)
+        return vis_cache[uid]
+
     for local_cal in local_calendars:
         local_events = (
             db.query(models.LocalEvent)
@@ -351,10 +365,27 @@ def get_events(
         )
         for ev in local_events:
             creator = resolve_creator(ev, name_cache=name_cache)
+            # A private event belonging to someone else (shared calendar or group
+            # calendar) must honour that owner's private_event_visibility, exactly
+            # like the group combined view — otherwise private titles/locations
+            # leak through the ordinary calendar read.
+            owner_id = ev.creator_id or local_cal.user_id
+            is_priv = bool(ev.is_private)
+            foreign_private = is_priv and owner_id != current_user.id
+            visibility = vis_for(owner_id) if foreign_private else "busy"
+            if foreign_private and visibility == "hidden":
+                continue
             if ev.rrule:
-                all_events.extend(expand_recurring_local(ev, local_cal, start_dt, end_dt, creator=creator))
+                built = expand_recurring_local(ev, local_cal, start_dt, end_dt, creator=creator)
             else:
-                all_events.append(build_local_event_dict(ev, local_cal, rrule=None, creator=creator))
+                built = [build_local_event_dict(ev, local_cal, rrule=None, creator=creator)]
+            for b in built:
+                b = apply_event_privacy(
+                    b, owner_id=owner_id, is_private=is_priv,
+                    requester_id=current_user.id, visibility=visibility,
+                )
+                if b is not None:
+                    all_events.append(b)
 
     # ── iCal subscription events ──────────────────────────
     ical_subs = (

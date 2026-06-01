@@ -1,4 +1,5 @@
 import io
+import re
 import base64
 from pathlib import Path
 from typing import Optional
@@ -8,7 +9,7 @@ import qrcode
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from sqlalchemy import func
@@ -27,9 +28,16 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 # ── Schemas ───────────────────────────────────────────────
 class ProfileUpdate(BaseModel):
-    email: Optional[str] = None
-    display_name: Optional[str] = None
-    username: Optional[str] = None  # login name (stored lowercase)
+    # Length caps (SQLite ignores VARCHAR limits, so enforce here).
+    email: Optional[str] = Field(default=None, max_length=120)
+    display_name: Optional[str] = Field(default=None, max_length=80)
+    username: Optional[str] = Field(default=None, max_length=50)  # login name (stored lowercase)
+
+
+def _strip_controls(s: str) -> str:
+    """Remove control characters (defends against injected newlines / NULs that
+    could be reflected in other clients' calendar/sharing/group views)."""
+    return re.sub(r"[\x00-\x1f\x7f]", "", s).strip()
 
 
 class PasswordChange(BaseModel):
@@ -67,12 +75,26 @@ def update_profile(
 ):
     result = {"ok": True}
     if data.email is not None:
-        current_user.email = data.email or None
+        email = _strip_controls(data.email)
+        if email:
+            if "@" not in email or "." not in email.split("@")[-1]:
+                raise HTTPException(422, "Invalid email address")
+            clash = (
+                db.query(models.User)
+                .filter(func.lower(models.User.email) == email.lower(),
+                        models.User.id != current_user.id)
+                .first()
+            )
+            if clash:
+                raise HTTPException(400, "Email already in use")
+            current_user.email = email
+        else:
+            current_user.email = None
     if data.display_name is not None:
-        dn = data.display_name.strip()
+        dn = _strip_controls(data.display_name)
         current_user.display_name = dn or current_user.username
     if data.username is not None:
-        new_login = data.username.strip().lower()
+        new_login = _strip_controls(data.username).lower()
         if not new_login:
             raise HTTPException(422, "Login name cannot be empty")
         if new_login != current_user.username:

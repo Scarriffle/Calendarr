@@ -443,6 +443,17 @@ def _import_ics_into(cal: models.LocalCalendar, raw: bytes, db: Session) -> dict
     return {"imported": imported, "skipped": skipped, "errors": errors}
 
 
+# Cap .ics uploads so a huge file can't exhaust memory (read fully into RAM).
+MAX_ICS_BYTES = 5 * 1024 * 1024  # 5 MB — generous for calendars
+
+
+async def _read_capped(file: UploadFile) -> bytes:
+    raw = await file.read(MAX_ICS_BYTES + 1)
+    if len(raw) > MAX_ICS_BYTES:
+        raise HTTPException(413, "Datei zu groß (max. 5 MB)")
+    return raw
+
+
 @router.post("/calendars/{calendar_id}/import")
 async def import_calendar(
     calendar_id: int,
@@ -451,7 +462,7 @@ async def import_calendar(
     current_user: models.User = Depends(get_current_user),
 ):
     cal = permissions.accessible_local_calendar(db, current_user, calendar_id, require_write=True)
-    raw = await file.read()
+    raw = await _read_capped(file)
     try:
         return _import_ics_into(cal, raw, db)
     except ValueError as e:
@@ -467,10 +478,12 @@ async def import_generic(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    # Read (capped) first so an oversized upload can't leave an empty calendar.
+    raw = await _read_capped(file)
     if create_calendar:
         cal = models.LocalCalendar(
             user_id=current_user.id,
-            name=calendar_name or "Importiert",
+            name=(calendar_name or "Importiert")[:120],
         )
         db.add(cal)
         db.commit()
@@ -480,7 +493,6 @@ async def import_generic(
     else:
         raise HTTPException(422, "Provide calendar_id or create_calendar=true")
 
-    raw = await file.read()
     try:
         result = _import_ics_into(cal, raw, db)
     except ValueError as e:

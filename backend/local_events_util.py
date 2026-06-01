@@ -44,6 +44,53 @@ def resolve_creator(ev: models.LocalEvent, *, name_cache: Optional[dict] = None)
     return None
 
 
+def private_visibility_for(db: Session, user_id: int) -> str:
+    """A user's chosen visibility for their private events ('hidden' | 'busy')."""
+    s = db.query(models.UserSettings).filter(models.UserSettings.user_id == user_id).first()
+    return (s.private_event_visibility if s else None) or "busy"
+
+
+# Only these fields survive 'busy' anonymisation — a whitelist, so no content
+# field (title/location/description/creator/calendar name/recurrence) can leak.
+_BUSY_KEEP = {
+    "id", "url", "start", "end", "allDay", "calendar_id", "calendarColor",
+    "source", "type", "owner", "is_group_event", "display_color",
+}
+
+
+def mask_busy_event(event: dict) -> dict:
+    """Anonymise a private event for 'busy' visibility: keep only timing /
+    identity / render fields, drop ALL content."""
+    masked = {k: event[k] for k in _BUSY_KEEP if k in event}
+    masked["title"] = "Beschäftigt"
+    masked["location"] = ""
+    masked["description"] = ""
+    masked["calendar_name"] = ""
+    masked["creator"] = None
+    masked["color"] = None
+    masked["rrule"] = None
+    masked["exdate"] = None
+    masked["private"] = True
+    return masked
+
+
+def apply_event_privacy(
+    event: dict, *, owner_id, is_private: bool, requester_id: int, visibility: str
+) -> Optional[dict]:
+    """Enforce another user's private-event visibility on a built event dict.
+
+    Returns the event unchanged for the requester's own events or non-private
+    events, ``None`` when the owner chose 'hidden', or a busy-masked copy when
+    the owner chose 'busy'. Used by BOTH the merge read and the combined view so
+    the privacy rule can never drift between them.
+    """
+    if not is_private or owner_id == requester_id:
+        return event
+    if visibility == "hidden":
+        return None
+    return mask_busy_event(event)
+
+
 def build_local_event_dict(
     ev: models.LocalEvent,
     cal: models.LocalCalendar,

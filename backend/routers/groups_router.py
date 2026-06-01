@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 import models
 from auth import get_current_user
 from database import get_db
-from local_events_util import build_local_event_dict, expand_recurring_local
+from local_events_util import build_local_event_dict, expand_recurring_local, mask_busy_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -309,16 +309,6 @@ def delete_group(
     return {"ok": True}
 
 
-def _strip_busy(event: dict) -> dict:
-    """Anonymise a private event for the 'busy' visibility mode."""
-    event = dict(event)
-    event["title"] = "Beschäftigt"
-    event["location"] = ""
-    event["description"] = ""
-    event["private"] = True
-    return event
-
-
 def _first_name(name: Optional[str]) -> str:
     if not name:
         return ""
@@ -415,7 +405,7 @@ def combined_events(
 
             for b in built:
                 if ev.is_private and creator_owner_id != current_user.id and visibility_for(creator_owner_id) == "busy":
-                    b = _strip_busy(b)
+                    b = mask_busy_event(b)
                 # Colour to render with: the group calendar's colour for group
                 # events, otherwise the owning member's group colour.
                 b["display_color"] = group_cal_color if is_group else member_color.get(owner_id)
