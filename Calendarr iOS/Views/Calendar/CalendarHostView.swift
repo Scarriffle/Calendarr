@@ -101,18 +101,24 @@ struct CalendarHostView: View {
     // MARK: – Liquid Glass variant
 
     private var glassVariant: some View {
-        VStack(spacing: 0) {
-            glassTopBar
-            groupBanner
-            errorBanner
-            calendarContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(hex: bgHex))
-                .overlay(alignment: .top) {
-                    loadingIndicator.padding(.top, 12)
+        // Floating glass bar via safeAreaInset: the calendar content scrolls
+        // *underneath* the translucent bar (the actual Liquid Glass look), while
+        // the title is a plain inline Text in the bar — which, unlike the
+        // NavigationStack toolbar title, refreshes reliably on month change.
+        calendarContent
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(hex: bgHex))
+            .overlay(alignment: .top) {
+                loadingIndicator.padding(.top, 12)
+            }
+            .animation(.easeInOut(duration: 0.2), value: store.isLoading || store.isCachingBackground)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                VStack(spacing: 0) {
+                    glassTopBar
+                    groupBanner
+                    errorBanner
                 }
-                .animation(.easeInOut(duration: 0.2), value: store.isLoading || store.isCachingBackground)
-        }
+            }
         .overlay(alignment: .bottomTrailing) { glassFAB }
         .modifier(calendarSheets)
         .task { await startup() }

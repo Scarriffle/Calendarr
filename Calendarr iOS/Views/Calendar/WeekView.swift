@@ -61,7 +61,7 @@ struct WeekView: View {
             ForEach(weekDays, id: \.self) { day in
                 Text(headerFmt.string(from: day).uppercased())
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(cal.isDateInToday(day) ? Color.accentColor : Color(hex: textHex).opacity(secondaryTextOpacity(textContrast)))
+                    .foregroundStyle(cal.isDateInToday(day) ? Color(hex: todayHex) : Color(hex: textHex).opacity(secondaryTextOpacity(textContrast)))
                     .frame(maxWidth: .infinity, minHeight: 36)
                     .overlay(alignment: .trailing) {
                         Rectangle().fill(Color(hex: lineHex).opacity(gridLineOpacity(lineContrast))).frame(width: 0.5)

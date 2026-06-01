@@ -280,10 +280,13 @@ class CalendarStore {
     private func decorateGroupEvent(_ ev: CalEvent) -> CalEvent {
         var e = ev
         let me = UserDefaults.standard.integer(forKey: "userId")
+        // Use the group's own icon (set in group settings) so group events are
+        // recognisable; fall back to a generic people glyph.
+        let groupIcon = activeGroup?.icon ?? "👥"
         func first(_ s: String) -> String { s.split(separator: " ").first.map(String.init) ?? s }
         if ev.isGroupEvent {
-            if let c = ev.creator, c.id != me { e.title = "👥 \(first(c.displayName)): \(ev.title)" }
-            else { e.title = "👥 \(ev.title)" }
+            if let c = ev.creator, c.id != me { e.title = "\(groupIcon) \(first(c.displayName)): \(ev.title)" }
+            else { e.title = "\(groupIcon) \(ev.title)" }
         } else if let o = ev.owner, o.id != me {
             e.title = "\(first(o.displayName)): \(ev.title)"
         }
