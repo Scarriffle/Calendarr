@@ -36,6 +36,20 @@ fun CalendarFilterSheet(
     onDismiss: () -> Unit,
 ) {
     val state by vm.state.collectAsState()
+    val groupMode = state.activeGroup != null
+
+    // In group mode the filter lists members (+ the group calendar) so they can
+    // be hidden individually, Outlook-style; otherwise the normal calendars.
+    val groupEntries: List<CalendarFilterEntry> = if (groupMode) {
+        buildList {
+            state.activeGroupMembers.forEach { m ->
+                add(CalendarFilterEntry(groupMemberKey(m.id), m.displayName, m.color ?: "#4285f4"))
+            }
+            add(CalendarFilterEntry(GROUP_CALENDAR_KEY, tr("groups.calendar"), state.activeGroup?.groupCalendarColor ?: "#4285f4"))
+        }
+    } else emptyList()
+    val rows = if (groupMode) groupEntries else events
+    val hiddenSet = if (groupMode) state.hiddenGroupKeys else state.hiddenKeys
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -46,21 +60,24 @@ fun CalendarFilterSheet(
             ) {
                 Text(tr("filter.title"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Row {
-                    TextButton(onClick = { vm.setHiddenCalendars(emptySet()) }) { Text(tr("filter.show_all")) }
                     TextButton(onClick = {
-                        vm.setHiddenCalendars(events.map { it.key }.toSet())
+                        if (groupMode) vm.setHiddenGroupKeys(emptySet()) else vm.setHiddenCalendars(emptySet())
+                    }) { Text(tr("filter.show_all")) }
+                    TextButton(onClick = {
+                        if (groupMode) vm.setHiddenGroupKeys(rows.map { it.key }.toSet())
+                        else vm.setHiddenCalendars(rows.map { it.key }.toSet())
                     }) { Text(tr("filter.hide_all")) }
                 }
             }
-            if (events.isEmpty()) {
+            if (rows.isEmpty()) {
                 Text(
                     tr("filter.empty"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 24.dp),
                 )
             }
-            events.forEach { entry ->
-                val visible = entry.key !in state.hiddenKeys
+            rows.forEach { entry ->
+                val visible = entry.key !in hiddenSet
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -73,7 +90,10 @@ fun CalendarFilterSheet(
                     )
                     Switch(
                         checked = visible,
-                        onCheckedChange = { vm.setCalendarHidden(entry.key, hidden = !it) },
+                        onCheckedChange = {
+                            if (groupMode) vm.setGroupKeyHidden(entry.key, hidden = !it)
+                            else vm.setCalendarHidden(entry.key, hidden = !it)
+                        },
                     )
                 }
             }

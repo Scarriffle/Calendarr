@@ -7,6 +7,7 @@ import com.scarriffle.calendarr.data.SettingsStore
 import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.domain.model.Group
+import com.scarriffle.calendarr.domain.model.GroupMember
 import com.scarriffle.calendarr.domain.model.WritableCalendar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +43,14 @@ data class CalendarUiState(
     // Group overlay: when non-null the calendar shows the group's combined view.
     val groups: List<Group> = emptyList(),
     val activeGroup: Group? = null,
+    // Group overlay: full member list (for the filter) + per-member / group-cal
+    // hidden keys ("gm:<userId>" / "gc"). In-memory; reset when switching group.
+    val activeGroupMembers: List<GroupMember> = emptyList(),
+    val hiddenGroupKeys: Set<String> = emptySet(),
 )
+
+fun groupMemberKey(ownerId: Int): String = "gm:$ownerId"
+const val GROUP_CALENDAR_KEY = "gc"
 
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
@@ -252,9 +260,18 @@ class CalendarViewModel @Inject constructor(
 
     private fun refreshFromCache() {
         val st = _state.value
-        // In group mode the server already scopes + filters; show everything.
+        // In group mode: server scopes/filters by privacy; locally honour the
+        // per-member / group-calendar hide toggles (hiddenGroupKeys).
         val visible = if (st.activeGroup != null) {
-            allCachedEvents
+            val hg = st.hiddenGroupKeys
+            if (hg.isEmpty()) allCachedEvents
+            else allCachedEvents.filter { ev ->
+                when {
+                    ev.isGroupEvent -> GROUP_CALENDAR_KEY !in hg
+                    ev.owner != null -> groupMemberKey(ev.owner.id ?: -1) !in hg
+                    else -> true
+                }
+            }
         } else {
             val hidden = st.hiddenKeys
             val banished = st.banishedKeys
@@ -329,9 +346,33 @@ class CalendarViewModel @Inject constructor(
     /** Flip between personal and a group's combined overlay; reloads the wide window. */
     fun switchGroup(group: Group?) {
         if (_state.value.activeGroup?.id == group?.id) return
-        _state.update { it.copy(activeGroup = group) }
+        _state.update {
+            it.copy(activeGroup = group, hiddenGroupKeys = emptySet(), activeGroupMembers = emptyList())
+        }
         invalidateCache()
         initialLoad()
+        // Load the full member list (with server colours) for the filter sheet.
+        if (group != null) {
+            viewModelScope.launch {
+                runCatching { repository.getGroup(group.id) }
+                    .onSuccess { g -> _state.update { it.copy(activeGroupMembers = g.members) } }
+            }
+        }
+    }
+
+    /** Toggle a single member's calendar / the group calendar in the overlay. */
+    fun setGroupKeyHidden(key: String, hidden: Boolean) {
+        _state.update {
+            val next = it.hiddenGroupKeys.toMutableSet().apply { if (hidden) add(key) else remove(key) }
+            it.copy(hiddenGroupKeys = next)
+        }
+        refreshFromCache()
+    }
+
+    /** Replace the group-overlay hidden set (bulk show/hide all). */
+    fun setHiddenGroupKeys(keys: Set<String>) {
+        _state.update { it.copy(hiddenGroupKeys = keys) }
+        refreshFromCache()
     }
 
     // ---- Writable calendars ----
