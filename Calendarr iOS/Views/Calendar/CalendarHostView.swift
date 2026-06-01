@@ -101,9 +101,10 @@ struct CalendarHostView: View {
 
     private var glassVariant: some View {
         // Real iOS-26 Liquid Glass: the system NavigationStack toolbar renders the
-        // glass bar. The title is driven by `navTitle` (@State) — updated via
-        // onChange(of: titleString) and keyed with .id so the system bar reliably
-        // refreshes on month change (binding the computed title directly did not).
+        // glass bar (buttons). The month TITLE is NOT placed in the toolbar — the
+        // system title silently fails to refresh on month change on iOS 26 — but
+        // as a normal inline Text in a top safe-area inset just below the glass
+        // bar, where it updates reliably (same mechanism as the flat variant).
         NavigationStack {
             calendarContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -112,9 +113,6 @@ struct CalendarHostView: View {
                     loadingIndicator.padding(.top, 12)
                 }
                 .animation(.easeInOut(duration: 0.2), value: store.isLoading || store.isCachingBackground)
-                .overlay(alignment: .top) {
-                    if let err = store.lastError { errorBannerView(err).padding(.top, 8) }
-                }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -123,14 +121,6 @@ struct CalendarHostView: View {
                             Button { store.navigateNext() } label: { Image(systemName: "chevron.right") }
                             Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
                         }
-                    }
-                    ToolbarItem(placement: .principal) {
-                        // Reads store.visibleMonth (@Observable) so the system
-                        // toolbar refreshes on month change.
-                        Text(titleString)
-                            .font(.headline)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack(spacing: 8) {
@@ -141,7 +131,19 @@ struct CalendarHostView: View {
                         }
                     }
                 }
-                .safeAreaInset(edge: .top) { groupBanner }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(spacing: 0) {
+                        Text(titleString)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(.bar)
+                        groupBanner
+                        errorBanner
+                    }
+                }
         }
         .overlay(alignment: .bottomTrailing) { glassFAB }
         .modifier(calendarSheets)
