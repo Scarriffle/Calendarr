@@ -980,29 +980,54 @@ a { color: var(--primary); text-decoration: none; }
    modern und lässt dem Titel die meiste Breite. */
 .event-popup {
   position: fixed; z-index: 600;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  width: 360px;
-  box-shadow: var(--shadow-lg);
+  width: 320px;
+  background: var(--bg-surface); /* fallback for no color-mix */
+  background: color-mix(in srgb, var(--bg-surface) 86%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  backdrop-filter: blur(22px) saturate(1.6);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    0 12px 40px rgba(0,0,0,.55),
+    0 2px 8px rgba(0,0,0,.4);
+  overflow: hidden;
+  transform-origin: top left;
+  animation: popupIn .18s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes popupIn {
+  from { opacity: 0; transform: translateY(6px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .event-popup { animation: none; }
 }
 
 .popup-header {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 12px 10px 12px 16px;
-  border-bottom: 1px solid var(--border);
+  position: relative;
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 14px 10px 13px 18px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--ev-color, var(--primary)) 13%, transparent), transparent);
+}
+/* Slim accent strip in the event's colour. */
+.popup-header::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: var(--ev-color, var(--primary));
 }
 .popup-color-dot {
-  width: 11px; height: 11px; border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 6px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--ev-color, var(--primary));
+  flex-shrink: 0; margin-top: 6px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ev-color, var(--primary)) 22%, transparent);
 }
 .popup-header h4 {
   flex: 1;
-  font-size: 14px; font-weight: 500;
-  line-height: 1.4;
+  font-size: 15px; font-weight: 600;
+  line-height: 1.35; letter-spacing: -.01em;
+  color: var(--text-1);
   word-break: break-word;
-  padding-top: 2px;
+  padding-top: 1px;
 }
 
 .popup-toolbar {
@@ -1012,8 +1037,8 @@ a { color: var(--primary); text-decoration: none; }
   margin-left: 4px;
 }
 .popup-icon-btn {
-  width: 30px; height: 30px;
-  border-radius: 50%;
+  width: 32px; height: 32px;
+  border-radius: 10px;
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent;
   border: none;
@@ -1023,9 +1048,9 @@ a { color: var(--primary); text-decoration: none; }
   transition:
     background var(--transition),
     color var(--transition),
-    transform .1s ease;
+    transform .12s ease;
 }
-.popup-icon-btn svg { width: 15px; height: 15px; fill: currentColor; flex-shrink: 0; }
+.popup-icon-btn svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
 .popup-icon-btn:hover {
   background: rgba(66,133,244,.16);
   background: color-mix(in srgb, var(--primary) 16%, transparent);
@@ -1040,32 +1065,39 @@ a { color: var(--primary); text-decoration: none; }
   background: var(--bg-hover);
   color: var(--text-1);
 }
-.popup-icon-btn:active { transform: scale(.9); }
+.popup-icon-btn:active { transform: scale(.88); }
 
-.popup-body { padding: 12px 16px; }
-.popup-time, .popup-location, .popup-calendar { font-size: 13px; color: var(--text-2); margin-bottom: 6px; }
-.popup-description { font-size: 13px; color: var(--text-1); margin-bottom: 6px; white-space: pre-wrap; }
+.popup-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 9px; }
+.popup-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.popup-row-icon { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; fill: var(--text-3); }
+#popup-time { color: var(--text-1); font-weight: 500; }
+.popup-row-desc { color: var(--text-1); }
+.popup-row-desc span { white-space: pre-wrap; }
+#popup-creator { font-style: italic; }
+
 .popup-copy-menu {
-  border-top: 1px solid var(--border);
-  padding: 4px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  padding: 6px;
 }
 .popup-copy-label {
   font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: .5px; color: var(--text-3);
-  padding: 4px 14px 6px;
+  padding: 4px 10px 6px;
 }
 .popup-copy-item {
   display: flex; align-items: center; gap: 9px;
-  padding: 7px 14px; cursor: pointer; font-size: 13px; color: var(--text-1);
+  padding: 8px 10px; cursor: pointer; font-size: 13px; color: var(--text-1);
+  border-radius: 10px;
+  transition: background var(--transition);
 }
 .popup-copy-item:hover { background: var(--bg-hover); }
 .popup-copy-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .popup-copy-edit-toggle {
   display: flex; align-items: center; gap: 8px;
-  padding: 6px 14px 8px;
+  padding: 6px 10px 8px;
   font-size: 12px; color: var(--text-2);
   cursor: pointer;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   margin-bottom: 4px;
 }
 .popup-copy-edit-toggle input[type="checkbox"] { margin: 0; cursor: pointer; }
@@ -1696,11 +1728,11 @@ a { color: var(--primary); text-decoration: none; }
   .topbar-right { gap: 0; }
 
   /* Event-Popup auf Mobile: an Viewport-Breite anpassen */
-  .event-popup { width: min(94vw, 380px); max-width: 94vw; }
-  .popup-header { padding: 10px 8px 10px 14px; }
-  .popup-header h4 { font-size: 13.5px; }
-  .popup-icon-btn { width: 32px; height: 32px; }
-  .popup-icon-btn svg { width: 16px; height: 16px; }
+  .event-popup { width: min(94vw, 360px); max-width: 94vw; }
+  .popup-header { padding: 12px 8px 11px 16px; }
+  .popup-header h4 { font-size: 14.5px; }
+  .popup-icon-btn { width: 36px; height: 36px; }
+  .popup-icon-btn svg { width: 17px; height: 17px; }
 
   /* Monatsansicht: Startzeit ausblenden — nur Titel anzeigen ──── */
   .month-event-time { display: none; }
@@ -1793,12 +1825,7 @@ a { color: var(--primary); text-decoration: none; }
 }
 .share-user-item:last-child { border-bottom: none; }
 .share-user-item:hover { background: var(--bg-surface); }
-.popup-creator {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-2);
-  font-style: italic;
-}
+/* .popup-creator styling moved into the .popup-row / #popup-creator rules above. */
 
 /* ── Groups ─────────────────────────────────────────────────── */
 .group-view-banner {

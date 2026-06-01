@@ -1301,6 +1301,7 @@ function showEventPopup(ev, anchor) {
 
   const color = ev.color || ev.calendarColor || '#4285f4';
   document.getElementById('popup-color-dot').style.background = color;
+  popup.style.setProperty('--ev-color', color);
   document.getElementById('popup-title').textContent = ev.title;
 
   // Time
@@ -1318,24 +1319,24 @@ function showEventPopup(ev, anchor) {
   }
 
   document.getElementById('popup-location').textContent = ev.location || '';
-  document.getElementById('popup-location').style.display = ev.location ? '' : 'none';
+  document.getElementById('popup-row-location').style.display = ev.location ? '' : 'none';
   document.getElementById('popup-description').textContent = ev.description || '';
-  document.getElementById('popup-description').style.display = ev.description ? '' : 'none';
+  document.getElementById('popup-row-description').style.display = ev.description ? '' : 'none';
   document.getElementById('popup-calendar').textContent = ev.calendar_name || '';
+  document.getElementById('popup-row-calendar').style.display = ev.calendar_name ? '' : 'none';
 
   // Creator — only shown when it isn't the current user.
-  const creatorEl = document.getElementById('popup-creator');
   const me = JSON.parse(localStorage.getItem('user') || '{}');
   if (ev.creator && ev.creator.display_name && ev.creator.id !== me.id) {
-    creatorEl.textContent = t('created_by', { name: ev.creator.display_name });
-    creatorEl.style.display = '';
+    document.getElementById('popup-creator').textContent = t('created_by', { name: ev.creator.display_name });
+    document.getElementById('popup-row-creator').style.display = '';
   } else {
-    creatorEl.style.display = 'none';
+    document.getElementById('popup-row-creator').style.display = 'none';
   }
 
   // Position near anchor
   const rect = anchor.getBoundingClientRect();
-  const pw = 300, ph = 200;
+  const pw = 320, ph = 200;
   let left = rect.right + 8;
   let top  = rect.top;
   if (left + pw > window.innerWidth) left = rect.left - pw - 8;
