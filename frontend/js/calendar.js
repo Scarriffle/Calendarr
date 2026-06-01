@@ -280,6 +280,22 @@ function ownerColor(ownerId) {
   return OWNER_PALETTE[(Number(ownerId) >>> 0) % OWNER_PALETTE.length];
 }
 
+// Per-user (per-device) member-colour overrides for the group overlay, so each
+// viewer can recolour members just for their own view. Kept in localStorage,
+// keyed by group id then member key ("<userId>" or "gc" for the group calendar).
+function loadGroupColors() {
+  try { return JSON.parse(localStorage.getItem('groupMemberColors') || '{}'); } catch (e) { return {}; }
+}
+function groupColorOverride(groupId, key) {
+  return (loadGroupColors()[groupId] || {})[key] || null;
+}
+function setGroupColorOverride(groupId, key, hex) {
+  const all = loadGroupColors();
+  all[groupId] = all[groupId] || {};
+  if (hex) all[groupId][key] = hex; else delete all[groupId][key];
+  try { localStorage.setItem('groupMemberColors', JSON.stringify(all)); } catch (e) { /* ignore */ }
+}
+
 async function fetchAndRender(force = false, silent = false) {
   const { start, end } = getViewRange();
 
@@ -312,8 +328,11 @@ async function fetchAndRender(force = false, silent = false) {
             title = ev.title;
           }
         }
-        // Server-defined colour (member colour / group colour) so web + apps match.
-        const color = ev.display_color || ownerColor(ownerId) || ev.color;
+        // Colour: this viewer's local override first, else the server-defined
+        // member/group colour, else a palette fallback.
+        const ownerKey = ev.is_group_event ? 'gc' : (ownerId != null ? String(ownerId) : null);
+        const override = ownerKey ? groupColorOverride(state.activeGroupId, ownerKey) : null;
+        const color = override || ev.display_color || ownerColor(ownerId) || ev.color;
         return { ...ev, title, color };
       });
       eventCache.start = null; eventCache.end = null; // invalidate normal cache
@@ -2353,39 +2372,51 @@ function exitGroupView() {
   fetchAndRender(true);
 }
 
-// Per-member filter bar shown under the group banner: tap a member (or the
-// group calendar) to hide/show their events in the combined overlay.
+// Group members live in the sidebar (like the calendar list): each row has a
+// colour dot (tap to recolour that member just for your view) and a checkbox to
+// hide/show them in the combined overlay. The personal calendar list is hidden
+// while a group is active.
 function renderGroupMemberFilter() {
-  const banner = document.getElementById('group-view-banner');
-  if (!banner) return;
-  let bar = document.getElementById('group-members-filter');
-  if (!state.activeGroupId || !state.activeGroupDetail) {
-    if (bar) bar.remove();
-    return;
-  }
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'group-members-filter';
-    bar.className = 'group-members-filter';
-    banner.insertAdjacentElement('afterend', bar);
-  }
+  const section = document.getElementById('group-members');
+  const items = document.getElementById('group-members-items');
+  const calList = document.getElementById('cal-list');
+  const active = !!(state.activeGroupId && state.activeGroupDetail);
+  if (section) section.classList.toggle('hidden', !active);
+  if (calList) calList.classList.toggle('hidden', !!state.activeGroupId);
+  if (!active || !items) return;
+
   const g = state.activeGroupDetail;
-  const chip = (key, name, color) => {
-    const off = state.hiddenGroupMembers.has(key);
-    return `<button class="gmf-chip${off ? ' gmf-off' : ''}" data-gmf="${key}">
-      <span class="gmf-dot" style="background:${color || '#4285f4'}"></span>${escHtml(name)}</button>`;
+  const gid = state.activeGroupId;
+  const row = (numKey, colorKey, name, baseColor) => {
+    const hidden = state.hiddenGroupMembers.has(numKey);
+    const color = groupColorOverride(gid, colorKey) || baseColor || '#4285f4';
+    return `<div class="cal-item gm-row">
+      <input type="checkbox" class="gm-vis" ${hidden ? '' : 'checked'} data-k="${colorKey}" />
+      <div class="cal-item-dot gm-dot" style="background:${color}" data-k="${colorKey}" data-color="${color}" title="${t('change_color')}"></div>
+      <span class="cal-item-name">${escHtml(name)}</span>
+    </div>`;
   };
-  const parts = (g.members || []).map(m => chip(String(m.id), m.display_name || '—', m.color));
-  parts.push(chip('gc', t('group_calendar'), g.group_calendar_color));
-  bar.innerHTML = parts.join('');
-  bar.querySelectorAll('[data-gmf]').forEach(b => {
-    b.addEventListener('click', () => {
-      const raw = b.dataset.gmf;
-      const key = raw === 'gc' ? 'gc' : parseInt(raw);
-      if (state.hiddenGroupMembers.has(key)) state.hiddenGroupMembers.delete(key);
+  const parts = (g.members || []).map(m => row(m.id, String(m.id), m.display_name || '—', m.color));
+  parts.push(row('gc', 'gc', t('group_calendar'), g.group_calendar_color));
+  items.innerHTML = parts.join('');
+
+  items.querySelectorAll('.gm-vis').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const ck = cb.dataset.k;
+      const key = ck === 'gc' ? 'gc' : parseInt(ck);
+      if (cb.checked) state.hiddenGroupMembers.delete(key);
       else state.hiddenGroupMembers.add(key);
-      renderGroupMemberFilter();
       renderView();
+    });
+  });
+  items.querySelectorAll('.gm-dot').forEach(dot => {
+    dot.addEventListener('click', async () => {
+      const picked = await openColorPicker(dot, dot.dataset.color || '#4285f4');
+      if (picked) {
+        setGroupColorOverride(gid, dot.dataset.k, picked);
+        renderGroupMemberFilter();
+        fetchAndRender(true);
+      }
     });
   });
 }
