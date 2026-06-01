@@ -292,20 +292,23 @@ async function fetchAndRender(force = false, silent = false) {
         `/groups/${state.activeGroupId}/combined?start=${fStart.toISOString()}&end=${fEnd.toISOString()}`);
       const me = JSON.parse(localStorage.getItem('user') || '{}');
       const evs = (resp.events || []).map(ev => {
-        const ownerName = ev.owner && ev.owner.display_name;
         const ownerId = ev.owner && ev.owner.id;
-        const isMine = ownerId != null && me.id != null && ownerId === me.id;
-        // Group events get a 👥 marker; others get the owner's first name (not
-        // cryptic initials); your own events stay unprefixed. Colour-code by
-        // owner so each member reads as a group.
-        let title = ev.title;
-        if (ev.is_group_event) {
-          // Group calendar: everyone adds; mark who added it.
-          const cName = ev.creator && ev.creator.display_name;
-          const cId = ev.creator && ev.creator.id;
-          title = (cName && cId !== me.id) ? `👥 ${firstName(cName)}: ${ev.title}` : `👥 ${ev.title}`;
-        } else if (ownerName && !isMine) {
-          title = `${firstName(ownerName)}: ${ev.title}`;
+        // The server provides the decorated `display_title` (group icon + owner
+        // prefix) so web, iOS and Android render identically; fall back to the
+        // client-side prefix only for older servers.
+        let title = ev.display_title;
+        if (!title) {
+          const ownerName = ev.owner && ev.owner.display_name;
+          const isMine = ownerId != null && me.id != null && ownerId === me.id;
+          if (ev.is_group_event) {
+            const cName = ev.creator && ev.creator.display_name;
+            const cId = ev.creator && ev.creator.id;
+            title = (cName && cId !== me.id) ? `👥 ${firstName(cName)}: ${ev.title}` : `👥 ${ev.title}`;
+          } else if (ownerName && !isMine) {
+            title = `${firstName(ownerName)}: ${ev.title}`;
+          } else {
+            title = ev.title;
+          }
         }
         // Server-defined colour (member colour / group colour) so web + apps match.
         const color = ev.display_color || ownerColor(ownerId) || ev.color;
