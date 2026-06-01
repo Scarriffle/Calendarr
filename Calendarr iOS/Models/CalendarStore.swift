@@ -278,10 +278,16 @@ class CalendarStore {
     /// Prefix a combined-view event with its owner (others) or 👥 + creator
     /// (group calendar). Colour comes from the server's display_color.
     private func decorateGroupEvent(_ ev: CalEvent) -> CalEvent {
+        // Prefer the server-decorated title (group icon + owner prefix) so web,
+        // iOS and Android render group events identically. `title` stays raw.
+        if let dt = ev.displayTitle, !dt.isEmpty {
+            var e = ev
+            e.title = dt
+            return e
+        }
+        // Fallback for older servers without display_title.
         var e = ev
         let me = UserDefaults.standard.integer(forKey: "userId")
-        // Use the group's own icon (set in group settings) so group events are
-        // recognisable; fall back to a generic people glyph.
         let groupIcon = activeGroup?.icon ?? "👥"
         func first(_ s: String) -> String { s.split(separator: " ").first.map(String.init) ?? s }
         if ev.isGroupEvent {

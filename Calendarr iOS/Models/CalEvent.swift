@@ -38,6 +38,9 @@ struct CalEvent: Identifiable, Hashable {
     var owner: EventPerson? = nil
     var isGroupEvent: Bool = false
     var displayColor: String? = nil
+    // Server-decorated title for the group combined view (group icon / owner
+    // prefix); rendered in group mode while `title` stays raw for editing.
+    var displayTitle: String? = nil
 
     // Group view supplies a server-resolved colour; otherwise per-event then calendar colour.
     var effectiveColor: String { displayColor ?? color ?? calendarColor }
@@ -78,7 +81,8 @@ struct CalEvent: Identifiable, Hashable {
             isPrivate: json["private"] as? Bool ?? false,
             owner: EventPerson.from(json["owner"]),
             isGroupEvent: json["is_group_event"] as? Bool ?? false,
-            displayColor: (json["display_color"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            displayColor: (json["display_color"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+            displayTitle: (json["display_title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 }
