@@ -19,7 +19,6 @@ struct MonthView: View {
     let onCreateEvent: (Date) -> Void
     let onShowWeek: (Date) -> Void
     let onShowDay: (Date) -> Void
-    @Binding var visibleMonth: Date
 
     @AppStorage("appLanguage")       private var appLang = "system"
     @AppStorage("monthDividerColor") private var dividerHex = "#7090c0"
@@ -117,8 +116,8 @@ struct MonthView: View {
     private func publishVisibleMonth(from week: Date?) {
         guard let w = week else { return }
         let month = cal.date(from: cal.dateComponents([.year, .month], from: w)) ?? w
-        if visibleMonth != month {
-            visibleMonth = month
+        if store.visibleMonth != month {
+            store.visibleMonth = month
         }
     }
 }

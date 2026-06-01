@@ -27,21 +27,16 @@ struct CalendarHostView: View {
     @State private var store = CalendarStore()
     @State private var editorContext: CalEditorContext? = nil
     @State private var selectedEvent: CalEvent? = nil
-    @State private var visibleMonth: Date = .now
     @State private var showFilter = false
     @State private var didApplyDefaultView = false
     @State private var groups: [CalGroup] = []
-    // Drives the Liquid-Glass navigation-bar title. Kept in @State and updated
-    // via onChange so the system toolbar reliably refreshes on month change
-    // (reading the computed title directly in the toolbar did not update).
-    @State private var navTitle = ""
 
     private var titleString: String {
         if store.viewType == .month {
             let f = DateFormatter()
             f.locale = L10n.locale(appLang)
             f.dateFormat = "LLLL yyyy"
-            return f.string(from: visibleMonth).capitalized(with: L10n.locale(appLang))
+            return f.string(from: store.visibleMonth).capitalized(with: L10n.locale(appLang))
         }
         return store.titleForCurrentView(language: appLang)
     }
@@ -89,7 +84,7 @@ struct CalendarHostView: View {
         .onChange(of: store.currentDate) { _, _ in Task { await onNavigate() } }
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
-        .onChange(of: visibleMonth)      { _, new in Task { await ensureLoaded(around: new) } }
+        .onChange(of: store.visibleMonth) { _, new in Task { await ensureLoaded(around: new) } }
         .onChange(of: scenePhase)        { _, phase in if phase == .active { Task { await SettingsSync.pull(api: api) } } }
         .onReceive(NotificationCenter.default.publisher(for: .banishedCalendarsChanged)) { _ in
             store.syncBanishedFromDefaults()
@@ -130,11 +125,12 @@ struct CalendarHostView: View {
                         }
                     }
                     ToolbarItem(placement: .principal) {
-                        Text(navTitle)
+                        // Reads store.visibleMonth (@Observable) so the system
+                        // toolbar refreshes on month change.
+                        Text(titleString)
                             .font(.headline)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
-                            .id(navTitle)   // force re-creation so the bar refreshes
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack(spacing: 8) {
@@ -150,12 +146,10 @@ struct CalendarHostView: View {
         .overlay(alignment: .bottomTrailing) { glassFAB }
         .modifier(calendarSheets)
         .task { await startup() }
-        .task { navTitle = titleString }
-        .onChange(of: titleString)       { _, new in navTitle = new }
         .onChange(of: store.currentDate) { _, _ in Task { await onNavigate() } }
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
-        .onChange(of: visibleMonth)      { _, new in Task { await ensureLoaded(around: new) } }
+        .onChange(of: store.visibleMonth) { _, new in Task { await ensureLoaded(around: new) } }
         .onChange(of: scenePhase)        { _, phase in if phase == .active { Task { await SettingsSync.pull(api: api) } } }
         .onReceive(NotificationCenter.default.publisher(for: .banishedCalendarsChanged)) { _ in
             store.syncBanishedFromDefaults()
@@ -332,8 +326,7 @@ struct CalendarHostView: View {
                       onShowDay: { day in
                           store.currentDate = day
                           store.viewType = .day
-                      },
-                      visibleMonth: $visibleMonth)
+                      })
         case .week:
             WeekView(store: store,
                      onEventTap: { selectedEvent = $0 },

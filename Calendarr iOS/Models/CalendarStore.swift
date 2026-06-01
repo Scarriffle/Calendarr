@@ -51,6 +51,10 @@ class CalendarStore {
     var events: [CalEvent] = []
     var viewType: CalViewType = .month
     var currentDate: Date = .now
+    // The month currently scrolled into view (month view). Lives in the store so
+    // the Liquid-Glass navigation title — read in the system toolbar — updates
+    // via @Observable tracking (a plain @State did not refresh the toolbar).
+    var visibleMonth: Date = .now
     var isLoading = false
     var isCachingBackground = false
     var lastError: String? = nil
