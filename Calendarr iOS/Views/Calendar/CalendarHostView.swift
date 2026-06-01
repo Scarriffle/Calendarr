@@ -112,6 +112,12 @@ struct CalendarHostView: View {
                 .overlay(alignment: .top) {
                     if let err = store.lastError { errorBannerView(err).padding(.top, 8) }
                 }
+                // The month title uses `.navigationTitle` rather than a
+                // `.principal` ToolbarItem: a principal item disappears when the
+                // state it reads (visibleMonth) changes while on screen (month
+                // change / scroll), reappearing only on an unrelated rebuild.
+                // navigationTitle is updated reliably by the system.
+                .navigationTitle(titleString)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -120,12 +126,6 @@ struct CalendarHostView: View {
                             Button { store.navigateNext() } label: { Image(systemName: "chevron.right") }
                             Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
                         }
-                    }
-                    ToolbarItem(placement: .principal) {
-                        Text(titleString)
-                            .font(.headline)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack(spacing: 8) {
