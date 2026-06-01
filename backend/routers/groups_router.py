@@ -319,6 +319,28 @@ def _strip_busy(event: dict) -> dict:
     return event
 
 
+def _first_name(name: Optional[str]) -> str:
+    if not name:
+        return ""
+    return name.split(" ", 1)[0]
+
+
+def _decorate_title(title: str, *, is_group: bool, creator: Optional[dict],
+                    owner: Optional[dict], me_id: int, group_icon: Optional[str]) -> str:
+    """Server-side display title for the combined view so every client (web,
+    iOS, Android) renders group events identically: the group's own icon for
+    group-calendar events, the owner's first name for other members' events.
+    The raw `title` is left untouched for editing."""
+    icon = group_icon or "👥"
+    if is_group:
+        if creator and creator.get("id") is not None and creator.get("id") != me_id:
+            return f"{icon} {_first_name(creator.get('display_name'))}: {title}"
+        return f"{icon} {title}"
+    if owner and owner.get("id") is not None and owner.get("id") != me_id:
+        return f"{_first_name(owner.get('display_name'))}: {title}"
+    return title
+
+
 @router.get("/{group_id}/combined")
 def combined_events(
     group_id: int,
@@ -397,6 +419,12 @@ def combined_events(
                 # Colour to render with: the group calendar's colour for group
                 # events, otherwise the owning member's group colour.
                 b["display_color"] = group_cal_color if is_group else member_color.get(owner_id)
+                # Decorated title (group icon / owner name) computed server-side
+                # so all clients render identically; raw `title` kept for editing.
+                b["display_title"] = _decorate_title(
+                    b.get("title", ""), is_group=is_group, creator=b.get("creator"),
+                    owner=owner, me_id=current_user.id, group_icon=group.icon,
+                )
                 all_events.append(b)
 
     # Each member shares exactly one calendar into their groups, chosen in their
