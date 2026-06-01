@@ -101,7 +101,10 @@ struct CalendarHostView: View {
     // MARK: – Liquid Glass variant
 
     private var glassVariant: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            glassTopBar
+            groupBanner
+            errorBanner
             calendarContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(hex: bgHex))
@@ -109,38 +112,6 @@ struct CalendarHostView: View {
                     loadingIndicator.padding(.top, 12)
                 }
                 .animation(.easeInOut(duration: 0.2), value: store.isLoading || store.isCachingBackground)
-                .overlay(alignment: .top) {
-                    if let err = store.lastError { errorBannerView(err).padding(.top, 8) }
-                }
-                // The month title uses `.navigationTitle` rather than a
-                // `.principal` ToolbarItem: a principal item disappears when the
-                // state it reads (visibleMonth) changes while on screen (month
-                // change / scroll), reappearing only on an unrelated rebuild.
-                // navigationTitle is updated reliably by the system.
-                .navigationTitle(titleString)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        HStack(spacing: 2) {
-                            Button { store.navigatePrev() } label: { Image(systemName: "chevron.left") }
-                            Button { store.navigateNext() } label: { Image(systemName: "chevron.right") }
-                            Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        HStack(spacing: 8) {
-                            if !groups.isEmpty { groupMenu }
-                            viewPickerMenu
-                            Button { showFilter = true } label: {
-                                Image(systemName: "line.3.horizontal.decrease.circle")
-                                    .foregroundStyle(store.hiddenCalendarKeys.isEmpty ? .primary : Color.accentColor)
-                            }
-                            .accessibilityLabel(L10n.t("filter.button", appLang))
-                            Button { showMenu = true } label: { Image(systemName: "line.3.horizontal") }
-                        }
-                    }
-                }
-                .safeAreaInset(edge: .top) { groupBanner }
         }
         .overlay(alignment: .bottomTrailing) { glassFAB }
         .modifier(calendarSheets)
@@ -163,7 +134,10 @@ struct CalendarHostView: View {
 
     // MARK: – Top bar (flat mode)
 
-    private var topBar: some View {
+    /// Shared bar contents (chevrons / today / title / group / view / filter / menu).
+    /// Used by both the flat and the glass top bar so the inline title — which
+    /// updates reliably on month change — is identical in both modes.
+    @ViewBuilder private var barContents: some View {
         HStack(spacing: 0) {
             HStack(spacing: 2) {
                 Button { store.navigatePrev() } label: {
@@ -199,7 +173,23 @@ struct CalendarHostView: View {
             .padding(.trailing, 2)
         }
         .frame(height: 48)
-        .background(.bar)
+    }
+
+    private var topBar: some View {
+        barContents.background(.bar)
+    }
+
+    /// Liquid-glass top bar — a custom bar (not the NavigationStack toolbar) so
+    /// the inline month title reliably refreshes on month change. The system
+    /// navigation-bar title silently fails to update on scroll-driven state
+    /// changes (it only reappeared after an unrelated rebuild like opening the
+    /// menu), which is the bug this fixes.
+    @ViewBuilder private var glassTopBar: some View {
+        if #available(iOS 26, *) {
+            barContents.glassEffect(in: Rectangle())
+        } else {
+            barContents.background(.ultraThinMaterial)
+        }
     }
 
     private var filterButton: some View {
