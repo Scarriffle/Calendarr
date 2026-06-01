@@ -31,6 +31,9 @@ data class CalEvent(
     val owner: EventPerson? = null,
     val isGroupEvent: Boolean = false,
     val displayColor: String? = null,
+    // Server-decorated title for the group combined view (group icon / owner
+    // prefix); rendered in group mode while `title` stays raw for editing.
+    val displayTitle: String? = null,
 ) {
     /**
      * Group view supplies a server-resolved colour (display_color); otherwise
@@ -117,6 +120,7 @@ data class CalEvent(
                 owner = personFrom(json, "owner"),
                 isGroupEvent = json.optBoolean("is_group_event", false),
                 displayColor = json.strOrNull("display_color"),
+                displayTitle = json.strOrNull("display_title"),
             )
         }
     }

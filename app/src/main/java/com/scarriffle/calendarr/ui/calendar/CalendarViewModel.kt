@@ -215,6 +215,10 @@ class CalendarViewModel @Inject constructor(
     private fun decorateGroup(events: List<CalEvent>): List<CalEvent> {
         val me = currentUserId
         return events.map { ev ->
+            // Prefer the server-decorated title (group icon + owner prefix) so
+            // web, iOS and Android render identically; fall back for old servers.
+            val serverTitle = ev.displayTitle?.takeIf { it.isNotEmpty() }
+            if (serverTitle != null) return@map ev.copy(title = serverTitle)
             val prefix = when {
                 ev.isGroupEvent && ev.creator != null && ev.creator.id != me -> "👥 ${firstName(ev.creator.displayName)}: "
                 ev.isGroupEvent -> "👥 "
