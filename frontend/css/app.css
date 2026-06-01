@@ -1988,5 +1988,8 @@ a { color: var(--primary); text-decoration: none; }
   border-radius: 8px;
   cursor: pointer;
 }
+.group-icon-opt { color: var(--text-1); }
 .group-icon-opt:hover { background: var(--bg-surface); }
-.group-icon-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.group-icon-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; color: var(--accent); }
+/* SVG group icons render as block so they centre cleanly (vs emoji baseline). */
+.group-emoji svg, .cal-shared-flag svg, .group-icon-opt svg { display: block; }

@@ -735,8 +735,8 @@ function renderCalendarList() {
       <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
       <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
-      ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">👥</span>` : ''}
-      ${e.groupVisible ? `<span class="cal-shared-flag" title="${t('group_visible_flag')}">👥</span>` : ''}
+      ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">${groupIconSvg('people', 13)}</span>` : ''}
+      ${e.groupVisible ? `<span class="cal-shared-flag" title="${t('group_visible_flag')}">${groupIconSvg('people', 13)}</span>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
     </div>`
   ).join('');
@@ -2303,7 +2303,7 @@ function renderGroupList() {
   }
   el.innerHTML = state.groups.map(g =>
     `<div class="cal-item group-item ${g.id === state.activeGroupId ? 'group-item-active' : ''}" data-group-id="${g.id}">
-      <span class="group-emoji" data-group-open="${g.id}">${escHtml(g.icon || '👥')}</span>
+      <span class="group-emoji" data-group-open="${g.id}">${groupIconHtml(g.icon)}</span>
       <span class="cal-item-name" data-group-open="${g.id}">${escHtml(g.name)}</span>
       <button class="icon-btn mini-btn" data-group-edit="${g.id}" title="${t('group_manage')}">
         <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
@@ -2411,7 +2411,7 @@ async function openGroupModal(groupId) {
   document.getElementById('group-name').disabled = false;  // rename supported via PUT
 
   // Icon picker
-  modal.__icon = (detail && detail.icon) || '👥';
+  modal.__icon = (detail && GROUP_ICON_KEYS.includes(detail.icon)) ? detail.icon : 'people';
   renderGroupIconPicker();
 
   // Member picker: current members are checked; the owner (me) is excluded.
@@ -2454,14 +2454,42 @@ function renderGroupMemberColors(groupId, members) {
   });
 }
 
-const GROUP_ICONS = ['👥', '👨‍👩‍👧', '🏠', '❤️', '🧑‍🤝‍🧑', '⚽', '🎓', '💼', '🎉', '🐶', '✈️', '🎵', '🍕', '📚', '🌳', '⭐'];
+// Cross-platform group icons: semantic keys stored server-side, rendered as
+// inline SVG here (SF Symbols on iOS, Material on Android) so they look the same
+// everywhere instead of relying on OS-specific emoji.
+const GROUP_ICON_KEYS = ['people', 'home', 'heart', 'work', 'school', 'sports',
+                         'party', 'pet', 'travel', 'music', 'food', 'star'];
+const GROUP_ICON_PATHS = {
+  people: 'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
+  home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  heart: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
+  work: 'M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z',
+  school: 'M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z',
+  sports: 'M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z',
+  party: 'M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z',
+  pet: 'M12 14c-2.5 0-4.5 1.8-4.5 4 0 .6.4 1 1 1h7c.6 0 1-.4 1-1 0-2.2-2-4-4.5-4zM6 9.5a1.5 2 0 1 0 0 4 1.5 2 0 0 0 0-4zm12 0a1.5 2 0 1 0 0 4 1.5 2 0 0 0 0-4zM9 6a1.5 2 0 1 0 0 4 1.5 2 0 0 0 0-4zm6 0a1.5 2 0 1 0 0 4 1.5 2 0 0 0 0-4z',
+  travel: 'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z',
+  music: 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z',
+  food: 'M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z',
+  star: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
+};
+function groupIconSvg(key, size = 18) {
+  const p = GROUP_ICON_PATHS[key] || GROUP_ICON_PATHS.people;
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><path d="${p}"/></svg>`;
+}
+// Render a group's stored icon: SVG for known keys, legacy emoji as-is.
+function groupIconHtml(icon, size = 18) {
+  if (GROUP_ICON_KEYS.includes(icon)) return groupIconSvg(icon, size);
+  if (icon) return escHtml(icon);
+  return groupIconSvg('people', size);
+}
 function renderGroupIconPicker() {
   const modal = document.getElementById('modal-group');
-  const sel = modal.__icon || '👥';
+  const sel = modal.__icon || 'people';
   const picker = document.getElementById('group-icon-picker');
   if (!picker) return;
-  picker.innerHTML = GROUP_ICONS.map(ic =>
-    `<button type="button" class="group-icon-opt ${ic === sel ? 'on' : ''}" data-icon="${ic}">${ic}</button>`
+  picker.innerHTML = GROUP_ICON_KEYS.map(ic =>
+    `<button type="button" class="group-icon-opt ${ic === sel ? 'on' : ''}" data-icon="${ic}">${groupIconSvg(ic, 22)}</button>`
   ).join('');
   picker.querySelectorAll('.group-icon-opt').forEach(b => {
     b.addEventListener('click', () => {
@@ -2508,7 +2536,7 @@ function bindGroupUI() {
     const memberIds = [...(modal.__memberIds || new Set())];
     try {
       const name = document.getElementById('group-name').value.trim();
-      const icon = modal.__icon || '👥';
+      const icon = modal.__icon || 'people';
       if (!name) { showToast(t('error_enter_title'), true); return; }
       if (groupId) {
         // Manage mode: update name/icon, then sync member additions/removals.
