@@ -70,6 +70,15 @@ class CalendarStore {
     /// show/hide list. Re-activation happens in AccountsView.
     var banishedCalendarKeys: Set<String> = CalendarStore.loadBanishedKeys()
 
+    /// Group-overlay visibility: which members' calendars (`gm:<userId>`) and the
+    /// group calendar (`gc`) are hidden in the combined view — like hiding
+    /// individual people in Outlook. In-memory; resets when leaving/switching a
+    /// group (the per-calendar hide/banish sets are for the personal view only).
+    var hiddenGroupKeys: Set<String> = []
+
+    static func groupMemberKey(_ ownerId: Int) -> String { "gm:\(ownerId)" }
+    static let groupCalendarKey = "gc"
+
     // Cache bookkeeping
     private var cachedStart: Date? = nil
     private var cachedEnd: Date? = nil
@@ -112,6 +121,19 @@ class CalendarStore {
         let (s, e) = rangeForCurrentView()
         refreshFromCache(start: s, end: e)
         publishWidgetSnapshot()
+    }
+
+    /// Toggle / replace group-overlay visibility (members or the group calendar).
+    func setGroupKeyHidden(_ key: String, hidden: Bool) {
+        if hidden { hiddenGroupKeys.insert(key) } else { hiddenGroupKeys.remove(key) }
+        let (s, e) = rangeForCurrentView()
+        refreshFromCache(start: s, end: e)
+    }
+
+    func setHiddenGroupKeys(_ keys: Set<String>) {
+        hiddenGroupKeys = keys
+        let (s, e) = rangeForCurrentView()
+        refreshFromCache(start: s, end: e)
     }
 
     static func calendarKey(source: String, calendarId: String) -> String {
@@ -219,10 +241,18 @@ class CalendarStore {
     /// `start` / `end` are kept in the signature for call-site clarity.
     func refreshFromCache(start: Date, end: Date) {
         _ = (start, end)
-        // In group overlay mode show everything (the per-calendar hide/banish
-        // toggles are for the personal view only).
+        // In group overlay mode the per-calendar hide/banish toggles don't apply;
+        // instead honour the per-member / group-calendar toggles (hiddenGroupKeys).
         if activeGroup != nil {
-            events = allCachedEvents
+            if hiddenGroupKeys.isEmpty {
+                events = allCachedEvents
+            } else {
+                events = allCachedEvents.filter { ev in
+                    if ev.isGroupEvent { return !hiddenGroupKeys.contains(Self.groupCalendarKey) }
+                    if let o = ev.owner { return !hiddenGroupKeys.contains(Self.groupMemberKey(o.id ?? -1)) }
+                    return true
+                }
+            }
             return
         }
         events = allCachedEvents.filter { ev in

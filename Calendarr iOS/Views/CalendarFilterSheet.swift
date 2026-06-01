@@ -20,12 +20,18 @@ struct CalendarFilterSheet: View {
     @State private var banished: Set<String> = []
     /// All non-banished keys discovered during load — used by bulk show/hide.
     @State private var allKeys: Set<String> = []
+    /// Group-mode: the active group's full detail (members + colours) and the
+    /// per-member / group-calendar hidden keys.
+    @State private var groupDetail: CalGroup? = nil
+    @State private var hiddenGroup: Set<String> = []
 
     var body: some View {
         NavigationStack {
             Group {
                 if isLoading {
                     ProgressView(L10n.t("filter.loading", appLang))
+                } else if store.activeGroup != nil {
+                    groupFilterList
                 } else if allKeys.isEmpty {
                     Text(L10n.t("filter.empty", appLang))
                         .foregroundStyle(.secondary)
@@ -167,8 +173,61 @@ struct CalendarFilterSheet: View {
         }
     }
 
+    // MARK: – Group overlay filter (hide individual members / the group calendar)
+
+    @ViewBuilder
+    private var groupFilterList: some View {
+        if let g = groupDetail {
+            List {
+                Section(header: Text("\(g.icon ?? "👥") \(g.name)")) {
+                    ForEach(g.members ?? []) { m in
+                        groupRow(name: m.displayName ?? "—",
+                                 colorHex: m.color ?? "#4285f4",
+                                 key: CalendarStore.groupMemberKey(m.id))
+                    }
+                    groupRow(name: L10n.t("group.calendar", appLang),
+                             colorHex: g.groupCalendarColor ?? "#4285f4",
+                             key: CalendarStore.groupCalendarKey)
+                }
+            }
+        } else {
+            Text(L10n.t("filter.empty", appLang)).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func groupRow(name: String, colorHex: String, key: String) -> some View {
+        let isVisible = !hiddenGroup.contains(key)
+        Button {
+            if isVisible { hiddenGroup.insert(key) } else { hiddenGroup.remove(key) }
+            store.setGroupKeyHidden(key, hidden: isVisible)
+        } label: {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(Color(hex: colorHex))
+                    .frame(width: 14, height: 14)
+                    .opacity(isVisible ? 1.0 : 0.35)
+                Text(name)
+                    .foregroundStyle(isVisible ? .primary : .secondary)
+                    .strikethrough(!isVisible, color: .secondary)
+                Spacer()
+                Image(systemName: isVisible ? "eye" : "eye.slash")
+                    .foregroundStyle(isVisible ? Color.accentColor : .secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private func load() async {
         isLoading = true
+        // Group overlay: list members (+ the group calendar) to hide individually.
+        if let g = store.activeGroup {
+            hiddenGroup = store.hiddenGroupKeys
+            groupDetail = try? await api.getGroup(id: g.id)
+            isLoading = false
+            return
+        }
         hidden = store.hiddenCalendarKeys
         banished = store.banishedCalendarKeys
         async let c = (try? await api.getCalDAVAccounts()) ?? []

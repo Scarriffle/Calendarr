@@ -164,6 +164,7 @@ private let strings: [String: [String: String]] = [
         "group.name": "Name",
         "group.icon": "Icon",
         "group.members": "Mitglieder",
+        "group.calendar": "Gruppenkalender",
         "group.member_colors": "Farben der Mitglieder",
         "group.delete": "Gruppe löschen",
 
@@ -465,6 +466,7 @@ private let strings: [String: [String: String]] = [
         "group.name": "Name",
         "group.icon": "Icon",
         "group.members": "Members",
+        "group.calendar": "Group calendar",
         "group.member_colors": "Member colours",
         "group.delete": "Delete group",
 
