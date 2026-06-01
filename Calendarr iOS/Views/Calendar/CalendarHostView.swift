@@ -31,6 +31,10 @@ struct CalendarHostView: View {
     @State private var showFilter = false
     @State private var didApplyDefaultView = false
     @State private var groups: [CalGroup] = []
+    // Drives the Liquid-Glass navigation-bar title. Kept in @State and updated
+    // via onChange so the system toolbar reliably refreshes on month change
+    // (reading the computed title directly in the toolbar did not update).
+    @State private var navTitle = ""
 
     private var titleString: String {
         if store.viewType == .month {
@@ -101,27 +105,53 @@ struct CalendarHostView: View {
     // MARK: – Liquid Glass variant
 
     private var glassVariant: some View {
-        // Floating glass bar via safeAreaInset: the calendar content scrolls
-        // *underneath* the translucent bar (the actual Liquid Glass look), while
-        // the title is a plain inline Text in the bar — which, unlike the
-        // NavigationStack toolbar title, refreshes reliably on month change.
-        calendarContent
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(hex: bgHex))
-            .overlay(alignment: .top) {
-                loadingIndicator.padding(.top, 12)
-            }
-            .animation(.easeInOut(duration: 0.2), value: store.isLoading || store.isCachingBackground)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 0) {
-                    glassTopBar
-                    groupBanner
-                    errorBanner
+        // Real iOS-26 Liquid Glass: the system NavigationStack toolbar renders the
+        // glass bar. The title is driven by `navTitle` (@State) — updated via
+        // onChange(of: titleString) and keyed with .id so the system bar reliably
+        // refreshes on month change (binding the computed title directly did not).
+        NavigationStack {
+            calendarContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(hex: bgHex))
+                .overlay(alignment: .top) {
+                    loadingIndicator.padding(.top, 12)
                 }
-            }
+                .animation(.easeInOut(duration: 0.2), value: store.isLoading || store.isCachingBackground)
+                .overlay(alignment: .top) {
+                    if let err = store.lastError { errorBannerView(err).padding(.top, 8) }
+                }
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        HStack(spacing: 2) {
+                            Button { store.navigatePrev() } label: { Image(systemName: "chevron.left") }
+                            Button { store.navigateNext() } label: { Image(systemName: "chevron.right") }
+                            Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
+                        }
+                    }
+                    ToolbarItem(placement: .principal) {
+                        Text(navTitle)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .id(navTitle)   // force re-creation so the bar refreshes
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        HStack(spacing: 8) {
+                            if !groups.isEmpty { groupMenu }
+                            viewPickerMenu
+                            filterButton
+                            Button { showMenu = true } label: { Image(systemName: "line.3.horizontal") }
+                        }
+                    }
+                }
+                .safeAreaInset(edge: .top) { groupBanner }
+        }
         .overlay(alignment: .bottomTrailing) { glassFAB }
         .modifier(calendarSheets)
         .task { await startup() }
+        .task { navTitle = titleString }
+        .onChange(of: titleString)       { _, new in navTitle = new }
         .onChange(of: store.currentDate) { _, _ in Task { await onNavigate() } }
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
@@ -183,19 +213,6 @@ struct CalendarHostView: View {
 
     private var topBar: some View {
         barContents.background(.bar)
-    }
-
-    /// Liquid-glass top bar — a custom bar (not the NavigationStack toolbar) so
-    /// the inline month title reliably refreshes on month change. The system
-    /// navigation-bar title silently fails to update on scroll-driven state
-    /// changes (it only reappeared after an unrelated rebuild like opening the
-    /// menu), which is the bug this fixes.
-    @ViewBuilder private var glassTopBar: some View {
-        if #available(iOS 26, *) {
-            barContents.glassEffect(in: Rectangle())
-        } else {
-            barContents.background(.ultraThinMaterial)
-        }
     }
 
     private var filterButton: some View {
