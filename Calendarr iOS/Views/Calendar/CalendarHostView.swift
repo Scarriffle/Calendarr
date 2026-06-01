@@ -229,8 +229,8 @@ struct CalendarHostView: View {
             }
             ForEach(groups) { g in
                 Button { switchGroup(g) } label: {
-                    Label("\(g.icon ?? "👥") \(g.name)",
-                          systemImage: store.activeGroup?.id == g.id ? "checkmark" : "person.2")
+                    Label(g.name,
+                          systemImage: store.activeGroup?.id == g.id ? "checkmark" : GroupIcons.symbol(g.icon))
                 }
             }
         } label: {
@@ -244,8 +244,9 @@ struct CalendarHostView: View {
 
     @ViewBuilder private var groupBanner: some View {
         if let g = store.activeGroup {
-            HStack(spacing: 8) {
-                Text("\(L10n.t("groups.view_label", appLang)): \(g.icon ?? "👥") \(g.name)")
+            HStack(spacing: 6) {
+                GroupIconView(icon: g.icon).font(.subheadline)
+                Text("\(L10n.t("groups.view_label", appLang)): \(g.name)")
                     .font(.subheadline).lineLimit(1)
                 Spacer()
                 Button(L10n.t("groups.exit", appLang)) { switchGroup(nil) }

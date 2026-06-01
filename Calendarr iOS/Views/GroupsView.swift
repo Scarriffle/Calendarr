@@ -1,5 +1,50 @@
 import SwiftUI
 
+// MARK: - Group icons (cross-platform, non-emoji)
+
+/// Canonical group-icon keys stored server-side and rendered as native SF
+/// Symbols here (Material on Android, SVG on web), so groups look consistent
+/// instead of relying on OS-specific emoji rendering.
+enum GroupIcons {
+    static let keys = ["people", "home", "heart", "work", "school", "sports",
+                       "party", "pet", "travel", "music", "food", "star"]
+
+    static func symbol(_ key: String?) -> String {
+        switch key {
+        case "people": return "person.2.fill"
+        case "home": return "house.fill"
+        case "heart": return "heart.fill"
+        case "work": return "briefcase.fill"
+        case "school": return "graduationcap.fill"
+        case "sports": return "figure.run"
+        case "party": return "party.popper.fill"
+        case "pet": return "pawprint.fill"
+        case "travel": return "airplane"
+        case "music": return "music.note"
+        case "food": return "fork.knife"
+        case "star": return "star.fill"
+        default: return "person.2.fill"
+        }
+    }
+
+    static func isKey(_ s: String?) -> Bool { if let s { return keys.contains(s) }; return false }
+}
+
+/// Render a group's icon: native SF Symbol for known keys, the legacy emoji for
+/// pre-migration groups, else a default people glyph.
+struct GroupIconView: View {
+    let icon: String?
+    var body: some View {
+        if GroupIcons.isKey(icon) {
+            Image(systemName: GroupIcons.symbol(icon))
+        } else if let e = icon, !e.isEmpty {
+            Text(e)
+        } else {
+            Image(systemName: "person.2.fill")
+        }
+    }
+}
+
 // MARK: - Groups list
 
 struct GroupsView: View {
@@ -23,7 +68,7 @@ struct GroupsView: View {
                             GroupCombinedView(api: api, group: g)
                         } label: {
                             HStack {
-                                Text(g.icon ?? "👥")
+                                GroupIconView(icon: g.icon)
                                 Text(g.name)
                                 Spacer()
                                 if let n = g.memberCount {
@@ -71,12 +116,12 @@ struct GroupEditSheet: View {
     @AppStorage("appLanguage") private var appLang = "system"
 
     @State private var name = ""
-    @State private var icon = "👥"
+    @State private var icon = "people"
     @State private var directory: [DirectoryUser] = []
     @State private var selected: Set<Int> = []
     @State private var error = ""
 
-    private let icons = ["👥", "👨‍👩‍👧", "🏠", "❤️", "🧑‍🤝‍🧑", "⚽", "🎓", "💼", "🎉", "🐶", "✈️", "🎵", "🍕", "📚", "🌳", "⭐"]
+    private let icons = GroupIcons.keys
     private let cols = [GridItem(.adaptive(minimum: 46))]
 
     var body: some View {
@@ -88,9 +133,11 @@ struct GroupEditSheet: View {
                 Section(L10n.t("group.icon", appLang)) {
                     LazyVGrid(columns: cols, spacing: 8) {
                         ForEach(icons, id: \.self) { ic in
-                            Text(ic).font(.title2)
+                            Image(systemName: GroupIcons.symbol(ic))
+                                .font(.title3)
                                 .frame(width: 44, height: 44)
                                 .background(ic == icon ? Color.accentColor.opacity(0.25) : Color(.systemGray6))
+                                .foregroundStyle(ic == icon ? Color.accentColor : .primary)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .onTapGesture { icon = ic }
                         }
@@ -144,13 +191,13 @@ struct GroupManageSheet: View {
 
     @State private var group: CalGroup?
     @State private var name = ""
-    @State private var icon = "👥"
+    @State private var icon = "people"
     @State private var directory: [DirectoryUser] = []
     @State private var memberIds: Set<Int> = []
     @State private var showDeleteConfirm = false
     @State private var error = ""
 
-    private let icons = ["👥", "👨‍👩‍👧", "🏠", "❤️", "🧑‍🤝‍🧑", "⚽", "🎓", "💼", "🎉", "🐶", "✈️", "🎵", "🍕", "📚", "🌳", "⭐"]
+    private let icons = GroupIcons.keys
     private let cols = [GridItem(.adaptive(minimum: 46))]
 
     var body: some View {
@@ -162,9 +209,11 @@ struct GroupManageSheet: View {
                 Section(L10n.t("group.icon", appLang)) {
                     LazyVGrid(columns: cols, spacing: 8) {
                         ForEach(icons, id: \.self) { ic in
-                            Text(ic).font(.title2)
+                            Image(systemName: GroupIcons.symbol(ic))
+                                .font(.title3)
                                 .frame(width: 44, height: 44)
                                 .background(ic == icon ? Color.accentColor.opacity(0.25) : Color(.systemGray6))
+                                .foregroundStyle(ic == icon ? Color.accentColor : .primary)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .onTapGesture { icon = ic }
                         }
@@ -218,7 +267,7 @@ struct GroupManageSheet: View {
         if let g = try? await api.getGroup(id: groupId) {
             group = g
             name = g.name
-            icon = g.icon ?? "👥"
+            icon = GroupIcons.isKey(g.icon) ? g.icon! : "people"
             let me = UserDefaults.standard.integer(forKey: "userId")
             memberIds = Set((g.members ?? []).map { $0.id }.filter { $0 != me })
         }
@@ -324,7 +373,7 @@ struct GroupCombinedView: View {
                 Text(L10n.t("groups.combined_empty", appLang)).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("\(group.icon ?? "👥") \(group.name)")
+        .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -340,13 +389,11 @@ struct GroupCombinedView: View {
         .task(id: anchor) { await load() }
     }
 
-    // Prefix others' events with their first name; group events with 👥 + creator.
+    // Prefer the server-decorated title; fall back to a name prefix.
     private func displayTitle(_ ev: CalEvent) -> String {
+        if let dt = ev.displayTitle, !dt.isEmpty { return dt }
         let me = UserDefaults.standard.integer(forKey: "userId")
-        if ev.isGroupEvent {
-            if let c = ev.creator, c.id != me { return "👥 \(firstName(c.displayName)): \(ev.title)" }
-            return "👥 \(ev.title)"
-        }
+        if let c = ev.creator, ev.isGroupEvent, c.id != me { return "\(firstName(c.displayName)): \(ev.title)" }
         if let o = ev.owner, o.id != me { return "\(firstName(o.displayName)): \(ev.title)" }
         return ev.title
     }

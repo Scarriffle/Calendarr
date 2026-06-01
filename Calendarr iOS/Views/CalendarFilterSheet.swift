@@ -179,7 +179,7 @@ struct CalendarFilterSheet: View {
     private var groupFilterList: some View {
         if let g = groupDetail {
             List {
-                Section(header: Text("\(g.icon ?? "👥") \(g.name)")) {
+                Section(header: Label(g.name, systemImage: GroupIcons.symbol(g.icon))) {
                     ForEach(g.members ?? []) { m in
                         groupRow(name: m.displayName ?? "—",
                                  colorHex: m.color ?? "#4285f4",
