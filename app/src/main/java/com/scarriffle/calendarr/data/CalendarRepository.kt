@@ -127,6 +127,8 @@ class CalendarRepository @Inject constructor(
                 "month_divider_color" to s.monthDividerColor,
                 "month_label_color" to s.monthLabelColor,
                 "private_event_visibility" to s.privateEventVisibility,
+                // Explicit JSON null clears it (off); jsonBody drops Kotlin nulls.
+                "default_reminder_minutes" to (s.defaultReminderMinutes ?: org.json.JSONObject.NULL),
             )
         ).ensureSuccess()
     }
@@ -298,18 +300,18 @@ class CalendarRepository @Inject constructor(
     suspend fun createLocalEvent(
         calendarId: Int, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
-        isPrivate: Boolean = false,
+        isPrivate: Boolean = false, reminders: List<Int>? = null,
     ) = guarded {
-        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate))
+        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate, reminders))
             .ensureSuccess()
     }
 
     suspend fun updateLocalEvent(
         uid: String, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
-        isPrivate: Boolean = false,
+        isPrivate: Boolean = false, reminders: List<Int>? = null,
     ) = guarded {
-        api.updateLocalEvent(uid, eventBody(null, title, start, end, isAllDay, location, description, color, isPrivate))
+        api.updateLocalEvent(uid, eventBody(null, title, start, end, isAllDay, location, description, color, isPrivate, reminders))
             .ensureSuccess()
     }
 
@@ -555,7 +557,7 @@ class CalendarRepository @Inject constructor(
     private fun eventBody(
         calendarId: Int?, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
-        isPrivate: Boolean = false,
+        isPrivate: Boolean = false, reminders: List<Int>? = null,
     ) = jsonBody(
         buildMap {
             calendarId?.let { put("calendar_id", it) }
@@ -567,6 +569,7 @@ class CalendarRepository @Inject constructor(
             put("description", description)
             if (!color.isNullOrBlank()) put("color", color)
             put("private", isPrivate)
+            if (reminders != null) put("reminders", org.json.JSONArray(reminders))
         }
     )
 }

@@ -401,20 +401,21 @@ class CalendarViewModel @Inject constructor(
         description: String,
         color: String?,
         isPrivate: Boolean,
+        reminders: List<Int> = emptyList(),
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             val result = runCatching {
                 if (existing != null && existing.source == calendar.source) {
                     when (existing.source) {
-                        "local" -> repository.updateLocalEvent(existing.id, title, start, end, isAllDay, location, description, color, isPrivate)
+                        "local" -> repository.updateLocalEvent(existing.id, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
                         "caldav" -> repository.updateCalDAVEvent(existing.id, existing.url, calendar.numericId, title, start, end, isAllDay, location, description, color)
                         "homeassistant" -> repository.updateHAEvent(calendar.numericId, existing.id, title, start, end, isAllDay, location, description)
                         "google" -> repository.updateGoogleEvent(calendar.numericId, existing.id, title, start, end, isAllDay, location, description)
-                        else -> createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate)
+                        else -> createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
                     }
                 } else {
-                    createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate)
+                    createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
                 }
             }
             result.onSuccess { afterMutation(); onResult(null) }
@@ -425,9 +426,10 @@ class CalendarViewModel @Inject constructor(
     private suspend fun createForSource(
         calendar: WritableCalendar, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?, isPrivate: Boolean,
+        reminders: List<Int> = emptyList(),
     ) {
         when (calendar.source) {
-            "local" -> repository.createLocalEvent(calendar.numericId, title, start, end, isAllDay, location, description, color, isPrivate)
+            "local" -> repository.createLocalEvent(calendar.numericId, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
             "caldav" -> repository.createCalDAVEvent(calendar.numericId, title, start, end, isAllDay, location, description, color)
             "google" -> repository.createGoogleEvent(calendar.numericId, title, start, end, isAllDay, location, description)
             "homeassistant" -> repository.createHAEvent(calendar.numericId, title, start, end, isAllDay, location, description)

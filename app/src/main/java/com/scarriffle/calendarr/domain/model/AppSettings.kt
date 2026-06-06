@@ -25,6 +25,8 @@ data class AppSettings(
     // How this user's private events appear to other group members: 'hidden' | 'busy'.
     @Json(name = "private_event_visibility") val privateEventVisibility: String = "busy",
     @Json(name = "group_visible_calendar_id") val groupVisibleCalendarId: Int? = null,
+    // Minutes-before-start applied to all events client-side; null = off.
+    @Json(name = "default_reminder_minutes") val defaultReminderMinutes: Int? = null,
 ) {
     val weekStartsOnMonday: Boolean get() = weekStartDay != "sunday"
 }

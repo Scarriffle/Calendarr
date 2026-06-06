@@ -34,6 +34,7 @@ class SettingsStore @Inject constructor(
         language = prefs.getString(K_LANGUAGE, null) ?: "de",
         monthDividerColor = prefs.getString(K_DIVIDER, null) ?: "#7090c0",
         monthLabelColor = prefs.getString(K_LABEL, null) ?: "#7090c0",
+        defaultReminderMinutes = prefs.getInt(K_DEFAULT_REMINDER, -1).takeIf { it >= 0 },
     )
 
     fun saveSettings(s: AppSettings) {
@@ -50,6 +51,7 @@ class SettingsStore @Inject constructor(
             .putString(K_LANGUAGE, s.language)
             .putString(K_DIVIDER, s.monthDividerColor)
             .putString(K_LABEL, s.monthLabelColor)
+            .putInt(K_DEFAULT_REMINDER, s.defaultReminderMinutes ?: -1)
             .apply()
     }
 
@@ -83,6 +85,7 @@ class SettingsStore @Inject constructor(
         const val K_LANGUAGE = "language"
         const val K_DIVIDER = "month_divider_color"
         const val K_LABEL = "month_label_color"
+        const val K_DEFAULT_REMINDER = "default_reminder_minutes"
         const val K_CACHE_MONTHS = "cache_months"
         const val K_HIDDEN = "hidden_calendar_keys"
         const val K_BANISHED = "banished_calendar_keys"

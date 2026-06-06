@@ -34,6 +34,8 @@ data class CalEvent(
     // Server-decorated title for the group combined view (group icon / owner
     // prefix); rendered in group mode while `title` stays raw for editing.
     val displayTitle: String? = null,
+    // Reminder offsets in minutes-before-start (0 = at start). Local events only.
+    val reminders: List<Int> = emptyList(),
 ) {
     /**
      * Group view supplies a server-resolved colour (display_color); otherwise
@@ -121,6 +123,9 @@ data class CalEvent(
                 isGroupEvent = json.optBoolean("is_group_event", false),
                 displayColor = json.strOrNull("display_color"),
                 displayTitle = json.strOrNull("display_title"),
+                reminders = json.optJSONArray("reminders")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { (arr.opt(it) as? Number)?.toInt() }
+                } ?: emptyList(),
             )
         }
     }
