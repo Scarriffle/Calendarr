@@ -101,6 +101,9 @@ class UserSettings(Base):
     # The single local calendar this user shares into all their groups
     # (combined view shows only this calendar per member). NULL = share nothing.
     group_visible_calendar_id = Column(Integer, nullable=True)
+    # Default reminder in minutes-before-start applied to all events client-side
+    # (0 = at start time). NULL = no default reminder.
+    default_reminder_minutes = Column(Integer, nullable=True)
 
     user = relationship("User", back_populates="settings")
 
@@ -133,6 +136,8 @@ class LocalEvent(Base):
     color = Column(String(7), nullable=True)
     rrule = Column(Text, nullable=True)
     exdate = Column(Text, nullable=True)  # Comma-separated YYYYMMDD dates to exclude
+    # Comma-separated minutes-before-start for reminders, e.g. "10,60" (0 = at start).
+    reminders = Column(Text, nullable=True)
     # Creator: set server-side from the auth token on create, never from the client.
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     # For imported events without a local user (from the .ics ORGANIZER field).

@@ -128,6 +128,7 @@ def build_local_event_dict(
         "type": "local",
         "creator": creator,
         "private": bool(ev.is_private),
+        "reminders": [int(x) for x in (ev.reminders or "").split(",") if x.strip().lstrip("-").isdigit()],
     }
     if owner is not None:
         d["owner"] = owner

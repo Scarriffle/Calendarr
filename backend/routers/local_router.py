@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File
 from fastapi.responses import Response
@@ -43,6 +43,7 @@ class EventCreate(BaseModel):
     color: Optional[str] = None
     rrule: Optional[str] = None
     private: bool = False
+    reminders: Optional[List[int]] = None  # minutes before start (0 = at start)
 
 
 class EventUpdate(BaseModel):
@@ -56,6 +57,7 @@ class EventUpdate(BaseModel):
     rrule: Optional[str] = None
     exdate: Optional[str] = None
     private: Optional[bool] = None
+    reminders: Optional[List[int]] = None
 
 
 class ShareCreate(BaseModel):
@@ -247,6 +249,7 @@ def create_event(
         color=data.color,
         rrule=data.rrule,
         is_private=data.private,
+        reminders=(",".join(str(m) for m in data.reminders) if data.reminders else None),
         creator_id=current_user.id,  # server-side, never from the client
     )
     db.add(ev)
@@ -296,6 +299,8 @@ def update_event(
         if data.exdate not in dates:
             dates.append(data.exdate)
         ev.exdate = ",".join(dates)
+    if data.reminders is not None:
+        ev.reminders = ",".join(str(m) for m in data.reminders) if data.reminders else None
     db.commit()
     return {"ok": True}
 

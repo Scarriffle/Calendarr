@@ -103,6 +103,20 @@ def _migrate():
             pass
 
         try:
+            conn.execute(text("ALTER TABLE local_events ADD COLUMN reminders TEXT"))
+            conn.commit()
+            logging.info("Migration: added reminders to local_events")
+        except Exception:
+            pass
+
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN default_reminder_minutes INTEGER"))
+            conn.commit()
+            logging.info("Migration: added default_reminder_minutes to user_settings")
+        except Exception:
+            pass
+
+        try:
             conn.execute(text("ALTER TABLE user_settings ADD COLUMN month_divider_color VARCHAR(7) DEFAULT '#7090c0'"))
             conn.commit()
         except Exception:
