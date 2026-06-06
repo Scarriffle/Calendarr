@@ -264,6 +264,15 @@ class CalendarStore {
             return !hiddenCalendarKeys.contains(key)
                 && !banishedCalendarKeys.contains(key)
         }
+        // Personal events drive local reminder notifications.
+        NotificationScheduler.reschedule(events: allCachedEvents)
+    }
+
+    /// Recompute scheduled reminder notifications from the personal cache
+    /// (skipped while a group overlay is active).
+    func rescheduleNotifications() {
+        guard activeGroup == nil else { return }
+        NotificationScheduler.reschedule(events: allCachedEvents)
     }
 
     /// Optimistically drop a just-deleted event from the cache so it disappears

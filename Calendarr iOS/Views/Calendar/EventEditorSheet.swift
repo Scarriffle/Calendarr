@@ -10,6 +10,7 @@ struct EventEditorSheet: View {
 
     @Environment(\.dismiss) var dismiss
     @AppStorage("appLanguage") private var appLang = "system"
+    @AppStorage("defaultReminderMinutes") private var defaultReminderMinutes = -1
     @State private var title = ""
     @State private var isAllDay = false
     @State private var startDate = Date()
@@ -19,6 +20,7 @@ struct EventEditorSheet: View {
     @State private var selectedCalendarId: String = ""
     @State private var color = ""
     @State private var isPrivate = false
+    @State private var reminders: [Int] = []
     @State private var isSaving = false
     @State private var error = ""
 
@@ -80,6 +82,27 @@ struct EventEditorSheet: View {
                     Section {
                         Toggle(L10n.t("event.private", appLang), isOn: $isPrivate)
                             .tint(Color.accentColor)
+                    }
+
+                    Section(ReminderOptions.sectionTitle(appLang)) {
+                        ForEach(Array(reminders.enumerated()), id: \.offset) { idx, _ in
+                            Picker(ReminderOptions.sectionTitle(appLang), selection: Binding(
+                                get: { reminders.indices.contains(idx) ? reminders[idx] : 0 },
+                                set: { if reminders.indices.contains(idx) { reminders[idx] = $0 } }
+                            )) {
+                                ForEach(ReminderOptions.all, id: \.self) { opt in
+                                    Text(ReminderOptions.label(opt, appLang)).tag(opt)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                        .onDelete { reminders.remove(atOffsets: $0) }
+                        Button {
+                            let next = ReminderOptions.all.first { !reminders.contains($0) } ?? 15
+                            reminders.append(next)
+                        } label: {
+                            Label(ReminderOptions.addLabel(appLang), systemImage: "bell.badge.plus")
+                        }
                     }
                 }
 
@@ -149,6 +172,7 @@ struct EventEditorSheet: View {
             notes = ev.notes
             color = ev.color ?? ""
             isPrivate = ev.isPrivate
+            reminders = ev.reminders
             // HA events use "homeassistant-42" in CalEvent but "ha-42" in WritableCalendar
             if ev.source == "homeassistant" {
                 let num = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
@@ -167,6 +191,7 @@ struct EventEditorSheet: View {
             notes = ev.notes
             color = ev.color ?? ""
             isPrivate = ev.isPrivate
+            reminders = ev.reminders
             selectedCalendarId = store.writableCalendars.first?.id ?? ""
         } else {
             let cal = Calendar.current
@@ -174,6 +199,8 @@ struct EventEditorSheet: View {
                                  minute: 0, second: 0, of: initialDate) ?? initialDate
             endDate = startDate.addingTimeInterval(3600)
             selectedCalendarId = store.writableCalendars.first?.id ?? ""
+            // New events inherit the user's default reminder (editable).
+            if defaultReminderMinutes >= 0 { reminders = [defaultReminderMinutes] }
         }
     }
 
@@ -193,7 +220,7 @@ struct EventEditorSheet: View {
                 case "local":
                     try await api.updateLocalEvent(uid: ev.id, title: title, start: start, end: end,
                                                    isAllDay: isAllDay, location: location, description: notes, color: colorVal,
-                                                   isPrivate: isPrivate)
+                                                   isPrivate: isPrivate, reminders: reminders)
                 case "homeassistant":
                     // No update API exists – delete the old event and recreate with new data.
                     let rawId = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
@@ -214,7 +241,7 @@ struct EventEditorSheet: View {
                     _ = try await api.createLocalEvent(calendarId: cal.numericId, title: title,
                                                        start: start, end: end, isAllDay: isAllDay,
                                                        location: location, description: notes, color: colorVal,
-                                                       isPrivate: isPrivate)
+                                                       isPrivate: isPrivate, reminders: reminders)
                 case "google":
                     try await api.createGoogleEvent(calendarDbId: cal.numericId, title: title,
                                                     start: start, end: end, isAllDay: isAllDay,

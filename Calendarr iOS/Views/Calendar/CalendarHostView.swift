@@ -95,6 +95,9 @@ struct CalendarHostView: View {
         .onReceive(NotificationCenter.default.publisher(for: .manualSyncRequested)) { _ in
             Task { await forceReload() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .rescheduleReminders)) { _ in
+            store.rescheduleNotifications()
+        }
     }
 
     // MARK: – Liquid Glass variant
@@ -161,6 +164,9 @@ struct CalendarHostView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .manualSyncRequested)) { _ in
             Task { await forceReload() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .rescheduleReminders)) { _ in
+            store.rescheduleNotifications()
         }
     }
 
@@ -407,6 +413,8 @@ struct CalendarHostView: View {
     // MARK: – Loading logic
 
     private func startup() async {
+        // Ask for notification permission early so reminders can be scheduled.
+        NotificationScheduler.requestAuthorizationIfNeeded()
         // 0. Pull settings first so week-start / default-view are correct
         //    before we compute the initial range and load events.
         await SettingsSync.pull(api: api)

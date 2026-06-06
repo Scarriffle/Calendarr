@@ -22,6 +22,7 @@ struct SettingsView: View {
     @AppStorage("defaultView")       private var defaultView = "month"
     @AppStorage("weekStartDay")      private var weekStartDay = "monday"
     @AppStorage("dimPastEvents")     private var dimPastEvents = false
+    @AppStorage("defaultReminderMinutes") private var defaultReminderMinutes = -1
 
     // Profile chapter (server-backed; loaded on appear).
     @State private var displayName = ""
@@ -37,6 +38,7 @@ struct SettingsView: View {
             Form {
                 profilSection
                 privatsphaereSection
+                benachrichtigungenSection
                 geteilterKalenderSection
                 liquidGlassSection
                 cacheSection
@@ -102,6 +104,27 @@ struct SettingsView: View {
             if !profileMsg.isEmpty {
                 Text(profileMsg).font(.caption).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // MARK: – Benachrichtigungen
+
+    var benachrichtigungenSection: some View {
+        Section {
+            Picker(ReminderOptions.defaultTitle(appLang), selection: $defaultReminderMinutes) {
+                Text(ReminderOptions.off(appLang)).tag(-1)
+                ForEach(ReminderOptions.all, id: \.self) { m in
+                    Text(ReminderOptions.label(m, appLang)).tag(m)
+                }
+            }
+            .onChange(of: defaultReminderMinutes) { _, _ in
+                SettingsSync.push(api: api)
+                NotificationCenter.default.post(name: .rescheduleReminders, object: nil)
+            }
+        } header: {
+            Text(ReminderOptions.sectionTitle(appLang))
+        } footer: {
+            Text(ReminderOptions.defaultFooter(appLang)).font(.caption)
         }
     }
 

@@ -1,0 +1,65 @@
+import Foundation
+import UserNotifications
+
+extension Notification.Name {
+    /// Posted when the default-reminder setting changes, so the calendar host
+    /// can recompute the scheduled local notifications from its cached events.
+    static let rescheduleReminders = Notification.Name("rescheduleReminders")
+}
+
+/// Schedules local OS notifications for upcoming events. Per-event reminders
+/// (local events) take precedence; otherwise the user's default reminder applies
+/// to every event (incl. external). Re-run whenever events or the default change.
+enum NotificationScheduler {
+
+    static func requestAuthorizationIfNeeded() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
+    /// Recompute and (re)schedule notifications from the given events. The iOS
+    /// pending-notification cap is 64, so only the soonest are scheduled.
+    static func reschedule(events: [CalEvent]) {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized
+                    || settings.authorizationStatus == .provisional else { return }
+
+            let defaultMin = (UserDefaults.standard.object(forKey: "defaultReminderMinutes") as? Int) ?? -1
+            let now = Date()
+            var pending: [(fire: Date, event: CalEvent)] = []
+            for ev in events {
+                let offsets = ev.reminders.isEmpty
+                    ? (defaultMin >= 0 ? [defaultMin] : [])
+                    : ev.reminders
+                for m in offsets {
+                    let fire = ev.startDate.addingTimeInterval(-Double(m) * 60)
+                    if fire > now { pending.append((fire, ev)) }
+                }
+            }
+            pending.sort { $0.fire < $1.fire }
+            let limited = pending.prefix(60)  // stay safely under the 64 system cap
+
+            center.removeAllPendingNotificationRequests()
+            for item in limited {
+                let content = UNMutableNotificationContent()
+                content.title = item.event.title
+                content.body = bodyText(item.event)
+                content.sound = .default
+                let comps = Calendar.current.dateComponents(
+                    [.year, .month, .day, .hour, .minute, .second], from: item.fire)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+                center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger))
+            }
+        }
+    }
+
+    private static func bodyText(_ ev: CalEvent) -> String {
+        var parts: [String] = []
+        if !ev.isAllDay {
+            let f = DateFormatter(); f.timeStyle = .short; f.dateStyle = .none
+            parts.append(f.string(from: ev.startDate))
+        }
+        if !ev.location.isEmpty { parts.append(ev.location) }
+        return parts.joined(separator: " · ")
+    }
+}

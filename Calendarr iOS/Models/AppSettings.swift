@@ -18,6 +18,7 @@ struct AppSettings: Codable {
     var lineColor: String = "#3A3A3C"
     var privateEventVisibility: String = "busy"   // 'hidden' | 'busy'
     var groupVisibleCalendarId: Int? = nil
+    var defaultReminderMinutes: Int? = nil         // minutes before start; nil = off
 
     enum CodingKeys: String, CodingKey {
         case defaultView = "default_view"
@@ -37,6 +38,7 @@ struct AppSettings: Codable {
         case lineColor = "line_color"
         case privateEventVisibility = "private_event_visibility"
         case groupVisibleCalendarId = "group_visible_calendar_id"
+        case defaultReminderMinutes = "default_reminder_minutes"
     }
 
     init() {}
@@ -66,6 +68,7 @@ struct AppSettings: Codable {
         lineColor         = try c.decodeIfPresent(String.self, forKey: .lineColor)         ?? d.lineColor
         privateEventVisibility = try c.decodeIfPresent(String.self, forKey: .privateEventVisibility) ?? d.privateEventVisibility
         groupVisibleCalendarId = try c.decodeIfPresent(Int.self, forKey: .groupVisibleCalendarId)
+        defaultReminderMinutes = try c.decodeIfPresent(Int.self, forKey: .defaultReminderMinutes)
     }
 }
 

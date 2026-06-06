@@ -229,7 +229,7 @@ class CalendarrAPI {
 
     func createLocalEvent(calendarId: Int, title: String, start: Date, end: Date,
                           isAllDay: Bool, location: String, description: String, color: String?,
-                          isPrivate: Bool = false) async throws -> CalEvent {
+                          isPrivate: Bool = false, reminders: [Int]? = nil) async throws -> CalEvent {
         var body: [String: Any] = [
             "calendar_id": calendarId,
             "title": title,
@@ -241,6 +241,7 @@ class CalendarrAPI {
             "private": isPrivate
         ]
         if let c = color, !c.isEmpty { body["color"] = c }
+        if let reminders { body["reminders"] = reminders }
         let data = try await request("/api/local/events", method: "POST", body: body)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let ev = CalEvent.from(json: json) else { throw APIError.decodingError }
@@ -249,7 +250,7 @@ class CalendarrAPI {
 
     func updateLocalEvent(uid: String, title: String, start: Date, end: Date,
                           isAllDay: Bool, location: String, description: String, color: String?,
-                          isPrivate: Bool = false) async throws {
+                          isPrivate: Bool = false, reminders: [Int]? = nil) async throws {
         var body: [String: Any] = [
             "title": title,
             "start": formatISO(start, allDay: isAllDay),
@@ -260,6 +261,7 @@ class CalendarrAPI {
             "private": isPrivate
         ]
         if let c = color { body["color"] = c }
+        if let reminders { body["reminders"] = reminders }
         _ = try await request("/api/local/events/\(uid)", method: "PUT", body: body)
     }
 
