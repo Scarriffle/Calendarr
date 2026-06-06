@@ -126,12 +126,7 @@ struct CalendarHostView: View {
                         }
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        HStack(spacing: 8) {
-                            if !groups.isEmpty { groupMenu }
-                            viewPickerMenu
-                            filterButton
-                            Button { showMenu = true } label: { Image(systemName: "line.3.horizontal") }
-                        }
+                        menuButton
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) {
@@ -200,54 +195,14 @@ struct CalendarHostView: View {
                 .minimumScaleFactor(0.7)
                 .layoutPriority(1)
             Spacer(minLength: 6)
-            if !groups.isEmpty { groupMenu }
-            viewPickerMenu
-            filterButton
-            Button { showMenu = true } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 18, weight: .medium))
-                    .frame(width: 36, height: 36)
-            }
-            .padding(.trailing, 2)
+            menuButton
+                .padding(.trailing, 2)
         }
         .frame(height: 48)
     }
 
     private var topBar: some View {
         barContents.background(.bar)
-    }
-
-    private var filterButton: some View {
-        Button { showFilter = true } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(store.hiddenCalendarKeys.isEmpty ? .primary : Color.accentColor)
-                .frame(width: 36, height: 36)
-        }
-        .accessibilityLabel(L10n.t("filter.button", appLang))
-    }
-
-    // Group switcher: "Persönlich" + each group. Selecting a group flips the
-    // calendar into the combined overlay (like the web's group view).
-    private var groupMenu: some View {
-        Menu {
-            Button { switchGroup(nil) } label: {
-                Label(L10n.t("groups.personal", appLang),
-                      systemImage: store.activeGroup == nil ? "checkmark" : "person")
-            }
-            ForEach(groups) { g in
-                Button { switchGroup(g) } label: {
-                    Label(g.name,
-                          systemImage: store.activeGroup?.id == g.id ? "checkmark" : GroupIcons.symbol(g.icon))
-                }
-            }
-        } label: {
-            Image(systemName: store.activeGroup == nil ? "person.2" : "person.2.fill")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(store.activeGroup == nil ? .primary : Color.accentColor)
-                .frame(width: 36, height: 36)
-        }
-        .accessibilityLabel(L10n.t("groups.title", appLang))
     }
 
     @ViewBuilder private var groupBanner: some View {
@@ -273,20 +228,58 @@ struct CalendarHostView: View {
         Task { await forceReload() }
     }
 
-    private var viewPickerMenu: some View {
+    /// The single top-bar action: a compact popup holding view / filter /
+    /// groups / sync, plus an "Einstellungen" entry that opens the full menu.
+    /// (Replaces the separate view / filter / group icons in the bar.)
+    private var menuButton: some View {
         Menu {
-            ForEach(CalViewType.allCases, id: \.self) { vt in
-                Button { store.viewType = vt } label: {
-                    Label(vt.label(appLang), systemImage: vt.systemImage)
+            // View (fixed icon, not per-view)
+            Menu {
+                ForEach(CalViewType.allCases, id: \.self) { vt in
+                    Button { store.viewType = vt } label: {
+                        Label(vt.label(appLang), systemImage: store.viewType == vt ? "checkmark" : vt.systemImage)
+                    }
+                }
+            } label: {
+                Label(L10n.t("view.change", appLang), systemImage: "rectangle.3.group")
+            }
+            // Filter
+            Button { showFilter = true } label: {
+                Label(L10n.t("filter.button", appLang), systemImage: "line.3.horizontal.decrease.circle")
+            }
+            // Groups
+            if !groups.isEmpty {
+                Menu {
+                    Button { switchGroup(nil) } label: {
+                        Label(L10n.t("groups.personal", appLang),
+                              systemImage: store.activeGroup == nil ? "checkmark" : "person")
+                    }
+                    ForEach(groups) { g in
+                        Button { switchGroup(g) } label: {
+                            Label(g.name,
+                                  systemImage: store.activeGroup?.id == g.id ? "checkmark" : GroupIcons.symbol(g.icon))
+                        }
+                    }
+                } label: {
+                    Label(L10n.t("groups.title", appLang), systemImage: "person.2")
                 }
             }
+            // Sync
+            Button { Task { await SettingsSync.pull(api: api); await forceReload() } } label: {
+                Label(L10n.t("menu.sync", appLang), systemImage: "arrow.triangle.2.circlepath")
+            }
+            Divider()
+            // Full settings menu
+            Button { showMenu = true } label: {
+                Label(L10n.t("menu.section.settings", appLang), systemImage: "gearshape")
+            }
         } label: {
-            Image(systemName: store.viewType.systemImage)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.primary)
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(store.activeGroup == nil && store.hiddenCalendarKeys.isEmpty ? .primary : Color.accentColor)
                 .frame(width: 36, height: 36)
         }
-        .accessibilityLabel(L10n.t("view.change", appLang))
+        .accessibilityLabel(L10n.t("nav.menu", appLang))
     }
 
     // MARK: – Error banner
