@@ -122,11 +122,13 @@ struct CalendarHostView: View {
                         HStack(spacing: 2) {
                             Button { store.navigatePrev() } label: { Image(systemName: "chevron.left") }
                             Button { store.navigateNext() } label: { Image(systemName: "chevron.right") }
-                            Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
                         }
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        menuButton
+                        HStack(spacing: 8) {
+                            Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
+                            menuButton
+                        }
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) {
@@ -183,9 +185,6 @@ struct CalendarHostView: View {
                         .font(.system(size: 17, weight: .medium))
                         .frame(width: 36, height: 36)
                 }
-                Button(L10n.t("nav.today", appLang)) { store.moveToToday() }
-                    .font(.callout).padding(.horizontal, 6)
-                    .lineLimit(1).fixedSize()
             }
             .padding(.leading, 6)
             Spacer(minLength: 6)
@@ -195,6 +194,9 @@ struct CalendarHostView: View {
                 .minimumScaleFactor(0.7)
                 .layoutPriority(1)
             Spacer(minLength: 6)
+            Button(L10n.t("nav.today", appLang)) { store.moveToToday() }
+                .font(.callout).padding(.horizontal, 6)
+                .lineLimit(1).fixedSize()
             menuButton
                 .padding(.trailing, 2)
         }
