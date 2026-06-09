@@ -5,7 +5,7 @@ import Foundation
 /// picker, and the notification scheduler so the choices stay consistent.
 enum ReminderOptions {
     /// Selectable offsets in minutes-before-start.
-    static let all: [Int] = [0, 5, 10, 15, 30, 60, 120, 1440, 2880]
+    static let all: [Int] = [0, 5, 15, 30, 60, 1440, 10080]
 
     private static func isEnglish(_ appLang: String) -> Bool {
         if appLang == "en" { return true }
@@ -16,13 +16,22 @@ enum ReminderOptions {
     static func label(_ minutes: Int, _ appLang: String) -> String {
         let en = isEnglish(appLang)
         if minutes <= 0 { return en ? "At start time" : "Zur Startzeit" }
-        if minutes < 60 { return en ? "\(minutes) min before" : "\(minutes) Min. vorher" }
+        if minutes < 60 {
+            return en ? "\(minutes) minutes before" : "\(minutes) Minuten vorher"
+        }
         if minutes < 1440 {
             let h = minutes / 60
-            return en ? "\(h) h before" : "\(h) Std. vorher"
+            if en { return h == 1 ? "1 hour before" : "\(h) hours before" }
+            return h == 1 ? "1 Stunde vorher" : "\(h) Stunden vorher"
         }
-        let d = minutes / 1440
-        return en ? "\(d) day\(d == 1 ? "" : "s") before" : "\(d) Tag\(d == 1 ? "" : "e") vorher"
+        if minutes < 10080 {
+            let d = minutes / 1440
+            if en { return d == 1 ? "1 day before" : "\(d) days before" }
+            return d == 1 ? "1 Tag vorher" : "\(d) Tage vorher"
+        }
+        let w = minutes / 10080
+        if en { return w == 1 ? "1 week before" : "\(w) weeks before" }
+        return w == 1 ? "1 Woche vorher" : "\(w) Wochen vorher"
     }
 
     static func sectionTitle(_ l: String) -> String { isEnglish(l) ? "Reminders" : "Benachrichtigungen" }
