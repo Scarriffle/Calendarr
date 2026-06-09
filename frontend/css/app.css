@@ -246,6 +246,51 @@ a { color: var(--primary); text-decoration: none; }
 }
 .form-group textarea { resize: vertical; }
 
+/* ── Custom calendar dropdown (shows colour dot + group icon) ── */
+.cal-native-hidden { display: none !important; }
+.cal-select { position: relative; }
+.cal-select-trigger {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 14px;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.cal-select-trigger:hover { border-color: var(--text-3); }
+.cal-select[data-open="1"] .cal-select-trigger {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+.cal-select-current { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.cal-select-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-select-chevron { flex-shrink: 0; color: var(--text-3); }
+.cal-select-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.cal-select-gicon { display: inline-flex; color: var(--text-2); flex-shrink: 0; }
+.cal-select-gicon svg { display: block; }
+.cal-select-menu {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  max-height: 280px; overflow-y: auto;
+  z-index: 50; padding: 4px;
+}
+.cal-select-section {
+  font-size: 11px; color: var(--text-3); font-weight: 600;
+  padding: 8px 10px 4px; text-transform: uppercase; letter-spacing: .4px;
+}
+.cal-select-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer;
+}
+.cal-select-option:hover { background: var(--bg-hover); }
+.cal-select-option.selected { background: var(--primary-dim); }
+
 /* ── Date/time input dark mode ──────────────────────────── */
 .form-group input[type="datetime-local"],
 .form-group input[type="date"] {

@@ -342,7 +342,16 @@
       </div>
       <div class="form-group">
         <label>Kalender</label>
-        <select id="ev-calendar"></select>
+        <!-- Hidden native select stays the value holder + change-event source;
+             the custom dropdown below renders colour dots and group icons. -->
+        <select id="ev-calendar" class="cal-native-hidden"></select>
+        <div class="cal-select" id="ev-cal-select">
+          <button type="button" class="cal-select-trigger" id="ev-cal-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="cal-select-current" id="ev-cal-current"></span>
+            <svg class="cal-select-chevron" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+          </button>
+          <div class="cal-select-menu hidden" id="ev-cal-menu" role="listbox"></div>
+        </div>
       </div>
       <div class="form-row" id="ev-private-row" style="display:none">
         <label class="toggle-label">

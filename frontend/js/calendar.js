@@ -1495,6 +1495,7 @@ document.addEventListener('click', e => {
 
 // ── Event Modal ───────────────────────────────────────────
 function populateCalendarSelect(selectedId) {
+  closeCalSelectMenu();
   const sel = document.getElementById('ev-calendar');
   sel.innerHTML = '';
   // CalDAV calendars (show all that aren't removed from sidebar, even if unchecked)
@@ -1546,6 +1547,117 @@ function populateCalendarSelect(selectedId) {
       sel.appendChild(opt);
     });
   });
+  renderCalSelectTrigger();
+}
+
+// ── Custom calendar dropdown (colour dot + group icon) ────
+// The hidden <select id="ev-calendar"> above stays the value holder; this
+// renders a styled list from the same state so group icons can show.
+
+function groupIconForLocalCal(calId) {
+  const g = (state.groups || []).find(x => x.group_calendar_id === calId);
+  return (g && g.icon) ? g.icon : 'people';
+}
+
+function calSelectData() {
+  const sections = [];
+  const byValue = {};
+  const push = (sec, value, name, color, isGroup, iconKey) => {
+    sec.items.push({ value, name, color, isGroup, iconKey });
+    byValue[value] = { name, color, isGroup, iconKey };
+  };
+  state.accounts.forEach(acc => {
+    const cals = (acc.calendars || []).filter(c => !c.sidebar_hidden);
+    if (!cals.length) return;
+    const sec = { label: acc.name, items: [] };
+    cals.forEach(cal => push(sec, String(cal.id), cal.name, cal.color || acc.color || '#4285f4', false, null));
+    sections.push(sec);
+  });
+  const locals = state.localCalendars.filter(c => !c.sidebar_hidden && !c.group);
+  if (locals.length) {
+    const sec = { label: t('cal_local'), items: [] };
+    locals.forEach(cal => push(sec, `local-${cal.id}`, cal.name, cal.color, false, null));
+    sections.push(sec);
+  }
+  const groups = state.localCalendars.filter(c => !c.sidebar_hidden && c.group);
+  if (groups.length) {
+    const sec = { label: t('groups_title'), items: [] };
+    groups.forEach(cal => push(sec, `local-${cal.id}`, cal.name, cal.color, true, groupIconForLocalCal(cal.id)));
+    sections.push(sec);
+  }
+  state.googleAccounts.forEach(acc => {
+    const cals = (acc.calendars || []).filter(c => !c.sidebar_hidden);
+    if (!cals.length) return;
+    const sec = { label: acc.email, items: [] };
+    cals.forEach(cal => push(sec, `google-${cal.id}`, cal.name, cal.color || '#4285f4', false, null));
+    sections.push(sec);
+  });
+  state.haAccounts.forEach(acc => {
+    const cals = (acc.calendars || []).filter(c => !c.sidebar_hidden);
+    if (!cals.length) return;
+    const sec = { label: acc.name, items: [] };
+    cals.forEach(cal => push(sec, `homeassistant-${cal.id}`, cal.name, cal.color || '#03a9f4', false, null));
+    sections.push(sec);
+  });
+  return { sections, byValue };
+}
+
+function calOptionInner(info) {
+  const dot = `<span class="cal-select-dot" style="background:${info.color || '#4285f4'}"></span>`;
+  const icon = info.isGroup ? `<span class="cal-select-gicon">${groupIconSvg(info.iconKey || 'people', 16)}</span>` : '';
+  return `${dot}${icon}<span class="cal-select-name">${escHtml(info.name)}</span>`;
+}
+
+function renderCalSelectTrigger() {
+  const cur = document.getElementById('ev-cal-current');
+  if (!cur) return;
+  const val = document.getElementById('ev-calendar').value;
+  const { byValue } = calSelectData();
+  const info = byValue[val];
+  cur.innerHTML = info ? calOptionInner(info) : `<span class="cal-select-name">—</span>`;
+}
+
+function renderCalSelectMenu() {
+  const menu = document.getElementById('ev-cal-menu');
+  const val = document.getElementById('ev-calendar').value;
+  const { sections } = calSelectData();
+  menu.innerHTML = sections.map(sec =>
+    `<div class="cal-select-section">${escHtml(sec.label)}</div>` +
+    sec.items.map(it =>
+      `<div class="cal-select-option ${it.value === val ? 'selected' : ''}" role="option" data-value="${it.value}">${calOptionInner(it)}</div>`
+    ).join('')
+  ).join('');
+  menu.querySelectorAll('.cal-select-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const sel = document.getElementById('ev-calendar');
+      sel.value = el.dataset.value;
+      sel.dispatchEvent(new Event('change'));
+      renderCalSelectTrigger();
+      closeCalSelectMenu();
+    });
+  });
+}
+
+function openCalSelectMenu() {
+  renderCalSelectMenu();
+  document.getElementById('ev-cal-menu').classList.remove('hidden');
+  document.getElementById('ev-cal-select').dataset.open = '1';
+  document.getElementById('ev-cal-trigger').setAttribute('aria-expanded', 'true');
+  setTimeout(() => document.addEventListener('click', calSelectOutside), 0);
+}
+
+function closeCalSelectMenu() {
+  const menu = document.getElementById('ev-cal-menu');
+  if (menu) menu.classList.add('hidden');
+  const wrap = document.getElementById('ev-cal-select');
+  if (wrap) delete wrap.dataset.open;
+  const trig = document.getElementById('ev-cal-trigger');
+  if (trig) trig.setAttribute('aria-expanded', 'false');
+  document.removeEventListener('click', calSelectOutside);
+}
+
+function calSelectOutside(e) {
+  if (!e.target.closest('#ev-cal-select')) closeCalSelectMenu();
 }
 
 // ── Date field helpers ────────────────────────────────────
@@ -1873,6 +1985,16 @@ function bindEventModal() {
   });
 
   document.getElementById('ev-reminder-add').addEventListener('click', addReminderRow);
+
+  // Custom calendar dropdown toggle
+  document.getElementById('ev-cal-trigger').addEventListener('click', e => {
+    e.stopPropagation();
+    const menu = document.getElementById('ev-cal-menu');
+    if (menu.classList.contains('hidden')) openCalSelectMenu(); else closeCalSelectMenu();
+  });
+  document.getElementById('ev-cal-select').addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeCalSelectMenu();
+  });
 
   // Date/time pickers with auto-adjustment logic
   [
