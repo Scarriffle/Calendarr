@@ -142,6 +142,7 @@ def _account_dict(a: models.GoogleAccount) -> dict:
                 "color": c.color or "#4285f4",
                 "enabled": c.enabled,
                 "sidebar_hidden": bool(c.sidebar_hidden),
+                "reminders_enabled": bool(c.reminders_enabled),
             }
             for c in a.calendars
             if not _is_system_calendar(c.cal_id)
@@ -344,6 +345,7 @@ class GoogleCalendarUpdate(BaseModel):
     color: Optional[str] = None
     name: Optional[str] = None
     sidebar_hidden: Optional[bool] = None
+    reminders_enabled: Optional[bool] = None
 
 
 @router.put("/calendars/{calendar_id}")
@@ -372,6 +374,8 @@ def update_calendar(
         gcal.name = data.name
     if data.sidebar_hidden is not None:
         gcal.sidebar_hidden = data.sidebar_hidden
+    if data.reminders_enabled is not None:
+        gcal.reminders_enabled = data.reminders_enabled
     db.commit()
     return {"ok": True}
 

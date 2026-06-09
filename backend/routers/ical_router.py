@@ -29,6 +29,7 @@ class SubscriptionUpdate(BaseModel):
     color: Optional[str] = None
     enabled: Optional[bool] = None
     refresh_minutes: Optional[int] = None
+    reminders_enabled: Optional[bool] = None
 
 
 def _sub_dict(sub: models.ICalSubscription) -> dict:
@@ -38,6 +39,7 @@ def _sub_dict(sub: models.ICalSubscription) -> dict:
         "url": sub.url,
         "color": sub.color,
         "enabled": sub.enabled,
+        "reminders_enabled": bool(sub.reminders_enabled),
         "refresh_minutes": sub.refresh_minutes,
         "last_fetched": sub.last_fetched.isoformat() if sub.last_fetched else None,
     }
@@ -215,6 +217,8 @@ def update_subscription(
         sub.enabled = data.enabled
     if data.refresh_minutes is not None:
         sub.refresh_minutes = data.refresh_minutes
+    if data.reminders_enabled is not None:
+        sub.reminders_enabled = data.reminders_enabled
     db.commit()
     return {"ok": True}
 

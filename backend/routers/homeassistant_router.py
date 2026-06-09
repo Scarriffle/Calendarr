@@ -349,6 +349,7 @@ def _account_dict(a: models.HomeAssistantAccount) -> dict:
                 "color": c.color or HA_DEFAULT_COLOR,
                 "enabled": c.enabled,
                 "sidebar_hidden": bool(c.sidebar_hidden),
+                "reminders_enabled": bool(c.reminders_enabled),
             }
             for c in a.calendars
         ],
@@ -375,6 +376,7 @@ class HACalendarUpdate(BaseModel):
     color: Optional[str] = None
     name: Optional[str] = None
     sidebar_hidden: Optional[bool] = None
+    reminders_enabled: Optional[bool] = None
 
 
 # ── Endpoints ─────────────────────────────────────────────
@@ -623,6 +625,8 @@ def update_calendar(
         cal.name = data.name
     if data.sidebar_hidden is not None:
         cal.sidebar_hidden = data.sidebar_hidden
+    if data.reminders_enabled is not None:
+        cal.reminders_enabled = data.reminders_enabled
     db.commit()
     return {"ok": True}
 

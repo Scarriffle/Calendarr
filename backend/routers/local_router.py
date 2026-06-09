@@ -30,6 +30,7 @@ class CalendarUpdate(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None
     enabled: Optional[bool] = None
+    reminders_enabled: Optional[bool] = None
 
 
 class EventCreate(BaseModel):
@@ -72,6 +73,7 @@ def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
         "name": cal.name,
         "color": cal.color,
         "enabled": cal.enabled,
+        "reminders_enabled": bool(cal.reminders_enabled),
         "type": "local",
         "owned": owned,
     }
@@ -199,6 +201,8 @@ def update_calendar(
         cal.color = data.color
     if data.enabled is not None:
         cal.enabled = data.enabled
+    if data.reminders_enabled is not None:
+        cal.reminders_enabled = data.reminders_enabled
     db.commit()
     return {"ok": True}
 

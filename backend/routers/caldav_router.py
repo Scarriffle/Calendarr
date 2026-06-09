@@ -42,6 +42,7 @@ class CalendarUpdate(BaseModel):
     color: Optional[str] = None
     name: Optional[str] = None
     sidebar_hidden: Optional[bool] = None
+    reminders_enabled: Optional[bool] = None
 
 
 class EventCreate(BaseModel):
@@ -84,6 +85,7 @@ def _account_dict(a: models.CalDAVAccount) -> dict:
                 "enabled": c.enabled,
                 "cal_id": c.cal_id,
                 "sidebar_hidden": bool(c.sidebar_hidden),
+                "reminders_enabled": bool(c.reminders_enabled),
             }
             for c in a.calendars
         ],
@@ -270,6 +272,8 @@ def update_calendar(
         calendar.name = data.name
     if data.sidebar_hidden is not None:
         calendar.sidebar_hidden = data.sidebar_hidden
+    if data.reminders_enabled is not None:
+        calendar.reminders_enabled = data.reminders_enabled
     db.commit()
     return {"ok": True}
 

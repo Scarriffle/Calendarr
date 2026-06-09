@@ -71,6 +71,8 @@ class Calendar(Base):
     color = Column(String(7), nullable=True)
     enabled = Column(Boolean, default=True)
     sidebar_hidden = Column(Boolean, default=False)
+    # Whether events of this calendar generate reminders/notifications on clients.
+    reminders_enabled = Column(Boolean, default=True, nullable=False)
 
     account = relationship("CalDAVAccount", back_populates="calendars")
 
@@ -116,6 +118,8 @@ class LocalCalendar(Base):
     name = Column(String(100), nullable=False)
     color = Column(String(7), default="#34a853")
     enabled = Column(Boolean, default=True)
+    # Whether events of this calendar generate reminders/notifications on clients.
+    reminders_enabled = Column(Boolean, default=True, nullable=False)
 
     user = relationship("User", back_populates="local_calendars")
     events = relationship("LocalEvent", back_populates="calendar", cascade="all, delete-orphan")
@@ -158,6 +162,8 @@ class ICalSubscription(Base):
     url = Column(String(1000), nullable=False)
     color = Column(String(7), default="#46bdc6")
     enabled = Column(Boolean, default=True)
+    # Whether events of this subscription generate reminders/notifications on clients.
+    reminders_enabled = Column(Boolean, default=True, nullable=False)
     refresh_minutes = Column(Integer, default=60)
     last_fetched = Column(DateTime, nullable=True)
     cached_ics = Column(Text, nullable=True)
@@ -210,6 +216,8 @@ class GoogleCalendar(Base):
     color = Column(String(7), nullable=True)
     enabled = Column(Boolean, default=True)
     sidebar_hidden = Column(Boolean, default=False)
+    # Whether events of this calendar generate reminders/notifications on clients.
+    reminders_enabled = Column(Boolean, default=True, nullable=False)
 
     account = relationship("GoogleAccount", back_populates="calendars")
 
@@ -243,6 +251,8 @@ class HomeAssistantCalendar(Base):
     color = Column(String(7), nullable=True)
     enabled = Column(Boolean, default=True)
     sidebar_hidden = Column(Boolean, default=False)
+    # Whether events of this calendar generate reminders/notifications on clients.
+    reminders_enabled = Column(Boolean, default=True, nullable=False)
 
     account = relationship("HomeAssistantAccount", back_populates="calendars")
 

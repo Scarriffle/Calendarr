@@ -201,6 +201,15 @@ def _migrate():
             logging.info("Migration: added color to group_members")
         except Exception:
             pass
+        # Per-calendar reminder toggle (default ON = unchanged behaviour for existing data).
+        for tbl in ("calendars", "local_calendars", "google_calendars",
+                    "homeassistant_calendars", "ical_subscriptions"):
+            try:
+                conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN reminders_enabled BOOLEAN DEFAULT 1"))
+                conn.commit()
+                logging.info("Migration: added reminders_enabled to %s", tbl)
+            except Exception:
+                pass
 
 _migrate()
 
