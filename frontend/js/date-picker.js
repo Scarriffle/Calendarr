@@ -48,9 +48,10 @@ export function openDatePicker(anchor, value, mode = 'datetime') {
       resolve(result);
     }
 
-    // Click outside → cancel
+    // Click outside (leaving the picker) → commit the current selection,
+    // rather than discarding it. Cancel button still reverts.
     overlay.addEventListener('mousedown', e => {
-      if (e.target === overlay) done(null);
+      if (e.target === overlay) done(buildResult());
     });
 
     // ── Calendar builder ──────────────────────────────────
@@ -144,13 +145,11 @@ export function openDatePicker(anchor, value, mode = 'datetime') {
         render();
       };
 
-      // Day click
+      // Day click → just select/highlight; committing happens on Save or when
+      // the user leaves the picker (clicks outside).
       card.querySelectorAll('.dtp-day').forEach(el => {
         el.addEventListener('click', () => {
           selDate = new Date(parseInt(el.dataset.ts));
-          // In date-only mode there's nothing else to choose — commit the day
-          // immediately instead of forcing an extra "Save" click.
-          if (mode === 'date') { done(buildResult()); return; }
           if (el.classList.contains('other')) {
             viewYear  = selDate.getFullYear();
             viewMonth = selDate.getMonth();

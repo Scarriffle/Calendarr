@@ -1373,6 +1373,9 @@ function showDayContextMenu(date, mouseEvent) {
 
 // ── Event Popup ───────────────────────────────────────────
 function showEventPopup(ev, anchor) {
+  // The event row stops click propagation, so the day context menu's own
+  // outside-click closer never fires — remove it explicitly here.
+  document.querySelectorAll('.cal-context-menu').forEach(m => m.remove());
   const popup = document.getElementById('popup-event');
   document.getElementById('popup-copy-menu').classList.add('hidden');
   popup.classList.remove('hidden');
