@@ -302,6 +302,10 @@ a { color: var(--primary); text-decoration: none; }
 .color-swatch.active { border-color: var(--text-1); }
 
 .ev-color-row { display: flex; align-items: center; gap: 8px; }
+.ev-reminders-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.ev-reminder-row { display: flex; align-items: center; gap: 8px; }
+.ev-reminder-row select { flex: 1; }
+.ev-reminder-remove { flex-shrink: 0; }
 .ev-color-hex {
   flex: 1; height: 36px; padding: 0 10px;
   background: var(--bg-hover); border: 1px solid var(--border);
@@ -539,6 +543,11 @@ a { color: var(--primary); text-decoration: none; }
    width and only truncates while the button is visible. */
 .cal-item-remove { display: none; }
 .cal-item:hover .cal-item-remove { display: inline-flex; }
+/* Reminder bell: only shown on hover when enabled, but always shown (dimmed)
+   when disabled so the muted state is visible at a glance. */
+.cal-item-bell { display: none; flex-shrink: 0; }
+.cal-item:hover .cal-item-bell { display: inline-flex; }
+.cal-item-bell.off { display: inline-flex; color: var(--text-3); opacity: .75; }
 
 /* ── Month View ─────────────────────────────────────────── */
 .month-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -574,7 +583,7 @@ a { color: var(--primary); text-decoration: none; }
 }
 .month-col:last-child { border-right: none; }
 .month-col:hover { background: var(--bg-hover); }
-.month-col.today { background: rgba(66,133,244,.08); }
+.month-col.today { background: color-mix(in srgb, var(--today-color) 10%, transparent); }
 .month-col.month-selected { background: var(--primary-dim); }
 .month-col.month-selected .cell-day { border: 2px solid var(--primary); color: var(--primary); font-weight: 700; }
 .month-col.month-selected .cell-day.today { background: var(--today-color); color: #fff; border: none; }

@@ -148,6 +148,9 @@ export function openDatePicker(anchor, value, mode = 'datetime') {
       card.querySelectorAll('.dtp-day').forEach(el => {
         el.addEventListener('click', () => {
           selDate = new Date(parseInt(el.dataset.ts));
+          // In date-only mode there's nothing else to choose — commit the day
+          // immediately instead of forcing an extra "Save" click.
+          if (mode === 'date') { done(buildResult()); return; }
           if (el.classList.contains('other')) {
             viewYear  = selDate.getFullYear();
             viewMonth = selDate.getMonth();

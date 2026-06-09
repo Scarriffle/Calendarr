@@ -36,7 +36,10 @@ let weekStartDay = 'monday';
 
 let state = {
   currentDate: new Date(),
-  selectedDate: null,      // separate from currentDate; used for month-view selection
+  // Default to today so the month-view selection is anchored to a fixed date.
+  // (If left null the view falls back to currentDate, which then appears to
+  // "follow" the cells while navigating/scrolling before any explicit click.)
+  selectedDate: new Date(),
   currentView: 'month',
   events: [],
   accounts: [],
@@ -681,6 +684,8 @@ function renderCalendarList() {
   // Eye-off (hide external calendar) and trash (delete local/ical) icons.
   const EYE_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`;
   const TRASH = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
+  const BELL = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
+  const BELL_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42v5l-2 2v1h13.73l2 2L21 19.72l-1-1.03zM12 22c1.11 0 2-.89 2-2h-4c0 1.11.89 2 2 2zm6-7.32V11c0-3.08-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.42.12-.1.03-.2.07-.3.11h-.01c-.01 0-.01 0-.02.01-.23.09-.46.2-.68.31L18 14.68z"/></svg>`;
 
   // Build a single flat list of all calendars. The source/account is shown
   // inline (small, grey) next to the name and section headers are gone, so the
@@ -690,6 +695,7 @@ function renderCalendarList() {
     (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
       entries.push({ key: `caldav:${cal.id}`, source: 'caldav', dataId: `data-cal-id="${cal.id}"`,
         name: cal.name, color: cal.color || '#4285f4', enabled: cal.enabled,
+        reminders: true, remindersEnabled: cal.reminders_enabled !== false,
         sourceLabel: acc.name, remove: { icon: EYE_OFF, title: t('hide_cal') } });
     });
   });
@@ -697,6 +703,7 @@ function renderCalendarList() {
   state.localCalendars.filter(c => c.owned !== false && !c.group).forEach(cal => {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.name, color: cal.color, enabled: cal.enabled,
+      reminders: true, remindersEnabled: cal.reminders_enabled !== false,
       sourceLabel: t('cal_local'), groupVisible: cal.id === groupVisibleId,
       remove: { icon: TRASH, title: t('remove_cal') } });
   });
@@ -715,12 +722,14 @@ function renderCalendarList() {
   state.icalSubscriptions.forEach(sub => {
     entries.push({ key: `ical:${sub.id}`, source: 'ical', dataId: `data-sub-id="${sub.id}"`,
       name: sub.name, color: sub.color, enabled: sub.enabled,
+      reminders: true, remindersEnabled: sub.reminders_enabled !== false,
       sourceLabel: t('cal_ical'), remove: { icon: TRASH, title: t('remove_ical_sub') } });
   });
   state.googleAccounts.forEach(acc => {
     (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
       entries.push({ key: `google:${cal.id}`, source: 'google', dataId: `data-cal-id="${cal.id}"`,
         name: cal.name, color: cal.color || '#4285f4', enabled: cal.enabled,
+        reminders: true, remindersEnabled: cal.reminders_enabled !== false,
         sourceLabel: acc.email, remove: { icon: EYE_OFF, title: t('hide_cal') } });
     });
   });
@@ -728,6 +737,7 @@ function renderCalendarList() {
     (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
       entries.push({ key: `homeassistant:${cal.id}`, source: 'homeassistant', dataId: `data-cal-id="${cal.id}"`,
         name: cal.name, color: cal.color || '#03a9f4', enabled: cal.enabled,
+        reminders: true, remindersEnabled: cal.reminders_enabled !== false,
         sourceLabel: acc.name, remove: { icon: EYE_OFF, title: t('hide_cal') } });
     });
   });
@@ -756,6 +766,7 @@ function renderCalendarList() {
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
       ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">${groupIconSvg('people', 13)}</span>` : ''}
       ${e.groupVisible ? `<span class="cal-shared-flag" title="${t('group_visible_flag')}">${groupIconSvg('people', 13)}</span>` : ''}
+      ${e.reminders ? `<button class="icon-btn mini-btn cal-item-bell ${e.remindersEnabled ? '' : 'off'}" data-source="${e.source}" ${e.dataId} title="${e.remindersEnabled ? t('calendar_reminders_on') : t('calendar_reminders_off')}">${e.remindersEnabled ? BELL : BELL_OFF}</button>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
     </div>`
   ).join('');
@@ -822,6 +833,37 @@ function renderCalendarList() {
         // Showing: refetch silently — view stays visible, updates when done
         fetchAndRender(true, true);
       }
+    });
+  });
+
+  // ── Reminder bell handlers (toggle reminders_enabled per calendar) ──
+  container.querySelectorAll('.cal-item-bell').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const source = btn.dataset.source;
+      const id = parseInt(btn.dataset.calId || btn.dataset.subId);
+      let cal = null;
+      if (source === 'caldav') {
+        for (const acc of state.accounts) { const c = acc.calendars.find(c => c.id === id); if (c) cal = c; }
+      } else if (source === 'local') {
+        cal = state.localCalendars.find(c => c.id === id);
+      } else if (source === 'ical') {
+        cal = state.icalSubscriptions.find(s => s.id === id);
+      } else if (source === 'google') {
+        for (const acc of state.googleAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) cal = c; }
+      } else if (source === 'homeassistant') {
+        for (const acc of state.haAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) cal = c; }
+      }
+      if (!cal) return;
+      const newVal = cal.reminders_enabled === false; // toggle
+      const path = source === 'ical'
+        ? `/ical/subscriptions/${id}`
+        : `/${source}/calendars/${id}`;
+      try {
+        await api.put(path, { reminders_enabled: newVal });
+        cal.reminders_enabled = newVal;
+        renderCalendarList();
+      } catch (err) { showToast(err.message, true); }
     });
   });
 
@@ -1463,15 +1505,24 @@ function populateCalendarSelect(selectedId) {
       sel.appendChild(opt);
     });
   });
-  // Local calendars (group calendars marked with 👥 so group events can be
-  // created from anywhere, not just the group view).
-  state.localCalendars.filter(c => !c.sidebar_hidden).forEach(cal => {
+  // Local calendars. Group calendars are collected under a "Groups" optgroup
+  // (no emoji — a native <select> can't render the group icon SVG).
+  const localCals = state.localCalendars.filter(c => !c.sidebar_hidden);
+  const makeLocalOpt = cal => {
     const opt = document.createElement('option');
     opt.value = `local-${cal.id}`;
-    opt.textContent = cal.group ? `👥 ${cal.name}` : cal.name;
+    opt.textContent = cal.name;
     if (`local-${cal.id}` === selectedId) opt.selected = true;
-    sel.appendChild(opt);
-  });
+    return opt;
+  };
+  localCals.filter(c => !c.group).forEach(cal => sel.appendChild(makeLocalOpt(cal)));
+  const groupCals = localCals.filter(c => c.group);
+  if (groupCals.length) {
+    const og = document.createElement('optgroup');
+    og.label = t('groups_title');
+    groupCals.forEach(cal => og.appendChild(makeLocalOpt(cal)));
+    sel.appendChild(og);
+  }
   // iCal subscriptions are read-only, not shown here
   // Google calendars (read/write)
   state.googleAccounts.forEach(acc => {
@@ -1542,6 +1593,10 @@ function openNewEventModal(date) {
   toggleAlldayFields(false);
   populateCalendarSelect(null);
   updatePrivateRow(false);
+  // New local event: prefill with the global default reminder if one is set.
+  const defMin = state.settings && state.settings.default_reminder_minutes;
+  setEventReminders(defMin != null ? [defMin] : []);
+  updateRemindersRow();
   resetColorPicker('');
   resetRecurrenceUI();
   document.getElementById('ev-delete').classList.add('hidden');
@@ -1578,6 +1633,8 @@ function openCopyEditModal(ev, targetCal) {
   else                              selectedId = `${targetCal.type}-${targetCal.id}`;
   populateCalendarSelect(selectedId);
   updatePrivateRow(ev.private);
+  setEventReminders(ev.reminders || []);
+  updateRemindersRow();
 
   resetColorPicker(ev.color || '');
   resetRecurrenceUI();
@@ -1611,6 +1668,8 @@ function openEditEventModal(ev) {
 
   populateCalendarSelect(ev.calendar_id);
   updatePrivateRow(ev.private);
+  setEventReminders(ev.reminders || []);
+  updateRemindersRow();
   resetColorPicker(ev.color || '');
 
   // Recurrence
@@ -1656,6 +1715,70 @@ function resetColorPicker(color) {
   const preview = document.getElementById('ev-color-preview');
   hex.value = color ? color.toUpperCase() : '';
   preview.style.background = color || 'var(--primary)';
+}
+
+// ── Reminders (local events only) ─────────────────────────
+const REMINDER_OPTIONS = [0, 5, 10, 15, 30, 60, 120, 1440, 2880];
+
+function reminderLabel(min) {
+  if (min <= 0) return t('reminder_at_start');
+  if (min < 60) return t('reminder_min', { n: min });
+  if (min < 1440) return t('reminder_hour', { n: min / 60 });
+  return t('reminder_day', { n: min / 1440 });
+}
+
+function setEventReminders(arr) {
+  state.eventReminders = Array.isArray(arr)
+    ? arr.map(Number).filter(n => !isNaN(n)) : [];
+  renderReminderRows();
+}
+
+function renderReminderRows() {
+  const list = document.getElementById('ev-reminders-list');
+  if (!list) return;
+  list.innerHTML = '';
+  state.eventReminders.forEach((min, idx) => {
+    const row = document.createElement('div');
+    row.className = 'ev-reminder-row';
+    const sel = document.createElement('select');
+    // Keep a non-catalog value (from an old/imported reminder) selectable.
+    const opts = REMINDER_OPTIONS.includes(min) ? REMINDER_OPTIONS : [min, ...REMINDER_OPTIONS];
+    opts.forEach(v => {
+      const o = document.createElement('option');
+      o.value = String(v);
+      o.textContent = reminderLabel(v);
+      if (v === min) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', () => {
+      state.eventReminders[idx] = parseInt(sel.value, 10);
+    });
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'icon-btn ev-reminder-remove';
+    rm.innerHTML = '&times;';
+    rm.addEventListener('click', () => {
+      state.eventReminders.splice(idx, 1);
+      renderReminderRows();
+    });
+    row.appendChild(sel);
+    row.appendChild(rm);
+    list.appendChild(row);
+  });
+}
+
+function addReminderRow() {
+  const def = (state.settings && state.settings.default_reminder_minutes != null)
+    ? state.settings.default_reminder_minutes : 10;
+  state.eventReminders.push(REMINDER_OPTIONS.includes(def) ? def : 10);
+  renderReminderRows();
+}
+
+// Reminders apply to local events only (the server stores them on local events).
+function updateRemindersRow() {
+  const calVal = document.getElementById('ev-calendar').value || '';
+  const isLocal = calVal.startsWith('local-');
+  document.getElementById('ev-reminders-group').style.display = isLocal ? '' : 'none';
 }
 
 function buildRruleFromUI() {
@@ -1740,8 +1863,13 @@ function bindEventModal() {
     toggleAlldayFields(e.target.checked);
   });
 
-  // The "Privat" toggle is only relevant for local calendars.
-  document.getElementById('ev-calendar').addEventListener('change', () => updatePrivateRow());
+  // The "Privat" toggle and reminders are only relevant for local calendars.
+  document.getElementById('ev-calendar').addEventListener('change', () => {
+    updatePrivateRow();
+    updateRemindersRow();
+  });
+
+  document.getElementById('ev-reminder-add').addEventListener('click', addReminderRow);
 
   // Date/time pickers with auto-adjustment logic
   [
@@ -1781,19 +1909,21 @@ function bindEventModal() {
           }
         }
       } else {
-        // Validate end is not before start
+        // End moved before start → move the start back instead of erroring
+        // (mirror of the start handler, which moves the end).
         if (mode === 'datetime') {
           const startVal = document.getElementById('ev-start').value;
-          if (startVal && new Date(result) <= new Date(startVal)) {
-            const corrected = new Date(new Date(startVal).getTime() + 3600000);
-            setDtValue('ev-end', toLocalDatetimeInput(corrected), 'datetime');
-            showToast(t('error_end_before_start'), true);
+          if (startVal && new Date(result) < new Date(startVal)) {
+            const os = oldStart ? new Date(oldStart) : null;
+            const oe = oldEnd ? new Date(oldEnd) : null;
+            const duration = (os && oe && oe > os) ? (oe - os) : 3600000;
+            const ns = new Date(new Date(result).getTime() - duration);
+            setDtValue('ev-start', toLocalDatetimeInput(ns), 'datetime');
           }
         } else {
           const startVal = document.getElementById('ev-start-date').value;
           if (startVal && result < startVal) {
-            setDtValue('ev-end-date', startVal, 'date');
-            showToast(t('error_end_before_start'), true);
+            setDtValue('ev-start-date', result, 'date');
           }
         }
       }
@@ -1896,7 +2026,7 @@ function bindEventModal() {
           );
         } else if (ev.source === 'local') {
           await api.put(`/local/events/${encodeURIComponent(ev.id)}`,
-            { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '', private: isPrivate }
+            { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '', private: isPrivate, reminders: state.eventReminders }
           );
         } else if (ev.source === 'ical') {
           showToast(t('event_readonly'), true);
@@ -1919,6 +2049,7 @@ function bindEventModal() {
           color: color || null,
           rrule: rrule || null,
           private: ev.source === 'local' ? isPrivate : ev.private,
+          reminders: ev.source === 'local' ? state.eventReminders.slice() : ev.reminders,
         });
         showToast(t('event_updated'));
       } else if (isGoogle) {
@@ -1933,7 +2064,7 @@ function bindEventModal() {
         await api.post('/local/events', {
           calendar_id: calId, title, start, end, allDay,
           location: loc, description: desc, color: color || null,
-          rrule: rrule || null, private: isPrivate,
+          rrule: rrule || null, private: isPrivate, reminders: state.eventReminders,
         });
         showToast(t('event_created'));
       } else if (isHA) {
