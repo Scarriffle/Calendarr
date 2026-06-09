@@ -3,14 +3,19 @@ import WidgetKit
 
 private let rowHeight: CGFloat = 16
 private let dayHeaderHeight: CGFloat = 14
-private let maxEventsPerDay: Int = 3
-private let maxTotalRows: Int = 22
+// Show all events of a day (the total-row cap below governs how much fits);
+// a low per-day cap previously made busy days collapse to "+N" far too early.
+private let maxEventsPerDay: Int = 25
 
 struct UpcomingWidgetView: View {
     let entry: CalendarrEntry
+    @Environment(\.widgetFamily) private var family
 
     private var snapshot: WidgetSnapshot? { entry.snapshot }
     private var lang: String { snapshot?.language ?? "system" }
+
+    // Fill the available height: extraLarge (iPad) fits far more rows.
+    private var maxTotalRows: Int { family == .systemExtraLarge ? 40 : 22 }
 
     private var groupedWithLimits: [(Date, [WidgetEvent], Int)] {
         guard let s = snapshot else { return [] }
