@@ -74,6 +74,11 @@ class CalendarStore {
     /// show/hide list. Re-activation happens in AccountsView.
     var banishedCalendarKeys: Set<String> = CalendarStore.loadBanishedKeys()
 
+    /// Set of `"source:calendarId"` keys whose events must NOT generate reminder
+    /// notifications (mirrors the server `reminders_enabled=false` flag). Persisted
+    /// in UserDefaults; reconciled from the server in the filter sheet.
+    var reminderDisabledKeys: Set<String> = CalendarStore.loadReminderDisabledKeys()
+
     /// Group-overlay visibility: which members' calendars (`gm:<userId>`) and the
     /// group calendar (`gc`) are hidden in the combined view — like hiding
     /// individual people in Outlook. In-memory; resets when leaving/switching a
@@ -213,6 +218,42 @@ class CalendarStore {
         publishWidgetSnapshot()
     }
 
+    // MARK: – Reminder-disabled-calendar persistence
+
+    private static let reminderDisabledKeysDefaultsKey = "reminderDisabledCalendarKeys"
+
+    static func loadReminderDisabledKeys() -> Set<String> {
+        guard let raw = UserDefaults.standard.string(forKey: reminderDisabledKeysDefaultsKey),
+              let data = raw.data(using: .utf8),
+              let arr = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
+        return Set(arr)
+    }
+
+    static func saveReminderDisabledKeys(_ keys: Set<String>) {
+        if let data = try? JSONEncoder().encode(Array(keys)),
+           let s = String(data: data, encoding: .utf8) {
+            UserDefaults.standard.set(s, forKey: reminderDisabledKeysDefaultsKey)
+        }
+    }
+
+    /// Toggle whether a single calendar's events generate reminders, then
+    /// reschedule notifications from the cache.
+    func setReminderDisabled(_ key: String, disabled: Bool) {
+        if disabled { reminderDisabledKeys.insert(key) } else { reminderDisabledKeys.remove(key) }
+        Self.saveReminderDisabledKeys(reminderDisabledKeys)
+        rescheduleNotifications()
+    }
+
+    /// Replace the whole set (used when reconciling with the server's
+    /// `reminders_enabled` flags in the filter sheet).
+    func setReminderDisabledKeys(_ keys: Set<String>) {
+        guard keys != reminderDisabledKeys else { return }
+        reminderDisabledKeys = keys
+        Self.saveReminderDisabledKeys(keys)
+        rescheduleNotifications()
+    }
+
     /// Split a `"source:calendarId"` key back into its parts.
     static func parseCalendarKey(_ key: String) -> (source: String, id: Int)? {
         guard let colon = key.firstIndex(of: ":") else { return nil }
@@ -265,14 +306,14 @@ class CalendarStore {
                 && !banishedCalendarKeys.contains(key)
         }
         // Personal events drive local reminder notifications.
-        NotificationScheduler.reschedule(events: allCachedEvents)
+        NotificationScheduler.reschedule(events: allCachedEvents, disabledCalendarKeys: reminderDisabledKeys)
     }
 
     /// Recompute scheduled reminder notifications from the personal cache
     /// (skipped while a group overlay is active).
     func rescheduleNotifications() {
         guard activeGroup == nil else { return }
-        NotificationScheduler.reschedule(events: allCachedEvents)
+        NotificationScheduler.reschedule(events: allCachedEvents, disabledCalendarKeys: reminderDisabledKeys)
     }
 
     /// Optimistically drop a just-deleted event from the cache so it disappears

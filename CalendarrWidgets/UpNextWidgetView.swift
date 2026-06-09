@@ -108,7 +108,7 @@ struct UpNextWidgetView: View {
                             Text(ev.title)
                                 .font(.system(size: 10, weight: .semibold))
                                 .lineLimit(1)
-                            Text(ev.isAllDay ? WidgetL10n.t("widget.allday", lang) : timeFmt.string(from: ev.start))
+                            Text(WidgetTime.range(ev, lang: lang))
                                 .font(.system(size: 9))
                                 .foregroundStyle(.secondary)
                         }

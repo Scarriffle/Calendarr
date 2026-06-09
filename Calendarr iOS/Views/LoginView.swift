@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LoginView: View {
     @Environment(AppState.self) var appState
+    @AppStorage("appLanguage") private var appLang = "system"
     @State private var username = ""
     @State private var password = ""
     @State private var totpCode = ""
@@ -32,10 +33,10 @@ struct LoginView: View {
 
                     VStack(spacing: 16) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Benutzername")
+                            Text(L10n.t("login.username", appLang))
                                 .font(.footnote.weight(.medium))
                                 .foregroundStyle(.secondary)
-                            TextField("Benutzername", text: $username)
+                            TextField(L10n.t("login.username", appLang), text: $username)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .padding(12)
@@ -44,10 +45,10 @@ struct LoginView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Passwort")
+                            Text(L10n.t("login.password", appLang))
                                 .font(.footnote.weight(.medium))
                                 .foregroundStyle(.secondary)
-                            SecureField("Passwort", text: $password)
+                            SecureField(L10n.t("login.password", appLang), text: $password)
                                 .padding(12)
                                 .background(.quaternary)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -55,10 +56,10 @@ struct LoginView: View {
 
                         if needsTOTP {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("2FA-Code")
+                                Text(L10n.t("login.totp", appLang))
                                     .font(.footnote.weight(.medium))
                                     .foregroundStyle(.secondary)
-                                TextField("6-stelliger Code", text: $totpCode)
+                                TextField(L10n.t("login.totp_placeholder", appLang), text: $totpCode)
                                     .keyboardType(.numberPad)
                                     .padding(12)
                                     .background(.quaternary)
@@ -67,7 +68,7 @@ struct LoginView: View {
                             .transition(.move(edge: .top).combined(with: .opacity))
                         }
 
-                        Toggle("Angemeldet bleiben", isOn: $rememberMe)
+                        Toggle(L10n.t("login.remember", appLang), isOn: $rememberMe)
                             .tint(Color.accentColor)
 
                         if !error.isEmpty {
@@ -84,7 +85,7 @@ struct LoginView: View {
                                 if isLoading {
                                     ProgressView().tint(.white)
                                 } else {
-                                    Text("Anmelden").fontWeight(.semibold)
+                                    Text(L10n.t("login.signin", appLang)).fontWeight(.semibold)
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -100,7 +101,7 @@ struct LoginView: View {
 
                     Spacer().frame(height: 40)
 
-                    Button("Anderen Server wählen") {
+                    Button(L10n.t("login.choose_server", appLang)) {
                         appState.resetServer()
                     }
                     .font(.footnote)

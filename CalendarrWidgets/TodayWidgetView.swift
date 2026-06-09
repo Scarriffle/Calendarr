@@ -74,7 +74,7 @@ struct TodayWidgetView: View {
                 Text(ev.title)
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
-                Text(ev.isAllDay ? WidgetL10n.t("widget.allday", lang) : timeFmt.string(from: ev.start))
+                Text(WidgetTime.range(ev, lang: lang))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

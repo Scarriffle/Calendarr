@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ServerSetupView: View {
     @Environment(AppState.self) var appState
+    @AppStorage("appLanguage") private var appLang = "system"
     @State private var urlInput = ""
     @State private var error = ""
     @State private var isChecking = false
@@ -18,13 +19,13 @@ struct ServerSetupView: View {
                             .foregroundStyle(Color.accentColor)
                         Text("Calendarr")
                             .font(.largeTitle.bold())
-                        Text("Server verbinden")
+                        Text(L10n.t("server.connect_title", appLang))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Server-URL")
+                        Text(L10n.t("server.url", appLang))
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
                         TextField("https://calendarr.example.com", text: $urlInput)
@@ -50,7 +51,7 @@ struct ServerSetupView: View {
                                 ProgressView()
                                     .tint(.white)
                             } else {
-                                Text("Verbinden")
+                                Text(L10n.t("server.connect", appLang))
                                     .fontWeight(.semibold)
                             }
                         }
@@ -88,7 +89,7 @@ struct ServerSetupView: View {
             _ = try await CalendarrAPI.checkSetupRequired(baseURL: url)
             appState.saveServer(url: url)
         } catch {
-            self.error = "Server nicht erreichbar. URL prüfen."
+            self.error = L10n.t("server.unreachable", appLang)
         }
     }
 }

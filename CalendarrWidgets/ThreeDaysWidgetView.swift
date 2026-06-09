@@ -121,7 +121,7 @@ struct ThreeDaysWidgetView: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            Text(ev.isAllDay ? WidgetL10n.t("widget.allday", lang) : timeFmt.string(from: ev.start))
+            Text(WidgetTime.range(ev, lang: lang))
                 .font(.system(size: 8))
                 .foregroundStyle(.secondary)
                 .padding(.leading, 5)

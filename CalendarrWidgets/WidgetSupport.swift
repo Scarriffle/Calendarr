@@ -18,6 +18,21 @@ extension Color {
     }
 }
 
+/// Shared event time formatting for all widgets: "start – end", or the
+/// localized all-day label. Keeps every widget's event row consistent.
+enum WidgetTime {
+    static func range(_ ev: WidgetEvent, lang: String) -> String {
+        if ev.isAllDay { return WidgetL10n.t("widget.allday", lang) }
+        let f = DateFormatter()
+        f.locale = WidgetL10n.locale(lang)
+        f.dateFormat = "HH:mm"
+        let start = f.string(from: ev.start)
+        // Hide a redundant identical end time (zero-length events).
+        if ev.end <= ev.start { return start }
+        return "\(start) – \(f.string(from: ev.end))"
+    }
+}
+
 enum WidgetL10n {
     static func t(_ key: String, _ stored: String) -> String {
         let lang: String
@@ -46,14 +61,14 @@ enum WidgetL10n {
             "widget.no_events":     "Keine Termine",
             "widget.allday":        "Ganztägig",
             "widget.more":          "+%d weitere",
-            "widget.upcoming":      "Nächste 5 Tage",
+            "widget.upcoming":      "Nächste 7 Tage",
             "widget.no_data":       "Keine Daten – App einmal öffnen",
             "widget.display.today_title":       "Heute",
             "widget.display.today_desc":        "Heutige Termine auf einen Blick.",
             "widget.display.days_title":        "Heute & Morgen",
             "widget.display.days_desc":         "Termine der nächsten zwei Tage.",
-            "widget.display.upcoming_title":    "Nächste 5 Tage",
-            "widget.display.upcoming_desc":     "Termine der nächsten 5 Tage.",
+            "widget.display.upcoming_title":    "Nächste 7 Tage",
+            "widget.display.upcoming_desc":     "Termine der nächsten 7 Tage.",
             "widget.display.thisweek_title":    "Diese Woche",
             "widget.display.thisweek_desc":     "Wochenraster mit Terminen.",
             "widget.display.twoweeks_title":    "Zwei Wochen",
@@ -84,14 +99,14 @@ enum WidgetL10n {
             "widget.no_events":     "No events",
             "widget.allday":        "All-day",
             "widget.more":          "+%d more",
-            "widget.upcoming":      "Next 5 days",
+            "widget.upcoming":      "Next 7 days",
             "widget.no_data":       "No data – open the app once",
             "widget.display.today_title":       "Today",
             "widget.display.today_desc":        "Today's events at a glance.",
             "widget.display.days_title":        "Today & tomorrow",
             "widget.display.days_desc":         "Events for the next two days.",
-            "widget.display.upcoming_title":    "Next 5 days",
-            "widget.display.upcoming_desc":     "Events for the next 5 days.",
+            "widget.display.upcoming_title":    "Next 7 days",
+            "widget.display.upcoming_desc":     "Events for the next 7 days.",
             "widget.display.thisweek_title":    "This Week",
             "widget.display.thisweek_desc":     "Week grid with events.",
             "widget.display.twoweeks_title":    "Two Weeks",

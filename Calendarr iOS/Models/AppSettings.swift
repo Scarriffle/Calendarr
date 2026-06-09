@@ -92,10 +92,12 @@ struct CalDAVCalendar: Codable, Identifiable {
     var color: String?
     var enabled: Bool
     var sidebarHidden: Bool
+    var remindersEnabled: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name, color, enabled
         case sidebarHidden = "sidebar_hidden"
+        case remindersEnabled = "reminders_enabled"
     }
 }
 
@@ -108,10 +110,12 @@ struct LocalCalendar: Codable, Identifiable {
     var sharedBy: String? = nil
     var permission: String? = nil
     var group: Bool = false
+    var remindersEnabled: Bool = true
 
     enum CodingKeys: String, CodingKey {
         case id, name, color, enabled, owned, permission, group
         case sharedBy = "shared_by"
+        case remindersEnabled = "reminders_enabled"
     }
 
     init(from decoder: Decoder) throws {
@@ -124,6 +128,7 @@ struct LocalCalendar: Codable, Identifiable {
         sharedBy  = try c.decodeIfPresent(String.self, forKey: .sharedBy)
         permission = try c.decodeIfPresent(String.self, forKey: .permission)
         group     = try c.decodeIfPresent(Bool.self, forKey: .group) ?? false
+        remindersEnabled = try c.decodeIfPresent(Bool.self, forKey: .remindersEnabled) ?? true
     }
 }
 
@@ -135,11 +140,13 @@ struct ICalSubscription: Codable, Identifiable {
     var enabled: Bool
     var refreshMinutes: Int
     var lastFetched: String?
+    var remindersEnabled: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name, url, color, enabled
         case refreshMinutes = "refresh_minutes"
         case lastFetched = "last_fetched"
+        case remindersEnabled = "reminders_enabled"
     }
 }
 
@@ -155,10 +162,12 @@ struct GoogleCalendar: Codable, Identifiable {
     var color: String?
     var enabled: Bool
     var sidebarHidden: Bool
+    var remindersEnabled: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name, color, enabled
         case sidebarHidden = "sidebar_hidden"
+        case remindersEnabled = "reminders_enabled"
     }
 }
 
@@ -182,11 +191,13 @@ struct HACalendar: Codable, Identifiable {
     var color: String?
     var enabled: Bool
     var sidebarHidden: Bool
+    var remindersEnabled: Bool = true
 
     enum CodingKeys: String, CodingKey {
         case id, name, color, enabled
         case entityId = "entity_id"
         case sidebarHidden = "sidebar_hidden"
+        case remindersEnabled = "reminders_enabled"
     }
 
     init(from decoder: Decoder) throws {
@@ -197,6 +208,7 @@ struct HACalendar: Codable, Identifiable {
         color         = try c.decodeIfPresent(String.self, forKey: .color)
         enabled       = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
         sidebarHidden = try c.decodeIfPresent(Bool.self, forKey: .sidebarHidden) ?? false
+        remindersEnabled = try c.decodeIfPresent(Bool.self, forKey: .remindersEnabled) ?? true
     }
 }
 

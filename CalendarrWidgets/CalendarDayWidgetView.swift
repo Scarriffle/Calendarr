@@ -41,11 +41,11 @@ struct CalendarDayWidgetView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header(primary: primary)
                 weekStrip(snapshot: s, primary: primary, accent: accent)
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 3)
                 Rectangle()
                     .fill(Color(widgetHex: s.lineColorHex).opacity(0.4))
                     .frame(height: 0.5)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 4)
                 eventList(accent: accent)
             }
         } else {
@@ -61,9 +61,9 @@ struct CalendarDayWidgetView: View {
     private func header(primary: Color) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text("\(cal.component(.day, from: entry.date))")
-                .font(.system(size: 36, weight: .bold))
+                .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(primary)
-                .frame(width: 44, alignment: .leading)
+                .frame(width: 40, alignment: .leading)
                 .minimumScaleFactor(0.7)
             VStack(alignment: .leading, spacing: 1) {
                 Text(monthFmt.string(from: entry.date).uppercased())
@@ -125,12 +125,12 @@ struct CalendarDayWidgetView: View {
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
         } else {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(upcomingEvents.prefix(3)) { ev in
                     HStack(alignment: .center, spacing: 6) {
                         RoundedRectangle(cornerRadius: 1.5)
                             .fill(Color(widgetHex: ev.colorHex))
-                            .frame(width: 3, height: 26)
+                            .frame(width: 3, height: 22)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(ev.title)
                                 .font(.system(size: 11, weight: .semibold))

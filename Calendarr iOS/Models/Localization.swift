@@ -259,6 +259,30 @@ private let strings: [String: [String: String]] = [
         "event.save": "Sichern",
         "event.add": "Hinzufügen",
 
+        // Event detail
+        "detail.title": "Termin",
+        "detail.source": "Quelle",
+        "detail.created_by": "Erstellt von",
+        "detail.delete": "Termin löschen",
+        "detail.edit": "Bearbeiten",
+        "detail.delete_confirm_title": "Termin löschen?",
+        "detail.delete_msg_suffix": "wird dauerhaft gelöscht.",
+        "common.delete": "Löschen",
+
+        // Login / server setup
+        "login.username": "Benutzername",
+        "login.password": "Passwort",
+        "login.totp": "2FA-Code",
+        "login.totp_placeholder": "6-stelliger Code",
+        "login.remember": "Angemeldet bleiben",
+        "login.signin": "Anmelden",
+        "login.choose_server": "Anderen Server wählen",
+        "server.connect_title": "Server verbinden",
+        "server.url": "Server-URL",
+        "server.connect": "Verbinden",
+        "server.unreachable": "Server nicht erreichbar. URL prüfen.",
+        "settings.email": "E-Mail",
+
         // Accounts
         "accounts.title": "Konten",
         "accounts.loading": "Lade Konten…",
@@ -292,6 +316,8 @@ private let strings: [String: [String: String]] = [
         "filter.hide_all": "Alle ausblenden",
         "filter.button": "Kalender ein-/ausblenden",
         "filter.banish": "Dauerhaft ausblenden",
+        "filter.reminders_on": "Benachrichtigungen an",
+        "filter.reminders_off": "Benachrichtigungen aus",
         "filter.banished_footer": "Dauerhaft ausgeblendete Kalender erscheinen unter »Konten & Kalender« und können dort wieder eingeblendet werden.",
         "accounts.banished_header": "Ausgeblendete Kalender",
         "accounts.banished_unhide": "Wieder einblenden",
@@ -561,6 +587,30 @@ private let strings: [String: [String: String]] = [
         "event.save": "Save",
         "event.add": "Add",
 
+        // Event detail
+        "detail.title": "Event",
+        "detail.source": "Source",
+        "detail.created_by": "Created by",
+        "detail.delete": "Delete event",
+        "detail.edit": "Edit",
+        "detail.delete_confirm_title": "Delete event?",
+        "detail.delete_msg_suffix": "will be permanently deleted.",
+        "common.delete": "Delete",
+
+        // Login / server setup
+        "login.username": "Username",
+        "login.password": "Password",
+        "login.totp": "2FA code",
+        "login.totp_placeholder": "6-digit code",
+        "login.remember": "Stay signed in",
+        "login.signin": "Sign in",
+        "login.choose_server": "Choose another server",
+        "server.connect_title": "Connect server",
+        "server.url": "Server URL",
+        "server.connect": "Connect",
+        "server.unreachable": "Server unreachable. Check the URL.",
+        "settings.email": "Email",
+
         // Accounts
         "accounts.title": "Accounts",
         "accounts.loading": "Loading accounts…",
@@ -594,6 +644,8 @@ private let strings: [String: [String: String]] = [
         "filter.hide_all": "Hide all",
         "filter.button": "Show/hide calendars",
         "filter.banish": "Hide permanently",
+        "filter.reminders_on": "Reminders on",
+        "filter.reminders_off": "Reminders off",
         "filter.banished_footer": "Permanently hidden calendars appear under “Accounts & Calendars”, where you can show them again.",
         "accounts.banished_header": "Hidden calendars",
         "accounts.banished_unhide": "Show again",

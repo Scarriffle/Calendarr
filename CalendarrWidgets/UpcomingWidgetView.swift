@@ -4,7 +4,7 @@ import WidgetKit
 private let rowHeight: CGFloat = 16
 private let dayHeaderHeight: CGFloat = 14
 private let maxEventsPerDay: Int = 3
-private let maxTotalRows: Int = 15
+private let maxTotalRows: Int = 22
 
 struct UpcomingWidgetView: View {
     let entry: CalendarrEntry
@@ -16,7 +16,7 @@ struct UpcomingWidgetView: View {
         guard let s = snapshot else { return [] }
         let cal = Calendar.current
         let now = entry.date
-        let events = WidgetHelpers.upcoming(from: now, daysAhead: 5, in: s)
+        let events = WidgetHelpers.upcoming(from: now, daysAhead: 7, in: s)
         var buckets: [Date: [WidgetEvent]] = [:]
         for ev in events {
             let key = cal.startOfDay(for: ev.start)

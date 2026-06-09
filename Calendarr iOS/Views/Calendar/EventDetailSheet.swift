@@ -11,6 +11,7 @@ struct EventDetailSheet: View {
     let onDone: (_ editEvent: CalEvent?, _ forceReload: Bool) async -> Void
 
     @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
     @State private var showDeleteConfirm = false
     @State private var isDeleting = false
     @State private var showCopySheet = false
@@ -33,10 +34,10 @@ struct EventDetailSheet: View {
         if event.isAllDay {
             if Calendar.current.isDate(event.startDate, inSameDayAs: event.endDate) ||
                event.endDate == event.startDate {
-                return "Ganztägig · \(dateFmt.string(from: event.startDate))"
+                return "\(L10n.t("event.allday", appLang)) · \(dateFmt.string(from: event.startDate))"
             }
             let end = Calendar.current.date(byAdding: .day, value: -1, to: event.endDate) ?? event.endDate
-            return "Ganztägig · \(dateFmt.string(from: event.startDate)) – \(dateFmt.string(from: end))"
+            return "\(L10n.t("event.allday", appLang)) · \(dateFmt.string(from: event.startDate)) – \(dateFmt.string(from: end))"
         }
         return "\(timeFmt.string(from: event.startDate)) – \(timeFmt.string(from: event.endDate))"
     }
@@ -85,27 +86,27 @@ struct EventDetailSheet: View {
 
                 Section {
                     HStack {
-                        Label("Kalender", systemImage: "calendar")
+                        Label(L10n.t("event.calendar_section", appLang), systemImage: "calendar")
                         Spacer()
                         Text(event.calendarName)
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Label("Quelle", systemImage: "server.rack")
+                        Label(L10n.t("detail.source", appLang), systemImage: "server.rack")
                         Spacer()
                         Text(event.source.capitalized)
                             .foregroundStyle(.secondary)
                     }
                     if let creator = event.creator, creator.id != currentUserId {
                         HStack {
-                            Label("Erstellt von", systemImage: "person")
+                            Label(L10n.t("detail.created_by", appLang), systemImage: "person")
                             Spacer()
                             Text(creator.displayName)
                                 .foregroundStyle(.secondary)
                         }
                     }
                     if event.isPrivate {
-                        Label("Privat", systemImage: "lock")
+                        Label(L10n.t("event.private", appLang), systemImage: "lock")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -115,7 +116,7 @@ struct EventDetailSheet: View {
                         Button {
                             showCopySheet = true
                         } label: {
-                            Label("Termin kopieren", systemImage: "doc.on.doc")
+                            Label(L10n.t("event.copy_title", appLang), systemImage: "doc.on.doc")
                         }
                     }
                 }
@@ -125,7 +126,7 @@ struct EventDetailSheet: View {
                         Button(role: .destructive) {
                             showDeleteConfirm = true
                         } label: {
-                            Label("Termin löschen", systemImage: "trash")
+                            Label(L10n.t("detail.delete", appLang), systemImage: "trash")
                                 .foregroundStyle(.red)
                         }
                         .disabled(isDeleting)
@@ -133,29 +134,29 @@ struct EventDetailSheet: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Termin")
+            .navigationTitle(L10n.t("detail.title", appLang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Schliessen") {
+                    Button(L10n.t("common.close", appLang)) {
                         Task { await onDone(nil, false) }
                     }
                 }
                 if canEdit {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Bearbeiten") {
+                        Button(L10n.t("detail.edit", appLang)) {
                             Task { await onDone(event, false) }
                         }
                     }
                 }
             }
-            .alert("Termin löschen?", isPresented: $showDeleteConfirm) {
-                Button("Löschen", role: .destructive) {
+            .alert(L10n.t("detail.delete_confirm_title", appLang), isPresented: $showDeleteConfirm) {
+                Button(L10n.t("common.delete", appLang), role: .destructive) {
                     Task { await deleteEvent() }
                 }
-                Button("Abbrechen", role: .cancel) {}
+                Button(L10n.t("common.cancel", appLang), role: .cancel) {}
             } message: {
-                Text("\"\(event.title)\" wird dauerhaft gelöscht.")
+                Text("\"\(event.title)\" \(L10n.t("detail.delete_msg_suffix", appLang))")
             }
             .sheet(isPresented: $showCopySheet) {
                 EventEditorSheet(

@@ -93,9 +93,9 @@ struct SettingsView: View {
                 Text(loginName).foregroundStyle(.secondary)
             }
             HStack {
-                Text("E-Mail")
+                Text(L10n.t("settings.email", appLang))
                 Spacer()
-                TextField("E-Mail", text: $email)
+                TextField(L10n.t("settings.email", appLang), text: $email)
                     .multilineTextAlignment(.trailing)
                     .keyboardType(.emailAddress)
                     .autocapitalization(.none)

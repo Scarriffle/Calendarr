@@ -18,6 +18,8 @@ struct CalendarFilterSheet: View {
     @State private var isLoading = true
     @State private var hidden: Set<String> = []
     @State private var banished: Set<String> = []
+    /// Calendars whose events do not generate reminder notifications.
+    @State private var reminderDisabled: Set<String> = []
     /// All non-banished keys discovered during load — used by bulk show/hide.
     @State private var allKeys: Set<String> = []
     /// Group-mode: the active group's full detail (members + colours) and the
@@ -155,12 +157,27 @@ struct CalendarFilterSheet: View {
                     .foregroundStyle(isVisible ? .primary : .secondary)
                     .strikethrough(!isVisible, color: .secondary)
                 Spacer()
+                if reminderDisabled.contains(key) {
+                    Image(systemName: "bell.slash")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Image(systemName: isVisible ? "eye" : "eye.slash")
                     .foregroundStyle(isVisible ? Color.accentColor : .secondary)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            let disabled = reminderDisabled.contains(key)
+            Button {
+                toggleReminders(forKey: key)
+            } label: {
+                Label(L10n.t(disabled ? "filter.reminders_on" : "filter.reminders_off", appLang),
+                      systemImage: disabled ? "bell" : "bell.slash")
+            }
+            .tint(.orange)
+        }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 hidden.remove(key)
@@ -170,6 +187,17 @@ struct CalendarFilterSheet: View {
             } label: {
                 Label(L10n.t("filter.banish", appLang), systemImage: "archivebox")
             }
+        }
+    }
+
+    /// Flip a calendar's reminder mute, persist locally + on the server, reschedule.
+    private func toggleReminders(forKey key: String) {
+        let nowDisabled = !reminderDisabled.contains(key)
+        if nowDisabled { reminderDisabled.insert(key) } else { reminderDisabled.remove(key) }
+        store.setReminderDisabled(key, disabled: nowDisabled)
+        if let parsed = CalendarStore.parseCalendarKey(key) {
+            Task { try? await api.setCalendarRemindersEnabled(
+                source: parsed.source, calendarId: parsed.id, enabled: !nowDisabled) }
         }
     }
 
@@ -249,6 +277,19 @@ struct CalendarFilterSheet: View {
         for acc in haAccounts     { for cal in acc.calendars ?? [] { applyServerHidden("homeassistant", cal.id, cal.sidebarHidden) } }
         store.setBanishedCalendars(b)
         banished = b
+
+        // Reconcile reminder-muted state from the server's reminders_enabled flags.
+        var rd = Set<String>()
+        func applyReminders(_ source: String, _ id: Int, _ enabled: Bool) {
+            if !enabled { rd.insert(CalendarStore.calendarKey(source: source, calendarId: "\(id)")) }
+        }
+        for cal in localCalendars { applyReminders("local", cal.id, cal.remindersEnabled) }
+        for acc in caldavAccounts { for cal in acc.calendars ?? [] { applyReminders("caldav", cal.id, cal.remindersEnabled ?? true) } }
+        for sub in icalSubs       { applyReminders("ical", sub.id, sub.remindersEnabled ?? true) }
+        for acc in googleAccounts { for cal in acc.calendars ?? [] { applyReminders("google", cal.id, cal.remindersEnabled ?? true) } }
+        for acc in haAccounts     { for cal in acc.calendars ?? [] { applyReminders("homeassistant", cal.id, cal.remindersEnabled) } }
+        store.setReminderDisabledKeys(rd)
+        reminderDisabled = rd
 
         var keys = Set<String>()
         for cal in localCalendars {

@@ -402,6 +402,21 @@ class CalendarrAPI {
                               body: ["enabled": !hidden, "sidebar_hidden": hidden])
     }
 
+    /// Toggle a calendar's server-side `reminders_enabled` flag. Supported for
+    /// all source types (caldav/google/homeassistant/local/ical).
+    func setCalendarRemindersEnabled(source: String, calendarId: Int, enabled: Bool) async throws {
+        let path: String
+        switch source {
+        case "caldav":        path = "/api/caldav/calendars/\(calendarId)"
+        case "google":        path = "/api/google/calendars/\(calendarId)"
+        case "homeassistant": path = "/api/homeassistant/calendars/\(calendarId)"
+        case "local":         path = "/api/local/calendars/\(calendarId)"
+        case "ical":          path = "/api/ical/subscriptions/\(calendarId)"
+        default:              return
+        }
+        _ = try await request(path, method: "PUT", body: ["reminders_enabled": enabled])
+    }
+
     // MARK: – Calendar colour
 
     func updateLocalCalendarColor(id: Int, color: String) async throws {

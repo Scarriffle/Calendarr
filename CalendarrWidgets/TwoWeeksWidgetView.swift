@@ -111,19 +111,22 @@ struct TwoWeeksWidgetView: View {
                 .frame(width: 12, height: 12)
                 .background(isToday ? primary : Color.clear)
                 .clipShape(Circle())
-            // Up to 3 colored dots
-            HStack(spacing: 1) {
-                ForEach(evs.prefix(3).indices, id: \.self) { i in
-                    Circle()
-                        .fill(Color(widgetHex: evs[i].colorHex))
-                        .frame(width: 3, height: 3)
-                }
+            // Up to 2 mini event-title pills (the cell has room for titles).
+            ForEach(evs.prefix(2)) { ev in
+                Text(ev.title)
+                    .font(.system(size: 6, weight: .medium))
+                    .lineLimit(1)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 1.5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(widgetHex: ev.colorHex))
+                    .clipShape(RoundedRectangle(cornerRadius: 1.5))
             }
-            .frame(height: 3)
-            if evs.count > 3 {
-                Text("+\(evs.count - 3)")
+            if evs.count > 2 {
+                Text("+\(evs.count - 2)")
                     .font(.system(size: 6))
                     .foregroundStyle(accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             Spacer(minLength: 0)
         }

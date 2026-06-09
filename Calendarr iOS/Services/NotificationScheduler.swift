@@ -18,7 +18,9 @@ enum NotificationScheduler {
 
     /// Recompute and (re)schedule notifications from the given events. The iOS
     /// pending-notification cap is 64, so only the soonest are scheduled.
-    static func reschedule(events: [CalEvent]) {
+    /// `disabledCalendarKeys` ("source:id") are calendars with reminders turned
+    /// off — their events never generate notifications.
+    static func reschedule(events: [CalEvent], disabledCalendarKeys: Set<String> = []) {
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized
@@ -28,6 +30,11 @@ enum NotificationScheduler {
             let now = Date()
             var pending: [(fire: Date, event: CalEvent)] = []
             for ev in events {
+                // Skip calendars the user muted for reminders.
+                if !disabledCalendarKeys.isEmpty {
+                    let key = CalendarStore.calendarKey(source: ev.source, calendarId: ev.calendarId)
+                    if disabledCalendarKeys.contains(key) { continue }
+                }
                 let offsets = ev.reminders.isEmpty
                     ? (defaultMin >= 0 ? [defaultMin] : [])
                     : ev.reminders

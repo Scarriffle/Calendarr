@@ -110,9 +110,11 @@ struct TwoMonthWidgetView: View {
                                     primary: primary, accent: accent)
                         }
                     }
+                    // Distribute weeks across the full column height instead of
+                    // top-packing them (which left the lower portion empty).
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            Spacer(minLength: 0)
         }
     }
 
