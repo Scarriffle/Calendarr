@@ -713,10 +713,12 @@ function renderCalendarList() {
       sourceLabel: `${t('shared_with_me')} · ${cal.shared_by || ''}`, remove: null });
   });
   // Group calendars (owned by the creator or reached via membership) — shown so
-  // they can be toggled/recoloured; marked with the group emoji.
+  // they can be toggled/recoloured. Owned group calendars can also be muted
+  // (reminders), which the server then syncs; member-reached ones can't (no PUT).
   state.localCalendars.filter(c => c.group).forEach(cal => {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.name, color: cal.color, enabled: cal.enabled,
+      reminders: cal.owned !== false, remindersEnabled: cal.reminders_enabled !== false,
       sourceLabel: `${t('groups_title')} · ${cal.shared_by || ''}`, isGroupCal: true, remove: null });
   });
   state.icalSubscriptions.forEach(sub => {
@@ -1718,13 +1720,14 @@ function resetColorPicker(color) {
 }
 
 // ── Reminders (local events only) ─────────────────────────
-const REMINDER_OPTIONS = [0, 5, 10, 15, 30, 60, 120, 1440, 2880];
+const REMINDER_OPTIONS = [0, 5, 15, 30, 60, 1440, 10080];
 
 function reminderLabel(min) {
   if (min <= 0) return t('reminder_at_start');
-  if (min < 60) return t('reminder_min', { n: min });
-  if (min < 1440) return t('reminder_hour', { n: min / 60 });
-  return t('reminder_day', { n: min / 1440 });
+  if (min < 60)    return t('reminder_minutes', { n: min });
+  if (min < 1440)  { const h = min / 60;    return h === 1 ? t('reminder_hour_one') : t('reminder_hours', { n: h }); }
+  if (min < 10080) { const d = min / 1440;  return d === 1 ? t('reminder_day_one')  : t('reminder_days',  { n: d }); }
+  const w = min / 10080;                    return w === 1 ? t('reminder_week_one') : t('reminder_weeks', { n: w });
 }
 
 function setEventReminders(arr) {
