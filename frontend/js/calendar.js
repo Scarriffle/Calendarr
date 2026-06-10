@@ -9,8 +9,8 @@ import { openDatePicker, formatDtDisplay } from './date-picker.js';
 import { t, setLang, getLang } from './i18n.js';
 import { APP_VERSION } from './version.js';
 
-// Version sofort beim Modul-Load ueberall sichtbar setzen.
-document.title = `Calendarr ${APP_VERSION}`;
+// Version im Impressum/Sidebar sichtbar, nicht im Tab-Titel.
+document.title = 'Calendarr';
 document.addEventListener('DOMContentLoaded', () => {
   const imp = document.getElementById('impressum-version');
   if (imp) imp.textContent = `Calendarr ${APP_VERSION}`;
@@ -543,7 +543,7 @@ function updateTitle() {
   titleEl.innerHTML =
     `<span class="view-title-main">${main}</span>` +
     (year ? `<span class="view-title-year">${year}</span>` : '');
-  document.title = `Calendarr ${APP_VERSION} - ${fullText}`;
+  document.title = `Calendarr – ${fullText}`;
 }
 
 function updateViewButtons() {

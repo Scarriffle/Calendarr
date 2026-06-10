@@ -733,6 +733,43 @@ a { color: var(--primary); text-decoration: none; }
 }
 .month-more:hover { color: var(--primary); }
 
+/* Overflow popup ("+N weitere") */
+.month-overflow-popup {
+  position: fixed; z-index: 800;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 10px 0;
+  min-width: 220px; max-width: 300px;
+  user-select: none;
+}
+.mop-header {
+  font-size: 12px; font-weight: 600;
+  color: var(--text-2);
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.mop-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 12px; cursor: pointer;
+  border-radius: 6px; margin: 0 4px;
+}
+.mop-row:hover { background: var(--bg-hover); }
+.mop-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.mop-time {
+  font-size: 11px; color: var(--text-2);
+  min-width: 42px; flex-shrink: 0;
+}
+.mop-title {
+  font-size: 12px; font-weight: 500; color: var(--text-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
 /* ── Week / Day Views ───────────────────────────────────── */
 .week-view, .day-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: scroll; }
 .week-head-sticky {

@@ -71,13 +71,21 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       return new Date(a.ev.start) - new Date(b.ev.start);
     });
 
-    // Assign lanes (greedy interval packing)
-    const lanes = [];
+    // Assign lanes using a 2D occupancy grid (per-column tracking).
+    // This prevents gaps: an event in cols 3-6 no longer blocks col 0-2 in the same lane.
+    const occupiedGrid = []; // occupiedGrid[lane] = Set<col>
     rowItems.forEach(item => {
-      let laneIdx = lanes.findIndex(l => item.colStart >= l.colEnd);
-      if (laneIdx === -1) { laneIdx = lanes.length; lanes.push({ colEnd: 0 }); }
-      item.lane = laneIdx;
-      lanes[laneIdx].colEnd = item.colStart + item.span;
+      const cols = Array.from({ length: item.span }, (_, i) => item.colStart + i);
+      let laneIdx = 0;
+      for (;;) {
+        if (!occupiedGrid[laneIdx]) occupiedGrid[laneIdx] = new Set();
+        if (cols.every(c => !occupiedGrid[laneIdx].has(c))) {
+          cols.forEach(c => occupiedGrid[laneIdx].add(c));
+          item.lane = laneIdx;
+          break;
+        }
+        laneIdx++;
+      }
     });
 
     // Track overflow per column
@@ -190,11 +198,20 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       if (ev) onEventClick(ev, spanEl);
       return;
     }
-    // "+N more" → navigate to day view
+    // "+N more" → show overflow popup with all events for that day
     const moreEl = e.target.closest('.month-more');
     if (moreEl) {
       e.stopPropagation();
-      onDayClick(new Date(moreEl.dataset.date + 'T00:00:00'), 'navigate');
+      const dayDate = new Date(moreEl.dataset.date + 'T00:00:00');
+      const dayEvents = normed
+        .filter(({ ns, ne }) => ns <= dayDate && ne >= dayDate)
+        .map(({ ev }) => ev)
+        .sort((a, b) => {
+          if (a.allDay && !b.allDay) return -1;
+          if (!a.allDay && b.allDay) return 1;
+          return new Date(a.start) - new Date(b.start);
+        });
+      showOverflowPopup(moreEl, dayDate, dayEvents, onEventClick);
       return;
     }
     // Column click → select day
@@ -242,4 +259,67 @@ function escHtml(s) {
 
 function escAttr(s) {
   return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function showOverflowPopup(anchor, date, events, onEventClick) {
+  document.querySelectorAll('.month-overflow-popup').forEach(p => p.remove());
+
+  const popup = document.createElement('div');
+  popup.className = 'month-overflow-popup';
+
+  // Header: "Mo, 3. Jul"
+  const months = t('months');
+  const dow    = t('dow_monday');
+  const dowIdx = (date.getDay() + 6) % 7; // 0=Mon
+  const header = document.createElement('div');
+  header.className = 'mop-header';
+  header.textContent = `${dow[dowIdx]}, ${date.getDate()}. ${months[date.getMonth()]}`;
+  popup.appendChild(header);
+
+  events.forEach(ev => {
+    const row = document.createElement('div');
+    row.className = 'mop-row';
+
+    const dot = document.createElement('span');
+    dot.className = 'mop-dot';
+    dot.style.background = ev.color || ev.calendarColor || '#4285f4';
+
+    const time = document.createElement('span');
+    time.className = 'mop-time';
+    time.textContent = ev.allDay ? t('allday_cap') : fmtTime(new Date(ev.start));
+
+    const title = document.createElement('span');
+    title.className = 'mop-title';
+    title.textContent = ev.title;
+
+    row.append(dot, time, title);
+    row.addEventListener('click', e => {
+      e.stopPropagation();
+      popup.remove();
+      onEventClick(ev, row);
+    });
+    popup.appendChild(row);
+  });
+
+  document.body.appendChild(popup);
+
+  // Position near anchor, stay in viewport
+  const r  = anchor.getBoundingClientRect();
+  const pw = popup.offsetWidth  || 260;
+  const ph = popup.offsetHeight || 200;
+  let left = r.left;
+  let top  = r.bottom + 4;
+  if (left + pw > window.innerWidth  - 8) left = window.innerWidth  - pw - 8;
+  if (top  + ph > window.innerHeight - 8) top  = r.top - ph - 4;
+  if (left < 8) left = 8;
+  if (top  < 8) top  = 8;
+  popup.style.left = left + 'px';
+  popup.style.top  = top  + 'px';
+
+  setTimeout(() => {
+    document.addEventListener('click', function close() {
+      popup.remove();
+      document.removeEventListener('click', close);
+    });
+  }, 0);
 }
