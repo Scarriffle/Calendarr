@@ -277,28 +277,53 @@ function showOverflowPopup(anchor, date, events, onEventClick) {
   popup.appendChild(header);
 
   events.forEach(ev => {
-    const row = document.createElement('div');
-    row.className = 'mop-row';
+    const evStart = new Date(ev.start); evStart.setHours(0, 0, 0, 0);
+    const evEnd   = new Date(ev.end);   evEnd.setHours(0, 0, 0, 0);
+    // allDay end from API is exclusive → actual last day = evEnd - 1d
+    const lastDay      = ev.allDay ? new Date(evEnd.getTime() - 86400000) : evEnd;
+    const continuesLeft  = evStart < date;
+    const continuesRight = lastDay > date;
+    const color = ev.color || ev.calendarColor || '#4285f4';
 
-    const dot = document.createElement('span');
-    dot.className = 'mop-dot';
-    dot.style.background = ev.color || ev.calendarColor || '#4285f4';
+    if (ev.allDay) {
+      // All-day events → colored bar with continuation arrows
+      const bar = document.createElement('div');
+      bar.className = 'mop-bar'
+        + (continuesLeft  ? ' continues-left'  : '')
+        + (continuesRight ? ' continues-right' : '');
+      bar.style.background = color;
+      bar.textContent = ev.title;
+      bar.addEventListener('click', e => {
+        e.stopPropagation();
+        popup.remove();
+        onEventClick(ev, bar);
+      });
+      popup.appendChild(bar);
+    } else {
+      // Timed events → dot + time + title
+      const row = document.createElement('div');
+      row.className = 'mop-row';
 
-    const time = document.createElement('span');
-    time.className = 'mop-time';
-    time.textContent = ev.allDay ? t('allday_cap') : fmtTime(new Date(ev.start));
+      const dot = document.createElement('span');
+      dot.className = 'mop-dot';
+      dot.style.background = color;
 
-    const title = document.createElement('span');
-    title.className = 'mop-title';
-    title.textContent = ev.title;
+      const time = document.createElement('span');
+      time.className = 'mop-time';
+      time.textContent = fmtTime(new Date(ev.start));
 
-    row.append(dot, time, title);
-    row.addEventListener('click', e => {
-      e.stopPropagation();
-      popup.remove();
-      onEventClick(ev, row);
-    });
-    popup.appendChild(row);
+      const title = document.createElement('span');
+      title.className = 'mop-title';
+      title.textContent = ev.title;
+
+      row.append(dot, time, title);
+      row.addEventListener('click', e => {
+        e.stopPropagation();
+        popup.remove();
+        onEventClick(ev, row);
+      });
+      popup.appendChild(row);
+    }
   });
 
   document.body.appendChild(popup);

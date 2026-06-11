@@ -742,6 +742,7 @@ a { color: var(--primary); text-decoration: none; }
   box-shadow: var(--shadow-lg);
   padding: 10px 0;
   min-width: 220px; max-width: 300px;
+  overflow: hidden;
   user-select: none;
 }
 .mop-header {
@@ -768,6 +769,27 @@ a { color: var(--primary); text-decoration: none; }
 .mop-title {
   font-size: 12px; font-weight: 500; color: var(--text-1);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* All-day event bars in overflow popup */
+.mop-bar {
+  position: relative; display: block;
+  margin: 2px 8px; padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px; font-weight: 500; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
+}
+.mop-bar:hover { filter: brightness(1.15); }
+.mop-bar.continues-left  { border-radius: 0 4px 4px 0; margin-left: 0; padding-left: 14px; }
+.mop-bar.continues-right { border-radius: 4px 0 0 4px; margin-right: 0; padding-right: 14px; }
+.mop-bar.continues-left.continues-right { border-radius: 0; }
+.mop-bar.continues-left::before {
+  content: '‹'; position: absolute; left: 3px; top: 50%;
+  transform: translateY(-50%); font-size: 12px; opacity: 0.85;
+}
+.mop-bar.continues-right::after {
+  content: '›'; position: absolute; right: 3px; top: 50%;
+  transform: translateY(-50%); font-size: 12px; opacity: 0.85;
 }
 
 /* ── Week / Day Views ───────────────────────────────────── */
