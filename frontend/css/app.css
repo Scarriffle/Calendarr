@@ -770,9 +770,9 @@ a { color: var(--primary); text-decoration: none; }
   font-size: 12px; font-weight: 500; color: var(--text-1);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* All-day event bars in overflow popup */
+/* All-day event bars in overflow popup — pointed ends via clip-path */
 .mop-bar {
-  position: relative; display: block;
+  display: block;
   margin: 2px 8px; padding: 3px 8px;
   border-radius: 4px;
   font-size: 11px; font-weight: 500; color: #fff;
@@ -780,16 +780,16 @@ a { color: var(--primary); text-decoration: none; }
   cursor: pointer;
 }
 .mop-bar:hover { filter: brightness(1.15); }
-.mop-bar.continues-left  { border-radius: 0 4px 4px 0; margin-left: 0; padding-left: 14px; }
-.mop-bar.continues-right { border-radius: 4px 0 0 4px; margin-right: 0; padding-right: 14px; }
-.mop-bar.continues-left.continues-right { border-radius: 0; }
-.mop-bar.continues-left::before {
-  content: '‹'; position: absolute; left: 3px; top: 50%;
-  transform: translateY(-50%); font-size: 12px; opacity: 0.85;
+.mop-bar.continues-left {
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
+  border-radius: 0; padding-left: 16px;
 }
-.mop-bar.continues-right::after {
-  content: '›'; position: absolute; right: 3px; top: 50%;
-  transform: translateY(-50%); font-size: 12px; opacity: 0.85;
+.mop-bar.continues-right {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  border-radius: 0; padding-right: 16px;
+}
+.mop-bar.continues-left.continues-right {
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
 }
 
 /* ── Week / Day Views ───────────────────────────────────── */
