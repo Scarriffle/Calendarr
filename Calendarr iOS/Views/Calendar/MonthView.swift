@@ -209,7 +209,7 @@ private struct WeekRow: View {
         let weekEndExclusive = cal.date(byAdding: .day, value: 7, to: weekStart)!
         let (placed, extras) = packEvents()
         let allWeekEvents = store.events(in: weekStart, end: weekEndExclusive)
-        let rowHeight = dayNumberRowHeight + CGFloat(maxLanesPerWeek) * (laneHeight + laneSpacing) + 4
+        let rowHeight = dayNumberRowHeight + CGFloat(maxLanesPerWeek) * (laneHeight + laneSpacing) + 16
         let mondayIdx = days.firstIndex(where: { cal.component(.weekday, from: $0) == 2 }) ?? 0
 
         // Where in this row does a new month start? (col 1...6 = mid-row step; nil = no step)
@@ -446,46 +446,57 @@ private struct DayPreviewAllDayBar: View {
     private var cal: Calendar { .current }
 
     var body: some View {
-        let color = Color(hex: event.effectiveColor)
+        let color    = Color(hex: event.effectiveColor)
         let dayStart = cal.startOfDay(for: date)
         let dayEnd   = cal.date(byAdding: .day, value: 1, to: dayStart)!
-        // isAllDay endDate is exclusive
-        let cLeft  = event.startDate < dayStart
-        let cRight = event.endDate > dayEnd
+        let cLeft    = event.startDate < dayStart
+        let cRight   = event.endDate   > dayEnd   // endDate is exclusive for allDay
+        Text(event.title)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 3)
+            .padding(.leading,  cLeft  ? 14 : 8)
+            .padding(.trailing, cRight ? 14 : 8)
+            .background(color)
+            .clipShape(ChevronBarShape(continuesLeft: cLeft, continuesRight: cRight))
+    }
+}
 
-        HStack(spacing: 0) {
-            if cLeft {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.leading, 3)
-            }
-            Text(event.title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .padding(.horizontal, 6)
-            Spacer(minLength: 0)
-            if cRight {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.trailing, 3)
-            }
+private struct ChevronBarShape: Shape {
+    var continuesLeft: Bool
+    var continuesRight: Bool
+    private let tip: CGFloat = 8
+
+    func path(in rect: CGRect) -> Path {
+        guard continuesLeft || continuesRight else {
+            return RoundedRectangle(cornerRadius: 4).path(in: rect)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 3)
-        .background(color)
-        .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius:     cLeft  ? 0 : 4,
-                bottomLeadingRadius:  cLeft  ? 0 : 4,
-                bottomTrailingRadius: cRight ? 0 : 4,
-                topTrailingRadius:    cRight ? 0 : 4
-            )
-        )
-        .padding(.leading,  cLeft  ? 0 : 0)
-        .padding(.trailing, cRight ? 0 : 0)
+        var p = Path()
+        let t = min(tip, rect.width / 2)
+        if continuesLeft && continuesRight {
+            p.move(to:    CGPoint(x: t,             y: 0))
+            p.addLine(to: CGPoint(x: rect.maxX - t, y: 0))
+            p.addLine(to: CGPoint(x: rect.maxX,     y: rect.midY))
+            p.addLine(to: CGPoint(x: rect.maxX - t, y: rect.maxY))
+            p.addLine(to: CGPoint(x: t,             y: rect.maxY))
+            p.addLine(to: CGPoint(x: 0,             y: rect.midY))
+        } else if continuesLeft {
+            p.move(to:    CGPoint(x: t,         y: 0))
+            p.addLine(to: CGPoint(x: rect.maxX, y: 0))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: t,         y: rect.maxY))
+            p.addLine(to: CGPoint(x: 0,         y: rect.midY))
+        } else {
+            p.move(to:    CGPoint(x: 0,             y: 0))
+            p.addLine(to: CGPoint(x: rect.maxX - t, y: 0))
+            p.addLine(to: CGPoint(x: rect.maxX,     y: rect.midY))
+            p.addLine(to: CGPoint(x: rect.maxX - t, y: rect.maxY))
+            p.addLine(to: CGPoint(x: 0,             y: rect.maxY))
+        }
+        p.closeSubpath()
+        return p
     }
 }
 
