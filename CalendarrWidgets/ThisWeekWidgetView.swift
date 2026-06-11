@@ -89,11 +89,11 @@ struct ThisWeekWidgetView: View {
                 .frame(width: 16, height: 16)
                 .background(isToday ? primary : Color.clear)
                 .clipShape(Circle())
-            ForEach(evs.prefix(6)) { ev in
+            ForEach(evs.prefix(8)) { ev in
                 eventPill(ev)
             }
-            if evs.count > 6 {
-                Text("+\(evs.count - 6)")
+            if evs.count > 8 {
+                Text("+\(evs.count - 8)")
                     .font(.system(size: 6.5))
                     .foregroundStyle(accent)
             }

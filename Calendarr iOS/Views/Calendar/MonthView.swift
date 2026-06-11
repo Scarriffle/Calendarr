@@ -206,7 +206,9 @@ private struct WeekRow: View {
     }
 
     var body: some View {
+        let weekEndExclusive = cal.date(byAdding: .day, value: 7, to: weekStart)!
         let (placed, extras) = packEvents()
+        let allWeekEvents = store.events(in: weekStart, end: weekEndExclusive)
         let rowHeight = dayNumberRowHeight + CGFloat(maxLanesPerWeek) * (laneHeight + laneSpacing) + 4
         let mondayIdx = days.firstIndex(where: { cal.component(.weekday, from: $0) == 2 }) ?? 0
 
@@ -229,6 +231,11 @@ private struct WeekRow: View {
                             }
                             return rowStartsNewMonth ? .topHighlight : .none
                         }()
+                        let dayStart = cal.startOfDay(for: day)
+                        let dayEnd   = cal.date(byAdding: .day, value: 1, to: dayStart)!
+                        let eventsForDay = allWeekEvents.filter {
+                            $0.startDate < dayEnd && $0.endDate > dayStart
+                        }
                         DayCell(date: day,
                                 isToday: cal.isDateInToday(day),
                                 monthLabelColor: labelColor,
@@ -240,6 +247,7 @@ private struct WeekRow: View {
                                 weekNumber: idx == mondayIdx ? weekNumber : nil,
                                 cwLabel: L10n.t("cal.cw", language),
                                 edge: edge,
+                                dayEvents: eventsForDay,
                                 onTap: { onDayTap(day) },
                                 onCreateEvent: { onCreateEvent(day) },
                                 onShowWeek: { onShowWeek(day) },
@@ -286,6 +294,7 @@ private struct DayCell: View {
     let weekNumber: Int?
     let cwLabel: String
     let edge: DividerEdge
+    let dayEvents: [CalEvent]
     let onTap: () -> Void
     let onCreateEvent: () -> Void
     let onShowWeek: () -> Void
@@ -372,7 +381,137 @@ private struct DayCell: View {
             Button { onShowDay() } label: {
                 Label(L10n.t("cal.show_in_day_view", language), systemImage: "sun.max")
             }
+        } preview: {
+            DayContextPreviewView(date: date, events: dayEvents, language: language)
         }
+    }
+}
+
+// MARK: – Day Context Menu Preview
+
+private struct DayContextPreviewView: View {
+    let date: Date
+    let events: [CalEvent]
+    let language: String
+
+    private var cal: Calendar { .current }
+
+    private var sortedEvents: [CalEvent] {
+        events.sorted { a, b in
+            if a.isAllDay != b.isAllDay { return a.isAllDay }
+            return a.startDate < b.startDate
+        }
+    }
+
+    private var weekdayAbbr: String {
+        let fmt = DateFormatter()
+        fmt.locale = L10n.locale(language)
+        fmt.dateFormat = "EEE"
+        return fmt.string(from: date).uppercased()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(weekdayAbbr)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text("\(cal.component(.day, from: date))")
+                    .font(.title2.weight(.bold))
+            }
+            if !sortedEvents.isEmpty {
+                Divider()
+                ForEach(sortedEvents) { ev in
+                    if ev.isAllDay {
+                        DayPreviewAllDayBar(event: ev, date: date)
+                    } else {
+                        DayPreviewTimedRow(event: ev)
+                    }
+                }
+            } else {
+                Text("–")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .frame(minWidth: 220, maxWidth: 300)
+    }
+}
+
+private struct DayPreviewAllDayBar: View {
+    let event: CalEvent
+    let date: Date
+
+    private var cal: Calendar { .current }
+
+    var body: some View {
+        let color = Color(hex: event.effectiveColor)
+        let dayStart = cal.startOfDay(for: date)
+        let dayEnd   = cal.date(byAdding: .day, value: 1, to: dayStart)!
+        // isAllDay endDate is exclusive
+        let cLeft  = event.startDate < dayStart
+        let cRight = event.endDate > dayEnd
+
+        HStack(spacing: 0) {
+            if cLeft {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.leading, 3)
+            }
+            Text(event.title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .padding(.horizontal, 6)
+            Spacer(minLength: 0)
+            if cRight {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.trailing, 3)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 3)
+        .background(color)
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius:     cLeft  ? 0 : 4,
+                bottomLeadingRadius:  cLeft  ? 0 : 4,
+                bottomTrailingRadius: cRight ? 0 : 4,
+                topTrailingRadius:    cRight ? 0 : 4
+            )
+        )
+        .padding(.leading,  cLeft  ? 0 : 0)
+        .padding(.trailing, cRight ? 0 : 0)
+    }
+}
+
+private struct DayPreviewTimedRow: View {
+    let event: CalEvent
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(Color(hex: event.effectiveColor))
+                .frame(width: 7, height: 7)
+            Text(timeString)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .leading)
+            Text(event.title)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var timeString: String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        return fmt.string(from: event.startDate)
     }
 }
 

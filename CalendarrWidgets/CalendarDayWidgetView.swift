@@ -40,6 +40,7 @@ struct CalendarDayWidgetView: View {
             let accent  = Color(widgetHex: s.accentColorHex)
             VStack(alignment: .leading, spacing: 0) {
                 header(primary: primary)
+                    .padding(.top, 6)
                 weekStrip(snapshot: s, primary: primary, accent: accent)
                     .padding(.vertical, 3)
                 Rectangle()
