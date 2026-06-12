@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -126,13 +125,15 @@ fun EventDetailScreen(
                     Text(tr("event.copy_title"))
                 }
                 if (canDelete) {
-                    Spacer(Modifier.height(12.dp))
-                    Button(
+                    Spacer(Modifier.height(4.dp))
+                    // Deliberately low-key (plain text button): destructive action
+                    // should be findable, not the loudest element on the screen.
+                    TextButton(
                         onClick = { confirmDelete = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(Icons.Filled.Delete, contentDescription = null)
+                        Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(tr("common.delete"))
                     }

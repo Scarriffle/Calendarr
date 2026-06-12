@@ -29,6 +29,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -94,6 +95,7 @@ fun CalendarScreen(
     var detailEvent by remember { mutableStateOf<CalEvent?>(null) }
     var editor by remember { mutableStateOf<EditorRequest?>(null) }
     var overlay by remember { mutableStateOf(Overlay.NONE) }
+    var dayPreview by remember { mutableStateOf<LocalDate?>(null) }
 
     // Continuous month scrolling
     val monthListState = rememberLazyListState()
@@ -137,6 +139,7 @@ fun CalendarScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { editor = EditorRequest(null, if (isMonth) visibleMonth else state.currentDate) },
+                shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
@@ -152,6 +155,8 @@ fun CalendarScreen(
                 GroupBanner(group = g, onExit = { vm.switchGroup(null) })
             }
             Box(Modifier.fillMaxSize()) {
+                // remember: stable callbacks keep the lazily composed week rows
+                // skippable during scroll (fresh lambdas would recompose them all).
                 CalendarBody(
                     state = state,
                     vm = vm,
@@ -159,10 +164,10 @@ fun CalendarScreen(
                     scrollToTodaySignal = todaySignal,
                     monthJumpSignal = monthJumpSignal,
                     monthJumpTarget = monthJumpTarget,
-                    onVisibleMonthChange = { visibleMonth = it },
-                    onEventClick = { detailEvent = it },
-                    onDayClick = { date -> vm.goToDate(date, CalViewType.DAY) },
-                    onDayLongPress = { date -> editor = EditorRequest(null, date) },
+                    onVisibleMonthChange = remember { { visibleMonth = it } },
+                    onEventClick = remember { { detailEvent = it } },
+                    onDayClick = remember(vm) { { date -> vm.goToDate(date, CalViewType.DAY) } },
+                    onDayLongPress = remember { { date -> dayPreview = date } },
                 )
             }
         }
@@ -189,6 +194,18 @@ fun CalendarScreen(
             events = remember(state.events, state.hiddenKeys) { allKnownCalendars(vm) },
             vm = vm,
             onDismiss = { showFilter = false },
+        )
+    }
+
+    dayPreview?.let { date ->
+        DayPreviewDialog(
+            date = date,
+            events = remember(state.events, date) { vm.eventsOn(date, state.events) },
+            onDismiss = { dayPreview = null },
+            onEventClick = { ev -> dayPreview = null; detailEvent = ev },
+            onCreateEvent = { dayPreview = null; editor = EditorRequest(null, date) },
+            onOpenDay = { dayPreview = null; vm.goToDate(date, CalViewType.DAY) },
+            onOpenWeek = { dayPreview = null; vm.goToDate(date, CalViewType.WEEK) },
         )
     }
 
@@ -330,6 +347,7 @@ private fun CompactTopBar(
 ) {
     val twoLine = viewType == CalViewType.WEEK || viewType == CalViewType.DAY
     Surface(color = MaterialTheme.colorScheme.background) {
+        Column {
         Row(
             Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -372,6 +390,11 @@ private fun CompactTopBar(
                 }
             }
             CompactIcon(Icons.Filled.Menu, onMenu, tr("nav.menu"))
+        }
+        Divider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+        )
         }
     }
 }

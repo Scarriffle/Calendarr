@@ -62,7 +62,8 @@ private const val MAX_LANES = 4
 private val DAY_NUM_H = 22.dp
 private val LANE_H = 15.dp
 private val LANE_SPACE = 2.dp
-private val ROW_HEIGHT = DAY_NUM_H + (LANE_H + LANE_SPACE) * MAX_LANES + 6.dp
+// Bottom strip must fit the 8sp "+N"/"KW" labels without event bars overlapping them.
+private val ROW_HEIGHT = DAY_NUM_H + (LANE_H + LANE_SPACE) * MAX_LANES + 16.dp
 
 private enum class DividerEdge { NONE, TOP, BOTTOM }
 
@@ -97,11 +98,14 @@ fun MonthView(
     val mondayFirst = state.weekStartsOnMonday
     val today = LocalDate.now()
 
-    val dividerColor = colorFromHex(settings.monthDividerColor, Color(0xFF7090C0))
-    val labelColor = colorFromHex(settings.monthLabelColor, MaterialTheme.colorScheme.onSurfaceVariant)
-    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = gridLineOpacity(settings.lineContrast))
-    val secondaryText = MaterialTheme.colorScheme.onBackground.copy(alpha = secondaryTextOpacity(settings.textContrast))
-    val todayColor = colorFromHex(settings.todayColor)
+    val fallbackLabel = MaterialTheme.colorScheme.onSurfaceVariant
+    val outline = MaterialTheme.colorScheme.outline
+    val onBackground = MaterialTheme.colorScheme.onBackground
+    val dividerColor = remember(settings.monthDividerColor) { colorFromHex(settings.monthDividerColor, Color(0xFF7090C0)) }
+    val labelColor = remember(settings.monthLabelColor, fallbackLabel) { colorFromHex(settings.monthLabelColor, fallbackLabel) }
+    val gridColor = remember(outline, settings.lineContrast) { outline.copy(alpha = gridLineOpacity(settings.lineContrast)) }
+    val secondaryText = remember(onBackground, settings.textContrast) { onBackground.copy(alpha = secondaryTextOpacity(settings.textContrast)) }
+    val todayColor = remember(settings.todayColor) { colorFromHex(settings.todayColor) }
 
     // Column width measured once → no per-row BoxWithConstraints (smooth scrolling).
     val density = LocalDensity.current
@@ -144,7 +148,10 @@ fun MonthView(
 
     val eventsByWeek = remember(state.events, mondayFirst) { buildEventsByWeek(state.events, mondayFirst) }
     val dimPast = settings.dimPastEvents
-    val now = java.time.Instant.now()
+    val cwLabel = tr("cal.cw")
+    // remember: a fresh Instant per recomposition would invalidate every visible
+    // WeekRow (the main source of scroll jank); minute precision is plenty here.
+    val now = remember { java.time.Instant.now() }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
@@ -163,7 +170,7 @@ fun MonthView(
             state = listState,
             modifier = Modifier.fillMaxSize().onSizeChanged { gridWidthPx = it.width },
         ) {
-            items(weekCount) { index ->
+            items(weekCount, key = { it }, contentType = { "week" }) { index ->
                 val weekStart = firstVisible.plusWeeks(index.toLong())
                 WeekRow(
                     weekStart = weekStart,
@@ -173,6 +180,7 @@ fun MonthView(
                     dimPast = dimPast,
                     now = now,
                     lang = lang,
+                    cwLabel = cwLabel,
                     dividerColor = dividerColor,
                     gridColor = gridColor,
                     labelColor = labelColor,
@@ -196,6 +204,7 @@ private fun WeekRow(
     dimPast: Boolean,
     now: java.time.Instant,
     lang: String,
+    cwLabel: String,
     dividerColor: Color,
     gridColor: Color,
     labelColor: Color,
@@ -208,7 +217,6 @@ private fun WeekRow(
     val days = remember(weekStart) { (0 until 7).map { weekStart.plusDays(it.toLong()) } }
     val boundaryCol = (1 until 7).firstOrNull { days[it].dayOfMonth == 1 }
     val rowStartsNewMonth = days[0].dayOfMonth == 1
-    val cwLabel = tr("cal.cw")
 
     val packed = remember(weekStart, weekEvents) { packEvents(weekStart, weekEvents) }
 
