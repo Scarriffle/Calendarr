@@ -1,10 +1,13 @@
 package com.scarriffle.calendarr.ui.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.scarriffle.calendarr.domain.model.AppSettings
 import com.scarriffle.calendarr.util.colorFromHex
 import com.scarriffle.calendarr.util.contrastingTextColor
@@ -53,6 +56,9 @@ fun CalendarrTheme(
     MaterialTheme(
         colorScheme = colors,
         typography = Typography(),
+        // extraSmall drives DropdownMenu containers (default 4dp looks boxy);
+        // rounder popups to match the iOS look.
+        shapes = Shapes(extraSmall = RoundedCornerShape(14.dp)),
         content = content,
     )
 }
