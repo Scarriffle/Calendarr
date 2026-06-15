@@ -50,7 +50,10 @@ enum NotificationScheduler {
             for item in limited {
                 let content = UNMutableNotificationContent()
                 content.title = item.event.title
-                content.body = bodyText(item.event)
+                let minutes = Int(item.event.startDate.timeIntervalSince(item.fire) / 60)
+                let rel     = relativeText(minutes)
+                let detail  = bodyText(item.event)
+                content.body = detail.isEmpty ? rel : "\(rel) · \(detail)"
                 content.sound = .default
                 let comps = Calendar.current.dateComponents(
                     [.year, .month, .day, .hour, .minute, .second], from: item.fire)
@@ -58,6 +61,14 @@ enum NotificationScheduler {
                 center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger))
             }
         }
+    }
+
+    private static func relativeText(_ minutes: Int) -> String {
+        if minutes < 60    { return "in \(minutes) Min." }
+        if minutes == 60   { return "in 1 Std." }
+        if minutes < 1440  { return "in \(minutes / 60) Std." }
+        if minutes == 1440 { return "morgen" }
+        return "in \(minutes / 1440) Tagen"
     }
 
     private static func bodyText(_ ev: CalEvent) -> String {

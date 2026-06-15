@@ -39,6 +39,7 @@ struct SettingsView: View {
             Form {
                 profilSection
                 privatsphaereSection
+                termindauerSection
                 benachrichtigungenSection
                 geteilterKalenderSection
                 liquidGlassSection
@@ -144,6 +145,21 @@ struct SettingsView: View {
             Text(L10n.t("settings.privacy", appLang))
         } footer: {
             Text(L10n.t("settings.private_visibility.desc", appLang)).font(.caption)
+        }
+    }
+
+    // MARK: – Standardtermindauer
+
+    var termindauerSection: some View {
+        Section {
+            Picker(L10n.t("settings.default_duration", appLang), selection: $defaultEventDurationMinutes) {
+                ForEach([15, 30, 45, 60, 90, 120, 240], id: \.self) { m in
+                    Text(ReminderOptions.durationLabel(m, appLang)).tag(m)
+                }
+            }
+            .onChange(of: defaultEventDurationMinutes) { _, _ in SettingsSync.push(api: api) }
+        } header: {
+            Text(L10n.t("settings.calview", appLang))
         }
     }
 
@@ -361,12 +377,6 @@ struct SettingsView: View {
             }
             Toggle(L10n.t("settings.dimpast", appLang), isOn: $dimPastEvents)
                 .tint(Color.accentColor)
-            Picker(L10n.t("settings.default_duration", appLang), selection: $defaultEventDurationMinutes) {
-                ForEach([15, 30, 45, 60, 90, 120, 240], id: \.self) { m in
-                    Text(ReminderOptions.durationLabel(m, appLang)).tag(m)
-                }
-            }
-            .onChange(of: defaultEventDurationMinutes) { _, _ in SettingsSync.push(api: api) }
         }
     }
 
