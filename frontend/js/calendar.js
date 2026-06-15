@@ -1425,6 +1425,33 @@ function showEventPopup(ev, anchor) {
   popup.style.left = Math.max(8, left) + 'px';
   popup.style.top  = Math.max(8, top)  + 'px';
 
+  // Drag-to-move: grab the header and drag the popup anywhere on screen
+  const dragHandle = popup.querySelector('.popup-header');
+  let dragOffX = 0, dragOffY = 0;
+  dragHandle.style.cursor = 'grab';
+  const onPointerMove = e => {
+    if (!popup.classList.contains('ep-dragging')) return;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const x = Math.max(0, Math.min(vw - popup.offsetWidth,  e.clientX - dragOffX));
+    const y = Math.max(0, Math.min(vh - popup.offsetHeight, e.clientY - dragOffY));
+    popup.style.left = x + 'px';
+    popup.style.top  = y + 'px';
+  };
+  const onPointerUp = () => {
+    popup.classList.remove('ep-dragging');
+    dragHandle.style.cursor = 'grab';
+  };
+  dragHandle.onpointerdown = e => {
+    if (e.button !== 0) return;
+    dragOffX = e.clientX - popup.getBoundingClientRect().left;
+    dragOffY = e.clientY - popup.getBoundingClientRect().top;
+    dragHandle.setPointerCapture(e.pointerId);
+    popup.classList.add('ep-dragging');
+    dragHandle.style.cursor = 'grabbing';
+  };
+  dragHandle.onpointermove = onPointerMove;
+  dragHandle.onpointerup = onPointerUp;
+
   // Hide edit/delete for read-only iCal subscription events
   const isReadOnly = (ev.source === 'ical');
   document.getElementById('popup-edit').style.display = isReadOnly ? 'none' : '';
@@ -3004,7 +3031,6 @@ function openSettingsModal() {
     prev.style.background = val || fallback;
   });
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
-  document.getElementById('cfg-default-duration').value = String(s.default_event_duration_minutes || 60);
   document.getElementById('cfg-language').value = getLang();
   document.getElementById('cfg-private-visibility').value = s.private_event_visibility || 'busy';
   renderGroupVisibleList(s.group_visible_calendar_id);
@@ -3017,11 +3043,12 @@ function openSettingsModal() {
     document.getElementById('cfg-email').value = p.email || '';
   }).catch(() => {});
 
-  // Set active contrast/hour-height buttons
+  // Set active contrast/hour-height/duration buttons
   [
-    { id: 'cfg-text-contrast', val: s.text_contrast || 3 },
-    { id: 'cfg-line-contrast', val: s.line_contrast || 3 },
-    { id: 'cfg-hour-height',   val: s.hour_height   || 60 },
+    { id: 'cfg-text-contrast',  val: s.text_contrast || 3 },
+    { id: 'cfg-line-contrast',  val: s.line_contrast || 3 },
+    { id: 'cfg-hour-height',    val: s.hour_height   || 60 },
+    { id: 'cfg-event-duration', val: s.default_event_duration_minutes || 60 },
   ].forEach(({ id, val }) => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -3040,9 +3067,8 @@ function openSettingsModal() {
   const firstBtn = document.querySelector('.settings-nav-btn:not(.hidden)');
   if (firstBtn) activateSettingsPanel(firstBtn.dataset.panel);
 
-  // Render all accounts and hidden calendars
+  // Render unified calendar table
   renderAllAccounts();
-  renderHiddenCalendars();
 
   openModal('modal-settings');
 }
@@ -3215,9 +3241,6 @@ function renderAllAccounts() {
     }
   }
 
-  // Google accounts section — delegate to existing function
-  renderGoogleAccounts();
-
   // Home Assistant accounts section
   const haList = document.getElementById('accounts-ha-list');
   if (haList) {
@@ -3262,10 +3285,13 @@ function renderAllAccounts() {
       });
     }
   }
+
+  renderCalendarTable();
 }
 
 function renderHiddenCalendars() {
   const list = document.getElementById('hidden-cals-list');
+  if (!list) return;
   const hidden = [];
   for (const acc of state.accounts) {
     for (const cal of acc.calendars) {
@@ -3321,6 +3347,252 @@ function renderHiddenCalendars() {
       renderHiddenCalendars();
       renderCalendarList();
       fetchAndRender();
+    });
+  });
+}
+
+function renderCalendarTable() {
+  const container = document.getElementById('cal-settings-table');
+  if (!container) return;
+
+  const TRASH = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
+  let rowCount = 0;
+
+  const hid  = (src, id, checked) =>
+    `<input type="checkbox" class="ct-toggle" ${checked ? 'checked' : ''} data-ct-hid="${src}" data-ct-id="${id}">`;
+  const rem  = (src, id, checked) =>
+    `<input type="checkbox" class="ct-toggle" ${checked ? 'checked' : ''} data-ct-rem="${src}" data-ct-id="${id}">`;
+  const dot  = (color, fb) =>
+    `<span class="ct-dot" style="background:${color || fb}"></span>`;
+
+  let rows = '';
+
+  // Local calendars
+  for (const cal of state.localCalendars) {
+    if (cal.group) continue;
+    const owned = cal.owned !== false;
+    const canWrite = owned || cal.permission === 'read_write';
+    rows += `<tr>
+      <td>${dot(cal.color, '#34a853')}${escHtml(cal.name)}</td>
+      <td class="ct-src">Lokal</td>
+      <td>—</td>
+      <td>${owned ? rem('local', cal.id, cal.reminders_enabled !== false) : '—'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" data-ct-export="local" data-ct-id="${cal.id}" data-ct-name="${escHtml(cal.name)}">Export</button>
+        ${canWrite ? `<button class="btn btn-ghost btn-sm" data-ct-import="local" data-ct-id="${cal.id}">Import</button>` : ''}
+      </td>
+      <td>—</td>
+      <td>${owned ? `<button class="icon-btn mini-btn" data-ct-del="local" data-ct-id="${cal.id}">${TRASH}</button>` : ''}</td>
+    </tr>`;
+    rowCount++;
+  }
+
+  // iCal subscriptions
+  for (const sub of state.icalSubscriptions) {
+    rows += `<tr>
+      <td>${dot(sub.color, '#aa66cc')}${escHtml(sub.name)}</td>
+      <td class="ct-src">iCal</td>
+      <td>${hid('ical', sub.id, !sub.sidebar_hidden)}</td>
+      <td>${rem('ical', sub.id, sub.reminders_enabled !== false)}</td>
+      <td>—</td>
+      <td>—</td>
+      <td><button class="icon-btn mini-btn" data-ct-del="ical" data-ct-id="${sub.id}">${TRASH}</button></td>
+    </tr>`;
+    rowCount++;
+  }
+
+  // CalDAV accounts + their calendars
+  for (const acc of state.accounts) {
+    rows += `<tr class="ct-acc-row">
+      <td colspan="2"><strong>${escHtml(acc.name)}</strong><span class="ct-badge">CalDAV</span></td>
+      <td>—</td><td>—</td><td>—</td>
+      <td><button class="btn btn-secondary btn-sm" data-ct-sync="caldav" data-ct-id="${acc.id}">${t('sync')}</button></td>
+      <td><button class="btn btn-ghost btn-sm" data-ct-disc="caldav" data-ct-id="${acc.id}">${t('disconnect')}</button></td>
+    </tr>`;
+    rowCount++;
+    for (const cal of (acc.calendars || [])) {
+      rows += `<tr class="ct-cal-row">
+        <td class="ct-indent">${dot(cal.color, '#4285f4')}${escHtml(cal.name)}</td>
+        <td class="ct-src">${escHtml(acc.name)}</td>
+        <td>${hid('caldav', cal.id, !cal.sidebar_hidden)}</td>
+        <td>${rem('caldav', cal.id, cal.reminders_enabled !== false)}</td>
+        <td>—</td><td>—</td><td>—</td>
+      </tr>`;
+      rowCount++;
+    }
+  }
+
+  // Google accounts + their calendars
+  for (const acc of state.googleAccounts) {
+    rows += `<tr class="ct-acc-row">
+      <td colspan="2"><strong>${escHtml(acc.email)}</strong><span class="ct-badge ct-badge-g">Google</span></td>
+      <td>—</td><td>—</td><td>—</td>
+      <td><button class="btn btn-secondary btn-sm" data-ct-sync="google" data-ct-id="${acc.id}">${t('sync')}</button></td>
+      <td><button class="btn btn-ghost btn-sm" data-ct-disc="google" data-ct-id="${acc.id}">${t('disconnect')}</button></td>
+    </tr>`;
+    rowCount++;
+    for (const cal of (acc.calendars || [])) {
+      rows += `<tr class="ct-cal-row">
+        <td class="ct-indent">${dot(cal.color, '#4285f4')}${escHtml(cal.name)}</td>
+        <td class="ct-src">${escHtml(acc.email)}</td>
+        <td>${hid('google', cal.id, !cal.sidebar_hidden)}</td>
+        <td>${rem('google', cal.id, cal.reminders_enabled !== false)}</td>
+        <td>—</td><td>—</td><td>—</td>
+      </tr>`;
+      rowCount++;
+    }
+  }
+
+  // Home Assistant accounts + their calendars
+  for (const acc of state.haAccounts) {
+    rows += `<tr class="ct-acc-row">
+      <td colspan="2"><strong>${escHtml(acc.name)}</strong><span class="ct-badge ct-badge-ha">Home Assistant</span></td>
+      <td>—</td><td>—</td><td>—</td>
+      <td><button class="btn btn-secondary btn-sm" data-ct-sync="ha" data-ct-id="${acc.id}">${t('sync')}</button></td>
+      <td><button class="btn btn-ghost btn-sm" data-ct-disc="ha" data-ct-id="${acc.id}">${t('disconnect')}</button></td>
+    </tr>`;
+    rowCount++;
+    for (const cal of (acc.calendars || [])) {
+      rows += `<tr class="ct-cal-row">
+        <td class="ct-indent">${dot(cal.color, '#03a9f4')}${escHtml(cal.name)}</td>
+        <td class="ct-src">${escHtml(acc.name)}</td>
+        <td>${hid('ha', cal.id, !cal.sidebar_hidden)}</td>
+        <td>${rem('ha', cal.id, cal.reminders_enabled !== false)}</td>
+        <td>—</td><td>—</td><td>—</td>
+      </tr>`;
+      rowCount++;
+    }
+  }
+
+  if (!rowCount) {
+    rows = `<tr><td colspan="7" class="ct-empty">Keine Kalender vorhanden</td></tr>`;
+  }
+
+  container.innerHTML = `<table class="cal-manage-table">
+    <thead><tr>
+      <th>Name</th><th>Herkunft</th><th>Ausgeblendet</th><th>Benachrichtigungen</th><th>Export / Import</th><th>Sync</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+
+  // Hidden toggle
+  container.querySelectorAll('.ct-toggle[data-ct-hid]').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const src = cb.dataset.ctHid, id = parseInt(cb.dataset.ctId), hidden = !cb.checked;
+      try {
+        if (src === 'ical') {
+          await api.put(`/ical/subscriptions/${id}`, { sidebar_hidden: hidden });
+          const s = state.icalSubscriptions.find(s => s.id === id);
+          if (s) s.sidebar_hidden = hidden;
+        } else if (src === 'caldav') {
+          await api.put(`/caldav/calendars/${id}`, { enabled: !hidden, sidebar_hidden: hidden });
+          for (const acc of state.accounts) { const c = acc.calendars.find(c => c.id === id); if (c) { c.sidebar_hidden = hidden; c.enabled = !hidden; } }
+        } else if (src === 'google') {
+          await api.put(`/google/calendars/${id}`, { enabled: !hidden, sidebar_hidden: hidden });
+          for (const acc of state.googleAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) { c.sidebar_hidden = hidden; c.enabled = !hidden; } }
+        } else if (src === 'ha') {
+          await api.put(`/homeassistant/calendars/${id}`, { enabled: !hidden, sidebar_hidden: hidden });
+          for (const acc of state.haAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) { c.sidebar_hidden = hidden; c.enabled = !hidden; } }
+        }
+        renderCalendarList();
+      } catch (e) { showToast(e.message, true); cb.checked = !cb.checked; }
+    });
+  });
+
+  // Reminders toggle
+  container.querySelectorAll('.ct-toggle[data-ct-rem]').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const src = cb.dataset.ctRem, id = parseInt(cb.dataset.ctId), enabled = cb.checked;
+      const path = src === 'ical' ? `/ical/subscriptions/${id}` : `/${src === 'ha' ? 'homeassistant' : src}/calendars/${id}`;
+      try {
+        await api.put(path, { reminders_enabled: enabled });
+        if (src === 'local')  { const c = state.localCalendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; }
+        else if (src === 'ical')  { const s = state.icalSubscriptions.find(s => s.id === id); if (s) s.reminders_enabled = enabled; }
+        else if (src === 'caldav')  { for (const acc of state.accounts) { const c = acc.calendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; } }
+        else if (src === 'google') { for (const acc of state.googleAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; } }
+        else if (src === 'ha')     { for (const acc of state.haAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; } }
+        renderCalendarList();
+      } catch (e) { showToast(e.message, true); cb.checked = !cb.checked; }
+    });
+  });
+
+  // Sync buttons
+  container.querySelectorAll('[data-ct-sync]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const src = btn.dataset.ctSync, id = parseInt(btn.dataset.ctId);
+      const label = btn.textContent;
+      btn.disabled = true; btn.textContent = '…';
+      try {
+        if (src === 'caldav') {
+          await api.post(`/caldav/accounts/${id}/sync`);
+        } else if (src === 'google') {
+          const updated = await api.post(`/google/accounts/${id}/sync`);
+          const idx = state.googleAccounts.findIndex(a => a.id === updated.id);
+          if (idx !== -1) state.googleAccounts[idx] = updated;
+        } else if (src === 'ha') {
+          const updated = await api.post(`/homeassistant/accounts/${id}/sync`);
+          const idx = state.haAccounts.findIndex(a => a.id === updated.id);
+          if (idx !== -1) state.haAccounts[idx] = updated;
+        }
+        renderCalendarTable(); renderCalendarList(); fetchAndRender(true);
+        showToast(t('google_synced'));
+      } catch (e) { showToast(e.message, true); }
+      finally { btn.disabled = false; btn.textContent = label; }
+    });
+  });
+
+  // Disconnect buttons
+  container.querySelectorAll('[data-ct-disc]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const src = btn.dataset.ctDisc, id = parseInt(btn.dataset.ctId);
+      const msg = src === 'caldav' ? t('confirm_caldav_disconnect')
+                : src === 'google' ? t('confirm_google_disconnect')
+                : 'Konto wirklich trennen?';
+      if (!confirm(msg)) return;
+      try {
+        if (src === 'caldav') {
+          await api.delete(`/caldav/accounts/${id}`);
+          state.accounts = state.accounts.filter(a => a.id !== id);
+        } else if (src === 'google') {
+          await api.delete(`/google/accounts/${id}`);
+          state.googleAccounts = state.googleAccounts.filter(a => a.id !== id);
+        } else if (src === 'ha') {
+          await api.delete(`/homeassistant/accounts/${id}`);
+          state.haAccounts = state.haAccounts.filter(a => a.id !== id);
+        }
+        renderCalendarTable(); renderCalendarList(); fetchAndRender(true);
+        showToast(t('caldav_disconnected'));
+      } catch (e) { showToast(e.message, true); }
+    });
+  });
+
+  // Export / Import
+  container.querySelectorAll('[data-ct-export]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try { await api.download(`/local/calendars/${btn.dataset.ctId}/export`, `${btn.dataset.ctName || 'calendar'}.ics`); }
+      catch (e) { showToast(e.message, true); }
+    });
+  });
+  container.querySelectorAll('[data-ct-import]').forEach(btn => {
+    btn.addEventListener('click', () => triggerIcsImport(parseInt(btn.dataset.ctId)));
+  });
+
+  // Delete
+  container.querySelectorAll('[data-ct-del]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const src = btn.dataset.ctDel, id = parseInt(btn.dataset.ctId);
+      const msg = src === 'local' ? t('confirm_delete_local_cal') : t('confirm_remove_ical');
+      if (!confirm(msg)) return;
+      try {
+        if (src === 'local') {
+          await api.delete(`/local/calendars/${id}`);
+          state.localCalendars = state.localCalendars.filter(c => c.id !== id);
+        } else {
+          await api.delete(`/ical/subscriptions/${id}`);
+          state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== id);
+        }
+        renderCalendarTable(); renderCalendarList(); fetchAndRender(true);
+      } catch (e) { showToast(e.message, true); }
     });
   });
 }
@@ -3515,7 +3787,7 @@ function bindSettingsModal() {
       line_color:          colourOrNull('cfg-line-color-hex'),
       bg_color:            colourOrNull('cfg-bg-color-hex'),
       dim_past_events:     document.getElementById('cfg-dim-past').checked,
-      default_event_duration_minutes: parseInt(document.getElementById('cfg-default-duration').value, 10) || 60,
+      default_event_duration_minutes: getActive('cfg-event-duration') || 60,
       hour_height:         getActive('cfg-hour-height')   || 44,
       language:            document.getElementById('cfg-language').value,
       private_event_visibility: document.getElementById('cfg-private-visibility').value,
@@ -3535,6 +3807,22 @@ function bindSettingsModal() {
       fetchAndRender();
     } catch (e) { showToast(e.message, true); }
   };
+
+  // Add-account buttons in calendar panel
+  const addBtnMap = {
+    'settings-btn-add-local':  openLocalCalModal,
+    'settings-btn-add-caldav': openAccountModal,
+    'settings-btn-add-ical':   openICalSubModal,
+    'settings-btn-add-ha':     openHAAccountModal,
+    'settings-btn-add-google': async () => {
+      const url = await api.get('/google/auth/url');
+      if (url && url.auth_url) window.open(url.auth_url, '_blank');
+    },
+  };
+  Object.entries(addBtnMap).forEach(([id, fn]) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener('click', () => { closeModal('modal-settings'); fn(); });
+  });
 }
 
 // ── Profile Modal ─────────────────────────────────────────

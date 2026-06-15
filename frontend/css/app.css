@@ -1137,6 +1137,7 @@ a { color: var(--primary); text-decoration: none; }
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--ev-color, var(--primary)) 13%, transparent), transparent);
 }
+.ep-dragging { user-select: none; }
 /* Slim accent strip in the event's colour. */
 .popup-header::before {
   content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
@@ -1429,6 +1430,31 @@ a { color: var(--primary); text-decoration: none; }
 .accounts-local-dot {
   width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block;
 }
+
+/* ── Calendar Management Table ──────────────────────────── */
+.accounts-add-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.cal-manage-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cal-manage-table th {
+  text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .4px; color: var(--text-3); padding: 0 8px 8px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.cal-manage-table td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--border-light); vertical-align: middle; }
+.cal-manage-table tbody tr:last-child td { border-bottom: none; }
+.ct-acc-row td { padding-top: 14px; background: none; }
+.ct-acc-row td:first-child { font-size: 13px; }
+.ct-cal-row .ct-indent { padding-left: 16px; }
+.ct-src { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.ct-badge {
+  display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 5px;
+  border-radius: 3px; background: var(--surface-2); color: var(--text-3);
+  margin-left: 6px; vertical-align: middle;
+}
+.ct-badge-g  { background: #e8f0fe; color: #1a73e8; }
+.ct-badge-ha { background: #e8f5e9; color: #2e7d32; }
+.ct-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; flex-shrink: 0; }
+.ct-empty { color: var(--text-3); font-size: 13px; padding: 16px 0; text-align: center; }
+.ct-toggle { cursor: pointer; }
 
 /* ── Month View (spanning bars) ─────────────────────────── */
 .month-body {
