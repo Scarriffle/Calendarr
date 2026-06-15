@@ -129,6 +129,7 @@ class CalendarRepository @Inject constructor(
                 "private_event_visibility" to s.privateEventVisibility,
                 // Explicit JSON null clears it (off); jsonBody drops Kotlin nulls.
                 "default_reminder_minutes" to (s.defaultReminderMinutes ?: org.json.JSONObject.NULL),
+                "default_event_duration_minutes" to s.defaultEventDurationMinutes,
             )
         ).ensureSuccess()
     }
@@ -240,6 +241,19 @@ class CalendarRepository @Inject constructor(
         val body = jsonBody("enabled" to !hidden, "sidebar_hidden" to hidden)
         when (source) {
             "caldav" -> api.updateCalDAVCalendar(calendarId, body).ensureSuccess()
+            "google" -> api.updateGoogleCalendar(calendarId, body).ensureSuccess()
+            "homeassistant" -> api.updateHACalendar(calendarId, body).ensureSuccess()
+            else -> Unit
+        }
+    }
+
+    /** Toggle a calendar's server-side `reminders_enabled` flag (all sources). */
+    suspend fun setCalendarRemindersEnabled(source: String, calendarId: Int, enabled: Boolean) = guarded {
+        val body = jsonBody("reminders_enabled" to enabled)
+        when (source) {
+            "caldav" -> api.updateCalDAVCalendar(calendarId, body).ensureSuccess()
+            "local" -> api.updateLocalCalendar(calendarId, body).ensureSuccess()
+            "ical" -> api.updateICalSubscription(calendarId, body).ensureSuccess()
             "google" -> api.updateGoogleCalendar(calendarId, body).ensureSuccess()
             "homeassistant" -> api.updateHACalendar(calendarId, body).ensureSuccess()
             else -> Unit

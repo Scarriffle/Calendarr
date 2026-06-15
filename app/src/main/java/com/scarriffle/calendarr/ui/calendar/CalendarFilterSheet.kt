@@ -9,7 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
@@ -88,6 +93,16 @@ fun CalendarFilterSheet(
                         modifier = Modifier.weight(1f).padding(start = 12.dp),
                         style = MaterialTheme.typography.bodyLarge,
                     )
+                    if (!groupMode) {
+                        val remDisabled = entry.key in state.reminderDisabledKeys
+                        IconButton(onClick = { vm.setCalendarRemindersDisabled(entry.key, disabled = !remDisabled) }) {
+                            Icon(
+                                if (remDisabled) Icons.Filled.NotificationsOff else Icons.Filled.Notifications,
+                                contentDescription = tr(if (remDisabled) "filter.reminders_on" else "filter.reminders_off"),
+                                tint = if (remDisabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                     Switch(
                         checked = visible,
                         onCheckedChange = {

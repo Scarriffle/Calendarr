@@ -13,13 +13,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -43,8 +47,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.scarriffle.calendarr.domain.model.CalEvent
+import com.scarriffle.calendarr.domain.model.ReminderOptions
 import com.scarriffle.calendarr.domain.model.WritableCalendar
 import com.scarriffle.calendarr.ui.L10n
 import com.scarriffle.calendarr.ui.LocalLang
@@ -69,7 +75,9 @@ fun EventEditorSheet(
     request: EditorRequest,
     writableCalendars: List<WritableCalendar>,
     onDismiss: () -> Unit,
-    onSave: (WritableCalendar, String, Instant, Instant, Boolean, String, String, String?, Boolean) -> Unit,
+    defaultDurationMinutes: Int = 60,
+    reminderDisabledKeys: Set<String> = emptySet(),
+    onSave: (WritableCalendar, String, Instant, Instant, Boolean, String, String, String?, Boolean, List<Int>) -> Unit,
 ) {
     val zone = ZoneId.systemDefault()
     val context = LocalContext.current
@@ -95,17 +103,20 @@ fun EventEditorSheet(
     var startTime by remember {
         mutableStateOf(initialStart?.let { LocalTime.ofInstant(it, zone).withSecond(0).withNano(0) } ?: LocalTime.of(9, 0))
     }
+    // New events default to start (09:00) + the user's default duration.
+    val defaultEnd = request.date.atTime(9, 0).plusMinutes(defaultDurationMinutes.toLong())
     var endDate by remember {
         mutableStateOf(
             initialEnd?.let {
                 val d = LocalDate.ofInstant(it, zone)
                 if (template?.isAllDay == true) d.minusDays(1) else d
-            } ?: request.date
+            } ?: defaultEnd.toLocalDate()
         )
     }
     var endTime by remember {
-        mutableStateOf(initialEnd?.let { LocalTime.ofInstant(it, zone).withSecond(0).withNano(0) } ?: LocalTime.of(10, 0))
+        mutableStateOf(initialEnd?.let { LocalTime.ofInstant(it, zone).withSecond(0).withNano(0) } ?: defaultEnd.toLocalTime())
     }
+    var reminders by remember { mutableStateOf(template?.reminders ?: emptyList<Int>()) }
 
     val preselected = template?.let { ev ->
         val id = calendarKey(ev.source, ev.calendarId).substringAfter(":").toIntOrNull()
@@ -231,12 +242,41 @@ fun EventEditorSheet(
             }
             Spacer(Modifier.size(12.dp))
 
-            // Private (local calendars only)
+            // Private + reminders (local calendars only)
             if (calendar?.source == "local") {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(tr("event.private"), style = MaterialTheme.typography.bodyLarge)
                     Switch(checked = isPrivate, onCheckedChange = { isPrivate = it })
                 }
+                Spacer(Modifier.size(12.dp))
+
+                val remindersDisabled = calendar?.let {
+                    reminderDisabledKeys.contains(calendarKey(it.source, it.numericId.toString()))
+                } ?: false
+                Text(tr("event.reminders"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (remindersDisabled) {
+                    Text(
+                        tr("event.reminders_disabled"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                reminders.forEachIndexed { idx, min ->
+                    ReminderRow(
+                        minutes = min,
+                        enabled = !remindersDisabled,
+                        onChange = { v -> reminders = reminders.toMutableList().also { it[idx] = v } },
+                        onRemove = { reminders = reminders.toMutableList().also { it.removeAt(idx) } },
+                    )
+                }
+                androidx.compose.material3.TextButton(
+                    enabled = !remindersDisabled,
+                    onClick = {
+                        val next = ReminderOptions.presets.firstOrNull { it !in reminders } ?: ReminderOptions.customDefault
+                        reminders = reminders + next
+                    },
+                ) { Text(tr("event.reminder_add")) }
                 Spacer(Modifier.size(12.dp))
             }
 
@@ -280,12 +320,83 @@ fun EventEditorSheet(
                         start = startDate.atTime(startTime).atZone(zone).toInstant()
                         end = endDate.atTime(endTime).atZone(zone).toInstant()
                     }
-                    onSave(cal, title.trim(), start, end, allDay, location.trim(), description.trim(), color, isPrivate && cal.source == "local")
+                    val rem = if (cal.source == "local") reminders else emptyList()
+                    onSave(cal, title.trim(), start, end, allDay, location.trim(), description.trim(), color, isPrivate && cal.source == "local", rem)
                 },
                 enabled = writableCalendars.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(if (existing == null) tr("event.add") else tr("event.save"))
+            }
+        }
+    }
+}
+
+/** One reminder row: a preset dropdown plus, in custom mode, a number field +
+ *  unit dropdown. The value is always emitted as minutes-before-start. */
+@Composable
+private fun ReminderRow(
+    minutes: Int,
+    enabled: Boolean,
+    onChange: (Int) -> Unit,
+    onRemove: () -> Unit,
+) {
+    val isPreset = minutes in ReminderOptions.presets
+    var presetMenu by remember { mutableStateOf(false) }
+    var unitMenu by remember { mutableStateOf(false) }
+
+    @Composable
+    fun label(min: Int): String =
+        if (min == 0) tr("event.reminder_at_start")
+        else ReminderOptions.split(min).let { (v, u) -> "$v ${tr(u.labelKey)} ${tr("event.reminder_before")}" }
+
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(1f)) {
+                OutlinedButton(onClick = { presetMenu = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (isPreset) label(minutes) else tr("event.reminder_custom"), modifier = Modifier.weight(1f))
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = presetMenu, onDismissRequest = { presetMenu = false }) {
+                    ReminderOptions.presets.forEach { p ->
+                        DropdownMenuItem(text = { Text(label(p)) }, onClick = { onChange(p); presetMenu = false })
+                    }
+                    DropdownMenuItem(text = { Text(tr("event.reminder_custom")) }, onClick = {
+                        if (minutes in ReminderOptions.presets) onChange(ReminderOptions.customDefault)
+                        presetMenu = false
+                    })
+                }
+            }
+            IconButton(onClick = onRemove, enabled = enabled) {
+                Icon(Icons.Filled.Close, contentDescription = null)
+            }
+        }
+        if (!isPreset) {
+            val (value, unit) = ReminderOptions.split(minutes)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = value.toString(),
+                    onValueChange = { txt ->
+                        val n = txt.filter { it.isDigit() }.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                        onChange(n * unit.mult)
+                    },
+                    enabled = enabled,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(96.dp),
+                )
+                Box {
+                    OutlinedButton(onClick = { unitMenu = true }, enabled = enabled) {
+                        Text(tr(unit.labelKey))
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                    }
+                    DropdownMenu(expanded = unitMenu, onDismissRequest = { unitMenu = false }) {
+                        ReminderOptions.Unit.values().forEach { u ->
+                            DropdownMenuItem(text = { Text(tr(u.labelKey)) }, onClick = { onChange(value * u.mult); unitMenu = false })
+                        }
+                    }
+                }
+                Text(tr("event.reminder_before"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -35,6 +35,7 @@ class SettingsStore @Inject constructor(
         monthDividerColor = prefs.getString(K_DIVIDER, null) ?: "#7090c0",
         monthLabelColor = prefs.getString(K_LABEL, null) ?: "#7090c0",
         defaultReminderMinutes = prefs.getInt(K_DEFAULT_REMINDER, -1).takeIf { it >= 0 },
+        defaultEventDurationMinutes = prefs.getInt(K_DEFAULT_DURATION, 60),
     )
 
     fun saveSettings(s: AppSettings) {
@@ -52,6 +53,7 @@ class SettingsStore @Inject constructor(
             .putString(K_DIVIDER, s.monthDividerColor)
             .putString(K_LABEL, s.monthLabelColor)
             .putInt(K_DEFAULT_REMINDER, s.defaultReminderMinutes ?: -1)
+            .putInt(K_DEFAULT_DURATION, s.defaultEventDurationMinutes)
             .apply()
     }
 
@@ -72,6 +74,15 @@ class SettingsStore @Inject constructor(
         get() = prefs.getStringSet(K_BANISHED, emptySet())?.toSet() ?: emptySet()
         set(value) = prefs.edit().putStringSet(K_BANISHED, value).apply()
 
+    // --- Reminder-disabled calendars ("source:id") ---
+    // Mirrors the server's per-calendar `reminders_enabled` flag so the
+    // notification scheduler can skip muted calendars without deleting any
+    // event reminders.
+
+    var reminderDisabledCalendarKeys: Set<String>
+        get() = prefs.getStringSet(K_REMINDER_DISABLED, emptySet())?.toSet() ?: emptySet()
+        set(value) = prefs.edit().putStringSet(K_REMINDER_DISABLED, value).apply()
+
     private companion object {
         const val K_DEFAULT_VIEW = "default_view"
         const val K_WEEK_START = "week_start_day"
@@ -86,8 +97,10 @@ class SettingsStore @Inject constructor(
         const val K_DIVIDER = "month_divider_color"
         const val K_LABEL = "month_label_color"
         const val K_DEFAULT_REMINDER = "default_reminder_minutes"
+        const val K_DEFAULT_DURATION = "default_event_duration_minutes"
         const val K_CACHE_MONTHS = "cache_months"
         const val K_HIDDEN = "hidden_calendar_keys"
         const val K_BANISHED = "banished_calendar_keys"
+        const val K_REMINDER_DISABLED = "reminder_disabled_calendar_keys"
     }
 }

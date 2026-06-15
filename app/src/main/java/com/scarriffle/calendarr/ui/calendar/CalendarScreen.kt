@@ -88,6 +88,27 @@ fun CalendarScreen(
 ) {
     val state by vm.state.collectAsState()
     val lang = LocalLang.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Ask once for notification permission (Android 13+), then keep the OS
+    // reminder alarms in sync with the visible events / muted-calendar set.
+    val notifPermLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) {}
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(state.events, state.reminderDisabledKeys) {
+        com.scarriffle.calendarr.notifications.NotificationScheduler.reschedule(
+            context, state.events, state.reminderDisabledKeys, vm.defaultReminderMinutes
+        )
+    }
 
     var viewMenuOpen by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -244,8 +265,10 @@ fun CalendarScreen(
             request = req,
             writableCalendars = state.writableCalendars,
             onDismiss = { editor = null },
-            onSave = { cal, title, start, end, allDay, location, desc, color, isPrivate ->
-                vm.saveEvent(cal, req.existing, title, start, end, allDay, location, desc, color, isPrivate) { error ->
+            defaultDurationMinutes = vm.defaultEventDurationMinutes,
+            reminderDisabledKeys = state.reminderDisabledKeys,
+            onSave = { cal, title, start, end, allDay, location, desc, color, isPrivate, reminders ->
+                vm.saveEvent(cal, req.existing, title, start, end, allDay, location, desc, color, isPrivate, reminders) { error ->
                     if (error == null) editor = null
                 }
             },

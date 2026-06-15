@@ -21,6 +21,7 @@ data class CalDAVCalendar(
     val color: String? = null,
     val enabled: Boolean = true,
     @Json(name = "sidebar_hidden") val sidebarHidden: Boolean = false,
+    @Json(name = "reminders_enabled") val remindersEnabled: Boolean = true,
 )
 
 @JsonClass(generateAdapter = false)
@@ -34,6 +35,7 @@ data class LocalCalendar(
     @Json(name = "shared_by") val sharedBy: String? = null,
     val permission: String? = null,
     val group: Boolean = false,
+    @Json(name = "reminders_enabled") val remindersEnabled: Boolean = true,
 )
 
 @JsonClass(generateAdapter = false)
@@ -45,6 +47,7 @@ data class ICalSubscription(
     val enabled: Boolean = true,
     @Json(name = "refresh_minutes") val refreshMinutes: Int = 60,
     @Json(name = "last_fetched") val lastFetched: String? = null,
+    @Json(name = "reminders_enabled") val remindersEnabled: Boolean = true,
 )
 
 @JsonClass(generateAdapter = false)
@@ -61,6 +64,7 @@ data class GoogleCalendar(
     val color: String? = null,
     val enabled: Boolean = true,
     @Json(name = "sidebar_hidden") val sidebarHidden: Boolean = false,
+    @Json(name = "reminders_enabled") val remindersEnabled: Boolean = true,
 )
 
 @JsonClass(generateAdapter = false)
@@ -80,6 +84,7 @@ data class HACalendar(
     val color: String? = null,
     val enabled: Boolean = true,
     @Json(name = "sidebar_hidden") val sidebarHidden: Boolean = false,
+    @Json(name = "reminders_enabled") val remindersEnabled: Boolean = true,
 )
 
 @JsonClass(generateAdapter = false)

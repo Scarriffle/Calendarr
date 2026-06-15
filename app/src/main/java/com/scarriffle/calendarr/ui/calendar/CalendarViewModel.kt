@@ -40,6 +40,9 @@ data class CalendarUiState(
     val writableCalendars: List<WritableCalendar> = emptyList(),
     val hiddenKeys: Set<String> = emptySet(),
     val banishedKeys: Set<String> = emptySet(),
+    // Calendars ("source:id") the user muted for reminders — events keep their
+    // reminders but the scheduler skips them.
+    val reminderDisabledKeys: Set<String> = emptySet(),
     // Group overlay: when non-null the calendar shows the group's combined view.
     val groups: List<Group> = emptyList(),
     val activeGroup: Group? = null,
@@ -107,7 +110,26 @@ class CalendarViewModel @Inject constructor(
             weekStartsOnMonday = s.weekStartsOnMonday,
             hiddenKeys = settingsStore.hiddenCalendarKeys,
             banishedKeys = settingsStore.banishedCalendarKeys,
+            reminderDisabledKeys = settingsStore.reminderDisabledCalendarKeys,
         )
+    }
+
+    /** Default duration (minutes) for a new event's end time. */
+    val defaultEventDurationMinutes: Int get() = settingsStore.loadSettings().defaultEventDurationMinutes
+
+    /** Default reminder offset (minutes before start), or -1 when off. */
+    val defaultReminderMinutes: Int get() = settingsStore.loadSettings().defaultReminderMinutes ?: -1
+
+    /** Toggle a calendar's reminders without deleting any event reminders. */
+    fun setCalendarRemindersDisabled(key: String, disabled: Boolean) {
+        val keys = settingsStore.reminderDisabledCalendarKeys.toMutableSet()
+        if (disabled) keys.add(key) else keys.remove(key)
+        settingsStore.reminderDisabledCalendarKeys = keys
+        _state.update { it.copy(reminderDisabledKeys = keys) }
+        val parts = key.split(":")
+        val source = parts.getOrNull(0) ?: return
+        val id = parts.getOrNull(1)?.toIntOrNull() ?: return
+        viewModelScope.launch { runCatching { repository.setCalendarRemindersEnabled(source, id, enabled = !disabled) } }
     }
 
     // ---- Navigation ----

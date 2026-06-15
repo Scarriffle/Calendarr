@@ -114,6 +114,17 @@ fun SettingsScreen(
                     Text(tr("settings.dimpast"), style = MaterialTheme.typography.bodyLarge)
                     Switch(checked = settings.dimPastEvents, onCheckedChange = { update(settings.copy(dimPastEvents = it)) })
                 }
+                Spacer(Modifier.size(16.dp))
+
+                Section(tr("settings.default_duration"))
+                ChipRow(
+                    options = listOf(
+                        "15" to "15 min", "30" to "30 min", "45" to "45 min",
+                        "60" to "1 h", "90" to "1.5 h", "120" to "2 h",
+                    ),
+                    selected = settings.defaultEventDurationMinutes.toString(),
+                    onSelect = { update(settings.copy(defaultEventDurationMinutes = it.toInt())) },
+                )
                 Divider(Modifier.padding(vertical = 16.dp))
 
                 Section(tr("settings.language"))
