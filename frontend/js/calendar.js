@@ -726,7 +726,8 @@ function renderCalendarList() {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.name, color: cal.color, enabled: cal.enabled,
       reminders: cal.owned !== false, remindersEnabled: cal.reminders_enabled !== false,
-      sourceLabel: `${t('groups_title')} · ${cal.shared_by || ''}`, isGroupCal: true, remove: null });
+      sourceLabel: `${t('groups_title')} · ${cal.shared_by || ''}`,
+      isGroupCal: true, groupIcon: groupIconForLocalCal(cal.id), remove: null });
   });
   state.icalSubscriptions.forEach(sub => {
     entries.push({ key: `ical:${sub.id}`, source: 'ical', dataId: `data-sub-id="${sub.id}"`,
@@ -772,8 +773,8 @@ function renderCalendarList() {
       <span class="cal-drag-handle" title="${t('drag_reorder')}">⠿</span>
       <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
       <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
-      ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">${groupIconSvg('people', 13)}</span>` : ''}
-      ${e.groupVisible ? `<span class="cal-shared-flag cal-shared-flag-own" title="${t('group_visible_flag')}">${SHARE_ICON}</span>` : ''}
+      ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">${groupIconSvg(e.groupIcon || 'people', 13)}</span>` : ''}
+      ${e.groupVisible ? `<span class="cal-shared-flag cal-shared-flag-own" title="${t('group_visible_flag')}">${groupIconSvg(state.settings?.share_calendar_icon || 'people', 13)}</span>` : ''}
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
       ${e.reminders ? `<button class="icon-btn mini-btn cal-item-bell ${e.remindersEnabled ? '' : 'off'}" data-source="${e.source}" ${e.dataId} title="${e.remindersEnabled ? t('calendar_reminders_on') : t('calendar_reminders_off')}">${e.remindersEnabled ? BELL : BELL_OFF}</button>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
@@ -966,6 +967,20 @@ function renderCalendarList() {
             await api.put(`/ical/subscriptions/${subId}`, { name: newName });
             const sub = state.icalSubscriptions.find(s => s.id === subId);
             if (sub) sub.name = newName;
+          } else if (source === 'google') {
+            const calId = parseInt(item.dataset.calId);
+            await api.put(`/google/calendars/${calId}`, { name: newName });
+            for (const acc of state.googleAccounts) {
+              const cal = (acc.calendars || []).find(c => c.id === calId);
+              if (cal) cal.name = newName;
+            }
+          } else if (source === 'homeassistant') {
+            const calId = parseInt(item.dataset.calId);
+            await api.put(`/homeassistant/calendars/${calId}`, { name: newName });
+            for (const acc of state.haAccounts) {
+              const cal = (acc.calendars || []).find(c => c.id === calId);
+              if (cal) cal.name = newName;
+            }
           }
         }
         renderCalendarList();
@@ -3042,6 +3057,21 @@ function openSettingsModal() {
   document.getElementById('cfg-private-visibility').value = s.private_event_visibility || 'busy';
   renderGroupVisibleList(s.group_visible_calendar_id);
 
+  // Share-Icon-Picker in Darstellung
+  const shareIconPicker = document.getElementById('cfg-share-icon');
+  if (shareIconPicker) {
+    const cur = s.share_calendar_icon || 'people';
+    shareIconPicker.innerHTML = GROUP_ICON_KEYS.map(k =>
+      `<button type="button" class="group-icon-opt ${cur === k ? 'on' : ''}" data-share-icon="${k}" title="${k}">${groupIconSvg(k, 20)}</button>`
+    ).join('');
+    shareIconPicker.querySelectorAll('.group-icon-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        shareIconPicker.querySelectorAll('.group-icon-opt').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+      });
+    });
+  }
+
   // Profile chapter: name (from cached user) + email (fresh from /profile).
   const pu = JSON.parse(localStorage.getItem('user') || '{}');
   document.getElementById('cfg-display-name').value = pu.display_name || pu.username || '';
@@ -3812,6 +3842,8 @@ function bindSettingsModal() {
     };
     const gvVal = document.getElementById('cfg-group-visible-list')?.dataset.selected;
     settings.group_visible_calendar_id = gvVal ? parseInt(gvVal) : null;
+    const shareIconPicker = document.getElementById('cfg-share-icon');
+    settings.share_calendar_icon = shareIconPicker?.querySelector('.group-icon-opt.on')?.dataset.shareIcon || null;
     try {
       await api.put('/settings/', settings);
       state.settings = { ...state.settings, ...settings };
@@ -3821,6 +3853,7 @@ function bindSettingsModal() {
       applyTheme(state.settings);
       showToast(t('settings_saved'));
       closeModal('modal-settings');
+      renderCalendarList();
       renderMiniCal();
       fetchAndRender();
     } catch (e) { showToast(e.message, true); }

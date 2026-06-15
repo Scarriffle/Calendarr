@@ -108,6 +108,8 @@ class UserSettings(Base):
     default_reminder_minutes = Column(Integer, nullable=True)
     # Default duration (in minutes) applied to a newly created event's end time.
     default_event_duration_minutes = Column(Integer, default=60)
+    # Icon key (from GROUP_ICON_KEYS) shown next to calendars this user shares with groups.
+    share_calendar_icon = Column(String(16), nullable=True)
 
     user = relationship("User", back_populates="settings")
 

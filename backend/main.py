@@ -218,6 +218,13 @@ def _migrate():
         except Exception:
             pass
 
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN share_calendar_icon VARCHAR(16)"))
+            conn.commit()
+            logging.info("Migration: added share_calendar_icon to user_settings")
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
