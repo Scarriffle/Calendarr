@@ -598,14 +598,19 @@ a { color: var(--primary); text-decoration: none; }
   outline: none;
 }
 .cal-account-name { font-size: 11px; color: var(--text-3); padding: 4px 16px 2px; font-weight: 500; }
-/* Hide the remove/eye button until hover — use opacity so no layout shift. */
-.cal-item-remove { opacity: 0; pointer-events: none; flex-shrink: 0; transition: opacity .12s; }
-.cal-item:hover .cal-item-remove { opacity: 1; pointer-events: auto; }
-/* Reminder bell: invisible (but present) when enabled; always visible (dimmed)
-   when disabled so the muted state is clear at a glance. */
-.cal-item-bell { opacity: 0; pointer-events: none; flex-shrink: 0; transition: opacity .12s; }
-.cal-item:hover .cal-item-bell { opacity: 1; pointer-events: auto; }
+/* Action buttons sit absolutely so they never push the name or shift row height. */
+.cal-item { position: relative; }
+.cal-item-remove,
+.cal-item-bell {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  opacity: 0; pointer-events: none; transition: opacity .12s;
+}
+.cal-item-remove { right: 4px; }
+.cal-item-bell  { right: 28px; }
+.cal-item:hover .cal-item-remove,
+.cal-item:hover .cal-item-bell  { opacity: 1; pointer-events: auto; }
 .cal-item-bell.off { opacity: .55; pointer-events: auto; color: var(--text-3); }
+.cal-item:hover .cal-item-bell.off { opacity: 1; }
 
 /* ── Month View ─────────────────────────────────────────── */
 .month-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
