@@ -92,6 +92,16 @@ fun SettingsScreen(
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)) {
 
                 ProfileChapter(vm)
+                Spacer(Modifier.size(16.dp))
+                Section(tr("settings.default_duration"))
+                ChipRow(
+                    options = listOf(
+                        "15" to "15 min", "30" to "30 min", "45" to "45 min",
+                        "60" to "1 h", "90" to "1.5 h", "120" to "2 h",
+                    ),
+                    selected = settings.defaultEventDurationMinutes.toString(),
+                    onSelect = { update(settings.copy(defaultEventDurationMinutes = it.toInt())) },
+                )
                 Divider(Modifier.padding(vertical = 16.dp))
 
                 Section(tr("settings.calview"))
@@ -116,15 +126,6 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.size(16.dp))
 
-                Section(tr("settings.default_duration"))
-                ChipRow(
-                    options = listOf(
-                        "15" to "15 min", "30" to "30 min", "45" to "45 min",
-                        "60" to "1 h", "90" to "1.5 h", "120" to "2 h",
-                    ),
-                    selected = settings.defaultEventDurationMinutes.toString(),
-                    onSelect = { update(settings.copy(defaultEventDurationMinutes = it.toInt())) },
-                )
                 Divider(Modifier.padding(vertical = 16.dp))
 
                 Section(tr("settings.language"))

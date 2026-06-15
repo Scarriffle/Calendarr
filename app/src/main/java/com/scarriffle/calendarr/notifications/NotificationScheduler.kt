@@ -58,7 +58,11 @@ object NotificationScheduler {
             } else ev.reminders
             for (m in offsets) {
                 val fire = ev.startDate.toEpochMilli() - m * 60_000L
-                if (fire > now) pending.add(Pending(fire, ev.title, ev.location))
+                if (fire > now) {
+                    val rel  = relativeText(m)
+                    val body = if (ev.location.isNotBlank()) "$rel · ${ev.location}" else rel
+                    pending.add(Pending(fire, ev.title, body))
+                }
             }
         }
         pending.sortBy { it.fire }
@@ -80,6 +84,14 @@ object NotificationScheduler {
             }
         }
         prefs.edit().putInt(KEY_COUNT, limited.size).apply()
+    }
+
+    private fun relativeText(minutes: Int): String = when {
+        minutes < 60   -> "in $minutes Min."
+        minutes == 60  -> "in 1 Std."
+        minutes < 1440 -> "in ${minutes / 60} Std."
+        minutes == 1440 -> "morgen"
+        else            -> "in ${minutes / 1440} Tagen"
     }
 
     private fun intentFor(context: Context, code: Int, p: Pending?): PendingIntent {
