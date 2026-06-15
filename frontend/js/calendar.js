@@ -692,6 +692,7 @@ function renderCalendarList() {
   const TRASH = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
   const BELL = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
   const BELL_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42v5l-2 2v1h13.73l2 2L21 19.72l-1-1.03zM12 22c1.11 0 2-.89 2-2h-4c0 1.11.89 2 2 2zm6-7.32V11c0-3.08-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.42.12-.1.03-.2.07-.3.11h-.01c-.01 0-.01 0-.02.01-.23.09-.46.2-.68.31L18 14.68z"/></svg>`;
+  const SHARE_ICON = `<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>`;
 
   // Build a single flat list of all calendars. The source/account is shown
   // inline (small, grey) next to the name and section headers are gone, so the
@@ -772,7 +773,7 @@ function renderCalendarList() {
       <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
       <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
       ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">${groupIconSvg('people', 13)}</span>` : ''}
-      ${e.groupVisible ? `<span class="cal-shared-flag" title="${t('group_visible_flag')}">${groupIconSvg('people', 13)}</span>` : ''}
+      ${e.groupVisible ? `<span class="cal-shared-flag cal-shared-flag-own" title="${t('group_visible_flag')}">${SHARE_ICON}</span>` : ''}
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
       ${e.reminders ? `<button class="icon-btn mini-btn cal-item-bell ${e.remindersEnabled ? '' : 'off'}" data-source="${e.source}" ${e.dataId} title="${e.remindersEnabled ? t('calendar_reminders_on') : t('calendar_reminders_off')}">${e.remindersEnabled ? BELL : BELL_OFF}</button>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
