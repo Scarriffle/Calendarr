@@ -590,7 +590,7 @@ a { color: var(--primary); text-decoration: none; }
 .cal-item-dot:hover { outline: 2px solid var(--text-2); outline-offset: 1px; }
 .cal-item input[type=checkbox] { accent-color: var(--primary); width: 14px; height: 14px; }
 .cal-item-name { font-size: 13px; flex: 1; min-width: 0; color: var(--text-1); cursor: default; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cal-item-remove { flex-shrink: 0; }
+.cal-item-remove { flex-shrink: 0; display: none; }
 .cal-rename-input {
   font-size: 13px; flex: 1; color: var(--text-1);
   background: var(--bg-app); border: 1px solid var(--primary);
@@ -598,19 +598,13 @@ a { color: var(--primary); text-decoration: none; }
   outline: none;
 }
 .cal-account-name { font-size: 11px; color: var(--text-3); padding: 4px 16px 2px; font-weight: 500; }
-/* Action buttons sit absolutely so they never push the name or shift row height. */
-.cal-item { position: relative; }
-.cal-item-remove,
-.cal-item-bell {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  opacity: 0; pointer-events: none; transition: opacity .12s;
-}
-.cal-item-remove { right: 4px; }
-.cal-item-bell  { right: 28px; }
+/* Fixed min-height so 28px mini-btns never change row height when they appear. */
+.cal-item { position: relative; min-height: 40px; }
+.cal-item-bell { display: none; flex-shrink: 0; }
 .cal-item:hover .cal-item-remove,
-.cal-item:hover .cal-item-bell  { opacity: 1; pointer-events: auto; }
-.cal-item-bell.off { opacity: .55; pointer-events: auto; color: var(--text-3); }
-.cal-item:hover .cal-item-bell.off { opacity: 1; }
+.cal-item:hover .cal-item-bell { display: inline-flex; }
+.cal-item-bell.off { display: inline-flex; opacity: .55; color: var(--text-3); }
+.cal-item:hover .cal-item-bell.off { opacity: 1; color: inherit; }
 
 /* ── Month View ─────────────────────────────────────────── */
 .month-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
