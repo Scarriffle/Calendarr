@@ -774,7 +774,7 @@ function renderCalendarList() {
       <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
       <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
       ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">${groupIconSvg(e.groupIcon || 'people', 13)}</span>` : ''}
-      ${e.groupVisible ? `<span class="cal-shared-flag cal-shared-flag-own" title="${t('group_visible_flag')}">${groupIconSvg(state.settings?.share_calendar_icon || 'people', 13)}</span>` : ''}
+      ${e.groupVisible ? `<span class="cal-shared-flag cal-shared-flag-own" title="${t('group_visible_flag')}">${shareIconSvg(state.settings?.share_calendar_icon || 'share', 13)}</span>` : ''}
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
       ${e.reminders ? `<button class="icon-btn mini-btn cal-item-bell ${e.remindersEnabled ? '' : 'off'}" data-source="${e.source}" ${e.dataId} title="${e.remindersEnabled ? t('calendar_reminders_on') : t('calendar_reminders_off')}">${e.remindersEnabled ? BELL : BELL_OFF}</button>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
@@ -2898,6 +2898,23 @@ function groupIconHtml(icon, size = 18) {
   if (icon) return escHtml(icon);
   return groupIconSvg('people', size);
 }
+
+// Icons specifically for the "this calendar is shared with a group" indicator.
+const SHARE_ICON_KEYS = ['share', 'link', 'send', 'eye', 'upload', 'wifi', 'person_add', 'ios_share'];
+const SHARE_ICON_PATHS = {
+  share:      'M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z',
+  link:       'M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z',
+  send:       'M2.01 21L23 12 2.01 3 2 10l15 2-15 2z',
+  eye:        'M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z',
+  upload:     'M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z',
+  wifi:       'M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z',
+  person_add: 'M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
+  ios_share:  'M16 5l-1.42 1.42-1.59-1.59V16h-1.98V4.83L9.42 6.42 8 5l4-4 4 4zm4 5v11c0 1.1-.9 2-2 2H6c-1.11 0-2-.9-2-2V10c0-1.11.89-2 2-2h3v2H6v11h12V10h-3V8h3c1.1 0 2 .89 2 2z',
+};
+function shareIconSvg(key, size = 18) {
+  const p = SHARE_ICON_PATHS[key] || SHARE_ICON_PATHS.share;
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><path d="${p}"/></svg>`;
+}
 function renderGroupIconPicker() {
   const modal = document.getElementById('modal-group');
   const sel = modal.__icon || 'people';
@@ -3060,9 +3077,9 @@ function openSettingsModal() {
   // Share-Icon-Picker in Darstellung
   const shareIconPicker = document.getElementById('cfg-share-icon');
   if (shareIconPicker) {
-    const cur = s.share_calendar_icon || 'people';
-    shareIconPicker.innerHTML = GROUP_ICON_KEYS.map(k =>
-      `<button type="button" class="group-icon-opt ${cur === k ? 'on' : ''}" data-share-icon="${k}" title="${k}">${groupIconSvg(k, 20)}</button>`
+    const cur = s.share_calendar_icon || 'share';
+    shareIconPicker.innerHTML = SHARE_ICON_KEYS.map(k =>
+      `<button type="button" class="group-icon-opt ${cur === k ? 'on' : ''}" data-share-icon="${k}" title="${k}">${shareIconSvg(k, 20)}</button>`
     ).join('');
     shareIconPicker.querySelectorAll('.group-icon-opt').forEach(btn => {
       btn.addEventListener('click', () => {
