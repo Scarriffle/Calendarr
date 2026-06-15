@@ -771,9 +771,9 @@ function renderCalendarList() {
       <span class="cal-drag-handle" title="${t('drag_reorder')}">⠿</span>
       <input type="checkbox" ${e.enabled ? 'checked' : ''} data-source="${e.source}" ${e.dataId} />
       <div class="cal-item-dot" style="background:${e.color}" data-source="${e.source}" ${e.dataId} title="${t('change_color')}"></div>
-      <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
       ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">${groupIconSvg('people', 13)}</span>` : ''}
       ${e.groupVisible ? `<span class="cal-shared-flag" title="${t('group_visible_flag')}">${groupIconSvg('people', 13)}</span>` : ''}
+      <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
       ${e.reminders ? `<button class="icon-btn mini-btn cal-item-bell ${e.remindersEnabled ? '' : 'off'}" data-source="${e.source}" ${e.dataId} title="${e.remindersEnabled ? t('calendar_reminders_on') : t('calendar_reminders_off')}">${e.remindersEnabled ? BELL : BELL_OFF}</button>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
     </div>`
