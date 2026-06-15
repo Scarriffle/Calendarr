@@ -3355,11 +3355,13 @@ function renderCalendarTable() {
   const container = document.getElementById('cal-settings-table');
   if (!container) return;
 
-  const TRASH = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
+  const TRASH   = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
+  const EYE_ON  = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
+  const EYE_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`;
   let rowCount = 0;
 
-  const hid  = (src, id, checked) =>
-    `<input type="checkbox" class="ct-toggle" ${checked ? 'checked' : ''} data-ct-hid="${src}" data-ct-id="${id}">`;
+  const hid  = (src, id, isVisible) =>
+    `<button class="icon-btn mini-btn ct-eye" data-ct-hid="${src}" data-ct-id="${id}" data-ct-visible="${isVisible ? '1' : '0'}" title="${isVisible ? 'Ausblenden' : 'Anzeigen'}">${isVisible ? EYE_ON : EYE_OFF}</button>`;
   const rem  = (src, id, checked) =>
     `<input type="checkbox" class="ct-toggle" ${checked ? 'checked' : ''} data-ct-rem="${src}" data-ct-id="${id}">`;
   const dot  = (color, fb) =>
@@ -3470,15 +3472,16 @@ function renderCalendarTable() {
 
   container.innerHTML = `<table class="cal-manage-table">
     <thead><tr>
-      <th>Name</th><th>Herkunft</th><th>Ausgeblendet</th><th>Benachrichtigungen</th><th>Export / Import</th><th>Sync</th><th></th>
+      <th>Name</th><th>Herkunft</th><th>Sichtbar</th><th>Benachrichtigungen</th><th>Export / Import</th><th>Sync</th><th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 
-  // Hidden toggle
-  container.querySelectorAll('.ct-toggle[data-ct-hid]').forEach(cb => {
-    cb.addEventListener('change', async () => {
-      const src = cb.dataset.ctHid, id = parseInt(cb.dataset.ctId), hidden = !cb.checked;
+  // Visibility eye toggle
+  container.querySelectorAll('.ct-eye[data-ct-hid]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const src = btn.dataset.ctHid, id = parseInt(btn.dataset.ctId);
+      const hidden = btn.dataset.ctVisible === '1'; // currently visible → we're hiding it
       try {
         if (src === 'ical') {
           await api.put(`/ical/subscriptions/${id}`, { sidebar_hidden: hidden });
@@ -3494,8 +3497,9 @@ function renderCalendarTable() {
           await api.put(`/homeassistant/calendars/${id}`, { enabled: !hidden, sidebar_hidden: hidden });
           for (const acc of state.haAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) { c.sidebar_hidden = hidden; c.enabled = !hidden; } }
         }
+        renderCalendarTable();
         renderCalendarList();
-      } catch (e) { showToast(e.message, true); cb.checked = !cb.checked; }
+      } catch (e) { showToast(e.message, true); }
     });
   });
 
