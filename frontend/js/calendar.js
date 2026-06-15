@@ -76,6 +76,8 @@ function readUrlState() {
     if (!isNaN(d.getTime())) out.date = d;
   }
   out.settings = params.get('settings') === '1';
+  const stab = params.get('stab');
+  if (stab && ['profile','general','accounts','users'].includes(stab)) out.stab = stab;
   return out;
 }
 
@@ -87,7 +89,11 @@ function writeUrlState() {
   const d = state.currentDate;
   const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   let newHash = `date=${dateStr}&view=${state.currentView}`;
-  if (uiSettingsOpen) newHash += '&settings=1';
+  if (uiSettingsOpen) {
+    newHash += '&settings=1';
+    const activeTab = document.querySelector('.settings-nav-btn.active');
+    if (activeTab) newHash += `&stab=${activeTab.dataset.panel}`;
+  }
   if (window.location.hash.replace(/^#/,'') !== newHash) {
     // replaceState statt pushState: prev/next-Klicks sollen nicht jeden
     // einzelnen Tag in den Browser-History-Stack drücken
@@ -3063,8 +3069,10 @@ function openSettingsModal() {
   if (usersNavBtn) usersNavBtn.classList.toggle('hidden', !user.is_admin);
   if (user.is_admin) loadUsers();
 
-  // Activate first panel
-  const firstBtn = document.querySelector('.settings-nav-btn:not(.hidden)');
+  // Activate panel from URL or fall back to first visible
+  const urlTab = readUrlState().stab;
+  const tabBtn = urlTab && document.querySelector(`.settings-nav-btn[data-panel="${urlTab}"]:not(.hidden)`);
+  const firstBtn = tabBtn || document.querySelector('.settings-nav-btn:not(.hidden)');
   if (firstBtn) activateSettingsPanel(firstBtn.dataset.panel);
 
   // Render unified calendar table
@@ -3076,6 +3084,7 @@ function openSettingsModal() {
 function activateSettingsPanel(panel) {
   document.querySelectorAll('.settings-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.panel === panel));
   document.querySelectorAll('.settings-panel').forEach(p => p.classList.toggle('active', p.id === 'settings-panel-' + panel));
+  writeUrlState();
 }
 
 function renderGoogleAccounts() {
