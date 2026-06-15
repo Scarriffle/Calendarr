@@ -30,6 +30,7 @@ class SettingsUpdate(BaseModel):
     private_event_visibility: Optional[str] = None
     group_visible_calendar_id: Optional[int] = None
     default_reminder_minutes: Optional[int] = None  # null = off
+    default_event_duration_minutes: Optional[int] = None
 
 
 def _settings_dict(s: models.UserSettings) -> dict:
@@ -52,6 +53,7 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "private_event_visibility": s.private_event_visibility or "busy",
         "group_visible_calendar_id": s.group_visible_calendar_id,
         "default_reminder_minutes": s.default_reminder_minutes,
+        "default_event_duration_minutes": s.default_event_duration_minutes or 60,
     }
 
 

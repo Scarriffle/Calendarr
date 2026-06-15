@@ -106,6 +106,8 @@ class UserSettings(Base):
     # Default reminder in minutes-before-start applied to all events client-side
     # (0 = at start time). NULL = no default reminder.
     default_reminder_minutes = Column(Integer, nullable=True)
+    # Default duration (in minutes) applied to a newly created event's end time.
+    default_event_duration_minutes = Column(Integer, default=60)
 
     user = relationship("User", back_populates="settings")
 

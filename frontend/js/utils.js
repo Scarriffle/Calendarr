@@ -142,6 +142,79 @@ function contrastRatio(c1, c2) {
   } catch { return 21; }
 }
 
+// ── Safe HTML rendering for event descriptions ───────────────────────────
+// External calendars (CalDAV, iCal) often store rich-text descriptions as raw
+// HTML. We render a small allowlist of formatting tags so links/line breaks
+// look right, but strip everything dangerous (scripts, event handlers, inline
+// styles) — we never execute code from a description.
+const ALLOWED_TAGS = new Set(['A', 'BR', 'P', 'DIV', 'B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'SPAN']);
+const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,:;!?)\]}'"])/g;
+
+function makeSafeLink(href, text) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.textContent = text;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  return a;
+}
+
+// Replace bare URLs inside a text node with clickable <a> elements.
+function linkifyTextNode(node, out) {
+  const text = node.nodeValue;
+  let last = 0;
+  let m;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text)) !== null) {
+    if (m.index > last) out.appendChild(document.createTextNode(text.slice(last, m.index)));
+    out.appendChild(makeSafeLink(m[0], m[0]));
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.appendChild(document.createTextNode(text.slice(last)));
+}
+
+// Recursively copy `src` into `dest`, keeping only allowlisted tags/attributes.
+function sanitizeInto(src, dest) {
+  src.childNodes.forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      linkifyTextNode(node, dest);
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const tag = node.tagName;
+    if (!ALLOWED_TAGS.has(tag)) {
+      // Drop the tag but keep its (sanitized) contents.
+      sanitizeInto(node, dest);
+      return;
+    }
+    let el;
+    if (tag === 'A') {
+      const href = node.getAttribute('href') || '';
+      if (/^(https?:|mailto:)/i.test(href)) {
+        el = makeSafeLink(href, '');
+      } else {
+        // Unsafe/relative href: render as plain text container.
+        el = document.createElement('span');
+      }
+    } else {
+      el = document.createElement(tag.toLowerCase());
+    }
+    sanitizeInto(node, el);
+    dest.appendChild(el);
+  });
+}
+
+// Returns a sanitized HTML string for an event description, safe for innerHTML.
+export function renderDescriptionHtml(raw) {
+  if (!raw) return '';
+  const hasHtml = /<[a-z][\s\S]*>/i.test(raw);
+  const doc = new DOMParser().parseFromString(
+    hasHtml ? raw : raw.replace(/\n/g, '<br>'), 'text/html');
+  const out = document.createElement('div');
+  sanitizeInto(doc.body, out);
+  return out.innerHTML;
+}
+
 function hexToRgba(hex, alpha) {
   const r = parseInt(hex.slice(1,3), 16);
   const g = parseInt(hex.slice(3,5), 16);

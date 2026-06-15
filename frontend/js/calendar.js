@@ -1,5 +1,5 @@
 ﻿import { api } from './api.js';
-import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart, DEFAULT_TEXT_COLOR, DEFAULT_LINE_COLOR, DEFAULT_BG_COLOR } from './utils.js';
+import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart, renderDescriptionHtml, DEFAULT_TEXT_COLOR, DEFAULT_LINE_COLOR, DEFAULT_BG_COLOR } from './utils.js';
 import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
@@ -1401,7 +1401,7 @@ function showEventPopup(ev, anchor) {
 
   document.getElementById('popup-location').textContent = ev.location || '';
   document.getElementById('popup-row-location').style.display = ev.location ? '' : 'none';
-  document.getElementById('popup-description').textContent = ev.description || '';
+  document.getElementById('popup-description').innerHTML = renderDescriptionHtml(ev.description || '');
   document.getElementById('popup-row-description').style.display = ev.description ? '' : 'none';
   document.getElementById('popup-calendar').textContent = ev.calendar_name || '';
   document.getElementById('popup-row-calendar').style.display = ev.calendar_name ? '' : 'none';
@@ -1700,8 +1700,8 @@ function openNewEventModal(date) {
   document.getElementById('ev-allday').checked = false;
 
   const start = new Date(date);
-  const end   = new Date(date);
-  end.setHours(end.getHours() + 1);
+  const durMin = (state.settings && state.settings.default_event_duration_minutes) || 60;
+  const end   = new Date(start.getTime() + durMin * 60000);
   setDtValue('ev-start',      toLocalDatetimeInput(start), 'datetime');
   setDtValue('ev-end',        toLocalDatetimeInput(end),   'datetime');
   setDtValue('ev-start-date', toDateInput(start),          'date');
@@ -1835,7 +1835,15 @@ function resetColorPicker(color) {
 }
 
 // ── Reminders (local events only) ─────────────────────────
-const REMINDER_OPTIONS = [0, 5, 15, 30, 60, 1440, 10080];
+// A few quick presets; anything else is entered via the "custom" mode
+// (number + unit). Reminders are stored as minutes-before-start integers.
+const REMINDER_PRESETS = [0, 30, 1440]; // at start, 30 min, 1 day
+const REMINDER_UNITS = [
+  { unit: 'minutes', mult: 1 },
+  { unit: 'hours',   mult: 60 },
+  { unit: 'days',    mult: 1440 },
+  { unit: 'weeks',   mult: 10080 },
+];
 
 function reminderLabel(min) {
   if (min <= 0) return t('reminder_at_start');
@@ -1843,6 +1851,15 @@ function reminderLabel(min) {
   if (min < 1440)  { const h = min / 60;    return h === 1 ? t('reminder_hour_one') : t('reminder_hours', { n: h }); }
   if (min < 10080) { const d = min / 1440;  return d === 1 ? t('reminder_day_one')  : t('reminder_days',  { n: d }); }
   const w = min / 10080;                    return w === 1 ? t('reminder_week_one') : t('reminder_weeks', { n: w });
+}
+
+// Split a minutes value into the largest exact {value, unit} for the custom picker.
+function splitReminder(min) {
+  for (let i = REMINDER_UNITS.length - 1; i >= 0; i--) {
+    const u = REMINDER_UNITS[i];
+    if (min > 0 && min % u.mult === 0) return { value: min / u.mult, unit: u.unit };
+  }
+  return { value: Math.max(1, min), unit: 'minutes' };
 }
 
 function setEventReminders(arr) {
@@ -1858,19 +1875,63 @@ function renderReminderRows() {
   state.eventReminders.forEach((min, idx) => {
     const row = document.createElement('div');
     row.className = 'ev-reminder-row';
+
+    const isPreset = REMINDER_PRESETS.includes(min);
     const sel = document.createElement('select');
-    // Keep a non-catalog value (from an old/imported reminder) selectable.
-    const opts = REMINDER_OPTIONS.includes(min) ? REMINDER_OPTIONS : [min, ...REMINDER_OPTIONS];
-    opts.forEach(v => {
+    REMINDER_PRESETS.forEach(v => {
       const o = document.createElement('option');
       o.value = String(v);
       o.textContent = reminderLabel(v);
-      if (v === min) o.selected = true;
+      if (isPreset && v === min) o.selected = true;
       sel.appendChild(o);
     });
-    sel.addEventListener('change', () => {
-      state.eventReminders[idx] = parseInt(sel.value, 10);
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = t('reminder_custom');
+    if (!isPreset) customOpt.selected = true;
+    sel.appendChild(customOpt);
+
+    // Custom (number + unit) inputs, shown only in custom mode.
+    const customWrap = document.createElement('span');
+    customWrap.className = 'ev-reminder-custom';
+    customWrap.style.display = isPreset ? 'none' : '';
+    const numInput = document.createElement('input');
+    numInput.type = 'number';
+    numInput.min = '1';
+    const unitSel = document.createElement('select');
+    REMINDER_UNITS.forEach(u => {
+      const o = document.createElement('option');
+      o.value = u.unit;
+      o.textContent = t('reminder_unit_' + u.unit);
+      unitSel.appendChild(o);
     });
+    const beforeLbl = document.createElement('span');
+    beforeLbl.className = 'ev-reminder-before';
+    beforeLbl.textContent = t('reminder_before');
+    const sp = splitReminder(isPreset ? 30 : min);
+    numInput.value = String(sp.value);
+    unitSel.value = sp.unit;
+    customWrap.appendChild(numInput);
+    customWrap.appendChild(unitSel);
+    customWrap.appendChild(beforeLbl);
+
+    function commitCustom() {
+      const n = Math.max(1, parseInt(numInput.value, 10) || 1);
+      const mult = REMINDER_UNITS.find(u => u.unit === unitSel.value).mult;
+      state.eventReminders[idx] = n * mult;
+    }
+    sel.addEventListener('change', () => {
+      if (sel.value === 'custom') {
+        customWrap.style.display = '';
+        commitCustom();
+      } else {
+        customWrap.style.display = 'none';
+        state.eventReminders[idx] = parseInt(sel.value, 10);
+      }
+    });
+    numInput.addEventListener('input', commitCustom);
+    unitSel.addEventListener('change', commitCustom);
+
     const rm = document.createElement('button');
     rm.type = 'button';
     rm.className = 'icon-btn ev-reminder-remove';
@@ -1880,6 +1941,7 @@ function renderReminderRows() {
       renderReminderRows();
     });
     row.appendChild(sel);
+    row.appendChild(customWrap);
     row.appendChild(rm);
     list.appendChild(row);
   });
@@ -1887,16 +1949,30 @@ function renderReminderRows() {
 
 function addReminderRow() {
   const def = (state.settings && state.settings.default_reminder_minutes != null)
-    ? state.settings.default_reminder_minutes : 10;
-  state.eventReminders.push(REMINDER_OPTIONS.includes(def) ? def : 10);
+    ? state.settings.default_reminder_minutes : 30;
+  state.eventReminders.push(def >= 0 ? def : 30);
   renderReminderRows();
 }
 
 // Reminders apply to local events only (the server stores them on local events).
+// When the selected calendar has its reminders disabled, we keep any existing
+// reminders intact (never delete them) but grey out the controls and explain
+// that they won't fire — matching the apps' behaviour.
 function updateRemindersRow() {
   const calVal = document.getElementById('ev-calendar').value || '';
   const isLocal = calVal.startsWith('local-');
-  document.getElementById('ev-reminders-group').style.display = isLocal ? '' : 'none';
+  const group = document.getElementById('ev-reminders-group');
+  group.style.display = isLocal ? '' : 'none';
+  if (!isLocal) return;
+
+  const calId = parseInt(calVal.slice('local-'.length), 10);
+  const cal = (state.localCalendars || []).find(c => c.id === calId);
+  const disabled = !!(cal && cal.reminders_enabled === false);
+
+  const hint = document.getElementById('ev-reminders-hint');
+  if (hint) hint.style.display = disabled ? '' : 'none';
+  group.classList.toggle('reminders-disabled', disabled);
+  group.querySelectorAll('select, input, button').forEach(el => { el.disabled = disabled; });
 }
 
 function buildRruleFromUI() {
@@ -2928,6 +3004,7 @@ function openSettingsModal() {
     prev.style.background = val || fallback;
   });
   document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
+  document.getElementById('cfg-default-duration').value = String(s.default_event_duration_minutes || 60);
   document.getElementById('cfg-language').value = getLang();
   document.getElementById('cfg-private-visibility').value = s.private_event_visibility || 'busy';
   renderGroupVisibleList(s.group_visible_calendar_id);
@@ -3438,6 +3515,7 @@ function bindSettingsModal() {
       line_color:          colourOrNull('cfg-line-color-hex'),
       bg_color:            colourOrNull('cfg-bg-color-hex'),
       dim_past_events:     document.getElementById('cfg-dim-past').checked,
+      default_event_duration_minutes: parseInt(document.getElementById('cfg-default-duration').value, 10) || 60,
       hour_height:         getActive('cfg-hour-height')   || 44,
       language:            document.getElementById('cfg-language').value,
       private_event_visibility: document.getElementById('cfg-private-visibility').value,

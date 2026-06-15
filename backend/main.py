@@ -210,6 +210,13 @@ def _migrate():
                 logging.info("Migration: added reminders_enabled to %s", tbl)
             except Exception:
                 pass
+        # Synced default duration (minutes) for newly created events.
+        try:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN default_event_duration_minutes INTEGER DEFAULT 60"))
+            conn.commit()
+            logging.info("Migration: added default_event_duration_minutes to user_settings")
+        except Exception:
+            pass
 
 _migrate()
 
