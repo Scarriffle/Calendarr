@@ -96,7 +96,7 @@ def update_settings(
     # For these three override colours, an explicit null is meaningful
     # ("reset to default") and must be persisted as NULL. All other fields
     # keep the previous behaviour where a null/missing value is ignored.
-    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "group_visible_calendar_id", "default_reminder_minutes"}
+    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "group_visible_calendar_id", "default_reminder_minutes", "default_event_duration_minutes"}
     update_data = data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if field in NULLABLE_OVERRIDES:

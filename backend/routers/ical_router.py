@@ -50,6 +50,7 @@ def _fetch_ics(url: str) -> str:
     try:
         resp = http_requests.get(url, timeout=30, allow_redirects=True)
         resp.raise_for_status()
+        resp.encoding = 'utf-8'
         return resp.text
     except http_requests.RequestException as e:
         raise ValueError(f"Fehler beim Abrufen der URL: {e}")
