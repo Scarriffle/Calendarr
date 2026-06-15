@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
 
-data class CalendarFilterEntry(val key: String, val name: String, val color: String)
+data class CalendarFilterEntry(val key: String, val name: String, val color: String, val source: String = "")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,7 +107,7 @@ fun CalendarFilterSheet(
                         checked = visible,
                         onCheckedChange = {
                             if (groupMode) vm.setGroupKeyHidden(entry.key, hidden = !it)
-                            else vm.setCalendarHidden(entry.key, hidden = !it)
+                            else vm.setCalendarHiddenSynced(entry.key, entry.source, !it)
                         },
                     )
                 }

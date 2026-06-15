@@ -501,7 +501,7 @@ private fun GroupBanner(group: Group, onExit: () -> Unit) {
 private fun allKnownCalendars(vm: CalendarViewModel): List<CalendarFilterEntry> {
     val st = vm.state.value
     return st.events
-        .map { CalendarFilterEntry(calendarKey(it.source, it.calendarId), it.calendarName.ifBlank { it.source }, it.effectiveColor) }
+        .map { CalendarFilterEntry(calendarKey(it.source, it.calendarId), it.calendarName.ifBlank { it.source }, it.effectiveColor, it.source) }
         .distinctBy { it.key }
         .sortedBy { it.name.lowercase() }
 }

@@ -330,6 +330,15 @@ class CalendarViewModel @Inject constructor(
         refreshFromCache()
     }
 
+    /** Like [setCalendarHidden] but also syncs server-side sidebar_hidden for external calendars. */
+    fun setCalendarHiddenSynced(key: String, source: String, hidden: Boolean) {
+        setCalendarHidden(key, hidden)
+        val id = key.substringAfter(":").toIntOrNull() ?: return
+        if (source in listOf("caldav", "google", "homeassistant")) {
+            viewModelScope.launch { repository.setCalendarSidebarHidden(source, id, hidden) }
+        }
+    }
+
     fun setHiddenCalendars(keys: Set<String>) {
         settingsStore.hiddenCalendarKeys = keys
         _state.update { it.copy(hiddenKeys = keys) }
