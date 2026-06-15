@@ -23,6 +23,7 @@ struct SettingsView: View {
     @AppStorage("weekStartDay")      private var weekStartDay = "monday"
     @AppStorage("dimPastEvents")     private var dimPastEvents = false
     @AppStorage("defaultReminderMinutes") private var defaultReminderMinutes = -1
+    @AppStorage("defaultEventDurationMinutes") private var defaultEventDurationMinutes = 60
 
     // Profile chapter (server-backed; loaded on appear).
     @State private var displayName = ""
@@ -360,6 +361,12 @@ struct SettingsView: View {
             }
             Toggle(L10n.t("settings.dimpast", appLang), isOn: $dimPastEvents)
                 .tint(Color.accentColor)
+            Picker(L10n.t("settings.default_duration", appLang), selection: $defaultEventDurationMinutes) {
+                ForEach([15, 30, 45, 60, 90, 120, 240], id: \.self) { m in
+                    Text(ReminderOptions.durationLabel(m, appLang)).tag(m)
+                }
+            }
+            .onChange(of: defaultEventDurationMinutes) { _, _ in SettingsSync.push(api: api) }
         }
     }
 

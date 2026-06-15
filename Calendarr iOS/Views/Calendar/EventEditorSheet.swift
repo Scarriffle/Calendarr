@@ -11,6 +11,7 @@ struct EventEditorSheet: View {
     @Environment(\.dismiss) var dismiss
     @AppStorage("appLanguage") private var appLang = "system"
     @AppStorage("defaultReminderMinutes") private var defaultReminderMinutes = -1
+    @AppStorage("defaultEventDurationMinutes") private var defaultEventDurationMinutes = 60
     @State private var title = ""
     @State private var isAllDay = false
     @State private var startDate = Date()
@@ -29,6 +30,15 @@ struct EventEditorSheet: View {
 
     private var selectedCal: WritableCalendar? {
         store.writableCalendars.first { $0.id == selectedCalendarId }
+    }
+
+    /// True when the selected calendar has its reminders muted: we keep any
+    /// existing reminders on the event (never delete them) but grey out the
+    /// controls and explain that they won't fire.
+    private var remindersDisabled: Bool {
+        guard let cal = selectedCal else { return false }
+        let key = CalendarStore.calendarKey(source: cal.source, calendarId: String(cal.numericId))
+        return store.reminderDisabledKeys.contains(key)
     }
 
     var body: some View {
@@ -84,26 +94,26 @@ struct EventEditorSheet: View {
                             .tint(Color.accentColor)
                     }
 
-                    Section(ReminderOptions.sectionTitle(appLang)) {
-                        ForEach(Array(reminders.enumerated()), id: \.offset) { idx, _ in
-                            Picker(ReminderOptions.sectionTitle(appLang), selection: Binding(
-                                get: { reminders.indices.contains(idx) ? reminders[idx] : 0 },
-                                set: { if reminders.indices.contains(idx) { reminders[idx] = $0 } }
-                            )) {
-                                ForEach(ReminderOptions.all, id: \.self) { opt in
-                                    Text(ReminderOptions.label(opt, appLang)).tag(opt)
-                                }
-                            }
-                            .labelsHidden()
+                    Section {
+                        ForEach(reminders.indices, id: \.self) { idx in
+                            ReminderEditRow(minutes: $reminders[idx], appLang: appLang)
                         }
                         .onDelete { reminders.remove(atOffsets: $0) }
                         Button {
-                            let next = ReminderOptions.all.first { !reminders.contains($0) } ?? 15
+                            let next = ReminderOptions.presets.first { !reminders.contains($0) }
+                                ?? ReminderOptions.customDefault
                             reminders.append(next)
                         } label: {
                             Label(ReminderOptions.addLabel(appLang), systemImage: "bell.badge.plus")
                         }
+                    } header: {
+                        Text(ReminderOptions.sectionTitle(appLang))
+                    } footer: {
+                        if remindersDisabled {
+                            Text(ReminderOptions.disabledNote(appLang)).foregroundStyle(.orange)
+                        }
                     }
+                    .disabled(remindersDisabled)
                 }
 
                 Section(L10n.t("event.color_section", appLang)) {
@@ -197,7 +207,8 @@ struct EventEditorSheet: View {
             let cal = Calendar.current
             startDate = cal.date(bySettingHour: cal.component(.hour, from: initialDate),
                                  minute: 0, second: 0, of: initialDate) ?? initialDate
-            endDate = startDate.addingTimeInterval(3600)
+            let durMin = defaultEventDurationMinutes > 0 ? defaultEventDurationMinutes : 60
+            endDate = startDate.addingTimeInterval(Double(durMin) * 60)
             selectedCalendarId = store.writableCalendars.first?.id ?? ""
             // New events inherit the user's default reminder (editable).
             if defaultReminderMinutes >= 0 { reminders = [defaultReminderMinutes] }
@@ -260,6 +271,57 @@ struct EventEditorSheet: View {
             dismiss()
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+}
+
+/// One reminder row: a preset picker plus, when "Custom" is chosen, a number
+/// stepper and a unit picker. The value is always stored as minutes-before-start.
+private struct ReminderEditRow: View {
+    @Binding var minutes: Int
+    let appLang: String
+    private let customTag = -1
+
+    private var isPreset: Bool { ReminderOptions.presets.contains(minutes) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Picker("", selection: Binding(
+                get: { isPreset ? minutes : customTag },
+                set: { newVal in
+                    if newVal == customTag {
+                        if ReminderOptions.presets.contains(minutes) { minutes = ReminderOptions.customDefault }
+                    } else {
+                        minutes = newVal
+                    }
+                }
+            )) {
+                ForEach(ReminderOptions.presets, id: \.self) { Text(ReminderOptions.label($0, appLang)).tag($0) }
+                Text(ReminderOptions.customLabel(appLang)).tag(customTag)
+            }
+            .labelsHidden()
+
+            if !isPreset {
+                HStack {
+                    Stepper(value: Binding(
+                        get: { ReminderOptions.split(minutes).value },
+                        set: { minutes = max(1, $0) * ReminderOptions.split(minutes).unit.mult }
+                    ), in: 1...999) {
+                        Text("\(ReminderOptions.split(minutes).value)")
+                            .monospacedDigit()
+                    }
+                    Picker("", selection: Binding(
+                        get: { ReminderOptions.split(minutes).unit },
+                        set: { newUnit in minutes = ReminderOptions.split(minutes).value * newUnit.mult }
+                    )) {
+                        ForEach(ReminderOptions.Unit.allCases) { u in
+                            Text(ReminderOptions.unitLabel(u, appLang)).tag(u)
+                        }
+                    }
+                    .labelsHidden()
+                    Text(ReminderOptions.beforeLabel(appLang)).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 }

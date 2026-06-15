@@ -7,6 +7,63 @@ enum ReminderOptions {
     /// Selectable offsets in minutes-before-start.
     static let all: [Int] = [0, 5, 15, 30, 60, 1440, 10080]
 
+    /// Quick presets shown in the picker; everything else is entered as a
+    /// custom number + unit. Default for a freshly-switched custom row.
+    static let presets: [Int] = [0, 30, 1440]   // at start, 30 min, 1 day
+    static let customDefault = 120              // 2 hours (deliberately not a preset)
+
+    /// Time units for the custom picker (value × mult = minutes-before-start).
+    enum Unit: Int, CaseIterable, Identifiable {
+        case minutes, hours, days, weeks
+        var id: Int { rawValue }
+        var mult: Int {
+            switch self {
+            case .minutes: return 1
+            case .hours:   return 60
+            case .days:    return 1440
+            case .weeks:   return 10080
+            }
+        }
+    }
+
+    /// Split a minutes value into the largest exact {value, unit} for the custom picker.
+    static func split(_ minutes: Int) -> (value: Int, unit: Unit) {
+        for u in Unit.allCases.reversed() where minutes > 0 && minutes % u.mult == 0 {
+            return (minutes / u.mult, u)
+        }
+        return (max(1, minutes), .minutes)
+    }
+
+    static func unitLabel(_ u: Unit, _ l: String) -> String {
+        let en = isEnglish(l)
+        switch u {
+        case .minutes: return en ? "minutes" : "Minuten"
+        case .hours:   return en ? "hours"   : "Stunden"
+        case .days:    return en ? "days"    : "Tage"
+        case .weeks:   return en ? "weeks"   : "Wochen"
+        }
+    }
+    /// Human label for a duration in minutes (no "before" suffix), e.g. "1 h", "30 min".
+    static func durationLabel(_ minutes: Int, _ l: String) -> String {
+        let en = isEnglish(l)
+        if minutes % 60 == 0 {
+            let h = minutes / 60
+            return en ? "\(h) h" : "\(h) Std."
+        }
+        if minutes > 60 {
+            let h = minutes / 60, m = minutes % 60
+            return "\(h):\(String(format: "%02d", m)) h"
+        }
+        return en ? "\(minutes) min" : "\(minutes) Min."
+    }
+    static func customLabel(_ l: String) -> String { isEnglish(l) ? "Custom…" : "Benutzerdefiniert…" }
+    static func beforeLabel(_ l: String) -> String { isEnglish(l) ? "before" : "vorher" }
+    static func disabledNote(_ l: String) -> String {
+        isEnglish(l)
+            ? "Reminders are disabled for this calendar – they will not fire."
+            : "Für diesen Kalender sind Benachrichtigungen deaktiviert – Erinnerungen werden nicht ausgeführt."
+    }
+
     private static func isEnglish(_ appLang: String) -> Bool {
         if appLang == "en" { return true }
         if appLang == "de" { return false }

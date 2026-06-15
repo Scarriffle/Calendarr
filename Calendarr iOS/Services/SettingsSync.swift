@@ -38,6 +38,7 @@ enum SettingsSync {
         static let weekStartDay      = "weekStartDay"
         static let dimPastEvents     = "dimPastEvents"
         static let defaultReminder   = "defaultReminderMinutes"  // Int, -1 = off
+        static let defaultEventDuration = "defaultEventDurationMinutes"  // Int minutes
         // master switch
         static let enabled           = "settingsSync"
     }
@@ -74,6 +75,7 @@ enum SettingsSync {
         s.dimPastEvents     = UserDefaults.standard.bool(forKey: Key.dimPastEvents)
         let rem = int(Key.defaultReminder, -1)
         s.defaultReminderMinutes = rem < 0 ? nil : rem
+        s.defaultEventDurationMinutes = int(Key.defaultEventDuration, 60)
         return s
     }
 
@@ -88,6 +90,7 @@ enum SettingsSync {
         d.set(s.weekStartDay,  forKey: Key.weekStartDay)
         d.set(s.dimPastEvents, forKey: Key.dimPastEvents)
         d.set(s.defaultReminderMinutes ?? -1, forKey: Key.defaultReminder)
+        d.set(s.defaultEventDurationMinutes, forKey: Key.defaultEventDuration)
         guard includeOptional else { return }
         // NOTE: textColor / backgroundColor / lineColor are intentionally NOT
         // synced – the server has no columns for them (iOS-only). Writing the
@@ -139,6 +142,7 @@ enum SettingsSync {
         merged.weekStartDay  = local.weekStartDay
         merged.dimPastEvents = local.dimPastEvents
         merged.defaultReminderMinutes = local.defaultReminderMinutes
+        merged.defaultEventDurationMinutes = local.defaultEventDurationMinutes
         if isEnabled {
             merged.primaryColor      = local.primaryColor
             merged.accentColor       = local.accentColor
