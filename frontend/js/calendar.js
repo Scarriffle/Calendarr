@@ -3356,14 +3356,16 @@ function renderCalendarTable() {
   if (!container) return;
 
   const TRASH   = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
-  const EYE_ON  = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
-  const EYE_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`;
+  const EYE_ON   = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
+  const EYE_OFF  = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`;
+  const BELL_ON  = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
+  const BELL_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42v5l-2 2v1h13.73l2 2L21 19.72l-1-1.03zM12 22c1.11 0 2-.89 2-2h-4c0 1.11.89 2 2 2zm6-7.32V11c0-3.08-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.42.12-.1.03-.2.07-.3.11h-.01c-.01 0-.01 0-.02.01-.23.09-.46.2-.68.31L18 14.68z"/></svg>`;
   let rowCount = 0;
 
   const hid  = (src, id, isVisible) =>
     `<button class="icon-btn mini-btn ct-eye" data-ct-hid="${src}" data-ct-id="${id}" data-ct-visible="${isVisible ? '1' : '0'}" title="${isVisible ? 'Ausblenden' : 'Anzeigen'}">${isVisible ? EYE_ON : EYE_OFF}</button>`;
-  const rem  = (src, id, checked) =>
-    `<input type="checkbox" class="ct-toggle" ${checked ? 'checked' : ''} data-ct-rem="${src}" data-ct-id="${id}">`;
+  const rem  = (src, id, on) =>
+    `<button class="icon-btn mini-btn ct-bell" data-ct-rem="${src}" data-ct-id="${id}" data-ct-on="${on ? '1' : '0'}" title="${on ? 'Benachrichtigungen aus' : 'Benachrichtigungen an'}">${on ? BELL_ON : BELL_OFF}</button>`;
   const dot  = (color, fb) =>
     `<span class="ct-dot" style="background:${color || fb}"></span>`;
 
@@ -3503,20 +3505,22 @@ function renderCalendarTable() {
     });
   });
 
-  // Reminders toggle
-  container.querySelectorAll('.ct-toggle[data-ct-rem]').forEach(cb => {
-    cb.addEventListener('change', async () => {
-      const src = cb.dataset.ctRem, id = parseInt(cb.dataset.ctId), enabled = cb.checked;
+  // Reminders bell toggle
+  container.querySelectorAll('.ct-bell[data-ct-rem]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const src = btn.dataset.ctRem, id = parseInt(btn.dataset.ctId);
+      const enabled = btn.dataset.ctOn !== '1'; // currently on → turn off, currently off → turn on
       const path = src === 'ical' ? `/ical/subscriptions/${id}` : `/${src === 'ha' ? 'homeassistant' : src}/calendars/${id}`;
       try {
         await api.put(path, { reminders_enabled: enabled });
-        if (src === 'local')  { const c = state.localCalendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; }
-        else if (src === 'ical')  { const s = state.icalSubscriptions.find(s => s.id === id); if (s) s.reminders_enabled = enabled; }
-        else if (src === 'caldav')  { for (const acc of state.accounts) { const c = acc.calendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; } }
+        if (src === 'local')       { const c = state.localCalendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; }
+        else if (src === 'ical')   { const s = state.icalSubscriptions.find(s => s.id === id); if (s) s.reminders_enabled = enabled; }
+        else if (src === 'caldav') { for (const acc of state.accounts) { const c = acc.calendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; } }
         else if (src === 'google') { for (const acc of state.googleAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; } }
         else if (src === 'ha')     { for (const acc of state.haAccounts) { const c = acc.calendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; } }
+        renderCalendarTable();
         renderCalendarList();
-      } catch (e) { showToast(e.message, true); cb.checked = !cb.checked; }
+      } catch (e) { showToast(e.message, true); }
     });
   });
 

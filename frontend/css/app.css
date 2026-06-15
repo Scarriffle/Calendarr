@@ -1455,9 +1455,9 @@ a { color: var(--primary); text-decoration: none; }
 .ct-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; flex-shrink: 0; }
 .ct-empty { color: var(--text-3); font-size: 13px; padding: 16px 0; text-align: center; }
 .ct-toggle { cursor: pointer; }
-.ct-eye { opacity: .55; transition: opacity .15s; }
-.ct-eye[data-ct-visible="1"] { opacity: 1; }
-.ct-eye:hover { opacity: 1; }
+.ct-eye, .ct-bell { opacity: .45; transition: opacity .15s; }
+.ct-eye[data-ct-visible="1"], .ct-bell[data-ct-on="1"] { opacity: 1; }
+.ct-eye:hover, .ct-bell:hover { opacity: 1; }
 
 /* ── Month View (spanning bars) ─────────────────────────── */
 .month-body {
