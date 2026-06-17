@@ -1465,6 +1465,9 @@ function showEventPopup(ev, anchor) {
   };
   dragHandle.onpointerdown = e => {
     if (e.button !== 0) return;
+    // Let the toolbar buttons (edit/copy/delete/close) receive their click —
+    // only the bare header area starts a drag.
+    if (e.target.closest('button, a')) return;
     dragOffX = e.clientX - popup.getBoundingClientRect().left;
     dragOffY = e.clientY - popup.getBoundingClientRect().top;
     dragHandle.setPointerCapture(e.pointerId);
