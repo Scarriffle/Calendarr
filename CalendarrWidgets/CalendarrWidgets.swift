@@ -47,7 +47,7 @@ struct TodayWidget: Widget {
     let kind: String = "TodayWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             TodayWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.today_title", "system"))
@@ -62,7 +62,7 @@ struct TwoDaysWidget: Widget {
     let kind: String = "TwoDaysWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             TwoDaysWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.days_title", "system"))
@@ -77,7 +77,7 @@ struct ThreeDaysWidget: Widget {
     let kind: String = "ThreeDaysWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             ThreeDaysWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.threedays_title", "system"))
@@ -92,7 +92,7 @@ struct ThisWeekWidget: Widget {
     let kind: String = "ThisWeekWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             ThisWeekWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.thisweek_title", "system"))
@@ -107,7 +107,7 @@ struct TwoWeeksWidget: Widget {
     let kind: String = "TwoWeeksWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             TwoWeeksWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.twoweeks_title", "system"))
@@ -122,7 +122,7 @@ struct UpcomingWidget: Widget {
     let kind: String = "UpcomingWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             UpcomingWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.upcoming_title", "system"))
@@ -137,7 +137,7 @@ struct UpNextWidget: Widget {
     let kind: String = "UpNextWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             UpNextWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.upnext_title", "system"))
@@ -152,7 +152,7 @@ struct CalendarDayWidget: Widget {
     let kind: String = "CalendarDayWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             CalendarDayWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.calday_title", "system"))
@@ -167,7 +167,7 @@ struct TwoMonthWidget: Widget {
     let kind: String = "TwoMonthWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             TwoMonthWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.twomonth_title", "system"))
@@ -182,7 +182,7 @@ struct NowNextEventsWidget: Widget {
     let kind: String = "NowNextEventsWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             NowNextWidgetView(entry: entry).calendarrChrome(entry.snapshot)
         }
         .configurationDisplayName(WidgetL10n.t("widget.display.nownext_title", "system"))
@@ -197,7 +197,7 @@ struct LockScreenWidget: Widget {
     let kind: String = "LockScreenWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             LockScreenWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Color.clear }
                 .environment(\.locale, WidgetL10n.locale(entry.snapshot?.language ?? "system"))
@@ -214,7 +214,7 @@ struct LockScreenCountWidget: Widget {
     let kind: String = "LockScreenCountWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             LockScreenCountWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Color.clear }
                 .environment(\.locale, WidgetL10n.locale(entry.snapshot?.language ?? "system"))
@@ -231,7 +231,7 @@ struct LockScreenCountdownWidget: Widget {
     let kind: String = "LockScreenCountdownWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CalendarrTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CalendarSelectionIntent.self, provider: CalendarrTimelineProvider()) { entry in
             LockScreenCountdownWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Color.clear }
                 .environment(\.locale, WidgetL10n.locale(entry.snapshot?.language ?? "system"))

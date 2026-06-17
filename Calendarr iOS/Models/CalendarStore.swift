@@ -438,12 +438,31 @@ class CalendarStore {
     /// covers the worst-case month grid (6 rows × 7 cols) for the calendar
     /// widget. Also asks the system to refresh the widget timeline.
     private func publishWidgetSnapshot() {
+        // Never write group-view data into the widget; it would show other
+        // people's calendar colours and decorated event titles.
+        guard activeGroup == nil else { return }
+
         let cal = userCalendar
         let now = Date()
         // Include the week before today so widgets that show the current week
         // (e.g. "This Week", "Up Next + Calendar") have data for Monday–today.
         let from = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: now)) ?? now
-        let to = cal.date(byAdding: .day, value: 42, to: cal.startOfDay(for: now)) ?? from
+        let to   = cal.date(byAdding: .day, value: 42, to: cal.startOfDay(for: now)) ?? from
+
+        // Build the calendar list from all cached events (not just the window)
+        // so every calendar appears in the widget configuration picker.
+        var calendarMap: [String: WidgetCalendar] = [:]
+        for ev in allCachedEvents {
+            let key = Self.calendarKey(source: ev.source, calendarId: ev.calendarId)
+            guard !banishedCalendarKeys.contains(key) else { continue }
+            if calendarMap[key] == nil {
+                calendarMap[key] = WidgetCalendar(id: key,
+                                                  name: ev.calendarName.isEmpty ? ev.calendarId : ev.calendarName,
+                                                  colorHex: ev.calendarColor)
+            }
+        }
+        WidgetStore.writeCalendars(Array(calendarMap.values).sorted { $0.name < $1.name })
+
         let visible = allCachedEvents
             .filter { ev in
                 let key = Self.calendarKey(source: ev.source, calendarId: ev.calendarId)
@@ -460,7 +479,8 @@ class CalendarStore {
                             end: ev.endDate,
                             isAllDay: ev.isAllDay,
                             colorHex: ev.effectiveColor,
-                            location: ev.location)
+                            location: ev.location,
+                            calendarKey: Self.calendarKey(source: ev.source, calendarId: ev.calendarId))
             }
         let defaults = UserDefaults.standard
         let snap = WidgetSnapshot(

@@ -1,33 +1,57 @@
 import WidgetKit
+import AppIntents
 
 struct CalendarrEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot?
 }
 
-struct CalendarrTimelineProvider: TimelineProvider {
+struct CalendarrTimelineProvider: AppIntentTimelineProvider {
+    typealias Entry = CalendarrEntry
+    typealias Intent = CalendarSelectionIntent
+
     func placeholder(in context: Context) -> CalendarrEntry {
         CalendarrEntry(date: .now, snapshot: WidgetStore.read())
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (CalendarrEntry) -> Void) {
-        completion(CalendarrEntry(date: .now, snapshot: WidgetStore.read()))
+    func snapshot(for configuration: CalendarSelectionIntent, in context: Context) async -> CalendarrEntry {
+        let raw = WidgetStore.read()
+        return CalendarrEntry(date: .now, snapshot: filtered(raw, by: configuration))
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<CalendarrEntry>) -> Void) {
-        let snapshot = WidgetStore.read()
+    func timeline(for configuration: CalendarSelectionIntent, in context: Context) async -> Timeline<CalendarrEntry> {
+        let raw = WidgetStore.read()
+        let snap = filtered(raw, by: configuration)
         let now = Date()
 
-        // Provide one entry per hour for the next 24h so the widget keeps
-        // re-rendering as time progresses (past events drop off, "now" advances).
+        // One entry per hour for 24 h so the widget re-renders as time advances.
         var entries: [CalendarrEntry] = []
         for h in 0..<24 {
             let date = Calendar.current.date(byAdding: .hour, value: h, to: now) ?? now
-            entries.append(CalendarrEntry(date: date, snapshot: snapshot))
+            entries.append(CalendarrEntry(date: date, snapshot: snap))
         }
-        // Ask iOS to refresh in 30 min to pick up any new data the app wrote.
         let refreshAt = Calendar.current.date(byAdding: .minute, value: 30, to: now) ?? now
-        completion(Timeline(entries: entries, policy: .after(refreshAt)))
+        return Timeline(entries: entries, policy: .after(refreshAt))
+    }
+
+    // MARK: – Filtering
+
+    private func filtered(_ snapshot: WidgetSnapshot?, by config: CalendarSelectionIntent) -> WidgetSnapshot? {
+        guard let snapshot else { return nil }
+        let ids = config.selectedCalendars.map { $0.id }
+        guard !ids.isEmpty else { return snapshot }   // empty = show all
+        let keep = Set(ids)
+        return WidgetSnapshot(
+            writtenAt:          snapshot.writtenAt,
+            events:             snapshot.events.filter { keep.contains($0.calendarKey) },
+            todayColorHex:      snapshot.todayColorHex,
+            textColorHex:       snapshot.textColorHex,
+            backgroundColorHex: snapshot.backgroundColorHex,
+            lineColorHex:       snapshot.lineColorHex,
+            primaryColorHex:    snapshot.primaryColorHex,
+            accentColorHex:     snapshot.accentColorHex,
+            language:           snapshot.language
+        )
     }
 }
 
