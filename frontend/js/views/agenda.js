@@ -51,7 +51,7 @@ export function renderAgenda(container, currentDate, events, onEventClick) {
         </div>`;
       }).join('');
 
-    return `<div class="agenda-day">
+    return `<div class="agenda-day" data-date="${key}">
       <div class="agenda-date ${todayCls}">
         <div class="agenda-date-num">${date.getDate()}</div>
         <div class="agenda-date-label">
@@ -64,6 +64,19 @@ export function renderAgenda(container, currentDate, events, onEventClick) {
   }).join('');
 
   container.innerHTML = `<div class="agenda-view">${html}</div>`;
+
+  // The agenda lists the whole cached range (past + future). Scroll so the
+  // current date (e.g. "today" after the Today button) sits at the top — or
+  // the next day with events if the current date itself has none.
+  const scrollEl = container.querySelector('.agenda-view');
+  if (scrollEl) {
+    const curKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
+    const days = [...scrollEl.querySelectorAll('.agenda-day')];
+    const target = days.find(d => d.dataset.date >= curKey) || days[days.length - 1];
+    if (target) {
+      scrollEl.scrollTop += target.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top;
+    }
+  }
 
   container.querySelectorAll('.agenda-event').forEach(el => {
     el.addEventListener('click', () => {
