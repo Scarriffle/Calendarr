@@ -1,30 +1,37 @@
 """Minimal two-way CalDAV server for published local calendars.
 
-Each published local calendar is reachable as a CalDAV collection at
-``/dav/{token}/`` (secret token = auth). Supports the subset real clients
-(Thunderbird, DAVx5, Apple Calendar) need: OPTIONS, PROPFIND, REPORT
-(calendar-query / calendar-multiget), GET, PUT and DELETE. Change detection is
-ctag-based (CS:getctag on the collection + getetag per event), which avoids
-maintaining deletion tombstones.
+Two ways to reach a published local calendar:
 
-Reuses ``ical_io.build_ics`` / ``parse_ics`` for (de)serialisation. Note:
-VALARM/reminders are not round-tripped (parse_ics ignores them).
+1. Secret token URL (no login) — ``/dav/{token}/``.
+2. Username + password (HTTP Basic Auth) with principal discovery —
+   ``/caldav/`` advertises the user's calendar-home-set and lists every
+   published calendar as ``/caldav/{id}/``. This is what account-based clients
+   (Apple Calendar, DAVx5, Thunderbird) use when you enter server + credentials.
+
+Supported methods: OPTIONS, PROPFIND, REPORT (calendar-query / calendar-multiget),
+GET, PUT, DELETE. Change detection is ctag-based (CS:getctag on the collection +
+getetag per event), avoiding deletion tombstones.
+
+Reuses ``ical_io.build_ics`` / ``parse_ics``. Note: VALARM/reminders are not
+round-tripped (parse_ics ignores them).
 """
 
 from __future__ import annotations
 
+import base64
 import uuid
 import xml.etree.ElementTree as ET
 from urllib.parse import quote, unquote
 from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 import dav_util
 import ical_io
 import models
+from auth import verify_password
 from database import get_db
 
 router = APIRouter()
@@ -44,6 +51,7 @@ _NS_DECL = (
 
 _ALLOW = "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, REPORT"
 _MULTISTATUS_CT = "application/xml; charset=utf-8"
+_LOGIN_HREF = "/caldav/"
 
 
 # ── Helpers ───────────────────────────────────────────────
@@ -58,6 +66,44 @@ def _resolve(token: str, db: Session) -> models.LocalCalendar | None:
             models.LocalCalendar.caldav_published == True,  # noqa: E712
         )
         .first()
+    )
+
+
+def _basic_auth_user(request: Request, db: Session) -> models.User | None:
+    """Validate an HTTP Basic Authorization header against a Calendarr account."""
+    hdr = request.headers.get("Authorization", "")
+    if not hdr.lower().startswith("basic "):
+        return None
+    try:
+        raw = base64.b64decode(hdr.split(" ", 1)[1]).decode("utf-8")
+    except Exception:
+        return None
+    username, sep, password = raw.partition(":")
+    if not sep:
+        return None
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        return None
+    try:
+        if not verify_password(password, user.password_hash):
+            return None
+    except Exception:
+        return None
+    return user
+
+
+def _unauthorized() -> Response:
+    return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Calendarr CalDAV"'})
+
+
+def _published_calendars(user: models.User, db: Session) -> list[models.LocalCalendar]:
+    return (
+        db.query(models.LocalCalendar)
+        .filter(
+            models.LocalCalendar.user_id == user.id,
+            models.LocalCalendar.caldav_published == True,  # noqa: E712
+        )
+        .all()
     )
 
 
@@ -77,12 +123,8 @@ def _resource_name(ev: models.LocalEvent) -> str:
     return f"{quote(ev.uid, safe='')}.ics"
 
 
-def _collection_href(token: str) -> str:
-    return f"/dav/{token}/"
-
-
-def _event_href(token: str, ev: models.LocalEvent) -> str:
-    return f"/dav/{token}/{_resource_name(ev)}"
+def _event_href(base: str, ev: models.LocalEvent) -> str:
+    return f"{base}{_resource_name(ev)}"
 
 
 def _name_cache(cal: models.LocalCalendar, db: Session) -> dict:
@@ -98,10 +140,13 @@ def _build_ics(cal: models.LocalCalendar, evs: list[models.LocalEvent], db: Sess
 
 # ── XML builders ──────────────────────────────────────────
 
-def _collection_propstat(cal: models.LocalCalendar, token: str) -> str:
-    href = _collection_href(token)
+def _collection_propstat(cal: models.LocalCalendar, base: str, *,
+                         principal_href: str | None = None,
+                         home_href: str | None = None) -> str:
+    principal_href = principal_href or base
+    home_href = home_href or base
     return f"""  <D:response>
-    <D:href>{href}</D:href>
+    <D:href>{base}</D:href>
     <D:propstat>
       <D:prop>
         <D:resourcetype><D:collection/><C:calendar/></D:resourcetype>
@@ -113,6 +158,24 @@ def _collection_propstat(cal: models.LocalCalendar, token: str) -> str:
         </D:supported-report-set>
         <C:supported-calendar-component-set><C:comp name="VEVENT"/></C:supported-calendar-component-set>
         <ICAL:calendar-color>{xml_escape(cal.color or "#34a853")}</ICAL:calendar-color>
+        <D:current-user-principal><D:href>{principal_href}</D:href></D:current-user-principal>
+        <D:principal-URL><D:href>{principal_href}</D:href></D:principal-URL>
+        <C:calendar-home-set><D:href>{home_href}</D:href></C:calendar-home-set>
+      </D:prop>
+      <D:status>HTTP/1.1 200 OK</D:status>
+    </D:propstat>
+  </D:response>"""
+
+
+def _principal_propstat(user: models.User) -> str:
+    href = _LOGIN_HREF
+    name = user.display_name or user.username
+    return f"""  <D:response>
+    <D:href>{href}</D:href>
+    <D:propstat>
+      <D:prop>
+        <D:resourcetype><D:collection/><D:principal/></D:resourcetype>
+        <D:displayname>{xml_escape(name)}</D:displayname>
         <D:current-user-principal><D:href>{href}</D:href></D:current-user-principal>
         <D:principal-URL><D:href>{href}</D:href></D:principal-URL>
         <C:calendar-home-set><D:href>{href}</D:href></C:calendar-home-set>
@@ -122,9 +185,9 @@ def _collection_propstat(cal: models.LocalCalendar, token: str) -> str:
   </D:response>"""
 
 
-def _event_propstat(token: str, ev: models.LocalEvent, *, with_data: bool = False,
+def _event_propstat(base: str, ev: models.LocalEvent, *, with_data: bool = False,
                     ics: str | None = None) -> str:
-    href = _event_href(token, ev)
+    href = _event_href(base, ev)
     data = ""
     if with_data and ics is not None:
         data = f"\n        <C:calendar-data>{xml_escape(ics)}</C:calendar-data>"
@@ -146,56 +209,13 @@ def _multistatus(body: str) -> Response:
     return Response(content=xml, status_code=207, media_type=_MULTISTATUS_CT)
 
 
-# ── Method handlers ───────────────────────────────────────
+# ── Method handlers (shared by token and Basic-Auth paths) ──
 
 def _handle_options() -> Response:
     return Response(status_code=200, headers={
         "DAV": "1, 2, 3, calendar-access",
         "Allow": _ALLOW,
     })
-
-
-def _handle_propfind(cal: models.LocalCalendar, token: str, resource: str,
-                     depth: str, db: Session) -> Response:
-    # PROPFIND on a single event resource.
-    if resource:
-        ev = _find_event(cal, resource, db)
-        if not ev:
-            return Response(status_code=404)
-        return _multistatus(_event_propstat(token, ev))
-
-    # Collection: always include collection props; Depth:1 adds each event.
-    parts = [_collection_propstat(cal, token)]
-    if depth != "0":
-        for ev in _events(cal, db):
-            parts.append(_event_propstat(token, ev))
-    return _multistatus("\n".join(parts))
-
-
-def _handle_report(cal: models.LocalCalendar, token: str, body: bytes, db: Session) -> Response:
-    report_type = None
-    hrefs: list[str] = []
-    if body:
-        try:
-            root = ET.fromstring(body)
-            report_type = root.tag.split("}")[-1]  # calendar-query | calendar-multiget
-            hrefs = [el.text for el in root.iter(f"{{{NS_DAV}}}href") if el.text]
-        except ET.ParseError:
-            pass
-
-    if report_type == "calendar-multiget" and hrefs:
-        # Decode each requested href to a bare "{uid}.ics" for encoding-safe match.
-        wanted = {unquote(h.rstrip("/").rsplit("/", 1)[-1]) for h in hrefs}
-        evs = [ev for ev in _events(cal, db) if f"{ev.uid}.ics" in wanted]
-    else:
-        # calendar-query (or unknown) → return the whole calendar.
-        evs = _events(cal, db)
-
-    parts = []
-    for ev in evs:
-        ics = _build_ics(cal, [ev], db)
-        parts.append(_event_propstat(token, ev, with_data=True, ics=ics))
-    return _multistatus("\n".join(parts) if parts else "")
 
 
 def _find_event(cal: models.LocalCalendar, resource: str, db: Session) -> models.LocalEvent | None:
@@ -211,6 +231,49 @@ def _find_event(cal: models.LocalCalendar, resource: str, db: Session) -> models
         )
         .first()
     )
+
+
+def _handle_propfind(cal: models.LocalCalendar, base: str, resource: str, depth: str,
+                     db: Session, *, principal_href: str | None = None,
+                     home_href: str | None = None) -> Response:
+    # PROPFIND on a single event resource.
+    if resource:
+        ev = _find_event(cal, resource, db)
+        if not ev:
+            return Response(status_code=404)
+        return _multistatus(_event_propstat(base, ev))
+
+    # Collection: always include collection props; Depth:1 adds each event.
+    parts = [_collection_propstat(cal, base, principal_href=principal_href, home_href=home_href)]
+    if depth != "0":
+        for ev in _events(cal, db):
+            parts.append(_event_propstat(base, ev))
+    return _multistatus("\n".join(parts))
+
+
+def _handle_report(cal: models.LocalCalendar, base: str, body: bytes, db: Session) -> Response:
+    report_type = None
+    hrefs: list[str] = []
+    if body:
+        try:
+            root = ET.fromstring(body)
+            report_type = root.tag.split("}")[-1]  # calendar-query | calendar-multiget
+            hrefs = [el.text for el in root.iter(f"{{{NS_DAV}}}href") if el.text]
+        except ET.ParseError:
+            pass
+
+    if report_type == "calendar-multiget" and hrefs:
+        wanted = {unquote(h.rstrip("/").rsplit("/", 1)[-1]) for h in hrefs}
+        evs = [ev for ev in _events(cal, db) if f"{ev.uid}.ics" in wanted]
+    else:
+        # calendar-query (or unknown) → return the whole calendar.
+        evs = _events(cal, db)
+
+    parts = []
+    for ev in evs:
+        ics = _build_ics(cal, [ev], db)
+        parts.append(_event_propstat(base, ev, with_data=True, ics=ics))
+    return _multistatus("\n".join(parts) if parts else "")
 
 
 def _handle_get(cal: models.LocalCalendar, resource: str, db: Session,
@@ -276,27 +339,20 @@ def _handle_delete(cal: models.LocalCalendar, resource: str, db: Session) -> Res
     return Response(status_code=204)
 
 
-# ── Dispatch ──────────────────────────────────────────────
-
-async def _dispatch(request: Request, token: str, resource: str, db: Session) -> Response:
+async def _dispatch_collection(request: Request, cal: models.LocalCalendar, base: str,
+                               resource: str, db: Session, *,
+                               principal_href: str | None = None,
+                               home_href: str | None = None) -> Response:
+    """Serve a single calendar collection; auth/ownership already checked."""
     method = request.method.upper()
-
-    # OPTIONS advertises capabilities without needing a valid token.
-    if method == "OPTIONS":
-        return _handle_options()
-
-    cal = _resolve(token, db)
-    if not cal:
-        return Response(status_code=404)
-
     if method == "PROPFIND":
         depth = request.headers.get("Depth", "0")
-        return _handle_propfind(cal, token, resource, depth, db)
+        return _handle_propfind(cal, base, resource, depth, db,
+                                principal_href=principal_href, home_href=home_href)
     if method == "REPORT":
-        return _handle_report(cal, token, await request.body(), db)
+        return _handle_report(cal, base, await request.body(), db)
     if method in ("GET", "HEAD"):
         if not resource:
-            # A bare collection GET: hand back the whole calendar as one .ics.
             ics = _build_ics(cal, _events(cal, db), db)
             return Response(content=ics, media_type="text/calendar; charset=utf-8")
         return _handle_get(cal, resource, db, head=(method == "HEAD"))
@@ -309,14 +365,93 @@ async def _dispatch(request: Request, token: str, resource: str, db: Session) ->
     return Response(status_code=405, headers={"Allow": _ALLOW})
 
 
+# ── Token path (no login): /dav/{token}/… ─────────────────
+
+async def _dispatch_token(request: Request, token: str, resource: str, db: Session) -> Response:
+    if request.method.upper() == "OPTIONS":
+        return _handle_options()
+    cal = _resolve(token, db)
+    if not cal:
+        return Response(status_code=404)
+    base = f"/dav/{token}/"
+    return await _dispatch_collection(request, cal, base, resource, db)
+
+
 _METHODS = ["OPTIONS", "GET", "HEAD", "PUT", "DELETE", "PROPFIND", "REPORT"]
 
 
 @router.api_route("/dav/{token}", methods=_METHODS, include_in_schema=False)
 async def dav_collection(token: str, request: Request, db: Session = Depends(get_db)):
-    return await _dispatch(request, token, "", db)
+    return await _dispatch_token(request, token, "", db)
 
 
 @router.api_route("/dav/{token}/{resource:path}", methods=_METHODS, include_in_schema=False)
 async def dav_resource(token: str, resource: str, request: Request, db: Session = Depends(get_db)):
-    return await _dispatch(request, token, resource, db)
+    return await _dispatch_token(request, token, resource, db)
+
+
+# ── Basic-Auth path (username/password): /caldav/… ────────
+
+async def _dispatch_home(request: Request, db: Session) -> Response:
+    """Principal + calendar-home-set: lists the user's published calendars."""
+    if request.method.upper() == "OPTIONS":
+        return _handle_options()
+    user = _basic_auth_user(request, db)
+    if not user:
+        return _unauthorized()
+    if request.method.upper() != "PROPFIND":
+        return Response(status_code=405, headers={"Allow": _ALLOW})
+    depth = request.headers.get("Depth", "0")
+    parts = [_principal_propstat(user)]
+    if depth != "0":
+        for cal in _published_calendars(user, db):
+            parts.append(_collection_propstat(
+                cal, f"/caldav/{cal.id}/",
+                principal_href=_LOGIN_HREF, home_href=_LOGIN_HREF))
+    return _multistatus("\n".join(parts))
+
+
+async def _dispatch_auth_calendar(request: Request, cal_id: int, resource: str, db: Session) -> Response:
+    if request.method.upper() == "OPTIONS":
+        return _handle_options()
+    user = _basic_auth_user(request, db)
+    if not user:
+        return _unauthorized()
+    cal = (
+        db.query(models.LocalCalendar)
+        .filter(
+            models.LocalCalendar.id == cal_id,
+            models.LocalCalendar.user_id == user.id,
+            models.LocalCalendar.caldav_published == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not cal:
+        return Response(status_code=404)
+    base = f"/caldav/{cal.id}/"
+    return await _dispatch_collection(request, cal, base, resource, db,
+                                      principal_href=_LOGIN_HREF, home_href=_LOGIN_HREF)
+
+
+@router.api_route("/.well-known/caldav", methods=["OPTIONS", "GET", "PROPFIND"], include_in_schema=False)
+async def wellknown_caldav(request: Request):
+    if request.method.upper() == "OPTIONS":
+        return _handle_options()
+    # Point discovery at the principal/home collection.
+    return RedirectResponse(url=_LOGIN_HREF, status_code=301)
+
+
+@router.api_route("/caldav", methods=_METHODS, include_in_schema=False)
+@router.api_route("/caldav/", methods=_METHODS, include_in_schema=False)
+async def caldav_home(request: Request, db: Session = Depends(get_db)):
+    return await _dispatch_home(request, db)
+
+
+@router.api_route("/caldav/{cal_id:int}", methods=_METHODS, include_in_schema=False)
+async def caldav_calendar(cal_id: int, request: Request, db: Session = Depends(get_db)):
+    return await _dispatch_auth_calendar(request, cal_id, "", db)
+
+
+@router.api_route("/caldav/{cal_id:int}/{resource:path}", methods=_METHODS, include_in_schema=False)
+async def caldav_calendar_resource(cal_id: int, resource: str, request: Request, db: Session = Depends(get_db)):
+    return await _dispatch_auth_calendar(request, cal_id, resource, db)

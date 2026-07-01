@@ -3471,6 +3471,12 @@ function renderCalendarTable() {
           <button class="btn btn-ghost btn-sm ct-dav-rotate" data-ct-dav-id="${cal.id}">${t('caldav_token_rotate')}</button>
         </div>
         <div class="ct-dav-hint">${t('caldav_hint')}</div>
+        <div class="ct-dav-box">
+          <span class="ct-dav-label">${t('caldav_login_url')}</span>
+          <input class="ct-dav-url" type="text" readonly value="${escHtml(cal.caldav_login_url || '')}">
+          <button class="btn btn-ghost btn-sm ct-dav-copy">${t('copy')}</button>
+        </div>
+        <div class="ct-dav-hint">${t('caldav_login_hint')}</div>
       </td></tr>`;
     }
   }

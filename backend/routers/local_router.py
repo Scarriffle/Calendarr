@@ -81,9 +81,10 @@ def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
         "type": "local",
         "owned": owned,
     }
-    # Only the owner may publish; expose the subscribe URL only when active.
+    # Only the owner may publish; expose the subscribe URLs only when active.
     if owned and cal.caldav_published and cal.dav_token:
         d["caldav_url"] = dav_util.caldav_url(request, cal.dav_token) if request else None
+        d["caldav_login_url"] = dav_util.caldav_login_url(request) if request else None
     if shared_by is not None:
         d["shared_by"] = shared_by
     if permission is not None:

@@ -9,6 +9,7 @@ token revokes existing subscriptions.
 
 from __future__ import annotations
 
+import os
 import secrets
 import uuid
 
@@ -35,7 +36,28 @@ def bump_dav(cal, event=None) -> None:
         event.etag = new_tag()
 
 
+def public_base(request) -> str:
+    """Public origin (scheme://host) as clients actually reach us.
+
+    Behind a reverse proxy (e.g. Nginx Proxy Manager) the app only sees
+    ``http://…:8080`` internally, so honour ``X-Forwarded-Proto/-Host`` and an
+    optional ``PUBLIC_BASE_URL`` override so published URLs are the real https
+    ones.
+    """
+    env = os.environ.get("PUBLIC_BASE_URL")
+    if env:
+        return env.rstrip("/")
+    h = request.headers
+    proto = (h.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip()
+    host = (h.get("x-forwarded-host") or h.get("host") or request.url.netloc).split(",")[0].strip()
+    return f"{proto}://{host}"
+
+
 def caldav_url(request, token: str) -> str:
-    """Absolute CalDAV collection URL for a token, based on the request origin."""
-    base = str(request.base_url).rstrip("/")
-    return f"{base}/dav/{token}/"
+    """Absolute per-calendar CalDAV collection URL (secret token, no login)."""
+    return f"{public_base(request)}/dav/{token}/"
+
+
+def caldav_login_url(request) -> str:
+    """Absolute discovery URL for username/password (Basic Auth) CalDAV access."""
+    return f"{public_base(request)}/caldav/"
