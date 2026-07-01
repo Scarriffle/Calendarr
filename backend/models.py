@@ -124,6 +124,12 @@ class LocalCalendar(Base):
     enabled = Column(Boolean, default=True)
     # Whether events of this calendar generate reminders/notifications on clients.
     reminders_enabled = Column(Boolean, default=True, nullable=False)
+    # CalDAV publishing (opt-in): expose this calendar as a two-way CalDAV
+    # collection reachable via a secret token URL. dav_ctag changes on every
+    # event write so clients detect changes; rotating the token revokes access.
+    caldav_published = Column(Boolean, default=False, nullable=False)
+    dav_token = Column(String(64), nullable=True, unique=True)
+    dav_ctag = Column(String(32), nullable=True)
 
     user = relationship("User", back_populates="local_calendars")
     events = relationship("LocalEvent", back_populates="calendar", cascade="all, delete-orphan")
@@ -152,6 +158,8 @@ class LocalEvent(Base):
     creator_name_external = Column(Text, nullable=True)
     # Private events are filtered for other group members per their visibility setting.
     is_private = Column(Boolean, default=False)
+    # CalDAV entity tag — changes on every write so CalDAV clients detect updates.
+    etag = Column(String(32), nullable=True)
 
     calendar = relationship("LocalCalendar", back_populates="events")
     creator = relationship("User")

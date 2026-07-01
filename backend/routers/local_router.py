@@ -2,11 +2,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+import dav_util
 import ical_io
 import models
 import permissions
@@ -31,6 +32,7 @@ class CalendarUpdate(BaseModel):
     color: Optional[str] = None
     enabled: Optional[bool] = None
     reminders_enabled: Optional[bool] = None
+    caldav_published: Optional[bool] = None
 
 
 class EventCreate(BaseModel):
@@ -67,16 +69,21 @@ class ShareCreate(BaseModel):
 
 
 def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
-              shared_by: Optional[str] = None, permission: Optional[str] = None) -> dict:
+              shared_by: Optional[str] = None, permission: Optional[str] = None,
+              request: Optional[Request] = None) -> dict:
     d = {
         "id": cal.id,
         "name": cal.name,
         "color": cal.color,
         "enabled": cal.enabled,
         "reminders_enabled": bool(cal.reminders_enabled),
+        "caldav_published": bool(cal.caldav_published),
         "type": "local",
         "owned": owned,
     }
+    # Only the owner may publish; expose the subscribe URL only when active.
+    if owned and cal.caldav_published and cal.dav_token:
+        d["caldav_url"] = dav_util.caldav_url(request, cal.dav_token) if request else None
     if shared_by is not None:
         d["shared_by"] = shared_by
     if permission is not None:
@@ -92,6 +99,7 @@ def _event_dict(ev: models.LocalEvent, cal: models.LocalCalendar, db: Session) -
 
 @router.get("/calendars")
 def list_calendars(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -117,7 +125,7 @@ def list_calendars(
     )
     result = []
     for c in own:
-        d = _cal_dict(c, owned=True)
+        d = _cal_dict(c, owned=True, request=request)
         if c.id in group_cal_map:
             d["group"] = True
             d["shared_by"] = group_cal_map[c.id]  # group name, for labelling
@@ -182,6 +190,7 @@ def create_calendar(
 def update_calendar(
     calendar_id: int,
     data: CalendarUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -203,8 +212,47 @@ def update_calendar(
         cal.enabled = data.enabled
     if data.reminders_enabled is not None:
         cal.reminders_enabled = data.reminders_enabled
+    if data.caldav_published is not None:
+        cal.caldav_published = data.caldav_published
+        if data.caldav_published:
+            # First publish: mint a token + initial ctag so clients can sync.
+            if not cal.dav_token:
+                cal.dav_token = dav_util.new_token()
+            if not cal.dav_ctag:
+                cal.dav_ctag = dav_util.new_tag()
+        else:
+            # Unpublishing revokes access: drop the token so the URL 404s.
+            cal.dav_token = None
     db.commit()
-    return {"ok": True}
+    db.refresh(cal)
+    return _cal_dict(cal, owned=True, request=request)
+
+
+@router.post("/calendars/{calendar_id}/dav-token/rotate")
+def rotate_dav_token(
+    calendar_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Issue a fresh CalDAV token — the old subscribe URL stops working."""
+    cal = (
+        db.query(models.LocalCalendar)
+        .filter(
+            models.LocalCalendar.id == calendar_id,
+            models.LocalCalendar.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not cal:
+        raise HTTPException(404, "Calendar not found")
+    if not cal.caldav_published:
+        raise HTTPException(422, "Calendar is not published")
+    cal.dav_token = dav_util.new_token()
+    cal.dav_ctag = dav_util.new_tag()
+    db.commit()
+    db.refresh(cal)
+    return _cal_dict(cal, owned=True, request=request)
 
 
 @router.delete("/calendars/{calendar_id}")
@@ -257,6 +305,7 @@ def create_event(
         creator_id=current_user.id,  # server-side, never from the client
     )
     db.add(ev)
+    dav_util.bump_dav(cal, ev)
     db.commit()
     db.refresh(ev)
     return _event_dict(ev, cal, db)
@@ -305,6 +354,7 @@ def update_event(
         ev.exdate = ",".join(dates)
     if data.reminders is not None:
         ev.reminders = ",".join(str(m) for m in data.reminders) if data.reminders else None
+    dav_util.bump_dav(ev.calendar, ev)
     db.commit()
     return {"ok": True}
 
@@ -316,6 +366,7 @@ def delete_event(
     current_user: models.User = Depends(get_current_user),
 ):
     ev = _writable_event(db, current_user, uid)
+    dav_util.bump_dav(ev.calendar)
     db.delete(ev)
     db.commit()
     return {"ok": True}
@@ -441,9 +492,12 @@ def _import_ics_into(cal: models.LocalCalendar, raw: bytes, db: Session) -> dict
             rrule=item.get("rrule"),
             exdate=item.get("exdate"),
             creator_name_external=item.get("organizer"),
+            etag=dav_util.new_tag(),
         )
         db.add(ev)
         imported += 1
+    if imported:
+        dav_util.bump_dav(cal)
     try:
         db.commit()
     except Exception as exc:

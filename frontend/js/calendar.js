@@ -3447,6 +3447,7 @@ function renderCalendarTable() {
     if (cal.group) continue;
     const owned = cal.owned !== false;
     const canWrite = owned || cal.permission === 'read_write';
+    const pub = !!cal.caldav_published;
     rows += `<tr>
       <td>${dot(cal.color, '#34a853')}${escHtml(cal.name)}</td>
       <td class="ct-src">Lokal</td>
@@ -3455,11 +3456,23 @@ function renderCalendarTable() {
       <td>
         <button class="btn btn-ghost btn-sm" data-ct-export="local" data-ct-id="${cal.id}" data-ct-name="${escHtml(cal.name)}">Export</button>
         ${canWrite ? `<button class="btn btn-ghost btn-sm" data-ct-import="local" data-ct-id="${cal.id}">Import</button>` : ''}
+        ${owned ? `<button class="btn btn-ghost btn-sm ct-dav-toggle${pub ? ' on' : ''}" data-ct-dav-id="${cal.id}" data-ct-dav-on="${pub ? '1' : '0'}">${pub ? t('caldav_unpublish') : t('caldav_publish')}</button>` : ''}
       </td>
       <td>—</td>
       <td>${owned ? `<button class="icon-btn mini-btn" data-ct-del="local" data-ct-id="${cal.id}">${TRASH}</button>` : ''}</td>
     </tr>`;
     rowCount++;
+    if (owned && pub) {
+      rows += `<tr class="ct-dav-row"><td colspan="7">
+        <div class="ct-dav-box">
+          <span class="ct-dav-label">${t('caldav_published_url')}</span>
+          <input class="ct-dav-url" type="text" readonly value="${escHtml(cal.caldav_url || '')}">
+          <button class="btn btn-ghost btn-sm ct-dav-copy">${t('copy')}</button>
+          <button class="btn btn-ghost btn-sm ct-dav-rotate" data-ct-dav-id="${cal.id}">${t('caldav_token_rotate')}</button>
+        </div>
+        <div class="ct-dav-hint">${t('caldav_hint')}</div>
+      </td></tr>`;
+    }
   }
 
   // iCal subscriptions
@@ -3654,6 +3667,42 @@ function renderCalendarTable() {
   });
   container.querySelectorAll('[data-ct-import]').forEach(btn => {
     btn.addEventListener('click', () => triggerIcsImport(parseInt(btn.dataset.ctId)));
+  });
+
+  // CalDAV publishing
+  container.querySelectorAll('.ct-dav-toggle').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = parseInt(btn.dataset.ctDavId);
+      const newVal = btn.dataset.ctDavOn !== '1';
+      const cal = state.localCalendars.find(c => c.id === id);
+      if (!cal) return;
+      try {
+        const updated = await api.put(`/local/calendars/${id}`, { caldav_published: newVal });
+        cal.caldav_published = updated.caldav_published;
+        cal.caldav_url = updated.caldav_url;
+        renderCalendarTable();
+      } catch (e) { showToast(e.message, true); }
+    });
+  });
+  container.querySelectorAll('.ct-dav-copy').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = btn.parentElement.querySelector('.ct-dav-url');
+      if (!input || !input.value) return;
+      navigator.clipboard.writeText(input.value).then(() => showToast(t('caldav_url_copied')));
+    });
+  });
+  container.querySelectorAll('.ct-dav-rotate').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = parseInt(btn.dataset.ctDavId);
+      const cal = state.localCalendars.find(c => c.id === id);
+      if (!cal || !confirm(t('caldav_rotate_confirm'))) return;
+      try {
+        const updated = await api.post(`/local/calendars/${id}/dav-token/rotate`);
+        cal.caldav_url = updated.caldav_url;
+        renderCalendarTable();
+        showToast(t('caldav_token_rotated'));
+      } catch (e) { showToast(e.message, true); }
+    });
   });
 
   // Delete

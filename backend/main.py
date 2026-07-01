@@ -17,7 +17,7 @@ STATIC_CACHE = f"public, max-age={STATIC_MAX_AGE_SECONDS}, must-revalidate"
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import Base, engine
-from routers import auth_router, caldav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
+from routers import auth_router, caldav_router, dav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -225,6 +225,25 @@ def _migrate():
         except Exception:
             pass
 
+        # CalDAV publishing of local calendars (opt-in, secret token URL).
+        for col, ddl in (
+            ("caldav_published", "ALTER TABLE local_calendars ADD COLUMN caldav_published BOOLEAN DEFAULT 0"),
+            ("dav_token",        "ALTER TABLE local_calendars ADD COLUMN dav_token VARCHAR(64)"),
+            ("dav_ctag",         "ALTER TABLE local_calendars ADD COLUMN dav_ctag VARCHAR(32)"),
+        ):
+            try:
+                conn.execute(text(ddl))
+                conn.commit()
+                logging.info("Migration: added %s to local_calendars", col)
+            except Exception:
+                pass
+        try:
+            conn.execute(text("ALTER TABLE local_events ADD COLUMN etag VARCHAR(32)"))
+            conn.commit()
+            logging.info("Migration: added etag to local_events")
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
@@ -272,6 +291,9 @@ app.include_router(groups_router.router, prefix="/api/groups", tags=["groups"])
 app.include_router(ical_router.router, prefix="/api/ical", tags=["ical"])
 app.include_router(google_router.router, prefix="/api/google", tags=["google"])
 app.include_router(homeassistant_router.router, prefix="/api/homeassistant", tags=["homeassistant"])
+# CalDAV publishing lives at root scope (no /api prefix) and must be registered
+# before the SPA catch-all so /dav/... isn't swallowed by the index fallback.
+app.include_router(dav_router.router, tags=["dav"])
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")

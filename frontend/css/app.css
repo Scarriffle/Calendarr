@@ -1462,6 +1462,16 @@ a { color: var(--primary); text-decoration: none; }
 .ct-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; flex-shrink: 0; }
 .ct-empty { color: var(--text-3); font-size: 13px; padding: 16px 0; text-align: center; }
 .ct-toggle { cursor: pointer; }
+.ct-dav-toggle.on { color: var(--primary); }
+.ct-dav-row td { padding-top: 4px; padding-bottom: 12px; }
+.ct-dav-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ct-dav-label { font-size: 12px; color: var(--text-3); }
+.ct-dav-url {
+  flex: 1; min-width: 220px; font-size: 12px; padding: 5px 8px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); color: var(--text-1);
+}
+.ct-dav-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; max-width: 640px; }
 .ct-eye, .ct-bell { opacity: .45; transition: opacity .15s; }
 .ct-eye[data-ct-visible="1"], .ct-bell[data-ct-on="1"] { opacity: 1; }
 .ct-eye:hover, .ct-bell:hover { opacity: 1; }
