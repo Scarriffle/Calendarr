@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import uuid
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from urllib.parse import quote, unquote
 from xml.sax.saxutils import escape as xml_escape
 
@@ -70,7 +71,12 @@ def _resolve(token: str, db: Session) -> models.LocalCalendar | None:
 
 
 def _basic_auth_user(request: Request, db: Session) -> models.User | None:
-    """Validate an HTTP Basic Authorization header against a Calendarr account."""
+    """Validate an HTTP Basic Authorization header against a Calendarr account.
+
+    Accepts an app-specific password (always) or the account password (only when
+    MFA is off — otherwise the account password would bypass 2FA, which CalDAV
+    clients can't satisfy).
+    """
     hdr = request.headers.get("Authorization", "")
     if not hdr.lower().startswith("basic "):
         return None
@@ -84,12 +90,25 @@ def _basic_auth_user(request: Request, db: Session) -> models.User | None:
     user = db.query(models.User).filter(models.User.username == username).first()
     if not user:
         return None
-    try:
-        if not verify_password(password, user.password_hash):
+
+    # 1) App-specific passwords — always allowed, MFA-safe.
+    for ap in db.query(models.AppPassword).filter(models.AppPassword.user_id == user.id).all():
+        try:
+            if verify_password(password, ap.password_hash):
+                ap.last_used_at = datetime.now(timezone.utc).isoformat()
+                db.commit()
+                return user
+        except Exception:
+            continue
+
+    # 2) Account password — only when 2FA is disabled.
+    if not user.totp_enabled:
+        try:
+            if verify_password(password, user.password_hash):
+                return user
+        except Exception:
             return None
-    except Exception:
-        return None
-    return user
+    return None
 
 
 def _unauthorized() -> Response:

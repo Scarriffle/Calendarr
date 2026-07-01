@@ -1,6 +1,8 @@
 import io
 import re
 import base64
+import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -262,5 +264,76 @@ def disable_totp(
 
     current_user.totp_secret = None
     current_user.totp_enabled = False
+    db.commit()
+    return {"ok": True}
+
+
+# ── App passwords (for CalDAV Basic Auth) ────────────────
+class AppPasswordCreate(BaseModel):
+    label: str = Field(default="CalDAV", max_length=100)
+
+
+def _app_pw_dict(ap: models.AppPassword) -> dict:
+    return {
+        "id": ap.id,
+        "label": ap.label,
+        "created_at": ap.created_at,
+        "last_used_at": ap.last_used_at,
+    }
+
+
+@router.get("/app-passwords")
+def list_app_passwords(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    rows = (
+        db.query(models.AppPassword)
+        .filter(models.AppPassword.user_id == current_user.id)
+        .order_by(models.AppPassword.id.desc())
+        .all()
+    )
+    return [_app_pw_dict(r) for r in rows]
+
+
+@router.post("/app-passwords")
+def create_app_password(
+    data: AppPasswordCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # Show the plaintext exactly once; only the hash is stored.
+    password = secrets.token_urlsafe(18)
+    ap = models.AppPassword(
+        user_id=current_user.id,
+        label=(data.label or "CalDAV")[:100],
+        password_hash=get_password_hash(password),
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    db.add(ap)
+    db.commit()
+    db.refresh(ap)
+    out = _app_pw_dict(ap)
+    out["password"] = password
+    return out
+
+
+@router.delete("/app-passwords/{ap_id}")
+def delete_app_password(
+    ap_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    ap = (
+        db.query(models.AppPassword)
+        .filter(
+            models.AppPassword.id == ap_id,
+            models.AppPassword.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not ap:
+        raise HTTPException(404, "App password not found")
+    db.delete(ap)
     db.commit()
     return {"ok": True}

@@ -4144,6 +4144,50 @@ function bindProfileModal() {
       document.getElementById('2fa-disable-pw').value = '';
     } catch (e) { showToast(e.message, true); }
   };
+
+  // ── App passwords (CalDAV) ──
+  const appPwList = document.getElementById('app-pw-list');
+  document.getElementById('app-pw-new').classList.add('hidden');
+  document.getElementById('app-pw-new-value').textContent = '';
+  async function loadAppPasswords() {
+    try {
+      const rows = await api.get('/profile/app-passwords');
+      appPwList.innerHTML = rows.length
+        ? rows.map(r => `<div class="app-pw-item">
+            <span class="app-pw-name">${escHtml(r.label)}</span>
+            <span class="app-pw-meta">${r.last_used_at ? t('app_pw_last_used') + ' ' + new Date(r.last_used_at).toLocaleDateString() : t('app_pw_never_used')}</span>
+            <button class="btn btn-ghost btn-sm app-pw-del" data-id="${r.id}">${t('app_pw_revoke')}</button>
+          </div>`).join('')
+        : `<p class="text-muted">${t('app_pw_none')}</p>`;
+    } catch (e) { /* ignore */ }
+  }
+  loadAppPasswords();
+
+  document.getElementById('app-pw-create-btn').onclick = async () => {
+    const label = document.getElementById('app-pw-label').value.trim() || 'CalDAV';
+    try {
+      const res = await api.post('/profile/app-passwords', { label });
+      document.getElementById('app-pw-new-value').textContent = res.password;
+      document.getElementById('app-pw-new').classList.remove('hidden');
+      document.getElementById('app-pw-label').value = '';
+      loadAppPasswords();
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  document.getElementById('app-pw-copy').onclick = () => {
+    const v = document.getElementById('app-pw-new-value').textContent;
+    if (v) navigator.clipboard.writeText(v).then(() => showToast(t('app_pw_copied')));
+  };
+
+  appPwList.onclick = async (e) => {
+    const btn = e.target.closest('.app-pw-del');
+    if (!btn) return;
+    if (!confirm(t('app_pw_revoke_confirm'))) return;
+    try {
+      await api.delete(`/profile/app-passwords/${btn.dataset.id}`);
+      loadAppPasswords();
+    } catch (err) { showToast(err.message, true); }
+  };
 }
 
 function updateTopbarAvatar(hasAvatar) {

@@ -114,6 +114,26 @@ class UserSettings(Base):
     user = relationship("User", back_populates="settings")
 
 
+class AppPassword(Base):
+    """Per-device app-specific password for CalDAV (Basic Auth).
+
+    Keeps MFA intact: accounts with 2FA can't use their normal password over
+    CalDAV (clients can't send a TOTP code), so they authenticate with one of
+    these revocable app passwords instead. Only the bcrypt hash is stored.
+    """
+
+    __tablename__ = "app_passwords"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    label = Column(String(100), nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(String(50), nullable=True)
+    last_used_at = Column(String(50), nullable=True)
+
+    user = relationship("User")
+
+
 class LocalCalendar(Base):
     __tablename__ = "local_calendars"
 
