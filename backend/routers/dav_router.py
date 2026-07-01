@@ -27,6 +27,7 @@ from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import dav_util
@@ -87,7 +88,12 @@ def _basic_auth_user(request: Request, db: Session) -> models.User | None:
     username, sep, password = raw.partition(":")
     if not sep:
         return None
-    user = db.query(models.User).filter(models.User.username == username).first()
+    # Login names are stored lowercase; match case-insensitively like the web login.
+    user = (
+        db.query(models.User)
+        .filter(func.lower(models.User.username) == username.lower())
+        .first()
+    )
     if not user:
         return None
 
