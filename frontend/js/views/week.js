@@ -124,8 +124,12 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       const color  = ev.color || ev.calendarColor || '#4285f4';
       const pastCls = isPast(ev) ? 'past' : '';
       const startStr = fmtTime(s);
-      const locHtml = ev.location ? `<div class="ev-loc">${escHtml(ev.location)}</div>` : '';
-      return `<div class="timed-event ${pastCls}"
+      // Short events lack the vertical room to stack time over title, so render
+      // them on one line (time next to title) and drop the location.
+      const isShort = height < 34;
+      const shortCls = isShort ? 'short' : '';
+      const locHtml = (!isShort && ev.location) ? `<div class="ev-loc">${escHtml(ev.location)}</div>` : '';
+      return `<div class="timed-event ${pastCls} ${shortCls}"
         style="top:${top}px;height:${height}px;left:${left}%;width:${width}%;background:${color};color:#fff"
         data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(ev.title)}">
         <div class="ev-time">${startStr}</div>

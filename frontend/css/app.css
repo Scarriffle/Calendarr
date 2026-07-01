@@ -915,6 +915,10 @@ a { color: var(--primary); text-decoration: none; }
 .timed-event .ev-time { font-size: 10px; opacity: .85; }
 .timed-event .ev-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .timed-event .ev-loc { font-size: 10px; opacity: .75; white-space: nowrap; overflow: hidden; }
+/* Short events: time and title on one line so the title stays visible. */
+.timed-event.short { display: flex; flex-direction: row; align-items: baseline; gap: 4px; }
+.timed-event.short .ev-time { flex-shrink: 0; }
+.timed-event.short .ev-title { flex: 1; min-width: 0; }
 
 /* Day view specifics */
 .day-view .week-day-col { flex: 1; }

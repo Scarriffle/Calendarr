@@ -576,11 +576,22 @@ function renderMiniCal() {
   const DOW_LABELS = weekStartDay === 'sunday' ? DOW_SUNDAY : DOW_MONDAY;
   miniDowEls.forEach((el, i) => { el.textContent = DOW_LABELS[i]; });
 
-  // Build event date set
-  const eventDates = new Set(state.events.map(ev => {
+  // Build event date set — mark every day an event spans, not just its start
+  // day, so multi-day events (Urlaub/Ferien) show a dot across the whole range.
+  const eventDates = new Set();
+  state.events.forEach(ev => {
     const s = new Date(ev.start);
-    return `${s.getFullYear()}-${s.getMonth()}-${s.getDate()}`;
-  }));
+    let end = new Date(ev.end || ev.start);
+    // All-day events store an exclusive end → step back to the last real day.
+    if (ev.allDay) { end.setHours(0, 0, 0, 0); if (end > s) end.setDate(end.getDate() - 1); }
+    const cur  = new Date(s.getFullYear(),   s.getMonth(),   s.getDate());
+    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    let guard = 0;
+    while (cur <= last && guard++ < 400) {
+      eventDates.add(`${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`);
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
 
   const days = [];
   const cur = new Date(gridStart);
