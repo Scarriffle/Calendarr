@@ -192,8 +192,23 @@ boot();
 
 // ── Service Worker registration (PWA) ─────────────────────
 if ('serviceWorker' in navigator) {
+  // Auto-update: when a new service worker takes control, reload once so the
+  // page runs the fresh assets. Guarded so it never loops and never fires on
+  // the very first install (when there was no previous controller).
+  let refreshing = false;
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing || !hadController) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(err => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(reg => {
+      // Check for a new SW now and hourly, so long-open tabs pick up releases.
+      reg.update();
+      setInterval(() => reg.update(), 60 * 60 * 1000);
+    }).catch(err => {
       console.warn('SW registration failed:', err);
     });
   });
