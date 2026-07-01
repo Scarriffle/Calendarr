@@ -3110,6 +3110,7 @@ function openSettingsModal() {
   api.get('/profile/').then(p => {
     document.getElementById('cfg-email').value = p.email || '';
   }).catch(() => {});
+  initAppPasswords();
 
   // Set active contrast/hour-height/duration buttons
   [
@@ -4144,12 +4145,17 @@ function bindProfileModal() {
       document.getElementById('2fa-disable-pw').value = '';
     } catch (e) { showToast(e.message, true); }
   };
+}
 
-  // ── App passwords (CalDAV) ──
+// ── App passwords (CalDAV) — lives in Settings → Profile ──
+function initAppPasswords() {
   const appPwList = document.getElementById('app-pw-list');
-  document.getElementById('app-pw-new').classList.add('hidden');
+  if (!appPwList) return;
+  const newBox = document.getElementById('app-pw-new');
+  newBox.classList.add('hidden');
   document.getElementById('app-pw-new-value').textContent = '';
-  async function loadAppPasswords() {
+
+  const load = async () => {
     try {
       const rows = await api.get('/profile/app-passwords');
       appPwList.innerHTML = rows.length
@@ -4160,17 +4166,17 @@ function bindProfileModal() {
           </div>`).join('')
         : `<p class="text-muted">${t('app_pw_none')}</p>`;
     } catch (e) { /* ignore */ }
-  }
-  loadAppPasswords();
+  };
+  load();
 
   document.getElementById('app-pw-create-btn').onclick = async () => {
     const label = document.getElementById('app-pw-label').value.trim() || 'CalDAV';
     try {
       const res = await api.post('/profile/app-passwords', { label });
       document.getElementById('app-pw-new-value').textContent = res.password;
-      document.getElementById('app-pw-new').classList.remove('hidden');
+      newBox.classList.remove('hidden');
       document.getElementById('app-pw-label').value = '';
-      loadAppPasswords();
+      load();
     } catch (e) { showToast(e.message, true); }
   };
 
@@ -4185,7 +4191,7 @@ function bindProfileModal() {
     if (!confirm(t('app_pw_revoke_confirm'))) return;
     try {
       await api.delete(`/profile/app-passwords/${btn.dataset.id}`);
-      loadAppPasswords();
+      load();
     } catch (err) { showToast(err.message, true); }
   };
 }
