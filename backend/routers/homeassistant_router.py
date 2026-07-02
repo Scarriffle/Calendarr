@@ -317,8 +317,8 @@ def get_ha_events(account: models.HomeAssistantAccount, start_dt: datetime, end_
     """Fetch events from all enabled HA calendars for an account.
 
     Returns (events, errors) — errors is a list of
-    {"source": "homeassistant", "name": ..., "message": ...} dicts for any
-    calendar that failed to sync. Never includes raw exception text.
+    {"source": "homeassistant", "name": ..., "calendar_id": ..., "message": ...}
+    dicts for any calendar that failed to sync. Never includes raw exception text.
     """
     all_events = []
     errors = []
@@ -340,6 +340,7 @@ def get_ha_events(account: models.HomeAssistantAccount, start_dt: datetime, end_
             errors.append({
                 "source": "homeassistant",
                 "name": f"{account.name} – {cal.name}",
+                "calendar_id": cal.id,
                 "message": "Sync fehlgeschlagen",
             })
     return all_events, errors

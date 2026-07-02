@@ -337,6 +337,7 @@ def get_events(
                 sync_errors.append({
                     "source": "caldav",
                     "name": f"{account.username} – {calendar.name}",
+                    "calendar_id": calendar.id,
                     "message": "Sync fehlgeschlagen",
                 })
 

@@ -418,6 +418,7 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
             errors.append({
                 "source": "google",
                 "name": f"{account.email} – {gcal.name}",
+                "calendar_id": gcal.id,
                 "message": "Sync fehlgeschlagen",
             })
 
