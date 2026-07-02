@@ -54,13 +54,15 @@ fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
                         onLoggedIn = vm::onLoggedIn,
                         onBack = vm::switchServer,
                     )
-                    AppRoute.MAIN -> CalendarScreen(
-                        vm = calendarVm!!,
-                        onLogout = vm::logout,
-                        onSwitchServer = vm::switchServer,
-                        onSettingsChanged = vm::applyLocalSettings,
-                        onSettingsSynced = vm::refreshSettings,
-                    )
+                    AppRoute.MAIN -> calendarVm?.let { cvm ->
+                        CalendarScreen(
+                            vm = cvm,
+                            onLogout = vm::logout,
+                            onSwitchServer = vm::switchServer,
+                            onSettingsChanged = vm::applyLocalSettings,
+                            onSettingsSynced = vm::refreshSettings,
+                        )
+                    } ?: SplashScreen()
                 }
             }
         }

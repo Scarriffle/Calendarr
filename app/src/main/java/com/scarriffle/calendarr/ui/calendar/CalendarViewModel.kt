@@ -229,10 +229,12 @@ class CalendarViewModel @Inject constructor(
     }
 
     /** Single serialized loader: avoids overlapping fetches that cause scroll jank. */
-    private suspend fun loadRange(start: Instant, end: Instant, background: Boolean) {
+    private suspend fun loadRange(start: Instant, end: Instant, background: Boolean, force: Boolean = false) {
         loadMutex.withLock {
             // Another load (e.g. the background prefetch) may have covered this range.
-            if (isCached(start, end)) return
+            // `force` bypasses this so callers can explicitly re-fetch an already-cached
+            // range (e.g. to pick up a mutation) without wiping the whole cache first.
+            if (!force && isCached(start, end)) return
             val group = _state.value.activeGroup
             val flag = if (background) "bg" else "fg"
             _state.update { if (flag == "bg") it.copy(isBackgroundCaching = true) else it.copy(isLoading = true, error = null) }
@@ -305,7 +307,8 @@ class CalendarViewModel @Inject constructor(
         } else {
             val hidden = st.hiddenKeys
             val banished = st.banishedKeys
-            allCachedEvents.filter { ev ->
+            if (hidden.isEmpty() && banished.isEmpty()) allCachedEvents
+            else allCachedEvents.filter { ev ->
                 val key = calendarKey(ev.source, ev.calendarId)
                 key !in hidden && key !in banished
             }
@@ -346,7 +349,14 @@ class CalendarViewModel @Inject constructor(
         setCalendarHidden(key, hidden)
         val id = key.substringAfter(":").toIntOrNull() ?: return
         if (source in listOf("caldav", "google", "homeassistant")) {
-            viewModelScope.launch { repository.setCalendarSidebarHidden(source, id, hidden) }
+            viewModelScope.launch {
+                runCatching { repository.setCalendarSidebarHidden(source, id, hidden) }
+                    .onFailure { e ->
+                        // The local toggle already applied; only the server write failed —
+                        // surface it so the client doesn't silently diverge from server state.
+                        _state.update { it.copy(error = e.message ?: "Fehler beim Speichern") }
+                    }
+            }
         }
     }
 
@@ -427,9 +437,23 @@ class CalendarViewModel @Inject constructor(
 
     // ---- Event mutations ----
 
+    /**
+     * Re-fetch just the already-cached range after a create/update so the edit is
+     * reflected everywhere it's currently loaded, without nuking and reloading the
+     * whole ±cacheMonths window (which caused a full-screen freeze on every save).
+     * Falls back to [initialLoad] if nothing was cached yet.
+     */
     private fun afterMutation() {
-        invalidateCache()
-        initialLoad()
+        val start = cachedStart
+        val end = cachedEnd
+        if (start == null || end == null) {
+            initialLoad()
+            return
+        }
+        viewModelScope.launch {
+            loadRange(start, end, background = false, force = true)
+            markReady()
+        }
     }
 
     fun saveEvent(

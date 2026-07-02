@@ -208,7 +208,7 @@ private fun GroupEditSheet(
 ) {
     val me = vm.currentUserId
     var name by remember { mutableStateOf(existing?.name ?: "") }
-    var icon by remember { mutableStateOf(if (GroupIcons.isKey(existing?.icon)) existing!!.icon!! else "people") }
+    var icon by remember { mutableStateOf(existing?.icon?.takeIf { GroupIcons.isKey(it) } ?: "people") }
     var selected by remember { mutableStateOf(setOf<Int>()) }
     var existingMembers by remember { mutableStateOf(setOf<Int>()) }
     var detail by remember { mutableStateOf<Group?>(null) }
@@ -223,7 +223,7 @@ private fun GroupEditSheet(
         detail = g
         if (g != null) {
             name = g.name
-            icon = if (GroupIcons.isKey(g.icon)) g.icon!! else "people"
+            icon = g.icon?.takeIf { GroupIcons.isKey(it) } ?: "people"
             val members = g.members.map { it.id }.filter { it != me }.toSet()
             existingMembers = members
             selected = members

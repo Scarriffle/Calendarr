@@ -18,6 +18,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -47,16 +48,21 @@ fun TimeGridView(
 ) {
     val hourHeight = LocalAppSettings.current.hourHeight.coerceIn(28, 100).dp
     val dimPast = LocalAppSettings.current.dimPastEvents
-    val now = java.time.Instant.now()
-    val lang = LocalLang.current
     val today = LocalDate.now()
+    // Recomputed once per day (not on every recomposition/frame) — Instant.now()
+    // was previously called fresh each recomposition, causing visible flicker in
+    // the "is this now" past-dimming and wasted allocation.
+    val now = remember(today) { java.time.Instant.now() }
+    val lang = LocalLang.current
 
     Column(Modifier.fillMaxSize()) {
         // Day headers (only for multi-day / week view)
         if (days.size > 1) {
             Row(Modifier.fillMaxWidth()) {
                 Box(Modifier.width(GUTTER))
-                val dayFmt = DateTimeFormatter.ofPattern("EEE d", com.scarriffle.calendarr.ui.L10n.locale(lang))
+                val dayFmt = remember(lang) {
+                    DateTimeFormatter.ofPattern("EEE d", com.scarriffle.calendarr.ui.L10n.locale(lang))
+                }
                 days.forEach { day ->
                     Text(
                         dayFmt.format(day),
