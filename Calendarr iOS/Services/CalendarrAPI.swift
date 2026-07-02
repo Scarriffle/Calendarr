@@ -206,7 +206,12 @@ class CalendarrAPI {
 
     // MARK: – Events
 
-    func fetchEvents(start: Date, end: Date) async throws -> [CalEvent] {
+    /// Fetches events for the personal calendar view. The server also reports
+    /// per-calendar sync failures (e.g. expired credentials) alongside an
+    /// otherwise-successful response, via the `errors` array — surfaced
+    /// separately from a hard fetch failure so the UI can distinguish
+    /// "everything failed" from "fetched fine, but calendar X didn't sync".
+    func fetchEvents(start: Date, end: Date) async throws -> (events: [CalEvent], errors: [SyncError]) {
         // Use UTC with Z suffix – avoids '+' character which breaks URL query params
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime]
@@ -224,7 +229,9 @@ class CalendarrAPI {
             let preview = String(data: data, encoding: .utf8).map { String($0.prefix(200)) } ?? "no data"
             throw APIError.serverError("Unerwartete Antwort: \(preview)")
         }
-        return arr.compactMap { CalEvent.from(json: $0) }
+        let events = arr.compactMap { CalEvent.from(json: $0) }
+        let errors = (root["errors"] as? [[String: Any]])?.compactMap { SyncError.from(json: $0) } ?? []
+        return (events, errors)
     }
 
     func createLocalEvent(calendarId: Int, title: String, start: Date, end: Date,

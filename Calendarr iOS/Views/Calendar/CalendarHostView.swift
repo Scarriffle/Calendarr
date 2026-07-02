@@ -284,16 +284,37 @@ struct CalendarHostView: View {
         .accessibilityLabel(L10n.t("nav.menu", appLang))
     }
 
-    // MARK: – Error banner
+    // MARK: – Error banners
 
+    // `lastError` (whole fetch failed) and `syncErrors` (fetch succeeded, but
+    // individual calendars didn't sync) are independent conditions and can
+    // both be shown at once.
     @ViewBuilder private var errorBanner: some View {
         if let err = store.lastError { errorBannerView(err) }
+        if !store.syncErrors.isEmpty { syncErrorBannerView(store.syncErrors) }
     }
 
     private func errorBannerView(_ err: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
             Text(err).font(.caption).foregroundStyle(.white).lineLimit(2)
+            Spacer()
+            Button { Task { await onNavigate() } } label: {
+                Image(systemName: "arrow.clockwise").foregroundStyle(.white)
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(Color.red.opacity(0.85))
+    }
+
+    /// One or more calendars didn't sync on the last fetch (e.g. expired
+    /// credentials) even though they're still enabled. Same visual language
+    /// as `errorBannerView`, joined into a single compact banner.
+    private func syncErrorBannerView(_ errors: [SyncError]) -> some View {
+        let text = errors.map { "\($0.source) (\($0.name)): \($0.message)" }.joined(separator: "\n")
+        return HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+            Text(text).font(.caption).foregroundStyle(.white).lineLimit(errors.count + 1)
             Spacer()
             Button { Task { await onNavigate() } } label: {
                 Image(systemName: "arrow.clockwise").foregroundStyle(.white)

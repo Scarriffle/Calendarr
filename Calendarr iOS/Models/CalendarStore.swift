@@ -58,6 +58,13 @@ class CalendarStore {
     var isLoading = false
     var isCachingBackground = false
     var lastError: String? = nil
+    /// Per-calendar sync failures reported alongside the last successful
+    /// personal `/events` fetch (e.g. expired CalDAV credentials on one
+    /// account) — distinct from `lastError`, which means the whole fetch
+    /// failed. Not populated in group-overlay mode. Left untouched on a hard
+    /// fetch failure (see `loadEvents`), so a stale-but-real warning doesn't
+    /// get wiped by an unrelated network hiccup.
+    var syncErrors: [SyncError] = []
     var weekStartsOnMonday = true
     var writableCalendars: [WritableCalendar] = []
     // When set, the calendar shows the group's combined overlay instead of the
@@ -340,10 +347,14 @@ class CalendarStore {
         lastError = nil
         defer { isLoading = false }
         do {
-            let fetched = try await fetchForMode(api: api, start: start, end: end)
+            let (fetched, errors) = try await fetchForMode(api: api, start: start, end: end)
+            syncErrors = errors
             mergeIntoCache(fetched, rangeStart: start, rangeEnd: end)
             refreshFromCache(start: start, end: end)
         } catch {
+            // Hard failure – leave `syncErrors` as-is; it reflects the last
+            // *successful* fetch and shouldn't be wiped by an unrelated
+            // network error on this attempt.
             lastError = error.localizedDescription
         }
     }
@@ -351,10 +362,12 @@ class CalendarStore {
     /// Fetch events for the current mode (personal vs. group overlay). Group
     /// events go through the same cache/prefetch/refresh path as personal ones,
     /// so the whole visible grid is covered (no "only the middle weeks" gaps).
-    private func fetchForMode(api: CalendarrAPI, start: Date, end: Date) async throws -> [CalEvent] {
+    /// Per-calendar sync errors are only reported by the personal `/events`
+    /// endpoint; group overlays always report none.
+    private func fetchForMode(api: CalendarrAPI, start: Date, end: Date) async throws -> (events: [CalEvent], errors: [SyncError]) {
         if let g = activeGroup {
             let combined = try await api.fetchGroupCombined(groupId: g.id, start: start, end: end)
-            return combined.map { decorateGroupEvent($0) }
+            return (combined.map { decorateGroupEvent($0) }, [])
         }
         return try await api.fetchEvents(start: start, end: end)
     }
@@ -394,7 +407,8 @@ class CalendarStore {
         isCachingBackground = true
         defer { isCachingBackground = false }
         do {
-            let fetched = try await fetchForMode(api: api, start: start, end: end)
+            let (fetched, errors) = try await fetchForMode(api: api, start: start, end: end)
+            syncErrors = errors
             mergeIntoCache(fetched, rangeStart: start, rangeEnd: end)
             // Refresh visible range from newly expanded cache
             let (vs, ve) = rangeForCurrentView()

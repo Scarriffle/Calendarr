@@ -18,6 +18,26 @@ struct EventPerson: Hashable {
     }
 }
 
+/// A partial-sync failure reported alongside an otherwise-successful
+/// `/api/caldav/events` response: one specific calendar didn't sync (e.g.
+/// expired credentials) even though it's still enabled. Distinct from a
+/// hard fetch failure (`CalendarStore.lastError`) — the request itself
+/// succeeded, just not every source within it.
+struct SyncError: Hashable {
+    let source: String
+    let name: String
+    let message: String
+
+    static func from(json: [String: Any]) -> SyncError? {
+        guard
+            let source = json["source"] as? String,
+            let name = json["name"] as? String,
+            let message = json["message"] as? String
+        else { return nil }
+        return SyncError(source: source, name: name, message: message)
+    }
+}
+
 struct CalEvent: Identifiable, Hashable {
     let id: String
     let url: String
