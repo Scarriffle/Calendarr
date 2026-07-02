@@ -35,6 +35,12 @@ data class LoginResult(val token: String, val username: String, val isAdmin: Boo
 
 data class TotpSetup(val secret: String, val qrUrl: String)
 
+/** A single calendar's sync failure, surfaced alongside a (still-successful) events fetch. */
+data class SyncError(val source: String, val name: String, val message: String)
+
+/** Result of [CalendarRepository.fetchEvents]: the merged events plus any per-calendar sync failures. */
+data class EventsResult(val events: List<CalEvent>, val errors: List<SyncError>)
+
 /**
  * Single entry point for all server interaction. Wraps [com.scarriffle.calendarr.data.remote.CalendarrApi],
  * converts HTTP failures into [ApiException]s carrying the server's `detail`
@@ -297,18 +303,30 @@ class CalendarRepository @Inject constructor(
 
     // ---- Events ----
 
-    suspend fun fetchEvents(start: Instant, end: Instant): List<CalEvent> = withContext(Dispatchers.IO) {
+    suspend fun fetchEvents(start: Instant, end: Instant): EventsResult = withContext(Dispatchers.IO) {
         val resp = api.fetchEvents(Dates.isoUtc(start), Dates.isoUtc(end))
         resp.ensureSuccess()
-        val raw = resp.body()?.string() ?: return@withContext emptyList()
+        val raw = resp.body()?.string() ?: return@withContext EventsResult(emptyList(), emptyList())
         val root = JSONObject(raw)
-        val arr = root.optJSONArray("events") ?: return@withContext emptyList()
-        buildList {
-            for (i in 0 until arr.length()) {
+        val arr = root.optJSONArray("events")
+        val events = buildList {
+            if (arr != null) for (i in 0 until arr.length()) {
                 val obj = arr.optJSONObject(i) ?: continue
                 CalEvent.fromJson(obj)?.let { add(it) }
             }
         }
+        val errArr = root.optJSONArray("errors")
+        val errors = buildList {
+            if (errArr != null) for (i in 0 until errArr.length()) {
+                val obj = errArr.optJSONObject(i) ?: continue
+                add(SyncError(
+                    source = obj.optString("source"),
+                    name = obj.optString("name"),
+                    message = obj.optString("message"),
+                ))
+            }
+        }
+        EventsResult(events, errors)
     }
 
     suspend fun createLocalEvent(

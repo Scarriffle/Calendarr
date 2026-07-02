@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scarriffle.calendarr.data.CalendarRepository
 import com.scarriffle.calendarr.data.SettingsStore
+import com.scarriffle.calendarr.data.SyncError
 import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.domain.model.Group
@@ -36,6 +37,10 @@ data class CalendarUiState(
     val isLoading: Boolean = false,
     val isBackgroundCaching: Boolean = false,
     val error: String? = null,
+    // Per-calendar sync failures from the last successful /events fetch (e.g.
+    // expired CalDAV credentials) — the fetch as a whole succeeded, but one or
+    // more enabled calendars silently returned nothing. Additive to `error`.
+    val syncErrors: List<SyncError> = emptyList(),
     val weekStartsOnMonday: Boolean = true,
     val writableCalendars: List<WritableCalendar> = emptyList(),
     val hiddenKeys: Set<String> = emptySet(),
@@ -232,10 +237,14 @@ class CalendarViewModel @Inject constructor(
             val flag = if (background) "bg" else "fg"
             _state.update { if (flag == "bg") it.copy(isBackgroundCaching = true) else it.copy(isLoading = true, error = null) }
             runCatching {
-                if (group != null) decorateGroup(repository.fetchGroupCombined(group.id, start, end))
-                else repository.fetchEvents(start, end)
+                if (group != null) decorateGroup(repository.fetchGroupCombined(group.id, start, end)) to emptyList<SyncError>()
+                else repository.fetchEvents(start, end).let { it.events to it.errors }
             }
-                .onSuccess { mergeIntoCache(it, start, end); refreshFromCache() }
+                .onSuccess { (events, errors) ->
+                    mergeIntoCache(events, start, end)
+                    refreshFromCache()
+                    _state.update { it.copy(syncErrors = errors) }
+                }
                 .onFailure { e -> if (!background) _state.update { it.copy(error = e.message) } }
             _state.update { it.copy(isLoading = false, isBackgroundCaching = false) }
         }
@@ -318,6 +327,8 @@ class CalendarViewModel @Inject constructor(
     }
 
     fun clearError() = _state.update { it.copy(error = null) }
+
+    fun clearSyncErrors() = _state.update { it.copy(syncErrors = emptyList()) }
 
     // ---- Visibility filters ----
 

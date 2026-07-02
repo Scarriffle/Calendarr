@@ -172,6 +172,9 @@ fun CalendarScreen(
             state.error?.let { err ->
                 ErrorBanner(err, onRetry = { vm.loadVisible(force = true) }, onDismiss = vm::clearError)
             }
+            if (state.syncErrors.isNotEmpty()) {
+                SyncErrorBanner(state.syncErrors, onDismiss = vm::clearSyncErrors)
+            }
             state.activeGroup?.let { g ->
                 GroupBanner(group = g, onExit = { vm.switchGroup(null) })
             }
@@ -338,6 +341,33 @@ private fun ErrorBanner(message: String, onRetry: () -> Unit, onDismiss: () -> U
             Text(message, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
             androidx.compose.foundation.layout.Row {
                 TextButton(onClick = onRetry) { Text(tr("common.retry")) }
+                TextButton(onClick = onDismiss) { Text(tr("common.close")) }
+            }
+        }
+    }
+}
+
+/**
+ * Additive to [ErrorBanner]: the fetch as a whole succeeded, but one or more
+ * enabled calendars failed to sync (e.g. expired credentials) and are showing
+ * zero events with no other indication. Same visual language, no retry button
+ * (retrying the whole range wouldn't target just the broken calendar).
+ */
+@Composable
+private fun SyncErrorBanner(errors: List<com.scarriffle.calendarr.data.SyncError>, onDismiss: () -> Unit) {
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            errors.forEach { err ->
+                Text(
+                    "${err.name}: ${err.message}",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            androidx.compose.foundation.layout.Row {
                 TextButton(onClick = onDismiss) { Text(tr("common.close")) }
             }
         }

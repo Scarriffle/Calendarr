@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -83,11 +84,24 @@ fun CalendarFilterSheet(
             }
             rows.forEach { entry ->
                 val visible = entry.key !in hiddenSet
+                // Best-effort match: server error `name` is "<account> – <calendar name>",
+                // so a suffix match on this calendar's own name is reliable enough.
+                val hasSyncError = !groupMode && state.syncErrors.any { err ->
+                    err.source == entry.source && err.name.endsWith(entry.name)
+                }
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.size(14.dp).clip(CircleShape).background(colorFromHex(entry.color)))
+                    if (hasSyncError) {
+                        Icon(
+                            Icons.Filled.WarningAmber,
+                            contentDescription = tr("filter.sync_error"),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(start = 8.dp).size(16.dp),
+                        )
+                    }
                     Text(
                         entry.name,
                         modifier = Modifier.weight(1f).padding(start = 12.dp),
