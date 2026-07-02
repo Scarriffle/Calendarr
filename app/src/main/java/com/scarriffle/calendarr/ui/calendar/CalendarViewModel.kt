@@ -214,7 +214,7 @@ class CalendarViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            loadRange(start, end, background = false)
+            loadRange(start, end, background = false, force = force)
             markReady()
         }
     }
