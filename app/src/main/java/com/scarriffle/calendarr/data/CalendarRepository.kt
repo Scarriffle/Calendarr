@@ -35,8 +35,9 @@ data class LoginResult(val token: String, val username: String, val isAdmin: Boo
 
 data class TotpSetup(val secret: String, val qrUrl: String)
 
-/** A single calendar's sync failure, surfaced alongside a (still-successful) events fetch. */
-data class SyncError(val source: String, val name: String, val message: String)
+/** A single calendar's sync failure, surfaced alongside a (still-successful) events fetch.
+ *  [calendarId] is null for account-wide failures (no single calendar is at fault). */
+data class SyncError(val source: String, val name: String, val calendarId: Int?, val message: String)
 
 /** Result of [CalendarRepository.fetchEvents]: the merged events plus any per-calendar sync failures. */
 data class EventsResult(val events: List<CalEvent>, val errors: List<SyncError>)
@@ -322,6 +323,7 @@ class CalendarRepository @Inject constructor(
                 add(SyncError(
                     source = obj.optString("source"),
                     name = obj.optString("name"),
+                    calendarId = if (obj.has("calendar_id")) obj.optInt("calendar_id") else null,
                     message = obj.optString("message"),
                 ))
             }

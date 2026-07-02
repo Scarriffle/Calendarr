@@ -84,10 +84,11 @@ fun CalendarFilterSheet(
             }
             rows.forEach { entry ->
                 val visible = entry.key !in hiddenSet
-                // Best-effort match: server error `name` is "<account> – <calendar name>",
-                // so a suffix match on this calendar's own name is reliable enough.
+                // entry.key is "source:id" (see calendarKey()); match sync errors on the
+                // same (source, calendarId) pair the server already attaches to events.
+                val entryId = entry.key.substringAfter(":")
                 val hasSyncError = !groupMode && state.syncErrors.any { err ->
-                    err.source == entry.source && err.name.endsWith(entry.name)
+                    err.source == entry.source && err.calendarId?.toString() == entryId
                 }
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 8.dp),
