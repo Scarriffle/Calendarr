@@ -300,6 +300,7 @@ def get_events(
         end_dt = end_dt.replace(tzinfo=timezone.utc)
 
     all_events = []
+    sync_errors = []
     accounts = (
         db.query(models.CalDAVAccount)
         .filter(
@@ -333,6 +334,11 @@ def get_events(
                 logger.error(
                     "Error fetching calendar %s: %s", calendar.id, exc
                 )
+                sync_errors.append({
+                    "source": "caldav",
+                    "name": f"{account.username} – {calendar.name}",
+                    "message": "Sync fehlgeschlagen",
+                })
 
     # ── Local calendar events (own + shared + group calendars) ─────────────
     readable_ids = permissions.readable_local_calendar_ids(db, current_user)
@@ -414,13 +420,18 @@ def get_events(
         .filter(models.GoogleAccount.user_id == current_user.id)
         .all()
     )
-    google_errors = []
     for g_acc in google_accounts:
         try:
-            all_events.extend(get_google_events(g_acc, start_dt, end_dt, db))
+            g_events, g_errors = get_google_events(g_acc, start_dt, end_dt, db)
+            all_events.extend(g_events)
+            sync_errors.extend(g_errors)
         except Exception as exc:
             logger.error("Error fetching Google Calendar for %s: %s", g_acc.email, exc)
-            google_errors.append({"email": g_acc.email})
+            sync_errors.append({
+                "source": "google",
+                "name": g_acc.email,
+                "message": "Sync fehlgeschlagen",
+            })
 
     # ── Home Assistant events ─────────────────────────────
     from routers.homeassistant_router import get_ha_events
@@ -431,11 +442,18 @@ def get_events(
     )
     for ha_acc in ha_accounts:
         try:
-            all_events.extend(get_ha_events(ha_acc, start_dt, end_dt, db))
+            ha_events, ha_errors = get_ha_events(ha_acc, start_dt, end_dt, db)
+            all_events.extend(ha_events)
+            sync_errors.extend(ha_errors)
         except Exception as exc:
             logger.error("Error fetching HA events for %s: %s", ha_acc.name, exc)
+            sync_errors.append({
+                "source": "homeassistant",
+                "name": ha_acc.name,
+                "message": "Sync fehlgeschlagen",
+            })
 
-    return {"events": all_events, "errors": google_errors}
+    return {"events": all_events, "errors": sync_errors}
 
 
 @router.post("/events")

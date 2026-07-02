@@ -377,8 +377,10 @@ async function fetchAndRender(force = false, silent = false) {
     const resp = await api.get(`/caldav/events?start=${fetchStart.toISOString()}&end=${fetchEnd.toISOString()}`);
     const events = resp.events || resp;
     if (resp.errors && resp.errors.length) {
+      const sourceLabels = { caldav: 'CalDAV', homeassistant: 'Home Assistant', google: 'Google' };
       for (const err of resp.errors) {
-        showToast(`Google (${err.email}): Token abgelaufen – bitte Konto trennen und neu verbinden`, true);
+        const label = sourceLabels[err.source] || err.source || 'Kalender';
+        showToast(`${label} (${err.name}): ${err.message}`, true);
       }
     }
     eventCache.start  = fetchStart;

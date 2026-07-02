@@ -382,8 +382,13 @@ def update_calendar(
 
 # ── Events ───────────────────────────────────────────────
 
-def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt: datetime, db: Session) -> list:
-    """Fetch events from all enabled Google calendars for an account."""
+def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt: datetime, db: Session) -> tuple:
+    """Fetch events from all enabled Google calendars for an account.
+
+    Returns (events, errors) — errors is a list of
+    {"source": "google", "name": ..., "message": ...} dicts for any
+    calendar that failed to sync. Never includes raw exception text.
+    """
     try:
         token = _refresh_access_token(account, db)
     except Exception as exc:
@@ -391,6 +396,7 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
         raise
 
     all_events = []
+    errors = []
     for gcal in account.calendars:
         if not gcal.enabled or gcal.sidebar_hidden:
             continue
@@ -409,8 +415,13 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
                 all_events.append(_parse_google_event(ev, gcal.id, gcal.name, gcal.color or "#4285f4"))
         except Exception as exc:
             logger.error("Error fetching events for calendar %s (%s): %s", gcal.name, gcal.cal_id, exc)
+            errors.append({
+                "source": "google",
+                "name": f"{account.email} – {gcal.name}",
+                "message": "Sync fehlgeschlagen",
+            })
 
-    return all_events
+    return all_events, errors
 
 
 class GoogleEventCreate(BaseModel):

@@ -313,8 +313,15 @@ def _parse_ha_event(ev: dict, cal_db_id: int, cal_name: str, cal_color: str) -> 
     }
 
 
-def get_ha_events(account: models.HomeAssistantAccount, start_dt: datetime, end_dt: datetime, db: Session) -> list:
+def get_ha_events(account: models.HomeAssistantAccount, start_dt: datetime, end_dt: datetime, db: Session) -> tuple:
+    """Fetch events from all enabled HA calendars for an account.
+
+    Returns (events, errors) — errors is a list of
+    {"source": "homeassistant", "name": ..., "message": ...} dicts for any
+    calendar that failed to sync. Never includes raw exception text.
+    """
     all_events = []
+    errors = []
     try:
         token = _get_valid_token(account, db)
     except Exception as exc:
@@ -330,7 +337,12 @@ def get_ha_events(account: models.HomeAssistantAccount, start_dt: datetime, end_
                 all_events.append(_parse_ha_event(ev, cal.id, cal.name, color))
         except Exception as exc:
             logger.error("HA event fetch error %s (%s): %s", cal.entity_id, account.name, exc)
-    return all_events
+            errors.append({
+                "source": "homeassistant",
+                "name": f"{account.name} – {cal.name}",
+                "message": "Sync fehlgeschlagen",
+            })
+    return all_events, errors
 
 
 # ── Serialization ─────────────────────────────────────────
