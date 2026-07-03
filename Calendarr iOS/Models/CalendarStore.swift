@@ -456,7 +456,13 @@ class CalendarStore {
         }
         allCachedEvents = retained + newEvents
 
-        // Extend cached range
+        // Only extend the cached range when the fetch was completely clean.
+        // When some calendars had sync errors (keepKeysInRange non-empty), leave
+        // cachedStart/End unchanged: this keeps isCached() returning false for
+        // the next loadEvents call so the failed calendars are retried
+        // automatically — rather than being silently treated as "done" with
+        // empty data (especially important on first launch or after forceReload).
+        guard keepKeysInRange.isEmpty else { return }
         if let cs = cachedStart, let ce = cachedEnd {
             cachedStart = min(cs, rangeStart)
             cachedEnd   = max(ce, rangeEnd)
