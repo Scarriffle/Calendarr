@@ -89,7 +89,7 @@ class CalendarViewModel @Inject constructor(
     init {
         loadWritableCalendars()
         loadGroups()
-        initialLoad()
+        initialLoad(reconcile = true)
     }
 
     /**
@@ -97,12 +97,15 @@ class CalendarViewModel @Inject constructor(
      * mark ready. Entering the app fully-loaded avoids the first-open jank of
      * loading a big batch while the user is already scrolling.
      */
-    private fun initialLoad() {
+    private fun initialLoad(reconcile: Boolean = false) {
         val months = settingsStore.cacheMonths.toLong()
         val today = LocalDate.now().withDayOfMonth(1)
         val start = instant(today.minusMonths(months))
         val end = instant(today.plusMonths(months + 1))
         viewModelScope.launch {
+            // Honour a calendar hidden/shown on the web BEFORE the first load so
+            // the visibility filter is correct before events are rendered.
+            if (reconcile) reconcileCalendarVisibility()
             loadRange(start, end, background = false)
             markReady()
         }
@@ -365,7 +368,50 @@ class CalendarViewModel @Inject constructor(
     fun syncWithServer() {
         invalidateCache()
         loadGroups()
-        initialLoad()
+        initialLoad(reconcile = true)
+    }
+
+    /**
+     * Called when the app returns to the foreground. Re-checks the server's
+     * per-calendar visibility (a calendar may have been hidden/shown on the web
+     * or another device meanwhile) and reloads only if something changed.
+     */
+    fun onAppResumed() {
+        viewModelScope.launch {
+            if (reconcileCalendarVisibility()) {
+                invalidateCache()
+                loadGroups()
+                initialLoad(reconcile = false) // just reconciled above
+            }
+        }
+    }
+
+    /**
+     * Reconcile the local hidden set with the server's per-calendar
+     * `sidebar_hidden` flags for external calendars (CalDAV / Google / HA).
+     * Returns `true` if the hidden set changed, so the caller can force a
+     * refetch — a calendar re-enabled on the web has NO events in the cache
+     * (the server excludes a hidden calendar's events entirely). Local / iCal
+     * hidden keys have no server flag and are left untouched.
+     */
+    private suspend fun reconcileCalendarVisibility(): Boolean {
+        val caldav = runCatching { repository.getCalDAVAccounts() }.getOrDefault(emptyList())
+        val google = runCatching { repository.getGoogleAccounts() }.getOrDefault(emptyList())
+        val ha = runCatching { repository.getHomeAssistantAccounts() }.getOrDefault(emptyList())
+
+        val hidden = settingsStore.hiddenCalendarKeys.toMutableSet()
+        fun apply(source: String, id: Int, serverHidden: Boolean) {
+            val key = calendarKey(source, id.toString())
+            if (serverHidden) hidden.add(key) else hidden.remove(key)
+        }
+        caldav.forEach { acc -> acc.calendars?.forEach { apply("caldav", it.id, it.sidebarHidden) } }
+        google.forEach { acc -> acc.calendars?.forEach { apply("google", it.id, it.sidebarHidden) } }
+        ha.forEach { acc -> acc.calendars?.forEach { apply("homeassistant", it.id, it.sidebarHidden) } }
+
+        if (hidden == settingsStore.hiddenCalendarKeys) return false
+        settingsStore.hiddenCalendarKeys = hidden
+        _state.update { it.copy(hiddenKeys = hidden) }
+        return true
     }
 
     fun clearError() = _state.update { it.copy(error = null) }

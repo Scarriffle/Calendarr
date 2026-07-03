@@ -109,6 +109,17 @@ fun CalendarScreen(
             context, state.events, state.reminderDisabledKeys, vm.defaultReminderMinutes
         )
     }
+    // Re-check server-side calendar visibility whenever the app returns to the
+    // foreground (e.g. after hiding/showing a calendar on the web or another
+    // device); reloads only if something changed.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) vm.onAppResumed()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     var viewMenuOpen by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
