@@ -243,7 +243,8 @@ class CalendarViewModel @Inject constructor(
                 else repository.fetchEvents(start, end).let { it.events to it.errors }
             }
                 .onSuccess { (events, errors) ->
-                    mergeIntoCache(events, start, end)
+                    val (keepKeys, keepSources) = failedCalendarKeys(errors)
+                    mergeIntoCache(events, start, end, keepKeys, keepSources)
                     refreshFromCache()
                     _state.update { it.copy(syncErrors = errors) }
                 }
@@ -281,13 +282,51 @@ class CalendarViewModel @Inject constructor(
         return !cs.isAfter(start) && !ce.isBefore(end)
     }
 
-    private fun mergeIntoCache(newEvents: List<CalEvent>, rangeStart: Instant, rangeEnd: Instant) {
-        val retained = allCachedEvents.filter {
-            !it.startDate.isBefore(rangeEnd) || !it.endDate.isAfter(rangeStart)
+    /**
+     * Split sync errors into per-calendar keys and whole sources whose cached
+     * events must NOT be evicted on a partial sync — stale data beats an empty
+     * calendar. An error carrying a calendar_id protects just that calendar; an
+     * account-level error without one (e.g. an HA / Google token-refresh
+     * failure, which aborts the whole account fetch) protects every cached
+     * calendar of that source.
+     */
+    private fun failedCalendarKeys(errors: List<SyncError>): Pair<Set<String>, Set<String>> {
+        val keys = mutableSetOf<String>()
+        val sources = mutableSetOf<String>()
+        for (err in errors) {
+            val cid = err.calendarId
+            if (cid != null) keys.add(calendarKey(err.source, cid.toString()))
+            else sources.add(err.source)
+        }
+        return keys to sources
+    }
+
+    private fun mergeIntoCache(
+        newEvents: List<CalEvent>, rangeStart: Instant, rangeEnd: Instant,
+        keepKeysInRange: Set<String> = emptySet(),
+        keepSourcesInRange: Set<String> = emptySet(),
+    ) {
+        // Remove old events in the fetched range to avoid duplicates — but
+        // PRESERVE events from calendars / sources that had sync errors so a
+        // transient CalDAV / Google / HA failure doesn't wipe the visible calendar.
+        val retained = allCachedEvents.filter { ev ->
+            val outsideRange = !ev.startDate.isBefore(rangeEnd) || !ev.endDate.isAfter(rangeStart)
+            when {
+                outsideRange -> true
+                ev.source in keepSourcesInRange -> true
+                keepKeysInRange.isEmpty() -> false
+                else -> calendarKey(ev.source, ev.calendarId) in keepKeysInRange
+            }
         }
         allCachedEvents = retained + newEvents
-        cachedStart = cachedStart?.let { minOf(it, rangeStart) } ?: rangeStart
-        cachedEnd = cachedEnd?.let { maxOf(it, rangeEnd) } ?: rangeEnd
+        // Only extend the cached range on a fully clean fetch. When some
+        // calendars/sources failed, leave cachedStart/End unchanged so
+        // isCached() stays false and they're retried on the next load rather
+        // than being silently treated as "done" with empty data.
+        if (keepKeysInRange.isEmpty() && keepSourcesInRange.isEmpty()) {
+            cachedStart = cachedStart?.let { minOf(it, rangeStart) } ?: rangeStart
+            cachedEnd = cachedEnd?.let { maxOf(it, rangeEnd) } ?: rangeEnd
+        }
     }
 
     private fun refreshFromCache() {
