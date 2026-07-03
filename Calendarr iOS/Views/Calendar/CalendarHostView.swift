@@ -85,7 +85,7 @@ struct CalendarHostView: View {
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
         .onChange(of: store.visibleMonth) { _, new in Task { await ensureLoaded(around: new) } }
-        .onChange(of: scenePhase)        { _, phase in if phase == .active { Task { await SettingsSync.pull(api: api) } } }
+        .onChange(of: scenePhase)        { _, phase in if phase == .active { Task { await syncFromServer() } } }
         .onReceive(NotificationCenter.default.publisher(for: .banishedCalendarsChanged)) { _ in
             store.syncBanishedFromDefaults()
         }
@@ -152,7 +152,7 @@ struct CalendarHostView: View {
         .onChange(of: store.viewType)    { _, _ in Task { await onNavigate() } }
         .onChange(of: cacheMonths)       { _, _ in Task { await recache() } }
         .onChange(of: store.visibleMonth) { _, new in Task { await ensureLoaded(around: new) } }
-        .onChange(of: scenePhase)        { _, phase in if phase == .active { Task { await SettingsSync.pull(api: api) } } }
+        .onChange(of: scenePhase)        { _, phase in if phase == .active { Task { await syncFromServer() } } }
         .onReceive(NotificationCenter.default.publisher(for: .banishedCalendarsChanged)) { _ in
             store.syncBanishedFromDefaults()
         }
@@ -267,7 +267,7 @@ struct CalendarHostView: View {
                 }
             }
             // Sync
-            Button { Task { await SettingsSync.pull(api: api); await forceReload() } } label: {
+            Button { Task { await syncFromServer(force: true) } } label: {
                 Label(L10n.t("menu.sync", appLang), systemImage: "arrow.triangle.2.circlepath")
             }
             Divider()
@@ -437,6 +437,10 @@ struct CalendarHostView: View {
         applyServerDrivenSettings(initial: true)
 
         await store.loadWritableCalendars(api: api)
+        // Reconcile per-calendar visibility with the server BEFORE the first
+        // load so a calendar hidden/shown on the web is honoured immediately
+        // (banished set correct before events are filtered).
+        _ = await store.reconcileCalendarVisibility(api: api)
         groups = (try? await api.getGroups()) ?? []
         // 1. Load current view immediately (visible)
         let (s, e) = store.rangeForCurrentView()
@@ -445,11 +449,11 @@ struct CalendarHostView: View {
         Task(priority: .background) {
             await store.prefetchBackground(api: api, months: cacheMonths)
         }
-        // 3. Periodic settings pull (tied to this .task's lifetime).
+        // 3. Periodic settings + visibility pull (tied to this .task's lifetime).
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(600))
             if Task.isCancelled { break }
-            await SettingsSync.pull(api: api)
+            await syncFromServer()
         }
     }
 
@@ -495,6 +499,17 @@ struct CalendarHostView: View {
         Task(priority: .background) {
             await store.prefetchBackground(api: api, months: cacheMonths)
         }
+    }
+
+    /// Pull server-driven settings AND reconcile per-calendar visibility in one
+    /// step (used on launch, resume and the periodic loop). If the server
+    /// changed a calendar's `sidebar_hidden` — e.g. hidden/shown on the web or
+    /// another device — or `force` is set (manual sync), refetch so the change
+    /// shows up without the user opening the filter sheet.
+    private func syncFromServer(force: Bool = false) async {
+        await SettingsSync.pull(api: api)
+        let changed = await store.reconcileCalendarVisibility(api: api)
+        if changed || force { await forceReload() }
     }
 
     /// Called when the user scrolls into a new month – refreshes the visible range

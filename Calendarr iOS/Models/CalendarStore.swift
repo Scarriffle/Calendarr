@@ -225,6 +225,38 @@ class CalendarStore {
         publishWidgetSnapshot()
     }
 
+    /// Reconcile the local "banished" set with the server's per-calendar
+    /// `sidebar_hidden` flags (server wins for CalDAV / Google / HA). Returns
+    /// `true` if the set changed, so the caller can force a refetch.
+    ///
+    /// This closes the sync gap where hiding/showing a calendar on the web (or
+    /// another device) was only ever picked up when the filter sheet or the
+    /// accounts screen happened to be opened — not on app launch / resume. A
+    /// calendar re-enabled on the web has NO events in the cache (the server
+    /// excludes a hidden calendar's events entirely), so a plain
+    /// `refreshFromCache` can't bring them back: the caller must force a reload.
+    func reconcileCalendarVisibility(api: CalendarrAPI) async -> Bool {
+        async let c = (try? await api.getCalDAVAccounts()) ?? []
+        async let g = (try? await api.getGoogleAccounts()) ?? []
+        async let h = (try? await api.getHomeAssistantAccounts()) ?? []
+        let (caldav, google, ha) = await (c, g, h)
+
+        var b = banishedCalendarKeys
+        func applyServerHidden(_ source: String, _ id: Int, _ hidden: Bool) {
+            let key = Self.calendarKey(source: source, calendarId: "\(id)")
+            if hidden { b.insert(key) } else { b.remove(key) }
+        }
+        for acc in caldav { for cal in acc.calendars ?? [] { applyServerHidden("caldav", cal.id, cal.sidebarHidden) } }
+        for acc in google { for cal in acc.calendars ?? [] { applyServerHidden("google", cal.id, cal.sidebarHidden) } }
+        for acc in ha     { for cal in acc.calendars ?? [] { applyServerHidden("homeassistant", cal.id, cal.sidebarHidden) } }
+
+        guard b != banishedCalendarKeys else { return false }
+        banishedCalendarKeys = b
+        Self.saveBanishedKeys(b)
+        NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+        return true
+    }
+
     // MARK: – Reminder-disabled-calendar persistence
 
     private static let reminderDisabledKeysDefaultsKey = "reminderDisabledCalendarKeys"
