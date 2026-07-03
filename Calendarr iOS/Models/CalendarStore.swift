@@ -349,7 +349,8 @@ class CalendarStore {
         do {
             let (fetched, errors) = try await fetchForMode(api: api, start: start, end: end)
             syncErrors = errors
-            mergeIntoCache(fetched, rangeStart: start, rangeEnd: end)
+            mergeIntoCache(fetched, rangeStart: start, rangeEnd: end,
+                           keepKeysInRange: failedCalendarKeys(from: errors))
             refreshFromCache(start: start, end: end)
         } catch {
             // Hard failure – leave `syncErrors` as-is; it reflects the last
@@ -409,7 +410,8 @@ class CalendarStore {
         do {
             let (fetched, errors) = try await fetchForMode(api: api, start: start, end: end)
             syncErrors = errors
-            mergeIntoCache(fetched, rangeStart: start, rangeEnd: end)
+            mergeIntoCache(fetched, rangeStart: start, rangeEnd: end,
+                           keepKeysInRange: failedCalendarKeys(from: errors))
             // Refresh visible range from newly expanded cache
             let (vs, ve) = rangeForCurrentView()
             refreshFromCache(start: vs, end: ve)
@@ -428,10 +430,29 @@ class CalendarStore {
         allCachedEvents = []
     }
 
-    private func mergeIntoCache(_ newEvents: [CalEvent], rangeStart: Date, rangeEnd: Date) {
-        // Remove old events that overlap with the newly fetched range (avoid duplicates)
+    /// Calendar keys (source:id) for calendars that reported a per-source sync
+    /// error. Events from these calendars must NOT be evicted from the cache on
+    /// a partial sync — stale data is better than a completely empty calendar.
+    private func failedCalendarKeys(from errors: [SyncError]) -> Set<String> {
+        var keys = Set<String>()
+        for err in errors {
+            guard let cid = err.calendarId else { continue }
+            keys.insert(Self.calendarKey(source: err.source, calendarId: cid))
+        }
+        return keys
+    }
+
+    private func mergeIntoCache(_ newEvents: [CalEvent], rangeStart: Date, rangeEnd: Date,
+                                 keepKeysInRange: Set<String> = []) {
+        // Remove old events in the fetched range to avoid duplicates — but
+        // PRESERVE events from calendars that had sync errors so that a
+        // transient CalDAV / Google failure doesn't wipe the visible calendar.
         let retained = allCachedEvents.filter { ev in
-            ev.startDate >= rangeEnd || ev.endDate <= rangeStart
+            let outsideRange = ev.startDate >= rangeEnd || ev.endDate <= rangeStart
+            if outsideRange { return true }
+            guard !keepKeysInRange.isEmpty else { return false }
+            let key = Self.calendarKey(source: ev.source, calendarId: ev.calendarId)
+            return keepKeysInRange.contains(key)
         }
         allCachedEvents = retained + newEvents
 

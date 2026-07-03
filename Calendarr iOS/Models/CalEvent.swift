@@ -25,16 +25,18 @@ struct EventPerson: Hashable {
 /// succeeded, just not every source within it.
 struct SyncError: Hashable {
     let source: String
+    let calendarId: String?   // nil on older server responses without calendar_id
     let name: String
     let message: String
 
     static func from(json: [String: Any]) -> SyncError? {
         guard
-            let source = json["source"] as? String,
-            let name = json["name"] as? String,
+            let source  = json["source"]  as? String,
+            let name    = json["name"]    as? String,
             let message = json["message"] as? String
         else { return nil }
-        return SyncError(source: source, name: name, message: message)
+        let calendarId = json["calendar_id"].map { "\($0)" }
+        return SyncError(source: source, calendarId: calendarId, name: name, message: message)
     }
 }
 
