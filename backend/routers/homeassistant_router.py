@@ -325,8 +325,20 @@ def get_ha_events(account: models.HomeAssistantAccount, start_dt: datetime, end_
     try:
         token = _get_valid_token(account, db)
     except Exception as exc:
+        # A token failure aborts the whole account, but attribute it to each
+        # enabled calendar so clients can pin the error to a specific calendar
+        # (and preserve that calendar's cached events instead of wiping it).
         logger.error("HA token error for %s: %s", account.name, exc)
-        raise
+        for cal in account.calendars:
+            if not cal.enabled or cal.sidebar_hidden:
+                continue
+            errors.append({
+                "source": "homeassistant",
+                "name": f"{account.name} – {cal.name}",
+                "calendar_id": cal.id,
+                "message": "Sync fehlgeschlagen",
+            })
+        return all_events, errors
     for cal in account.calendars:
         if not cal.enabled or cal.sidebar_hidden:
             continue

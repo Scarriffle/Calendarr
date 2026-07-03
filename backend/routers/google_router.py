@@ -389,14 +389,28 @@ def get_google_events(account: models.GoogleAccount, start_dt: datetime, end_dt:
     {"source": "google", "name": ..., "message": ...} dicts for any
     calendar that failed to sync. Never includes raw exception text.
     """
+    all_events = []
+    errors = []
     try:
         token = _refresh_access_token(account, db)
     except Exception as exc:
+        # A token failure aborts the whole account, but attribute it to each
+        # enabled calendar so clients can pin the error to a specific calendar
+        # (and preserve that calendar's cached events instead of wiping it).
         logger.error("Token refresh failed for Google account %s: %s", account.email, exc)
-        raise
+        for gcal in account.calendars:
+            if not gcal.enabled or gcal.sidebar_hidden:
+                continue
+            if _is_system_calendar(gcal.cal_id):
+                continue
+            errors.append({
+                "source": "google",
+                "name": f"{account.email} – {gcal.name}",
+                "calendar_id": gcal.id,
+                "message": "Sync fehlgeschlagen",
+            })
+        return all_events, errors
 
-    all_events = []
-    errors = []
     for gcal in account.calendars:
         if not gcal.enabled or gcal.sidebar_hidden:
             continue
