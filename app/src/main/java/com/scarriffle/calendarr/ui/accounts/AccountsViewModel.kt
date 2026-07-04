@@ -99,6 +99,13 @@ class AccountsViewModel @Inject constructor(
     fun setSourceColor(source: String, calendarId: Int, color: String, onChanged: () -> Unit) =
         mutate(onChanged) { repository.setCalendarColor(source, calendarId, color) }
 
+    // ---- Banished (permanently hidden) calendars ----
+
+    /** Lift the server-side sidebar_hidden flag so a banished calendar reappears.
+     *  `onChanged` triggers the calendar screen's reconcile + refetch. */
+    fun unbanishCalendar(source: String, calendarId: Int, onChanged: () -> Unit) =
+        mutate(onChanged) { repository.setCalendarSidebarHidden(source, calendarId, hidden = false) }
+
     // ---- Sharing ----
 
     var shares by mutableStateOf<List<CalendarShareEntry>>(emptyList())

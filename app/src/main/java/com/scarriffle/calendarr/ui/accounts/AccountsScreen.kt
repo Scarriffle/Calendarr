@@ -116,6 +116,26 @@ fun AccountsScreen(
         }
     }
 
+    // Calendars permanently hidden ("banished") on the server — offered for
+    // re-enabling. Derived from the loaded account lists' sidebar_hidden flags.
+    val banishedCals: List<BanishedCalendar> = buildList {
+        vm.caldav.forEach { acc ->
+            acc.calendars.orEmpty().filter { it.sidebarHidden }.forEach {
+                add(BanishedCalendar("caldav", it.id, "${acc.name} – ${it.name}", it.color ?: acc.color))
+            }
+        }
+        vm.google.forEach { acc ->
+            acc.calendars.orEmpty().filter { it.sidebarHidden }.forEach {
+                add(BanishedCalendar("google", it.id, "${acc.email} – ${it.name}", it.color ?: "#4285f4"))
+            }
+        }
+        vm.homeAssistant.forEach { acc ->
+            acc.calendars.orEmpty().filter { it.sidebarHidden }.forEach {
+                add(BanishedCalendar("homeassistant", it.id, "${acc.name} – ${it.name}", it.color ?: "#46bdc6"))
+            }
+        }
+    }
+
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Scaffold(
             topBar = {
@@ -194,6 +214,14 @@ fun AccountsScreen(
                                 editingColor = ColorTarget.Source("homeassistant", cal.id, cal.color ?: "#46bdc6")
                             }
                         }
+                    }
+                }
+
+                // Banished (permanently hidden) calendars — re-enable here.
+                if (banishedCals.isNotEmpty()) {
+                    item { SectionHeaderNoAdd(tr("accounts.banished_header")) }
+                    items(banishedCals, key = { "b${it.source}${it.id}" }) { cal ->
+                        BanishedCalendarRow(cal.label, cal.color) { vm.unbanishCalendar(cal.source, cal.id, onChanged) }
                     }
                 }
 
@@ -305,6 +333,26 @@ private fun ChildCalendarRow(name: String, color: String, onColor: () -> Unit) {
     ) {
         ColorDot(color, editable = true, onClick = onColor)
         Text(name, modifier = Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** A permanently-hidden ("banished") calendar with a "show again" button. */
+private data class BanishedCalendar(val source: String, val id: Int, val label: String, val color: String)
+
+@Composable
+private fun BanishedCalendarRow(name: String, color: String, onUnbanish: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ColorDot(color, editable = false, onClick = {})
+        Text(
+            name,
+            modifier = Modifier.weight(1f).padding(start = 12.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onUnbanish) { Text(tr("accounts.banished_unhide")) }
     }
 }
 

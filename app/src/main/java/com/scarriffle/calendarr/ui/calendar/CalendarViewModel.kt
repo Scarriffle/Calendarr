@@ -387,30 +387,34 @@ class CalendarViewModel @Inject constructor(
     }
 
     /**
-     * Reconcile the local hidden set with the server's per-calendar
+     * Reconcile the local **banished** set with the server's per-calendar
      * `sidebar_hidden` flags for external calendars (CalDAV / Google / HA).
-     * Returns `true` if the hidden set changed, so the caller can force a
-     * refetch — a calendar re-enabled on the web has NO events in the cache
-     * (the server excludes a hidden calendar's events entirely). Local / iCal
-     * hidden keys have no server flag and are left untouched.
+     * Returns `true` if the set changed, so the caller can force a refetch — a
+     * calendar re-enabled on the web has NO events in the cache (the server
+     * excludes a hidden calendar's events entirely).
+     *
+     * NOTE: This deliberately drives `banishedKeys`, NOT `hiddenKeys`. The
+     * quick-hide (`hiddenKeys`) is a device-local filter and must never be
+     * overwritten from the server; only the "banish / permanently hide" state
+     * maps to the server's `sidebar_hidden` (mirrors iOS).
      */
     private suspend fun reconcileCalendarVisibility(): Boolean {
         val caldav = runCatching { repository.getCalDAVAccounts() }.getOrDefault(emptyList())
         val google = runCatching { repository.getGoogleAccounts() }.getOrDefault(emptyList())
         val ha = runCatching { repository.getHomeAssistantAccounts() }.getOrDefault(emptyList())
 
-        val hidden = settingsStore.hiddenCalendarKeys.toMutableSet()
+        val banished = settingsStore.banishedCalendarKeys.toMutableSet()
         fun apply(source: String, id: Int, serverHidden: Boolean) {
             val key = calendarKey(source, id.toString())
-            if (serverHidden) hidden.add(key) else hidden.remove(key)
+            if (serverHidden) banished.add(key) else banished.remove(key)
         }
         caldav.forEach { acc -> acc.calendars?.forEach { apply("caldav", it.id, it.sidebarHidden) } }
         google.forEach { acc -> acc.calendars?.forEach { apply("google", it.id, it.sidebarHidden) } }
         ha.forEach { acc -> acc.calendars?.forEach { apply("homeassistant", it.id, it.sidebarHidden) } }
 
-        if (hidden == settingsStore.hiddenCalendarKeys) return false
-        settingsStore.hiddenCalendarKeys = hidden
-        _state.update { it.copy(hiddenKeys = hidden) }
+        if (banished == settingsStore.banishedCalendarKeys) return false
+        settingsStore.banishedCalendarKeys = banished
+        _state.update { it.copy(banishedKeys = banished) }
         return true
     }
 
@@ -429,28 +433,28 @@ class CalendarViewModel @Inject constructor(
         refreshFromCache()
     }
 
-    /** Like [setCalendarHidden] but also syncs server-side sidebar_hidden for external calendars. */
-    fun setCalendarHiddenSynced(key: String, source: String, hidden: Boolean) {
-        setCalendarHidden(key, hidden)
-        val id = key.substringAfter(":").toIntOrNull() ?: return
-        if (source in listOf("caldav", "google", "homeassistant")) {
-            viewModelScope.launch {
-                runCatching { repository.setCalendarSidebarHidden(source, id, hidden) }
-                    .onFailure { e ->
-                        // The local toggle already applied; only the server write failed —
-                        // surface it so the client doesn't silently diverge from server state.
-                        _state.update { it.copy(error = e.message ?: "Fehler beim Speichern") }
-                    }
-            }
-        }
-    }
-
     fun setHiddenCalendars(keys: Set<String>) {
         settingsStore.hiddenCalendarKeys = keys
         _state.update { it.copy(hiddenKeys = keys) }
         refreshFromCache()
     }
 
+    /** Distinct calendars present in the full cache, IGNORING the device-local
+     *  quick-hide filter but excluding banished ones — for the filter sheet, so
+     *  a locally hidden calendar still appears there and can be toggled back on. */
+    fun knownCalendars(): List<CalEvent> {
+        val banished = _state.value.banishedKeys
+        return allCachedEvents
+            .distinctBy { calendarKey(it.source, it.calendarId) }
+            .filter { calendarKey(it.source, it.calendarId) !in banished }
+    }
+
+    /**
+     * Banish ("permanently hide") a calendar, or lift the banish. Unlike the
+     * quick-hide, this DOES sync to the server (`sidebar_hidden`/`enabled`) for
+     * external calendars, matching iOS. Banishing also clears any local
+     * quick-hide flag for the same key (redundant once banished).
+     */
     fun setCalendarBanished(key: String, banished: Boolean) {
         val nextBanished = _state.value.banishedKeys.toMutableSet().apply {
             if (banished) add(key) else remove(key)
@@ -462,6 +466,23 @@ class CalendarViewModel @Inject constructor(
         settingsStore.hiddenCalendarKeys = nextHidden
         _state.update { it.copy(banishedKeys = nextBanished, hiddenKeys = nextHidden) }
         refreshFromCache()
+
+        val parts = key.split(":")
+        val source = parts.getOrNull(0)
+        val id = parts.getOrNull(1)?.toIntOrNull()
+        if (source != null && id != null && source in listOf("caldav", "google", "homeassistant")) {
+            viewModelScope.launch {
+                runCatching { repository.setCalendarSidebarHidden(source, id, banished) }
+                    .onFailure { e -> _state.update { it.copy(error = e.message ?: "Fehler beim Speichern") } }
+                // Un-banishing re-enables the calendar on the server, but its
+                // events were excluded while hidden — force a refetch so they
+                // reappear without a manual sync.
+                if (!banished) {
+                    invalidateCache()
+                    initialLoad(reconcile = false)
+                }
+            }
+        }
     }
 
     // ---- Groups ----

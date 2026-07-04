@@ -226,7 +226,7 @@ fun CalendarScreen(
 
     if (showFilter) {
         CalendarFilterSheet(
-            events = remember(state.events, state.hiddenKeys) { allKnownCalendars(vm) },
+            events = remember(state.events, state.banishedKeys) { allKnownCalendars(vm) },
             vm = vm,
             onDismiss = { showFilter = false },
         )
@@ -538,10 +538,11 @@ private fun GroupBanner(group: Group, onExit: () -> Unit) {
     }
 }
 
-/** Distinct calendars currently present in the cache, for the filter sheet. */
+/** Distinct calendars in the cache for the filter sheet — from the UNFILTERED
+ *  cache (minus banished) so a locally quick-hidden calendar still shows up and
+ *  can be toggled back on. */
 private fun allKnownCalendars(vm: CalendarViewModel): List<CalendarFilterEntry> {
-    val st = vm.state.value
-    return st.events
+    return vm.knownCalendars()
         .map { CalendarFilterEntry(calendarKey(it.source, it.calendarId), it.calendarName.ifBlank { it.source }, it.effectiveColor, it.source) }
         .distinctBy { it.key }
         .sortedBy { it.name.lowercase() }

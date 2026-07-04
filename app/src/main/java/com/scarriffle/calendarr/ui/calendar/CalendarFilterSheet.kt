@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.WarningAmber
@@ -117,15 +118,32 @@ fun CalendarFilterSheet(
                                 tint = if (remDisabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                             )
                         }
+                        // Banish = permanently hide (syncs to the server); moves the
+                        // calendar into Settings, distinct from the local quick-hide.
+                        IconButton(onClick = { vm.setCalendarBanished(entry.key, banished = true) }) {
+                            Icon(
+                                Icons.Filled.Archive,
+                                contentDescription = tr("filter.banish"),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     Switch(
                         checked = visible,
                         onCheckedChange = {
                             if (groupMode) vm.setGroupKeyHidden(entry.key, hidden = !it)
-                            else vm.setCalendarHiddenSynced(entry.key, entry.source, !it)
+                            else vm.setCalendarHidden(entry.key, !it)
                         },
                     )
                 }
+            }
+            if (!groupMode && state.banishedKeys.isNotEmpty()) {
+                Text(
+                    tr("filter.banished_footer"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
             Box(Modifier.padding(bottom = 24.dp))
         }
