@@ -728,9 +728,10 @@ function renderCalendarList() {
       remove: { icon: TRASH, title: t('remove_cal') } });
   });
   state.localCalendars.filter(c => c.owned === false && !c.group).forEach(cal => {
+    const readOnly = cal.permission !== 'read_write';
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.name, color: cal.color, enabled: cal.enabled,
-      sourceLabel: `${t('shared_with_me')} · ${cal.shared_by || ''}`, remove: null });
+      sourceLabel: `${t('shared_with_me')} · ${cal.shared_by || ''}${readOnly ? ' · ' + t('perm_read') : ''}`, remove: null });
   });
   // Group calendars (owned by the creator or reached via membership) — shown so
   // they can be toggled/recoloured. Owned group calendars can also be muted
@@ -1577,8 +1578,10 @@ function populateCalendarSelect(selectedId) {
     });
   });
   // Local calendars. Group calendars are collected under a "Groups" optgroup
-  // (no emoji — a native <select> can't render the group icon SVG).
-  const localCals = state.localCalendars.filter(c => !c.sidebar_hidden);
+  // (no emoji — a native <select> can't render the group icon SVG). Read-only
+  // shared calendars are excluded — a save would only 403.
+  const localCals = state.localCalendars.filter(c =>
+    !c.sidebar_hidden && (c.owned !== false || c.permission === 'read_write'));
   const makeLocalOpt = cal => {
     const opt = document.createElement('option');
     opt.value = `local-${cal.id}`;
