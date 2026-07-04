@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.WarningAmber
@@ -33,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
 
-data class CalendarFilterEntry(val key: String, val name: String, val color: String, val source: String = "")
+data class CalendarFilterEntry(val key: String, val name: String, val color: String, val source: String = "", val readOnly: Boolean = false)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,6 +110,14 @@ fun CalendarFilterSheet(
                         modifier = Modifier.weight(1f).padding(start = 12.dp),
                         style = MaterialTheme.typography.bodyLarge,
                     )
+                    if (entry.readOnly) {
+                        Icon(
+                            Icons.Filled.Lock,
+                            contentDescription = tr("filter.read_only"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 4.dp).size(15.dp),
+                        )
+                    }
                     if (!groupMode) {
                         val remDisabled = entry.key in state.reminderDisabledKeys
                         IconButton(onClick = { vm.setCalendarRemindersDisabled(entry.key, disabled = !remDisabled) }) {

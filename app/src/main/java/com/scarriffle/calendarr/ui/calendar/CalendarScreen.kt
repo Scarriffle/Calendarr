@@ -18,12 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -156,9 +154,6 @@ fun CalendarScreen(
                 viewType = state.viewType,
                 loading = state.isLoading || state.isBackgroundCaching,
                 viewMenuOpen = viewMenuOpen,
-                groups = state.groups,
-                activeGroup = state.activeGroup,
-                onSwitchGroup = { vm.switchGroup(it) },
                 onMenu = { showMenu = true },
                 onPrev = { goPrev() },
                 onToday = { goToday() },
@@ -213,6 +208,9 @@ fun CalendarScreen(
     if (showMenu) {
         MenuSheet(
             isAdmin = false,
+            groups = state.groups,
+            activeGroup = state.activeGroup,
+            onSwitchGroup = { showMenu = false; vm.switchGroup(it) },
             onDismiss = { showMenu = false },
             onProfile = { showMenu = false; overlay = Overlay.PROFILE },
             onAppearance = { showMenu = false; overlay = Overlay.SETTINGS },
@@ -398,9 +396,6 @@ private fun CompactTopBar(
     viewType: CalViewType,
     loading: Boolean,
     viewMenuOpen: Boolean,
-    groups: List<Group>,
-    activeGroup: Group?,
-    onSwitchGroup: (Group?) -> Unit,
     onMenu: () -> Unit,
     onPrev: () -> Unit,
     onToday: () -> Unit,
@@ -437,9 +432,6 @@ private fun CompactTopBar(
                     strokeWidth = 2.dp,
                 )
             }
-            if (groups.isNotEmpty()) {
-                GroupSwitcher(groups = groups, activeGroup = activeGroup, onSwitchGroup = onSwitchGroup)
-            }
             CompactIcon(Icons.Filled.FilterList, onFilter, tr("filter.button"))
             Box {
                 CompactIcon(viewType.icon, { onViewMenuToggle(true) }, tr("view.change"))
@@ -474,50 +466,6 @@ private fun CompactIcon(
     }
 }
 
-/**
- * Top-bar switcher: "My calendar" + each group; flips the calendar into the
- * group overlay. Rendered as a tonal pill so it stands out from the flat icons
- * (filled in the accent colour while a group overlay is active).
- */
-@Composable
-private fun GroupSwitcher(groups: List<Group>, activeGroup: Group?, onSwitchGroup: (Group?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    val active = activeGroup != null
-    Box {
-        Box(
-            Modifier
-                .padding(horizontal = 2.dp)
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                .clickable { open = true },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Filled.People,
-                contentDescription = tr("groups.title"),
-                modifier = Modifier.size(21.dp),
-                tint = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text = { Text(tr("group.switch.personal")) },
-                trailingIcon = { if (!active) Icon(Icons.Filled.Check, contentDescription = null) },
-                onClick = { open = false; onSwitchGroup(null) },
-            )
-            groups.forEach { g ->
-                DropdownMenuItem(
-                    text = { Text(g.name) },
-                    leadingIcon = { GroupIcon(g.icon) },
-                    trailingIcon = { if (activeGroup?.id == g.id) Icon(Icons.Filled.Check, contentDescription = null) },
-                    onClick = { open = false; onSwitchGroup(g) },
-                )
-            }
-        }
-    }
-}
-
 @Composable
 private fun GroupBanner(group: Group, onExit: () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.fillMaxWidth()) {
@@ -543,7 +491,7 @@ private fun GroupBanner(group: Group, onExit: () -> Unit) {
  *  can be toggled back on. */
 private fun allKnownCalendars(vm: CalendarViewModel): List<CalendarFilterEntry> {
     return vm.knownCalendars()
-        .map { CalendarFilterEntry(calendarKey(it.source, it.calendarId), it.calendarName.ifBlank { it.source }, it.effectiveColor, it.source) }
+        .map { CalendarFilterEntry(calendarKey(it.source, it.calendarId), it.calendarName.ifBlank { it.source }, it.effectiveColor, it.source, it.readOnly) }
         .distinctBy { it.key }
         .sortedBy { it.name.lowercase() }
 }

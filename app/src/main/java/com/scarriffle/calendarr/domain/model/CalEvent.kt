@@ -36,6 +36,8 @@ data class CalEvent(
     val displayTitle: String? = null,
     // Reminder offsets in minutes-before-start (0 = at start). Local events only.
     val reminders: List<Int> = emptyList(),
+    // True for events from a calendar shared with the user read-only.
+    val readOnly: Boolean = false,
 ) {
     /**
      * Group view supplies a server-resolved colour (display_color); otherwise
@@ -126,6 +128,7 @@ data class CalEvent(
                 reminders = json.optJSONArray("reminders")?.let { arr ->
                     (0 until arr.length()).mapNotNull { (arr.opt(it) as? Number)?.toInt() }
                 } ?: emptyList(),
+                readOnly = json.optBoolean("read_only", false),
             )
         }
     }

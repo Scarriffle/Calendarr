@@ -270,9 +270,14 @@ class CalendarRepository @Inject constructor(
     /** Resolve all calendars the user can create events in. */
     suspend fun getWritableCalendars(): List<WritableCalendar> = withContext(Dispatchers.IO) {
         val result = mutableListOf<WritableCalendar>()
-        runCatching { api.getLocalCalendars() }.getOrDefault(emptyList()).forEach { cal ->
-            result += WritableCalendar("local-${cal.id}", cal.name, cal.color, "local", cal.id)
-        }
+        runCatching { api.getLocalCalendars() }.getOrDefault(emptyList())
+            // Exclude read-only shared calendars — offering them in the event
+            // editor only leads to a 403 on save. Own + read_write (incl. group)
+            // calendars stay.
+            .filter { it.owned || it.permission == "read_write" }
+            .forEach { cal ->
+                result += WritableCalendar("local-${cal.id}", cal.name, cal.color, "local", cal.id)
+            }
         runCatching { api.getCalDAVAccounts() }.getOrDefault(emptyList())
             .filter { it.enabled }
             .forEach { acc ->
