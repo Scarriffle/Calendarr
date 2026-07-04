@@ -65,6 +65,8 @@ struct CalEvent: Identifiable, Hashable {
     var displayTitle: String? = nil
     // Reminder offsets in minutes-before-start (0 = at start). Local events only.
     var reminders: [Int] = []
+    // True for events from a calendar shared with the user read-only.
+    var readOnly: Bool = false
 
     // Group view supplies a server-resolved colour; otherwise per-event then calendar colour.
     var effectiveColor: String { displayColor ?? color ?? calendarColor }
@@ -107,7 +109,8 @@ struct CalEvent: Identifiable, Hashable {
             isGroupEvent: json["is_group_event"] as? Bool ?? false,
             displayColor: (json["display_color"] as? String).flatMap { $0.isEmpty ? nil : $0 },
             displayTitle: (json["display_title"] as? String).flatMap { $0.isEmpty ? nil : $0 },
-            reminders: (json["reminders"] as? [Int]) ?? (json["reminders"] as? [Any])?.compactMap { ($0 as? Int) ?? Int("\($0)") } ?? []
+            reminders: (json["reminders"] as? [Int]) ?? (json["reminders"] as? [Any])?.compactMap { ($0 as? Int) ?? Int("\($0)") } ?? [],
+            readOnly: json["read_only"] as? Bool ?? false
         )
     }
 }

@@ -45,8 +45,12 @@ struct CalendarFilterSheet: View {
                         if !visibleLocals.isEmpty {
                             Section(L10n.t("accounts.local.header", appLang)) {
                                 ForEach(visibleLocals) { cal in
-                                    row(name: cal.name, colorHex: cal.color,
-                                        key: CalendarStore.calendarKey(source: "local", calendarId: "\(cal.id)"))
+                                    // A calendar shared with me is shown under the owner's
+                                    // name and flagged read-only when I can't write to it.
+                                    row(name: cal.owned ? cal.name : (cal.sharedBy ?? cal.name),
+                                        colorHex: cal.color,
+                                        key: CalendarStore.calendarKey(source: "local", calendarId: "\(cal.id)"),
+                                        readOnly: !cal.owned && cal.permission != "read_write")
                                 }
                             }
                         }
@@ -140,7 +144,7 @@ struct CalendarFilterSheet: View {
     }
 
     @ViewBuilder
-    private func row(name: String, colorHex: String, key: String) -> some View {
+    private func row(name: String, colorHex: String, key: String, readOnly: Bool = false) -> some View {
         let isVisible = !hidden.contains(key)
         Button {
             if isVisible { hidden.insert(key) } else { hidden.remove(key) }
@@ -156,6 +160,11 @@ struct CalendarFilterSheet: View {
                 Text(name)
                     .foregroundStyle(isVisible ? .primary : .secondary)
                     .strikethrough(!isVisible, color: .secondary)
+                if readOnly {
+                    Image(systemName: "lock.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if reminderDisabled.contains(key) {
                     Image(systemName: "bell.slash")

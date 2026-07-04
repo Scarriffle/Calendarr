@@ -597,7 +597,9 @@ class CalendarStore {
         async let haCals     = (try? await api.getHACalendars()) ?? []
 
         var result: [WritableCalendar] = []
-        for cal in await localCals {
+        // Skip read-only shared calendars — offering them in the event editor
+        // only leads to a 403 on save. Own + read_write (incl. group) stay.
+        for cal in await localCals where cal.owned || cal.permission == "read_write" {
             result.append(WritableCalendar(id: "local-\(cal.id)", name: cal.name, color: cal.color, source: "local", numericId: cal.id))
         }
         for acc in await caldavAccs where acc.enabled {
