@@ -317,17 +317,12 @@ def _first_name(name: Optional[str]) -> str:
 
 def _decorate_title(title: str, *, is_group: bool, creator: Optional[dict],
                     owner: Optional[dict], me_id: int) -> str:
-    """Server-side display title for the combined view so every client (web,
-    iOS, Android) renders identically: another member's / creator's first name
-    is prefixed. No icon glyph is embedded — group icons are semantic keys the
-    clients render as native vector icons, and group-calendar events are
-    distinguished by their (group) colour. The raw `title` stays for editing."""
-    if is_group:
-        if creator and creator.get("id") is not None and creator.get("id") != me_id:
-            return f"{_first_name(creator.get('display_name'))}: {title}"
-        return title
-    if owner and owner.get("id") is not None and owner.get("id") != me_id:
-        return f"{_first_name(owner.get('display_name'))}: {title}"
+    """Server-side display title for the combined view. The former owner/creator
+    first-name prefix ("Guido: …") was dropped: each member already has a
+    distinct colour, so the prefix was redundant noise. We still return a
+    non-empty `display_title` (== raw title) so the clients' legacy fallback —
+    which rebuilds a prefix when `display_title` is empty — never kicks in.
+    `display_color` continues to carry the per-person colour."""
     return title
 
 

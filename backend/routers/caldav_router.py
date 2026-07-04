@@ -352,6 +352,21 @@ def get_events(
         .all()
     ) if readable_ids else []
     name_cache = {u.id: (u.display_name or u.username) for u in db.query(models.User).all()}
+    # A personal calendar shared WITH the current user is relabelled under the
+    # owner's name (so Guido's "Persönlich" reads as "Guido" for his mum) and
+    # flagged read_only unless the share grants write. Group calendars are
+    # excluded — they keep their own name and stay writable for members.
+    shares_map = {
+        s.calendar_id: s.permission
+        for s in db.query(models.CalendarShare).filter(
+            models.CalendarShare.user_id == current_user.id
+        )
+    }
+    group_cal_ids = {
+        r[0] for r in db.query(models.GroupCalendar.calendar_id).filter(
+            models.GroupCalendar.calendar_id.in_(readable_ids)
+        )
+    } if readable_ids else set()
     # Cache each owner's private-event visibility (one lookup per owner, not per event).
     vis_cache: dict = {}
 
@@ -361,6 +376,13 @@ def get_events(
         return vis_cache[uid]
 
     for local_cal in local_calendars:
+        # Decoration for a personal calendar shared with (not owned by) me.
+        is_shared_personal = (
+            local_cal.user_id != current_user.id
+            and local_cal.id not in group_cal_ids
+        )
+        shared_owner_name = name_cache.get(local_cal.user_id) if is_shared_personal else None
+        shared_read_only = is_shared_personal and shares_map.get(local_cal.id) != "read_write"
         local_events = (
             db.query(models.LocalEvent)
             .filter(
@@ -391,6 +413,10 @@ def get_events(
             else:
                 built = [build_local_event_dict(ev, local_cal, rrule=None, creator=creator)]
             for b in built:
+                if shared_owner_name:
+                    b["calendar_name"] = shared_owner_name
+                if shared_read_only:
+                    b["read_only"] = True
                 b = apply_event_privacy(
                     b, owner_id=owner_id, is_private=is_priv,
                     requester_id=current_user.id, visibility=visibility,
