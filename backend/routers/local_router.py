@@ -70,11 +70,13 @@ class ShareCreate(BaseModel):
 
 def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
               shared_by: Optional[str] = None, permission: Optional[str] = None,
+              color_override: Optional[str] = None,
               request: Optional[Request] = None) -> dict:
     d = {
         "id": cal.id,
         "name": cal.name,
-        "color": cal.color,
+        # A recipient's own colour for a shared calendar wins over the owner's.
+        "color": color_override or cal.color,
         "enabled": cal.enabled,
         "reminders_enabled": bool(cal.reminders_enabled),
         "caldav_published": bool(cal.caldav_published),
@@ -150,6 +152,7 @@ def list_calendars(
             cal, owned=False,
             shared_by=(owner.display_name or owner.username) if owner else None,
             permission=share.permission,
+            color_override=share.color,
         )
         if cal.id in group_cal_map:
             d["group"] = True
@@ -244,6 +247,33 @@ def update_calendar(
     db.commit()
     db.refresh(cal)
     return _cal_dict(cal, owned=True, request=request)
+
+
+class CalendarColorUpdate(BaseModel):
+    color: str
+
+
+@router.put("/calendars/{calendar_id}/color")
+def set_calendar_color(
+    calendar_id: int,
+    data: CalendarColorUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Set a calendar's colour. The owner changes the calendar's colour for
+    everyone; a share recipient sets only their OWN per-user colour (stored on
+    the share) without touching the owner's. Recipients may recolour but never
+    rename a shared calendar."""
+    cal = permissions.accessible_local_calendar(db, current_user, calendar_id)
+    if cal.user_id == current_user.id:
+        cal.color = data.color
+    else:
+        share = permissions._share_for(db, calendar_id, current_user.id)
+        if share is None:
+            raise HTTPException(403, "Only the owner or a share recipient can set the colour")
+        share.color = data.color
+    db.commit()
+    return {"ok": True, "color": data.color}
 
 
 @router.post("/calendars/{calendar_id}/dav-token/rotate")

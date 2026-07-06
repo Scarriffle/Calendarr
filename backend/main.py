@@ -243,6 +243,13 @@ def _migrate():
             logging.info("Migration: added etag to local_events")
         except Exception:
             pass
+        # Per-recipient colour override for a shared calendar (NULL = owner's colour).
+        try:
+            conn.execute(text("ALTER TABLE calendar_shares ADD COLUMN color VARCHAR(16)"))
+            conn.commit()
+            logging.info("Migration: added color to calendar_shares")
+        except Exception:
+            pass
 
         # Hide a user from sharing/group pickers (admin management still shows them).
         try:

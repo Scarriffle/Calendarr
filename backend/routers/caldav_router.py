@@ -356,8 +356,8 @@ def get_events(
     # owner's name (so Guido's "Persönlich" reads as "Guido" for his mum) and
     # flagged read_only unless the share grants write. Group calendars are
     # excluded — they keep their own name and stay writable for members.
-    shares_map = {
-        s.calendar_id: s.permission
+    shares_by_cal = {
+        s.calendar_id: s
         for s in db.query(models.CalendarShare).filter(
             models.CalendarShare.user_id == current_user.id
         )
@@ -381,8 +381,10 @@ def get_events(
             local_cal.user_id != current_user.id
             and local_cal.id not in group_cal_ids
         )
+        share = shares_by_cal.get(local_cal.id) if is_shared_personal else None
         shared_owner_name = name_cache.get(local_cal.user_id) if is_shared_personal else None
-        shared_read_only = is_shared_personal and shares_map.get(local_cal.id) != "read_write"
+        shared_read_only = is_shared_personal and (share.permission if share else None) != "read_write"
+        shared_color = share.color if share else None
         local_events = (
             db.query(models.LocalEvent)
             .filter(
@@ -417,6 +419,8 @@ def get_events(
                     b["calendar_name"] = shared_owner_name
                 if shared_read_only:
                     b["read_only"] = True
+                if shared_color:
+                    b["calendarColor"] = shared_color
                 b = apply_event_privacy(
                     b, owner_id=owner_id, is_private=is_priv,
                     requester_id=current_user.id, visibility=visibility,

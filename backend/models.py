@@ -307,6 +307,7 @@ class CalendarShare(Base):
     calendar_id = Column(Integer, ForeignKey("local_calendars.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     permission = Column(String(20), default="read")  # 'read' | 'read_write'
+    color = Column(String(16), nullable=True)  # recipient's own colour; NULL = owner's
     created_at = Column(String(50), nullable=True)  # ISO 8601
 
     calendar = relationship("LocalCalendar")
