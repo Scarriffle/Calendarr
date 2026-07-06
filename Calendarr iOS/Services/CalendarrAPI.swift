@@ -426,8 +426,11 @@ class CalendarrAPI {
 
     // MARK: – Calendar colour
 
+    /// Colour-only update: works for owners AND share recipients (recipients get
+    /// their own per-user colour; owners change the calendar's colour) — unlike
+    /// the owner-only PUT /calendars/{id}, and never touches the name.
     func updateLocalCalendarColor(id: Int, color: String) async throws {
-        _ = try await request("/api/local/calendars/\(id)", method: "PUT", body: ["color": color])
+        _ = try await request("/api/local/calendars/\(id)/color", method: "PUT", body: ["color": color])
     }
 
     func updateICalColor(id: Int, color: String) async throws {

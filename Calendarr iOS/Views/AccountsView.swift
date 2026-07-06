@@ -169,7 +169,9 @@ struct AccountsView: View {
             } else {
                 ForEach(localCalendars) { cal in
                     HStack {
-                        CalendarColorDot(hex: cal.color, editable: cal.owned) { hex in
+                        // Recipients of a shared calendar may recolour it (their
+                        // own per-user colour); renaming stays owner-only.
+                        CalendarColorDot(hex: cal.color, editable: true) { hex in
                             try? await api.updateLocalCalendarColor(id: cal.id, color: hex)
                         }
                         Text(cal.name)
