@@ -2024,7 +2024,13 @@ a { color: var(--primary); text-decoration: none; }
   cursor: pointer; text-transform: none; letter-spacing: normal;
   font-size: 14px; font-weight: 400; color: var(--text-1);
 }
-.checkbox-row input[type=checkbox] { flex-shrink: 0; margin: 0; }
+/* Undo the global ".form-group input { width:100%; padding; border }" so the
+   checkbox stays a small native box instead of a full-width field that shoves
+   the label text into a narrow, wrapping column. */
+.checkbox-row input[type=checkbox] {
+  flex: none; width: 16px; height: 16px; margin: 0; padding: 0;
+  border: 0; border-radius: 0; background: none; accent-color: var(--primary);
+}
 /* .popup-creator styling moved into the .popup-row / #popup-creator rules above. */
 
 /* ── Groups ─────────────────────────────────────────────────── */
