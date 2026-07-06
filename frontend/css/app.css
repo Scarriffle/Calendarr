@@ -2015,8 +2015,16 @@ a { color: var(--primary); text-decoration: none; }
   padding-top: 14px; font-size: 12px; font-weight: 600;
   color: var(--text-3); text-transform: uppercase; letter-spacing: .04em;
 }
-.checkbox-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.checkbox-row input[type=checkbox] { flex-shrink: 0; }
+/* Higher specificity than the global ".form-group label" (uppercase / spaced /
+   12px) so a checkbox label reads as normal inline text next to its box, not a
+   stretched uppercase column. */
+.form-group label.checkbox-row,
+.checkbox-row {
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+  cursor: pointer; text-transform: none; letter-spacing: normal;
+  font-size: 14px; font-weight: 400; color: var(--text-1);
+}
+.checkbox-row input[type=checkbox] { flex-shrink: 0; margin: 0; }
 /* .popup-creator styling moved into the .popup-row / #popup-creator rules above. */
 
 /* ── Groups ─────────────────────────────────────────────────── */

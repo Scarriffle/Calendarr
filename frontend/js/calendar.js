@@ -91,8 +91,19 @@ function writeUrlState() {
   let newHash = `date=${dateStr}&view=${state.currentView}`;
   if (uiSettingsOpen) {
     newHash += '&settings=1';
-    const activeTab = document.querySelector('.settings-nav-btn.active');
-    if (activeTab) newHash += `&stab=${activeTab.dataset.panel}`;
+    // Only read the active tab once the modal is actually shown. On an initial
+    // reload, writeUrlState() runs (via fetchAndRender) BEFORE openSettingsModal
+    // has activated the saved tab, and the HTML-default (Profile) tab is still
+    // marked active — writing it would clobber the saved stab and always send
+    // the user to Profile. In that window, keep the stab already in the URL.
+    const modalShown = !document.getElementById('modal-settings')?.classList.contains('hidden');
+    const activeTab = modalShown ? document.querySelector('.settings-nav-btn.active') : null;
+    if (activeTab) {
+      newHash += `&stab=${activeTab.dataset.panel}`;
+    } else {
+      const prev = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('stab');
+      if (prev) newHash += `&stab=${prev}`;
+    }
   }
   if (window.location.hash.replace(/^#/,'') !== newHash) {
     // replaceState statt pushState: prev/next-Klicks sollen nicht jeden
@@ -3516,7 +3527,7 @@ function renderCalendarTable() {
       <td><button class="icon-btn mini-btn" data-ct-del="local" data-ct-id="${cal.id}">${TRASH}</button></td>
     </tr>`;
     rowCount++;
-    if (owned && pub) {
+    if (cal.owned !== false && pub) {
       rows += `<tr class="ct-dav-row"><td colspan="7">
         <div class="ct-dav-box">
           <span class="ct-dav-label">${t('caldav_published_url')}</span>
