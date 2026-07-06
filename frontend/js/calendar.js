@@ -3097,6 +3097,17 @@ function renderGroupVisibleList(selectedId) {
 function openSettingsModal() {
   uiSettingsOpen = true;
   writeUrlState();
+  // Open the modal FIRST so a later error while populating a field (or in one of
+  // the render helpers below) can never prevent settings from opening at all.
+  openModal('modal-settings');
+  try {
+    populateSettings();
+  } catch (e) {
+    console.error('populateSettings failed', e);
+  }
+}
+
+function populateSettings() {
   const s = state.settings;
   document.getElementById('cfg-default-view').value  = s.default_view   || 'month';
   document.getElementById('cfg-week-start').value    = s.week_start_day || 'monday';
@@ -3184,8 +3195,6 @@ function openSettingsModal() {
 
   // Render unified calendar table
   renderAllAccounts();
-
-  openModal('modal-settings');
 }
 
 function activateSettingsPanel(panel) {
