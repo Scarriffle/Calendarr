@@ -163,3 +163,14 @@ def readable_local_calendar_ids(db: Session, user: models.User) -> list[int]:
     ids.update(c.id for c in co_member_group_visible_calendars(db, user))
 
     return list(ids)
+
+
+def color_prefs_for(db: Session, user_id: int) -> dict[int, str]:
+    """Map calendar_id -> the user's personal colour for calendars they don't
+    own (any sharing path). Empty when the user set no overrides."""
+    return {
+        p.calendar_id: p.color
+        for p in db.query(models.CalendarColorPref).filter(
+            models.CalendarColorPref.user_id == user_id
+        )
+    }

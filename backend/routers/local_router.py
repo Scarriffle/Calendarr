@@ -120,6 +120,9 @@ def list_calendars(
         )
     }
 
+    # Per-user colour overrides for calendars the user doesn't own (any sharing path).
+    color_prefs = permissions.color_prefs_for(db, current_user.id)
+
     # Own calendars
     own = (
         db.query(models.LocalCalendar)
@@ -152,7 +155,7 @@ def list_calendars(
             cal, owned=False,
             shared_by=(owner.display_name or owner.username) if owner else None,
             permission=share.permission,
-            color_override=share.color,
+            color_override=color_prefs.get(cal.id),
         )
         if cal.id in group_cal_map:
             d["group"] = True
@@ -167,7 +170,8 @@ def list_calendars(
         if not cal:
             continue
         seen_ids.add(cal_id)
-        d = _cal_dict(cal, owned=False, shared_by=group_name, permission="read_write")
+        d = _cal_dict(cal, owned=False, shared_by=group_name, permission="read_write",
+                      color_override=color_prefs.get(cal.id))
         d["group"] = True
         result.append(d)
 
@@ -183,6 +187,7 @@ def list_calendars(
             cal, owned=False,
             shared_by=(owner.display_name or owner.username) if owner else None,
             permission="read",
+            color_override=color_prefs.get(cal.id),
             request=request,
         )
         d["group_shared"] = True
@@ -261,17 +266,30 @@ def set_calendar_color(
     current_user: models.User = Depends(get_current_user),
 ):
     """Set a calendar's colour. The owner changes the calendar's colour for
-    everyone; a share recipient sets only their OWN per-user colour (stored on
-    the share) without touching the owner's. Recipients may recolour but never
-    rename a shared calendar."""
-    cal = permissions.accessible_local_calendar(db, current_user, calendar_id)
+    everyone; anyone else who can see the calendar (direct share, group calendar,
+    or a co-member's group-visible calendar) sets only their OWN per-user colour.
+    Recipients may recolour but never rename a shared calendar."""
+    cal = db.query(models.LocalCalendar).filter(models.LocalCalendar.id == calendar_id).first()
+    if cal is None:
+        raise HTTPException(404, "Calendar not found")
     if cal.user_id == current_user.id:
         cal.color = data.color
     else:
-        share = permissions._share_for(db, calendar_id, current_user.id)
-        if share is None:
-            raise HTTPException(403, "Only the owner or a share recipient can set the colour")
-        share.color = data.color
+        if calendar_id not in permissions.readable_local_calendar_ids(db, current_user):
+            raise HTTPException(403, "You cannot access this calendar")
+        pref = (
+            db.query(models.CalendarColorPref)
+            .filter(
+                models.CalendarColorPref.calendar_id == calendar_id,
+                models.CalendarColorPref.user_id == current_user.id,
+            )
+            .first()
+        )
+        if pref:
+            pref.color = data.color
+        else:
+            db.add(models.CalendarColorPref(
+                calendar_id=calendar_id, user_id=current_user.id, color=data.color))
     db.commit()
     return {"ok": True, "color": data.color}
 

@@ -307,11 +307,26 @@ class CalendarShare(Base):
     calendar_id = Column(Integer, ForeignKey("local_calendars.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     permission = Column(String(20), default="read")  # 'read' | 'read_write'
-    color = Column(String(16), nullable=True)  # recipient's own colour; NULL = owner's
     created_at = Column(String(50), nullable=True)  # ISO 8601
 
     calendar = relationship("LocalCalendar")
     user = relationship("User")
+
+
+class CalendarColorPref(Base):
+    """A user's personal colour for a calendar they don't own — works for any
+    way a foreign calendar becomes visible (direct share, group calendar, or a
+    co-member's group-visible calendar). NULL/absent = the owner's colour."""
+
+    __tablename__ = "calendar_color_prefs"
+    __table_args__ = (
+        UniqueConstraint("calendar_id", "user_id", name="uq_calendar_color_pref"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    calendar_id = Column(Integer, ForeignKey("local_calendars.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    color = Column(String(16), nullable=False)
 
 
 class Group(Base):

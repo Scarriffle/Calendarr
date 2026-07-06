@@ -367,6 +367,8 @@ def get_events(
             models.GroupCalendar.calendar_id.in_(readable_ids)
         )
     } if readable_ids else set()
+    # Per-user colour overrides for calendars the user doesn't own (any share path).
+    color_prefs = permissions.color_prefs_for(db, current_user.id)
     # Cache each owner's private-event visibility (one lookup per owner, not per event).
     vis_cache: dict = {}
 
@@ -384,7 +386,7 @@ def get_events(
         share = shares_by_cal.get(local_cal.id) if is_shared_personal else None
         shared_owner_name = name_cache.get(local_cal.user_id) if is_shared_personal else None
         shared_read_only = is_shared_personal and (share.permission if share else None) != "read_write"
-        shared_color = share.color if share else None
+        shared_color = color_prefs.get(local_cal.id)
         local_events = (
             db.query(models.LocalEvent)
             .filter(
