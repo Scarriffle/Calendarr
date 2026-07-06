@@ -1,6 +1,9 @@
+import ipaddress
 import logging
+import socket
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urljoin, urlparse
 
 import requests as http_requests
 from fastapi import APIRouter, Depends, HTTPException
@@ -45,13 +48,67 @@ def _sub_dict(sub: models.ICalSubscription) -> dict:
     }
 
 
-def _fetch_ics(url: str) -> str:
-    """Download .ics content from a URL."""
+_MAX_ICS_BYTES = 5 * 1024 * 1024
+_MAX_REDIRECTS = 5
+
+
+def _host_is_public(host: str) -> bool:
+    """False if the host resolves to any private/loopback/link-local address."""
     try:
-        resp = http_requests.get(url, timeout=30, allow_redirects=True)
-        resp.raise_for_status()
-        resp.encoding = 'utf-8'
-        return resp.text
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            return False
+    return True
+
+
+def _validate_public_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Nur http(s)-URLs sind erlaubt.")
+    if not parsed.hostname:
+        raise ValueError("Ungültige URL.")
+    if not _host_is_public(parsed.hostname):
+        raise ValueError("Interne/private Adressen sind nicht erlaubt.")
+
+
+def _fetch_ics(url: str) -> str:
+    """Download .ics content, blocking SSRF to internal/private hosts.
+
+    Redirects are followed manually so every hop is re-validated (a public URL
+    can otherwise 30x-redirect into the internal network). Response size is
+    capped. (Residual risk: DNS rebinding between check and connect.)
+    """
+    if url.startswith("webcal://"):
+        url = "https://" + url[len("webcal://"):]
+    try:
+        for _ in range(_MAX_REDIRECTS + 1):
+            _validate_public_url(url)
+            resp = http_requests.get(url, timeout=30, allow_redirects=False, stream=True)
+            if resp.is_redirect and resp.headers.get("location"):
+                url = urljoin(url, resp.headers["location"])
+                resp.close()
+                continue
+            resp.raise_for_status()
+            resp.encoding = "utf-8"
+            chunks, total = [], 0
+            for chunk in resp.iter_content(8192, decode_unicode=True):
+                if not chunk:
+                    continue
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > _MAX_ICS_BYTES:
+                    resp.close()
+                    raise ValueError("Datei zu groß (max. 5 MB).")
+            return "".join(chunks)
+        raise ValueError("Zu viele Weiterleitungen.")
     except http_requests.RequestException as e:
         raise ValueError(f"Fehler beim Abrufen der URL: {e}")
 

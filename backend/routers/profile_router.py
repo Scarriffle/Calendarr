@@ -170,7 +170,11 @@ def get_avatar(current_user: models.User = Depends(get_current_user)):
 
 
 @router.get("/avatar/{user_id}")
-def get_user_avatar(user_id: int, db: Session = Depends(get_db)):
+def get_user_avatar(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user or not user.avatar_filename:
         raise HTTPException(404, "Kein Profilbild")

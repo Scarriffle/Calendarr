@@ -331,13 +331,22 @@ def _handle_put(cal: models.LocalCalendar, resource: str, body: bytes, db: Sessi
         name = resource.rsplit("/", 1)[-1]
         uid = unquote(name[:-4] if name.endswith(".ics") else name) or str(uuid.uuid4())
 
+    # Scope to THIS calendar — never touch another calendar's/user's event that
+    # happens to share the UID (local_events.uid is globally unique).
     ev = (
         db.query(models.LocalEvent)
-        .filter(models.LocalEvent.uid == uid)
+        .filter(
+            models.LocalEvent.calendar_id == cal.id,
+            models.LocalEvent.uid == uid,
+        )
         .first()
     )
     created = ev is None
     if created:
+        # If the UID already exists elsewhere, the global UNIQUE constraint would
+        # 500 on commit — reject cleanly with 409 instead.
+        if db.query(models.LocalEvent.id).filter(models.LocalEvent.uid == uid).first():
+            return Response(status_code=409)
         ev = models.LocalEvent(calendar_id=cal.id, uid=uid, creator_id=cal.user_id)
         db.add(ev)
     ev.title = item.get("title") or "(ohne Titel)"
