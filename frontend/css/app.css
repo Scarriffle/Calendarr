@@ -1244,6 +1244,10 @@ a { color: var(--primary); text-decoration: none; }
 /* ── Settings Page ──────────────────────────────────────── */
 #modal-settings.modal-overlay {
   align-items: stretch; justify-content: stretch; padding: 0; background: var(--bg-app);
+  /* Full-screen opaque "page". Sit BELOW real modals (z-index 500) so dialogs
+     opened from inside settings — share, add-account, color picker — appear on
+     top instead of behind this page (that's why the Share button "did nothing"). */
+  z-index: 400;
 }
 .settings-page-card {
   width: 100%; height: 100%;
