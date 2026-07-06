@@ -380,7 +380,9 @@ private fun LocalCalendarRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        ColorDot(cal.color, editable = cal.owned, onClick = onColor)
+        // Recipients of a shared calendar may recolour it (their own per-user
+        // colour); only renaming/other management stays owner-only.
+        ColorDot(cal.color, editable = true, onClick = onColor)
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(cal.name, style = MaterialTheme.typography.bodyLarge)

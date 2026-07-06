@@ -222,9 +222,11 @@ class CalendarRepository @Inject constructor(
     suspend fun deleteHomeAssistantAccount(id: Int) =
         guarded { api.deleteHomeAssistantAccount(id).ensureSuccess() }
 
-    /** Change a local calendar's colour. */
+    /** Change a local calendar's colour. Uses the colour-only endpoint so share
+     *  recipients can recolour their view (own per-user colour) without needing
+     *  write access or being able to rename the calendar. */
     suspend fun updateLocalCalendarColor(id: Int, color: String) = guarded {
-        api.updateLocalCalendar(id, jsonBody("color" to color)).ensureSuccess()
+        api.setLocalCalendarColor(id, jsonBody("color" to color)).ensureSuccess()
     }
 
     /** Change an iCal subscription's colour. */

@@ -155,6 +155,11 @@ interface CalendarrApi {
     @PUT("api/local/calendars/{id}")
     suspend fun updateLocalCalendar(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
 
+    // Colour-only update that works for owners AND share recipients (recipients
+    // get their own per-user colour; owners change the calendar's colour).
+    @PUT("api/local/calendars/{id}/color")
+    suspend fun setLocalCalendarColor(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
+
     @DELETE("api/local/calendars/{id}")
     suspend fun deleteLocalCalendar(@Path("id") id: Int): Response<ResponseBody>
 
