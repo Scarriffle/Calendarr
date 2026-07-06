@@ -305,6 +305,28 @@ function setGroupColorOverride(groupId, key, hex) {
   try { localStorage.setItem('groupMemberColors', JSON.stringify(all)); } catch (e) { /* ignore */ }
 }
 
+// Per-device colour override for calendars shared WITH me. The calendar belongs
+// to someone else (server colour is theirs), so the recipient's chosen colour is
+// stored locally and re-applied on every fetch — keyed by local calendar id.
+function loadSharedCalColors() {
+  try { return JSON.parse(localStorage.getItem('sharedCalColors') || '{}'); } catch (e) { return {}; }
+}
+function sharedCalColorOverride(id) { return loadSharedCalColors()[String(id)] || null; }
+function setSharedCalColorOverride(id, hex) {
+  const all = loadSharedCalColors();
+  if (hex) all[String(id)] = hex; else delete all[String(id)];
+  try { localStorage.setItem('sharedCalColors', JSON.stringify(all)); } catch (e) { /* ignore */ }
+}
+function applySharedColorOverrides(events) {
+  const overrides = loadSharedCalColors();
+  if (!Object.keys(overrides).length) return;
+  events.forEach(ev => {
+    if (ev.source !== 'local') return;
+    const cid = String(ev.calendar_id).replace('local-', '');
+    if (overrides[cid]) ev.calendarColor = overrides[cid];
+  });
+}
+
 async function fetchAndRender(force = false, silent = false) {
   const { start, end } = getViewRange();
 
@@ -383,6 +405,7 @@ async function fetchAndRender(force = false, silent = false) {
         showToast(`${label} (${err.name}): ${err.message}`, true);
       }
     }
+    applySharedColorOverrides(events);
     eventCache.start  = fetchStart;
     eventCache.end    = fetchEnd;
     eventCache.events = events;
@@ -733,7 +756,7 @@ function renderCalendarList() {
     // (e.g. Guido's "Persönlich" appears as "Guido"); the original calendar
     // name stays in the sub-label so it's still identifiable.
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
-      name: cal.shared_by || cal.name, color: cal.color, enabled: cal.enabled, readOnly,
+      name: cal.shared_by || cal.name, color: sharedCalColorOverride(cal.id) || cal.color, enabled: cal.enabled, readOnly,
       sourceLabel: `${t('shared_with_me')} · ${cal.name}${readOnly ? ' · ' + t('perm_read') : ''}`, remove: null });
   });
   // Group calendars (owned by the creator or reached via membership) — shown so
@@ -905,7 +928,16 @@ function renderCalendarList() {
       } else if (source === 'local') {
         const calId = parseInt(dot.dataset.calId);
         const cal = state.localCalendars.find(c => c.id === calId);
-        if (cal && cal.owned === false) { showToast(t('only_owner_color'), true); return; }
+        if (cal && cal.owned === false) {
+          // Shared calendar — belongs to someone else. Apply a per-device local
+          // colour (stored client-side) instead of a server PUT that would 403.
+          const picked = await openColorPicker(dot, sharedCalColorOverride(calId) || cal.color || '#34a853');
+          if (picked) {
+            setSharedCalColorOverride(calId, picked);
+            applyCalendarColor('local', calId, picked); // recolour cached events + re-render
+          }
+          return;
+        }
         const picked = await openColorPicker(dot, cal?.color || '#34a853');
         if (picked) {
           await api.put(`/local/calendars/${calId}`, { color: picked });
