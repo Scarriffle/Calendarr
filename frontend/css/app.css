@@ -2148,6 +2148,8 @@ a { color: var(--primary); text-decoration: none; }
 /* Group emoji + icon picker */
 .group-emoji { flex: 0 0 auto; font-size: 16px; cursor: pointer; line-height: 1; }
 .cal-shared-flag { flex: 0 0 auto; font-size: 12px; opacity: .8; }
+/* Read-only (shared with me) indicator: a struck-through pencil. */
+.cal-readonly-flag { color: var(--text-3); opacity: .7; margin-left: 2px; }
 .group-icon-picker { display: flex; flex-wrap: wrap; gap: 6px; }
 .group-icon-opt {
   width: 38px; height: 38px;

@@ -733,7 +733,7 @@ function renderCalendarList() {
     // (e.g. Guido's "Persönlich" appears as "Guido"); the original calendar
     // name stays in the sub-label so it's still identifiable.
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
-      name: cal.shared_by || cal.name, color: cal.color, enabled: cal.enabled,
+      name: cal.shared_by || cal.name, color: cal.color, enabled: cal.enabled, readOnly,
       sourceLabel: `${t('shared_with_me')} · ${cal.name}${readOnly ? ' · ' + t('perm_read') : ''}`, remove: null });
   });
   // Group calendars (owned by the creator or reached via membership) — shown so
@@ -793,6 +793,7 @@ function renderCalendarList() {
       ${e.isGroupCal ? `<span class="cal-shared-flag" title="${escHtml(e.sourceLabel)}">${groupIconSvg(e.groupIcon || 'people', 13)}</span>` : ''}
       ${e.groupVisible ? `<span class="cal-shared-flag cal-shared-flag-own" title="${t('group_visible_flag')}">${shareIconSvg(state.settings?.share_calendar_icon || 'share', 13)}</span>` : ''}
       <span class="cal-item-name" data-source="${e.source}">${escHtml(e.name)}</span>
+      ${e.readOnly ? `<span class="cal-shared-flag cal-readonly-flag" title="${t('perm_read')}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/><line x1="3" y1="3" x2="21" y2="21"/></svg></span>` : ''}
       ${e.reminders ? `<button class="icon-btn mini-btn cal-item-bell ${e.remindersEnabled ? '' : 'off'}" data-source="${e.source}" ${e.dataId} title="${e.remindersEnabled ? t('calendar_reminders_on') : t('calendar_reminders_off')}">${e.remindersEnabled ? BELL : BELL_OFF}</button>` : ''}
       ${e.remove ? `<button class="icon-btn mini-btn cal-item-remove" data-source="${e.source}" ${e.dataId} title="${e.remove.title}">${e.remove.icon}</button>` : ''}
     </div>`
@@ -956,6 +957,12 @@ function renderCalendarList() {
       e.stopPropagation();
       const item = nameEl.closest('.cal-item');
       const source = nameEl.dataset.source;
+      // Can't rename a calendar shared with me — only the owner may. Renaming
+      // would just 403 on save, so don't even start editing.
+      if (source === 'local') {
+        const cal = state.localCalendars.find(c => c.id === parseInt(item?.dataset.calId));
+        if (cal && cal.owned === false) return;
+      }
       const currentName = nameEl.textContent;
       const input = document.createElement('input');
       input.type = 'text';
