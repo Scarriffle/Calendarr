@@ -135,7 +135,10 @@ export async function initCalendar() {
   updateViewButtons();
   renderCalendarList();
   renderMiniCal();
-  await fetchAndRender();
+  // Bind all UI handlers BEFORE the first data fetch. Otherwise a failing
+  // /caldav/events (e.g. a transient server error) would throw out of
+  // initCalendar and leave the topbar/settings/menu buttons dead — the
+  // "settings won't open" bug. Handlers must not depend on event data loading.
   bindTopbar();
   bindSidebar();
   bindEventModal();
@@ -149,6 +152,12 @@ export async function initCalendar() {
   bindSwipeNavigation();
   handleHAOAuthReturn();
   loadGroups();
+  try {
+    await fetchAndRender();
+  } catch (e) {
+    console.error('Initial fetchAndRender failed', e);
+    showToast(t('unknown_error'), true);
+  }
 
   // Reopen the settings modal after a reload if the URL says we were in it.
   if (urlState.settings) openSettingsModal();
