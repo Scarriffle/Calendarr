@@ -409,3 +409,78 @@ def test_import_export_only_local(client):
     cal_id = _make_calendar(client, admin, "Privat")
     # Bob has no access -> 404 on export.
     assert client.get(f"/api/local/calendars/{cal_id}/export", headers=auth(b_tok)).status_code == 404
+
+
+# ── Group-visible calendars propagate to co-members' sidebars ─────────────
+
+def test_group_visible_propagates_to_member_sidebar(client):
+    admin = register_admin(client)
+    b_id, b_tok = create_user(client, admin, "bob")
+    client.post("/api/groups/", headers=auth(admin),
+                json={"name": "Team", "member_ids": [b_id]})
+
+    # Bob designates a calendar as group-visible; admin (co-member) should see it.
+    b_cal = _make_calendar(client, b_tok, "Bobs Kalender")
+    client.put("/api/settings/", headers=auth(b_tok), json={"group_visible_calendar_id": b_cal})
+    _make_event(client, b_tok, b_cal, "Bobs Termin")
+
+    cals = client.get("/api/local/calendars", headers=auth(admin)).json()
+    shared = [c for c in cals if c["id"] == b_cal]
+    assert len(shared) == 1, shared
+    assert shared[0]["owned"] is False
+    assert shared[0]["shared_by"] == "bob"
+    assert shared[0]["permission"] == "read"
+    assert shared[0].get("group_shared") is True
+
+    # Its events appear in the normal merged read, read-only.
+    events = client.get("/api/caldav/events", headers=auth(admin), params=RANGE).json()["events"]
+    bob_ev = [e for e in events if e["title"] == "Bobs Termin"]
+    assert bob_ev and bob_ev[0].get("read_only") is True
+
+
+def test_group_visible_absent_when_not_designated(client):
+    admin = register_admin(client)
+    b_id, b_tok = create_user(client, admin, "bob")
+    client.post("/api/groups/", headers=auth(admin),
+                json={"name": "Team", "member_ids": [b_id]})
+    b_cal = _make_calendar(client, b_tok, "Bobs Kalender")  # never designated
+    cals = client.get("/api/local/calendars", headers=auth(admin)).json()
+    assert not any(c["id"] == b_cal for c in cals)
+
+
+def test_group_visible_not_duplicated_with_direct_share(client):
+    admin = register_admin(client)
+    admin_id = client.get("/api/profile/", headers=auth(admin)).json()["id"]
+    b_id, b_tok = create_user(client, admin, "bob")
+    client.post("/api/groups/", headers=auth(admin),
+                json={"name": "Team", "member_ids": [b_id]})
+    b_cal = _make_calendar(client, b_tok, "Bobs Kalender")
+    client.put("/api/settings/", headers=auth(b_tok), json={"group_visible_calendar_id": b_cal})
+    # Also directly shared with admin (read_write) — must not double-list.
+    client.post(f"/api/local/calendars/{b_cal}/shares", headers=auth(b_tok),
+                json={"user_id": admin_id, "permission": "read_write"})
+    cals = client.get("/api/local/calendars", headers=auth(admin)).json()
+    matches = [c for c in cals if c["id"] == b_cal]
+    assert len(matches) == 1, matches
+    # The direct share wins (read_write, not flagged group_shared).
+    assert matches[0]["permission"] == "read_write"
+    assert matches[0].get("group_shared") is not True
+
+
+# ── Hidden profile (directory opt-out) ────────────────────────────────────
+
+def test_directory_hidden_excludes_from_picker_but_not_admin(client):
+    admin = register_admin(client)
+    b_id, b_tok = create_user(client, admin, "bob")
+
+    assert any(u["id"] == b_id for u in
+               client.get("/api/users/directory", headers=auth(admin)).json())
+
+    r = client.put("/api/profile/", headers=auth(b_tok), json={"directory_hidden": True})
+    assert r.status_code == 200, r.text
+
+    assert not any(u["id"] == b_id for u in
+                   client.get("/api/users/directory", headers=auth(admin)).json())
+    # Admin user management still lists the hidden user.
+    assert any(u["id"] == b_id for u in
+               client.get("/api/users/", headers=auth(admin)).json())

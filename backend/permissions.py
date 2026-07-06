@@ -97,8 +97,44 @@ def is_calendar_owner(db: Session, user: models.User, calendar_id: int) -> model
     return cal
 
 
+def co_member_group_visible_calendars(db: Session, user: models.User) -> list[models.LocalCalendar]:
+    """Calendars that co-members of the user's groups share into the group.
+
+    Each user designates ONE of their own calendars via
+    UserSettings.group_visible_calendar_id. This returns those calendars for
+    every co-member of any group the user belongs to (excluding the user's own).
+    The calendar must be owned by the designating member. Deduped (each calendar
+    appears once even across multiple shared groups).
+    """
+    my_group_ids = (
+        db.query(models.GroupMember.group_id)
+        .filter(models.GroupMember.user_id == user.id)
+    )
+    co_member_ids = (
+        db.query(models.GroupMember.user_id)
+        .filter(
+            models.GroupMember.group_id.in_(my_group_ids),
+            models.GroupMember.user_id != user.id,
+        )
+        .distinct()
+    )
+    return (
+        db.query(models.LocalCalendar)
+        .join(
+            models.UserSettings,
+            models.UserSettings.group_visible_calendar_id == models.LocalCalendar.id,
+        )
+        .filter(
+            models.UserSettings.user_id.in_(co_member_ids),
+            # the designating member must own the calendar they share
+            models.LocalCalendar.user_id == models.UserSettings.user_id,
+        )
+        .all()
+    )
+
+
 def readable_local_calendar_ids(db: Session, user: models.User) -> list[int]:
-    """All local calendar ids the user may read: own + shared + group calendars."""
+    """All local calendar ids the user may read: own + shared + group + co-member group-visible."""
     ids: set[int] = set()
 
     own = (
@@ -122,5 +158,8 @@ def readable_local_calendar_ids(db: Session, user: models.User) -> list[int]:
         .all()
     )
     ids.update(r[0] for r in group_cals)
+
+    # Calendars co-members share into shared groups (group-visible).
+    ids.update(c.id for c in co_member_group_visible_calendars(db, user))
 
     return list(ids)

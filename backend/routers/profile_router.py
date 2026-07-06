@@ -34,6 +34,7 @@ class ProfileUpdate(BaseModel):
     email: Optional[str] = Field(default=None, max_length=120)
     display_name: Optional[str] = Field(default=None, max_length=80)
     username: Optional[str] = Field(default=None, max_length=50)  # login name (stored lowercase)
+    directory_hidden: Optional[bool] = None  # hide from sharing/group pickers
 
 
 def _strip_controls(s: str) -> str:
@@ -66,6 +67,7 @@ def get_profile(current_user: models.User = Depends(get_current_user)):
         "is_admin": current_user.is_admin,
         "has_avatar": current_user.avatar_filename is not None,
         "totp_enabled": current_user.totp_enabled,
+        "directory_hidden": bool(current_user.directory_hidden),
     }
 
 
@@ -109,11 +111,15 @@ def update_profile(
             if taken:
                 raise HTTPException(400, "Username already taken")
             current_user.username = new_login
+            if data.directory_hidden is not None:
+                current_user.directory_hidden = data.directory_hidden
             db.commit()
             # The JWT 'sub' is the login name — renaming it invalidates the old
             # token, so hand back a fresh one for the client to store.
             result["access_token"] = create_access_token({"sub": new_login})
             return result
+    if data.directory_hidden is not None:
+        current_user.directory_hidden = data.directory_hidden
     db.commit()
     return result
 

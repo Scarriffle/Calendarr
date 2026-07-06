@@ -176,11 +176,22 @@ def _group_detail(db: Session, group: models.Group, current_user: models.User) -
     member_dicts = []
     for i, m in enumerate(members):
         u = db.query(models.User).filter(models.User.id == m.user_id).first()
+        # Whether this member actually shares a calendar into the group (owns a
+        # calendar designated as their group_visible). Lets clients hide phantom
+        # empty rows for members who share nothing.
+        s = db.query(models.UserSettings).filter(models.UserSettings.user_id == m.user_id).first()
+        shares_calendar = False
+        if s and s.group_visible_calendar_id is not None:
+            shares_calendar = db.query(models.LocalCalendar.id).filter(
+                models.LocalCalendar.id == s.group_visible_calendar_id,
+                models.LocalCalendar.user_id == m.user_id,
+            ).first() is not None
         member_dicts.append({
             "id": m.user_id,
             "display_name": (u.display_name or u.username) if u else None,
             "role": m.role,
             "color": m.color or MEMBER_PALETTE[i % len(MEMBER_PALETTE)],
+            "shares_calendar": shares_calendar,
         })
     gcal_id = _group_calendar_id(db, group.id)
     return {

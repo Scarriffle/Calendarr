@@ -167,6 +167,23 @@ def list_calendars(
         d = _cal_dict(cal, owned=False, shared_by=group_name, permission="read_write")
         d["group"] = True
         result.append(d)
+
+    # Calendars co-members share into shared groups (group_visible_calendar_id).
+    # Read-only, shown under the owner's name. Deduped against everything above
+    # so a calendar already shared directly / as a group calendar isn't doubled.
+    for cal in permissions.co_member_group_visible_calendars(db, current_user):
+        if cal.id in seen_ids:
+            continue
+        seen_ids.add(cal.id)
+        owner = db.query(models.User).filter(models.User.id == cal.user_id).first()
+        d = _cal_dict(
+            cal, owned=False,
+            shared_by=(owner.display_name or owner.username) if owner else None,
+            permission="read",
+            request=request,
+        )
+        d["group_shared"] = True
+        result.append(d)
     return result
 
 

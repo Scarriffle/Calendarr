@@ -53,7 +53,10 @@ def user_directory(
     """
     users = (
         db.query(models.User)
-        .filter(models.User.id != current_user.id)
+        .filter(
+            models.User.id != current_user.id,
+            models.User.directory_hidden == False,  # noqa: E712 — hidden users opt out of pickers
+        )
         .order_by(models.User.username)
         .all()
     )

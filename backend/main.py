@@ -244,6 +244,14 @@ def _migrate():
         except Exception:
             pass
 
+        # Hide a user from sharing/group pickers (admin management still shows them).
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN directory_hidden BOOLEAN DEFAULT 0"))
+            conn.commit()
+            logging.info("Migration: added directory_hidden to users")
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)

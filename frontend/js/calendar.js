@@ -2682,31 +2682,42 @@ async function refreshShareModal(calendarId) {
     });
   });
 
-  // Store the directory (minus already-shared users) for the picker.
-  document.getElementById('modal-share').__users = users.filter(u => !sharedIds.has(u.id));
+  // Store the full directory + which users are already shared, so the picker
+  // can show a checkbox per user (checked = shared).
+  const modal = document.getElementById('modal-share');
+  modal.__users = users;
+  modal.__sharedIds = sharedIds;
   renderShareUserPicker();
 }
 
 function renderShareUserPicker() {
   const modal = document.getElementById('modal-share');
   const users = modal.__users || [];
+  const sharedIds = modal.__sharedIds || new Set();
   const q = (document.getElementById('share-user-search').value || '').toLowerCase();
   const filtered = users.filter(u => (u.display_name || '').toLowerCase().includes(q));
   const picker = document.getElementById('share-user-picker');
   picker.innerHTML = filtered.length
     ? filtered.map(u =>
-        `<div class="share-user-item" data-user-id="${u.id}">${escHtml(u.display_name || '')}</div>`
+        `<label class="share-user-item">
+          <input type="checkbox" class="share-user-cb" data-user-id="${u.id}" ${sharedIds.has(u.id) ? 'checked' : ''} />
+          <span>${escHtml(u.display_name || '')}</span>
+        </label>`
       ).join('')
     : `<span class="accounts-section-empty">${t('share_no_users')}</span>`;
-  picker.querySelectorAll('.share-user-item').forEach(el => {
-    el.addEventListener('click', async () => {
+  picker.querySelectorAll('.share-user-cb').forEach(cb => {
+    cb.addEventListener('change', async () => {
       const calId = parseInt(modal.dataset.calId);
-      const permission = document.getElementById('share-permission').value;
+      const userId = parseInt(cb.dataset.userId);
       try {
-        await api.post(`/local/calendars/${calId}/shares`,
-                       { user_id: parseInt(el.dataset.userId), permission });
+        if (cb.checked) {
+          const permission = document.getElementById('share-permission').value;
+          await api.post(`/local/calendars/${calId}/shares`, { user_id: userId, permission });
+        } else {
+          await api.delete(`/local/calendars/${calId}/shares/${userId}`);
+        }
         await refreshShareModal(calId);
-      } catch (e) { showToast(e.message, true); }
+      } catch (e) { showToast(e.message, true); cb.checked = !cb.checked; }
     });
   });
 }
@@ -2802,7 +2813,11 @@ function renderGroupMemberFilter() {
       <span class="cal-item-name">${escHtml(name)}</span>
     </div>`;
   };
-  const parts = (g.members || []).map(m => row(m.id, String(m.id), m.display_name || '—', m.color));
+  // Only members who actually share a calendar into the group get a toggle —
+  // otherwise we'd show phantom empty entries for members who share nothing.
+  const parts = (g.members || [])
+    .filter(m => m.shares_calendar)
+    .map(m => row(m.id, String(m.id), m.display_name || '—', m.color));
   parts.push(row('gc', 'gc', t('group_calendar'), g.group_calendar_color));
   items.innerHTML = parts.join('');
 
@@ -3117,6 +3132,8 @@ function openSettingsModal() {
   document.getElementById('cfg-login-name').value = pu.username || '';
   api.get('/profile/').then(p => {
     document.getElementById('cfg-email').value = p.email || '';
+    const dh = document.getElementById('cfg-directory-hidden');
+    if (dh) dh.checked = !!p.directory_hidden;
   }).catch(() => {});
   initAppPasswords();
 
@@ -3451,24 +3468,24 @@ function renderCalendarTable() {
 
   let rows = '';
 
-  // Local calendars
+  // Local calendars I own. Calendars shared WITH me (owned === false) are shown
+  // in a separate "shared with me" section further down.
   for (const cal of state.localCalendars) {
-    if (cal.group) continue;
-    const owned = cal.owned !== false;
-    const canWrite = owned || cal.permission === 'read_write';
+    if (cal.group || cal.owned === false) continue;
     const pub = !!cal.caldav_published;
     rows += `<tr>
-      <td>${dot(cal.color, '#34a853')}${escHtml(owned ? cal.name : (cal.shared_by || cal.name))}</td>
-      <td class="ct-src">${owned ? 'Lokal' : 'Geteilt · ' + escHtml(cal.name)}</td>
+      <td>${dot(cal.color, '#34a853')}${escHtml(cal.name)}</td>
+      <td class="ct-src">Lokal</td>
       <td>—</td>
-      <td>${owned ? rem('local', cal.id, cal.reminders_enabled !== false) : '—'}</td>
+      <td>${rem('local', cal.id, cal.reminders_enabled !== false)}</td>
       <td>
+        <button class="btn btn-ghost btn-sm" data-ct-share="${cal.id}">${t('share')}</button>
         <button class="btn btn-ghost btn-sm" data-ct-export="local" data-ct-id="${cal.id}" data-ct-name="${escHtml(cal.name)}">Export</button>
-        ${canWrite ? `<button class="btn btn-ghost btn-sm" data-ct-import="local" data-ct-id="${cal.id}">Import</button>` : ''}
-        ${owned ? `<button class="btn btn-ghost btn-sm ct-dav-toggle${pub ? ' on' : ''}" data-ct-dav-id="${cal.id}" data-ct-dav-on="${pub ? '1' : '0'}">${pub ? t('caldav_unpublish') : t('caldav_publish')}</button>` : ''}
+        <button class="btn btn-ghost btn-sm" data-ct-import="local" data-ct-id="${cal.id}">Import</button>
+        <button class="btn btn-ghost btn-sm ct-dav-toggle${pub ? ' on' : ''}" data-ct-dav-id="${cal.id}" data-ct-dav-on="${pub ? '1' : '0'}">${pub ? t('caldav_unpublish') : t('caldav_publish')}</button>
       </td>
       <td>—</td>
-      <td>${owned ? `<button class="icon-btn mini-btn" data-ct-del="local" data-ct-id="${cal.id}">${TRASH}</button>` : ''}</td>
+      <td><button class="icon-btn mini-btn" data-ct-del="local" data-ct-id="${cal.id}">${TRASH}</button></td>
     </tr>`;
     rowCount++;
     if (owned && pub) {
@@ -3562,6 +3579,22 @@ function renderCalendarTable() {
         <td>${hid('ha', cal.id, !cal.sidebar_hidden)}</td>
         <td>${rem('ha', cal.id, cal.reminders_enabled !== false)}</td>
         <td>—</td><td>—</td><td>—</td>
+      </tr>`;
+      rowCount++;
+    }
+  }
+
+  // Calendars shared WITH me (direct shares + group-shared) — read-only, no
+  // management actions since I don't own them. Shown under the owner's name.
+  const sharedWithMe = state.localCalendars.filter(c => c.owned === false && !c.group);
+  if (sharedWithMe.length) {
+    rows += `<tr class="ct-section-row"><td colspan="7">${t('shared_with_me')}</td></tr>`;
+    for (const cal of sharedWithMe) {
+      const readOnly = cal.permission !== 'read_write';
+      rows += `<tr>
+        <td>${dot(cal.color, '#34a853')}${escHtml(cal.shared_by || cal.name)}</td>
+        <td class="ct-src">${escHtml(cal.name)} <span class="cal-badge">${readOnly ? t('perm_read') : t('perm_read_write')}</span></td>
+        <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
       </tr>`;
       rowCount++;
     }
@@ -3682,6 +3715,11 @@ function renderCalendarTable() {
   });
   container.querySelectorAll('[data-ct-import]').forEach(btn => {
     btn.addEventListener('click', () => triggerIcsImport(parseInt(btn.dataset.ctId)));
+  });
+
+  // Share a calendar with specific users (person-to-person)
+  container.querySelectorAll('[data-ct-share]').forEach(btn => {
+    btn.addEventListener('click', () => openShareModal(parseInt(btn.dataset.ctShare)));
   });
 
   // CalDAV publishing
@@ -3892,6 +3930,8 @@ function bindSettingsModal() {
     const body = { email: email || null };
     if (displayName) body.display_name = displayName;
     if (loginName && loginName.toLowerCase() !== (user.username || '')) body.username = loginName;
+    const dh = document.getElementById('cfg-directory-hidden');
+    if (dh) body.directory_hidden = dh.checked;
     try {
       const res = await api.put('/profile/', body);
       if (res && res.access_token) localStorage.setItem('token', res.access_token);

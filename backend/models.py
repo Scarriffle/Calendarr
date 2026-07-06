@@ -17,6 +17,9 @@ class User(Base):
     avatar_filename = Column(String(255), nullable=True)
     totp_secret = Column(String(32), nullable=True)
     totp_enabled = Column(Boolean, default=False)
+    # When true, the user is hidden from sharing/group picker directories
+    # (/users/directory). Admin user management (/users/) still shows them.
+    directory_hidden = Column(Boolean, default=False, nullable=False)
 
     caldav_accounts = relationship(
         "CalDAVAccount", back_populates="user", cascade="all, delete-orphan"

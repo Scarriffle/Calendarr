@@ -1,2 +1,2 @@
 // Increment APP_VERSION with every code change
-export const APP_VERSION = 'v70';
+export const APP_VERSION = 'v71';
