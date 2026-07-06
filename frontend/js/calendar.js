@@ -729,9 +729,12 @@ function renderCalendarList() {
   });
   state.localCalendars.filter(c => c.owned === false && !c.group).forEach(cal => {
     const readOnly = cal.permission !== 'read_write';
+    // A shared calendar is shown to the recipient under the OWNER's name
+    // (e.g. Guido's "Persönlich" appears as "Guido"); the original calendar
+    // name stays in the sub-label so it's still identifiable.
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
-      name: cal.name, color: cal.color, enabled: cal.enabled,
-      sourceLabel: `${t('shared_with_me')} · ${cal.shared_by || ''}${readOnly ? ' · ' + t('perm_read') : ''}`, remove: null });
+      name: cal.shared_by || cal.name, color: cal.color, enabled: cal.enabled,
+      sourceLabel: `${t('shared_with_me')} · ${cal.name}${readOnly ? ' · ' + t('perm_read') : ''}`, remove: null });
   });
   // Group calendars (owned by the creator or reached via membership) — shown so
   // they can be toggled/recoloured. Owned group calendars can also be muted
@@ -3455,8 +3458,8 @@ function renderCalendarTable() {
     const canWrite = owned || cal.permission === 'read_write';
     const pub = !!cal.caldav_published;
     rows += `<tr>
-      <td>${dot(cal.color, '#34a853')}${escHtml(cal.name)}</td>
-      <td class="ct-src">Lokal</td>
+      <td>${dot(cal.color, '#34a853')}${escHtml(owned ? cal.name : (cal.shared_by || cal.name))}</td>
+      <td class="ct-src">${owned ? 'Lokal' : 'Geteilt · ' + escHtml(cal.name)}</td>
       <td>—</td>
       <td>${owned ? rem('local', cal.id, cal.reminders_enabled !== false) : '—'}</td>
       <td>
