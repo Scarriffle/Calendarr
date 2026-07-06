@@ -23,13 +23,22 @@ async function boot() {
   // Check if already logged in
   const token = localStorage.getItem('token');
   if (token) {
+    let authed = false;
     try {
-      await api.get('/auth/me'); // validate token
-      await launchApp();
-      return;
+      await api.get('/auth/me'); // validate the TOKEN only
+      authed = true;
     } catch (_) {
+      // The token is genuinely invalid/expired — clear it and show login.
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+    }
+    if (authed) {
+      // Token is valid → stay logged in. launchApp() runs OUTSIDE the auth
+      // try/catch on purpose: a later data/render error inside app init must
+      // never bounce a validly-authenticated user back to the login screen
+      // (that was the "logged out on every reload" bug).
+      await launchApp();
+      return;
     }
   }
 
