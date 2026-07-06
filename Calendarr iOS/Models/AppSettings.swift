@@ -223,6 +223,7 @@ struct UserProfile: Codable {
     let isAdmin: Bool
     let hasAvatar: Bool
     let totpEnabled: Bool
+    var directoryHidden: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case id, username, email
@@ -230,6 +231,19 @@ struct UserProfile: Codable {
         case isAdmin = "is_admin"
         case hasAvatar = "has_avatar"
         case totpEnabled = "totp_enabled"
+        case directoryHidden = "directory_hidden"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        username = try c.decode(String.self, forKey: .username)
+        displayName = try c.decodeIfPresent(String.self, forKey: .displayName)
+        email = try c.decodeIfPresent(String.self, forKey: .email)
+        isAdmin = try c.decodeIfPresent(Bool.self, forKey: .isAdmin) ?? false
+        hasAvatar = try c.decodeIfPresent(Bool.self, forKey: .hasAvatar) ?? false
+        totpEnabled = try c.decodeIfPresent(Bool.self, forKey: .totpEnabled) ?? false
+        directoryHidden = try c.decodeIfPresent(Bool.self, forKey: .directoryHidden) ?? false
     }
 }
 
@@ -258,9 +272,20 @@ struct GroupMember: Codable, Identifiable {
     let displayName: String?
     var role: String
     var color: String?
+    var sharesCalendar: Bool = true
     enum CodingKeys: String, CodingKey {
         case id, role, color
         case displayName = "display_name"
+        case sharesCalendar = "shares_calendar"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        displayName = try c.decodeIfPresent(String.self, forKey: .displayName)
+        role = try c.decodeIfPresent(String.self, forKey: .role) ?? "member"
+        color = try c.decodeIfPresent(String.self, forKey: .color)
+        sharesCalendar = try c.decodeIfPresent(Bool.self, forKey: .sharesCalendar) ?? true
     }
 }
 

@@ -450,11 +450,13 @@ class CalendarrAPI {
 
     /// Update profile fields. A login-name change returns a fresh token (the old
     /// one becomes invalid) — the caller must store the returned token.
-    func updateProfile(displayName: String?, username: String?, email: String?) async throws -> String? {
+    func updateProfile(displayName: String?, username: String?, email: String?,
+                       directoryHidden: Bool? = nil) async throws -> String? {
         var body: [String: Any] = [:]
         if let d = displayName { body["display_name"] = d }
         if let u = username { body["username"] = u }
         if let e = email { body["email"] = e } else { body["email"] = NSNull() }
+        if let h = directoryHidden { body["directory_hidden"] = h }
         let data = try await request("/api/profile/", method: "PUT", body: body)
         let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         return json?["access_token"] as? String

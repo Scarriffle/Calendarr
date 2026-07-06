@@ -32,6 +32,7 @@ struct SettingsView: View {
     @State private var privateVisibility = "busy"
     @State private var groupVisibleId = 0      // 0 = none
     @State private var ownLocalCals: [LocalCalendar] = []
+    @State private var directoryHidden = false
     @State private var profileMsg = ""
 
     var body: some View {
@@ -101,6 +102,13 @@ struct SettingsView: View {
                     .multilineTextAlignment(.trailing)
                     .keyboardType(.emailAddress)
                     .autocapitalization(.none)
+            }
+            Toggle(isOn: $directoryHidden) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.t("settings.directory_hidden", appLang))
+                    Text(L10n.t("settings.directory_hidden.desc", appLang))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Button(L10n.t("event.save", appLang)) { Task { await saveProfile() } }
             if !profileMsg.isEmpty {
@@ -188,6 +196,7 @@ struct SettingsView: View {
             displayName = p.displayName ?? p.username
             loginName = p.username
             email = p.email ?? ""
+            directoryHidden = p.directoryHidden
         }
         if let s = try? await api.getSettings() {
             privateVisibility = s.privateEventVisibility
@@ -202,7 +211,8 @@ struct SettingsView: View {
         do {
             _ = try await api.updateProfile(displayName: displayName.isEmpty ? nil : displayName,
                                             username: nil,
-                                            email: email.isEmpty ? "" : email)
+                                            email: email.isEmpty ? "" : email,
+                                            directoryHidden: directoryHidden)
             UserDefaults.standard.set(displayName, forKey: "displayName")
             profileMsg = L10n.t("settings.saved", appLang)
         } catch {

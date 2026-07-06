@@ -217,7 +217,9 @@ struct CalendarFilterSheet: View {
         if let g = groupDetail {
             List {
                 Section(header: Label(g.name, systemImage: GroupIcons.symbol(g.icon))) {
-                    ForEach(g.members ?? []) { m in
+                    // Only members who actually share a calendar into the group —
+                    // avoids phantom empty rows for members who share nothing.
+                    ForEach((g.members ?? []).filter { $0.sharesCalendar }) { m in
                         groupRow(name: m.displayName ?? "—",
                                  colorHex: m.color ?? "#4285f4",
                                  key: CalendarStore.groupMemberKey(m.id))
