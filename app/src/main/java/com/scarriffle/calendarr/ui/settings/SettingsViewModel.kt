@@ -32,6 +32,11 @@ class SettingsViewModel @Inject constructor(
         get() = settingsStore.cacheMonths
         set(value) { settingsStore.cacheMonths = value }
 
+    /** Device-local: month view as horizontal paged (swipe) vs. scroll feed. */
+    var monthViewPaged: Boolean
+        get() = settingsStore.monthViewPaged
+        set(value) { settingsStore.monthViewPaged = value }
+
     // ---- Profile chapter (server-backed) ----
 
     var displayName by mutableStateOf("")

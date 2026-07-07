@@ -299,7 +299,7 @@ fun CalendarScreen(
     when (overlay) {
         Overlay.PROFILE -> ProfileScreen(onClose = { overlay = Overlay.NONE })
         Overlay.SETTINGS -> SettingsScreen(
-            onClose = { overlay = Overlay.NONE },
+            onClose = { overlay = Overlay.NONE; vm.refreshMonthViewMode() },
             onSettingsChanged = onSettingsChanged,
             onSettingsSynced = onSettingsSynced,
         )

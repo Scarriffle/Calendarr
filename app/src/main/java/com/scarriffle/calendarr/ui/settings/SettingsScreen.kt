@@ -71,6 +71,7 @@ fun SettingsScreen(
     val initialSettings = LocalAppSettings.current
     var settings by remember { mutableStateOf(initialSettings) }
     var cacheMonths by remember { mutableStateOf(vm.cacheMonths) }
+    var monthPaged by remember { mutableStateOf(vm.monthViewPaged) }
 
     fun update(newSettings: AppSettings) {
         settings = newSettings
@@ -123,6 +124,12 @@ fun SettingsScreen(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(tr("settings.dimpast"), style = MaterialTheme.typography.bodyLarge)
                     Switch(checked = settings.dimPastEvents, onCheckedChange = { update(settings.copy(dimPastEvents = it)) })
+                }
+                Spacer(Modifier.size(16.dp))
+
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(tr("settings.month_paged"), style = MaterialTheme.typography.bodyLarge)
+                    Switch(checked = monthPaged, onCheckedChange = { monthPaged = it; vm.monthViewPaged = it })
                 }
                 Spacer(Modifier.size(16.dp))
 

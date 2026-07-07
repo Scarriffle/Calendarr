@@ -58,6 +58,8 @@ data class CalendarUiState(
     // Full calendar list across all sources (loaded on demand) so the filter
     // shows every calendar, including ones with no events in the loaded range.
     val allCalendars: List<CalendarFilterEntry> = emptyList(),
+    // Device-local: month view as horizontal paged (swipe) vs. scroll feed.
+    val monthViewPaged: Boolean = false,
 )
 
 fun groupMemberKey(ownerId: Int): String = "gm:$ownerId"
@@ -122,7 +124,13 @@ class CalendarViewModel @Inject constructor(
             hiddenKeys = settingsStore.hiddenCalendarKeys,
             banishedKeys = settingsStore.banishedCalendarKeys,
             reminderDisabledKeys = settingsStore.reminderDisabledCalendarKeys,
+            monthViewPaged = settingsStore.monthViewPaged,
         )
+    }
+
+    /** Re-read the device-local month-view mode (called when settings close). */
+    fun refreshMonthViewMode() {
+        _state.update { it.copy(monthViewPaged = settingsStore.monthViewPaged) }
     }
 
     /** Default duration (minutes) for a new event's end time. */

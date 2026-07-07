@@ -62,6 +62,12 @@ class SettingsStore @Inject constructor(
         get() = prefs.getInt(K_CACHE_MONTHS, 3)
         set(value) = prefs.edit().putInt(K_CACHE_MONTHS, value).apply()
 
+    /** Device-local: month view as horizontal paged (swipe) instead of the
+     *  continuous vertical scroll feed (default false = scroll). */
+    var monthViewPaged: Boolean
+        get() = prefs.getBoolean(K_MONTH_PAGED, false)
+        set(value) = prefs.edit().putBoolean(K_MONTH_PAGED, value).apply()
+
     // --- Hidden calendars ("source:id") ---
 
     var hiddenCalendarKeys: Set<String>
@@ -99,6 +105,7 @@ class SettingsStore @Inject constructor(
         const val K_DEFAULT_REMINDER = "default_reminder_minutes"
         const val K_DEFAULT_DURATION = "default_event_duration_minutes"
         const val K_CACHE_MONTHS = "cache_months"
+        const val K_MONTH_PAGED = "month_view_paged"
         const val K_HIDDEN = "hidden_calendar_keys"
         const val K_BANISHED = "banished_calendar_keys"
         const val K_REMINDER_DISABLED = "reminder_disabled_calendar_keys"

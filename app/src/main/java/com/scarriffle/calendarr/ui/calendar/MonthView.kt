@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -79,7 +81,10 @@ private data class PlacedBar(
 
 private class WeekLayout(val bars: List<PlacedBar>, val overflowPerCol: IntArray)
 
-/** Continuous, vertically scrolling month calendar with multi-day event bars (iOS-style). */
+/** Month calendar with multi-day event bars (iOS-style). Two modes: a
+ *  continuous vertical scroll feed, or a horizontally-paged one-month-per-screen
+ *  grid (swipe left/right), toggled by [CalendarUiState.monthViewPaged]. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MonthView(
     state: CalendarUiState,
@@ -127,24 +132,13 @@ fun MonthView(
 
     val todayIndex = remember(firstVisible) { weekIndexOf(today) }
 
-    LaunchedEffect(Unit) { listState.scrollToItem((todayIndex - 1).coerceAtLeast(0)) }
-    LaunchedEffect(scrollToTodaySignal) {
-        if (scrollToTodaySignal > 0) listState.animateScrollToItem((todayIndex - 1).coerceAtLeast(0))
-    }
-    LaunchedEffect(monthJumpSignal) {
-        if (monthJumpSignal > 0 && monthJumpTarget != null) {
-            listState.animateScrollToItem(weekIndexOf(monthJumpTarget.withDayOfMonth(1)))
-        }
-    }
-    LaunchedEffect(listState, weekCount) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .map { firstVisible.plusWeeks(it.toLong()).plusDays(3).withDayOfMonth(1) }
-            .distinctUntilChanged()
-            .collect { month ->
-                onVisibleMonthChange(month)
-                vm.ensureMonthLoaded(month)
-            }
-    }
+    // Month-paged mode bookkeeping (one page per calendar month).
+    val firstMonth = remember { today.withDayOfMonth(1).minusMonths(MONTHS_BACK) }
+    val monthCount = remember { (MONTHS_BACK + MONTHS_AHEAD + 1).toInt() }
+    fun monthIndexOf(date: LocalDate): Int =
+        ChronoUnit.MONTHS.between(firstMonth, date.withDayOfMonth(1)).toInt().coerceIn(0, monthCount - 1)
+    val todayMonthIndex = remember(firstMonth) { monthIndexOf(today) }
+    val pagerState = rememberPagerState(initialPage = todayMonthIndex) { monthCount }
 
     val eventsByWeek = remember(state.events, mondayFirst) { buildEventsByWeek(state.events, mondayFirst) }
     val dimPast = settings.dimPastEvents
@@ -152,6 +146,44 @@ fun MonthView(
     // remember: a fresh Instant per recomposition would invalidate every visible
     // WeekRow (the main source of scroll jank); minute precision is plenty here.
     val now = remember { java.time.Instant.now() }
+
+    // Route the title / prev-next / today signals to the active surface (pager or list).
+    if (state.monthViewPaged) {
+        LaunchedEffect(scrollToTodaySignal) {
+            if (scrollToTodaySignal > 0) pagerState.animateScrollToPage(todayMonthIndex)
+        }
+        LaunchedEffect(monthJumpSignal) {
+            if (monthJumpSignal > 0 && monthJumpTarget != null) pagerState.animateScrollToPage(monthIndexOf(monthJumpTarget))
+        }
+        LaunchedEffect(pagerState) {
+            snapshotFlow { pagerState.currentPage }
+                .map { firstMonth.plusMonths(it.toLong()) }
+                .distinctUntilChanged()
+                .collect { month ->
+                    onVisibleMonthChange(month)
+                    vm.ensureMonthLoaded(month)
+                }
+        }
+    } else {
+        LaunchedEffect(Unit) { listState.scrollToItem((todayIndex - 1).coerceAtLeast(0)) }
+        LaunchedEffect(scrollToTodaySignal) {
+            if (scrollToTodaySignal > 0) listState.animateScrollToItem((todayIndex - 1).coerceAtLeast(0))
+        }
+        LaunchedEffect(monthJumpSignal) {
+            if (monthJumpSignal > 0 && monthJumpTarget != null) {
+                listState.animateScrollToItem(weekIndexOf(monthJumpTarget.withDayOfMonth(1)))
+            }
+        }
+        LaunchedEffect(listState, weekCount) {
+            snapshotFlow { listState.firstVisibleItemIndex }
+                .map { firstVisible.plusWeeks(it.toLong()).plusDays(3).withDayOfMonth(1) }
+                .distinctUntilChanged()
+                .collect { month ->
+                    onVisibleMonthChange(month)
+                    vm.ensureMonthLoaded(month)
+                }
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
@@ -166,30 +198,66 @@ fun MonthView(
             }
         }
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize().onSizeChanged { gridWidthPx = it.width },
-        ) {
-            items(weekCount, key = { it }, contentType = { "week" }) { index ->
-                val weekStart = firstVisible.plusWeeks(index.toLong())
-                WeekRow(
-                    weekStart = weekStart,
-                    today = today,
-                    weekEvents = eventsByWeek[weekStart] ?: emptyList(),
-                    cellW = cellW,
-                    dimPast = dimPast,
-                    now = now,
-                    lang = lang,
-                    cwLabel = cwLabel,
-                    dividerColor = dividerColor,
-                    gridColor = gridColor,
-                    labelColor = labelColor,
-                    secondaryText = secondaryText,
-                    todayColor = todayColor,
-                    onDayClick = onDayClick,
-                    onDayLongPress = onDayLongPress,
-                    onEventClick = onEventClick,
-                )
+        if (state.monthViewPaged) {
+            // One month per page, six height-filling week rows, swipe to change month.
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize().onSizeChanged { gridWidthPx = it.width },
+            ) { page ->
+                val month = firstMonth.plusMonths(page.toLong())
+                val firstWeek = startOfWeek(month.withDayOfMonth(1), mondayFirst)
+                Column(Modifier.fillMaxSize()) {
+                    repeat(6) { w ->
+                        val weekStart = firstWeek.plusWeeks(w.toLong())
+                        WeekRow(
+                            rowModifier = Modifier.fillMaxWidth().weight(1f),
+                            weekStart = weekStart,
+                            today = today,
+                            weekEvents = eventsByWeek[weekStart] ?: emptyList(),
+                            cellW = cellW,
+                            dimPast = dimPast,
+                            now = now,
+                            lang = lang,
+                            cwLabel = cwLabel,
+                            dividerColor = dividerColor,
+                            gridColor = gridColor,
+                            labelColor = labelColor,
+                            secondaryText = secondaryText,
+                            todayColor = todayColor,
+                            onDayClick = onDayClick,
+                            onDayLongPress = onDayLongPress,
+                            onEventClick = onEventClick,
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().onSizeChanged { gridWidthPx = it.width },
+            ) {
+                items(weekCount, key = { it }, contentType = { "week" }) { index ->
+                    val weekStart = firstVisible.plusWeeks(index.toLong())
+                    WeekRow(
+                        rowModifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
+                        weekStart = weekStart,
+                        today = today,
+                        weekEvents = eventsByWeek[weekStart] ?: emptyList(),
+                        cellW = cellW,
+                        dimPast = dimPast,
+                        now = now,
+                        lang = lang,
+                        cwLabel = cwLabel,
+                        dividerColor = dividerColor,
+                        gridColor = gridColor,
+                        labelColor = labelColor,
+                        secondaryText = secondaryText,
+                        todayColor = todayColor,
+                        onDayClick = onDayClick,
+                        onDayLongPress = onDayLongPress,
+                        onEventClick = onEventClick,
+                    )
+                }
             }
         }
     }
@@ -197,6 +265,7 @@ fun MonthView(
 
 @Composable
 private fun WeekRow(
+    rowModifier: Modifier,
     weekStart: LocalDate,
     today: LocalDate,
     weekEvents: List<CalEvent>,
@@ -220,7 +289,9 @@ private fun WeekRow(
 
     val packed = remember(weekStart, weekEvents) { packEvents(weekStart, weekEvents) }
 
-    Box(Modifier.fillMaxWidth().height(ROW_HEIGHT)) {
+    // Scroll mode passes a fixed ROW_HEIGHT; paged mode passes weight(1f) so six
+    // rows fill the screen. Event bars anchor to the top; the day cells fill height.
+    Box(rowModifier) {
         Row(Modifier.fillMaxSize()) {
             days.forEachIndexed { idx, day ->
                 val edge = when {
