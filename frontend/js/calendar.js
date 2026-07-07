@@ -866,10 +866,10 @@ function renderCalendarList() {
       } else if (source === 'local') {
         const calId = parseInt(cb.dataset.calId);
         const cal = state.localCalendars.find(c => c.id === calId);
-        // `enabled` is the owner's property — only the owner may PUT it.
-        // For calendars shared with me, persist a per-device hide instead so it
-        // survives refetches (the server keeps returning the owner's events).
-        if (cal && cal.owned !== false) {
+        // `enabled` is the owner's property — only the owner may PUT it. For
+        // calendars shared with me (owned === false), persist a per-device hide
+        // instead so it survives refetches (the server keeps returning them).
+        if (cal && cal.owned === false) {
           setHiddenLocalCal(calId, !cb.checked);
         } else {
           await api.put(`/local/calendars/${calId}`, { enabled: cb.checked });
