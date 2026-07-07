@@ -1,6 +1,8 @@
 package com.scarriffle.calendarr.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -48,12 +50,18 @@ fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
                 }
 
                 when (route) {
-                    AppRoute.SETUP -> ServerSetupScreen(onConfigured = vm::onServerConfigured)
-                    AppRoute.LOGIN -> LoginScreen(
-                        serverUrl = vm.serverUrl,
-                        onLoggedIn = vm::onLoggedIn,
-                        onBack = vm::switchServer,
-                    )
+                    // Auth screens draw full-screen; inset them from the system
+                    // bars (edge-to-edge) so their content isn't under status/nav.
+                    AppRoute.SETUP -> Box(Modifier.systemBarsPadding()) {
+                        ServerSetupScreen(onConfigured = vm::onServerConfigured)
+                    }
+                    AppRoute.LOGIN -> Box(Modifier.systemBarsPadding()) {
+                        LoginScreen(
+                            serverUrl = vm.serverUrl,
+                            onLoggedIn = vm::onLoggedIn,
+                            onBack = vm::switchServer,
+                        )
+                    }
                     AppRoute.MAIN -> calendarVm?.let { cvm ->
                         CalendarScreen(
                             vm = cvm,

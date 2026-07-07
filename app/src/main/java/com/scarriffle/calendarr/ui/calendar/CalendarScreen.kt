@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -169,12 +172,17 @@ fun CalendarScreen(
                 shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.navigationBarsPadding(),
             ) {
                 Icon(Icons.Filled.Add, contentDescription = tr("cal.new_event"))
             }
         },
+        // Edge-to-edge: we place the system-bar insets ourselves (top bar gets
+        // statusBarsPadding, the content column gets navigationBarsPadding) so
+        // nothing hides behind the status/nav bars.
+        contentWindowInsets = WindowInsets(0),
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding).navigationBarsPadding()) {
             state.error?.let { err ->
                 ErrorBanner(err, onRetry = { vm.loadVisible(force = true) }, onDismiss = vm::clearError)
             }
@@ -223,8 +231,9 @@ fun CalendarScreen(
     }
 
     if (showFilter) {
+        androidx.compose.runtime.LaunchedEffect(Unit) { vm.loadAllCalendars() }
         CalendarFilterSheet(
-            events = remember(state.events, state.banishedKeys) { allKnownCalendars(vm) },
+            events = remember(state.events, state.banishedKeys, state.allCalendars) { allKnownCalendars(vm) },
             vm = vm,
             onDismiss = { showFilter = false },
         )
@@ -405,8 +414,9 @@ private fun CompactTopBar(
     onSelectView: (CalViewType) -> Unit,
 ) {
     val twoLine = viewType == CalViewType.WEEK || viewType == CalViewType.DAY
+    // Surface fills behind the status bar; the content column is inset below it.
     Surface(color = MaterialTheme.colorScheme.background) {
-        Column {
+        Column(Modifier.statusBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -490,8 +500,12 @@ private fun GroupBanner(group: Group, onExit: () -> Unit) {
  *  cache (minus banished) so a locally quick-hidden calendar still shows up and
  *  can be toggled back on. */
 private fun allKnownCalendars(vm: CalendarViewModel): List<CalendarFilterEntry> {
-    return vm.knownCalendars()
+    val fromEvents = vm.knownCalendars()
         .map { CalendarFilterEntry(calendarKey(it.source, it.calendarId), it.calendarName.ifBlank { it.source }, it.effectiveColor, it.source, it.readOnly) }
+    // Event-derived entries first (current server colour / owner name), then the
+    // full source list so calendars WITHOUT events in range still appear;
+    // distinctBy keeps the event-derived entry when a calendar has both.
+    return (fromEvents + vm.state.value.allCalendars)
         .distinctBy { it.key }
         .sortedBy { it.name.lowercase() }
 }

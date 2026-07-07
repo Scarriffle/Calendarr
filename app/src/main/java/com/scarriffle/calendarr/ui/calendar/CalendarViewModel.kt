@@ -55,6 +55,9 @@ data class CalendarUiState(
     // hidden keys ("gm:<userId>" / "gc"). In-memory; reset when switching group.
     val activeGroupMembers: List<GroupMember> = emptyList(),
     val hiddenGroupKeys: Set<String> = emptySet(),
+    // Full calendar list across all sources (loaded on demand) so the filter
+    // shows every calendar, including ones with no events in the loaded range.
+    val allCalendars: List<CalendarFilterEntry> = emptyList(),
 )
 
 fun groupMemberKey(ownerId: Int): String = "gm:$ownerId"
@@ -447,6 +450,47 @@ class CalendarViewModel @Inject constructor(
         return allCachedEvents
             .distinctBy { calendarKey(it.source, it.calendarId) }
             .filter { calendarKey(it.source, it.calendarId) !in banished }
+    }
+
+    /**
+     * Load the full calendar list across all sources into [CalendarUiState.allCalendars]
+     * so the filter shows every calendar, even ones with no events in the loaded
+     * range. Called when the filter sheet opens. Read-only flag for shared local
+     * calendars from owned/permission; banished calendars are dropped.
+     */
+    fun loadAllCalendars() {
+        viewModelScope.launch {
+            val banished = _state.value.banishedKeys
+            val entries = mutableListOf<CalendarFilterEntry>()
+            runCatching { repository.getLocalCalendars() }.getOrDefault(emptyList()).forEach { c ->
+                entries += CalendarFilterEntry(
+                    key = calendarKey("local", c.id.toString()),
+                    name = if (c.owned) c.name else (c.sharedBy ?: c.name),
+                    color = c.color,
+                    source = "local",
+                    readOnly = !c.owned && c.permission != "read_write",
+                )
+            }
+            runCatching { repository.getCalDAVAccounts() }.getOrDefault(emptyList()).forEach { acc ->
+                acc.calendars.orEmpty().forEach { c ->
+                    entries += CalendarFilterEntry(calendarKey("caldav", c.id.toString()), c.name, c.color ?: acc.color, "caldav")
+                }
+            }
+            runCatching { repository.getGoogleAccounts() }.getOrDefault(emptyList()).forEach { acc ->
+                acc.calendars.orEmpty().forEach { c ->
+                    entries += CalendarFilterEntry(calendarKey("google", c.id.toString()), c.name, c.color ?: "#4285f4", "google")
+                }
+            }
+            runCatching { repository.getHomeAssistantAccounts() }.getOrDefault(emptyList()).forEach { acc ->
+                acc.calendars.orEmpty().forEach { c ->
+                    entries += CalendarFilterEntry(calendarKey("homeassistant", c.id.toString()), c.name, c.color ?: "#46bdc6", "homeassistant")
+                }
+            }
+            runCatching { repository.getICalSubscriptions() }.getOrDefault(emptyList()).forEach { s ->
+                entries += CalendarFilterEntry(calendarKey("ical", s.id.toString()), s.name, s.color, "ical")
+            }
+            _state.update { st -> st.copy(allCalendars = entries.filter { it.key !in banished }) }
+        }
     }
 
     /**
