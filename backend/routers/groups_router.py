@@ -380,6 +380,9 @@ def combined_events(
     def emit_calendar(cal: models.LocalCalendar, owner_id: int, is_group: bool):
         owner_user = name_cache.get(owner_id)
         owner = {"id": owner_id, "display_name": owner_user}
+        # Editable by the requester iff it's the shared group calendar (all members
+        # may write) or the requester's own calendar; everyone else's is read-only.
+        read_only = not (is_group or owner_id == current_user.id)
         events = (
             db.query(models.LocalEvent)
             .filter(
@@ -405,9 +408,9 @@ def combined_events(
                 creator = {"id": None, "display_name": f"{ev.creator_name_external} (importiert)"}
 
             if ev.rrule:
-                built = expand_recurring_local(ev, cal, start_dt, end_dt, creator=creator, owner=owner, is_group_event=is_group)
+                built = expand_recurring_local(ev, cal, start_dt, end_dt, creator=creator, owner=owner, is_group_event=is_group, read_only=read_only)
             else:
-                built = [build_local_event_dict(ev, cal, rrule=None, creator=creator, owner=owner, is_group_event=is_group)]
+                built = [build_local_event_dict(ev, cal, rrule=None, creator=creator, owner=owner, is_group_event=is_group, read_only=read_only)]
 
             for b in built:
                 if ev.is_private and creator_owner_id != current_user.id and visibility_for(creator_owner_id) == "busy":

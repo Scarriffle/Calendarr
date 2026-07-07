@@ -484,3 +484,31 @@ def test_directory_hidden_excludes_from_picker_but_not_admin(client):
     # Admin user management still lists the hidden user.
     assert any(u["id"] == b_id for u in
                client.get("/api/users/", headers=auth(admin)).json())
+
+
+def test_combined_view_read_only_for_other_members(client):
+    """In the group combined view, events I may not edit carry read_only=True:
+    other members' calendars are read-only; the group calendar + my own aren't."""
+    admin = register_admin(client)
+    b_id, b_tok = create_user(client, admin, "bob")
+    group = client.post("/api/groups/", headers=auth(admin),
+                        json={"name": "Team", "member_ids": [b_id]}).json()
+    gid = group["id"]
+    gcal = group["group_calendar_id"]
+
+    b_cal = _make_calendar(client, b_tok, "Bobs Kalender")
+    client.put("/api/settings/", headers=auth(b_tok), json={"group_visible_calendar_id": b_cal})
+    _make_event(client, b_tok, b_cal, "Bobs Termin")
+    _make_event(client, admin, gcal, "Gruppentermin")
+
+    # As admin: bob's event is read-only; the group calendar is editable.
+    by = {e["title"]: e for e in
+          client.get(f"/api/groups/{gid}/combined", headers=auth(admin), params=RANGE).json()["events"]}
+    assert by["Bobs Termin"].get("read_only") is True
+    assert by["Gruppentermin"].get("read_only") is not True
+
+    # As bob: his own event and the group calendar are both editable.
+    by_b = {e["title"]: e for e in
+            client.get(f"/api/groups/{gid}/combined", headers=auth(b_tok), params=RANGE).json()["events"]}
+    assert by_b["Bobs Termin"].get("read_only") is not True
+    assert by_b["Gruppentermin"].get("read_only") is not True

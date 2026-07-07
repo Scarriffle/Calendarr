@@ -54,7 +54,7 @@ def private_visibility_for(db: Session, user_id: int) -> str:
 # field (title/location/description/creator/calendar name/recurrence) can leak.
 _BUSY_KEEP = {
     "id", "url", "start", "end", "allDay", "calendar_id", "calendarColor",
-    "source", "type", "owner", "is_group_event", "display_color",
+    "source", "type", "owner", "is_group_event", "display_color", "read_only",
 }
 
 
@@ -102,12 +102,14 @@ def build_local_event_dict(
     creator: Optional[dict] = None,
     owner: Optional[dict] = None,
     is_group_event: bool = False,
+    read_only: bool = False,
 ) -> dict:
     """Build the unified dict for a single local event (or occurrence).
 
     ``start``/``end``/``all_day`` override the stored values (used when emitting
     an expanded recurrence occurrence). ``owner``/``is_group_event`` are only set
-    by the group combined view.
+    by the group combined view. ``read_only`` marks events the requester may not
+    edit (someone else's calendar), so clients can hide edit/delete.
     """
     d = {
         "id": ev.uid,
@@ -134,6 +136,8 @@ def build_local_event_dict(
         d["owner"] = owner
     if is_group_event:
         d["is_group_event"] = True
+    if read_only:
+        d["read_only"] = True
     return d
 
 
@@ -146,6 +150,7 @@ def expand_recurring_local(
     creator: Optional[dict] = None,
     owner: Optional[dict] = None,
     is_group_event: bool = False,
+    read_only: bool = False,
 ) -> list:
     """Expand a recurring LocalEvent into individual occurrences in the range."""
     results = []
@@ -177,6 +182,7 @@ def expand_recurring_local(
                     ev, local_cal,
                     start=occ_start.isoformat(), end=occ_end.isoformat(), all_day=True,
                     creator=creator, owner=owner, is_group_event=is_group_event,
+                    read_only=read_only,
                 ))
         else:
             ev_start = dt_datetime.fromisoformat(ev_start_str)
@@ -203,11 +209,13 @@ def expand_recurring_local(
                     ev, local_cal,
                     start=occ.isoformat(), end=occ_end.isoformat(), all_day=False,
                     creator=creator, owner=owner, is_group_event=is_group_event,
+                    read_only=read_only,
                 ))
     except Exception as exc:
         logger.warning("Error expanding recurring event %s: %s", ev.uid, exc)
         # Fall back to a single event.
         results.append(build_local_event_dict(
             ev, local_cal, creator=creator, owner=owner, is_group_event=is_group_event,
+            read_only=read_only,
         ))
     return results

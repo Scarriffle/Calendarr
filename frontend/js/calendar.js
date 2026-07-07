@@ -519,6 +519,16 @@ function filterEvents(events) {
       return oid == null || !hidden.has(oid);
     });
   }
+  // Normal view: honour per-device hide for calendars shared with me (their
+  // events keep coming from the server since `enabled` is the owner's flag).
+  const hiddenLocal = state.activeGroupId ? null : loadHiddenLocalCals();
+  if (hiddenLocal && hiddenLocal.size) {
+    events = events.filter(ev => {
+      if (ev.source !== 'local') return true;
+      const id = parseInt(String(ev.calendar_id).replace('local-', ''));
+      return !hiddenLocal.has(id);
+    });
+  }
   // If dimPast is enabled, events are still shown but CSS handles opacity via .past class
   return events;
 }
@@ -672,6 +682,20 @@ function saveCalOrder(keys) {
   localStorage.setItem(CAL_ORDER_KEY, JSON.stringify(keys));
 }
 
+// Per-device hide for local calendars shared WITH me (owned=false). Their
+// `enabled` flag belongs to the owner, so hiding them can't be a server PUT —
+// keep it client-side and honour it at render time so it survives refetches.
+const HIDDEN_LOCAL_KEY = 'hiddenLocalCalendars';
+function loadHiddenLocalCals() {
+  try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_LOCAL_KEY) || '[]')); }
+  catch (e) { return new Set(); }
+}
+function setHiddenLocalCal(id, hidden) {
+  const s = loadHiddenLocalCals();
+  if (hidden) s.add(id); else s.delete(id);
+  try { localStorage.setItem(HIDDEN_LOCAL_KEY, JSON.stringify([...s])); } catch (e) { /* ignore */ }
+}
+
 // Drag & drop reordering of the flat calendar list (persisted per device).
 // The dragged row is moved live among its siblings during dragover, so the
 // list visibly "makes space" and you can see where it will land.
@@ -732,6 +756,7 @@ function renderCalendarList() {
   // inline (small, grey) next to the name and section headers are gone, so the
   // whole list can be freely reordered via drag & drop.
   const entries = [];
+  const hiddenLocal = loadHiddenLocalCals();  // per-device hide for shared-with-me calendars
   state.accounts.forEach(acc => {
     (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
       entries.push({ key: `caldav:${cal.id}`, source: 'caldav', dataId: `data-cal-id="${cal.id}"`,
@@ -754,7 +779,7 @@ function renderCalendarList() {
     // (e.g. Guido's "Persönlich" appears as "Guido"); the original calendar
     // name stays in the sub-label so it's still identifiable.
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
-      name: cal.shared_by || cal.name, color: cal.color, enabled: cal.enabled, readOnly,
+      name: cal.shared_by || cal.name, color: cal.color, enabled: !hiddenLocal.has(cal.id), readOnly,
       sourceLabel: `${t('shared_with_me')} · ${cal.name}${readOnly ? ' · ' + t('perm_read') : ''}`, remove: null });
   });
   // Group calendars (owned by the creator or reached via membership) — shown so
@@ -762,7 +787,8 @@ function renderCalendarList() {
   // (reminders), which the server then syncs; member-reached ones can't (no PUT).
   state.localCalendars.filter(c => c.group).forEach(cal => {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
-      name: cal.name, color: cal.color, enabled: cal.enabled,
+      name: cal.name, color: cal.color,
+      enabled: cal.owned !== false ? cal.enabled : !hiddenLocal.has(cal.id),
       reminders: cal.owned !== false, remindersEnabled: cal.reminders_enabled !== false,
       sourceLabel: `${t('groups_title')} · ${cal.shared_by || ''}`,
       isGroupCal: true, groupIcon: groupIconForLocalCal(cal.id), remove: null });
@@ -841,8 +867,11 @@ function renderCalendarList() {
         const calId = parseInt(cb.dataset.calId);
         const cal = state.localCalendars.find(c => c.id === calId);
         // `enabled` is the owner's property — only the owner may PUT it.
-        // For shared/group calendars just toggle visibility client-side.
+        // For calendars shared with me, persist a per-device hide instead so it
+        // survives refetches (the server keeps returning the owner's events).
         if (cal && cal.owned !== false) {
+          setHiddenLocalCal(calId, !cb.checked);
+        } else {
           await api.put(`/local/calendars/${calId}`, { enabled: cb.checked });
         }
         if (cal) cal.enabled = cb.checked;
@@ -1525,7 +1554,9 @@ function showEventPopup(ev, anchor) {
   dragHandle.onpointerup = onPointerUp;
 
   // Hide edit/delete for read-only iCal subscription events
-  const isReadOnly = (ev.source === 'ical');
+  // Read-only: iCal subscriptions, and events I may not write (someone else's
+  // calendar in a share / group overlay — the server flags these `read_only`).
+  const isReadOnly = (ev.source === 'ical' || ev.read_only === true);
   document.getElementById('popup-edit').style.display = isReadOnly ? 'none' : '';
   document.getElementById('popup-delete').style.display = isReadOnly ? 'none' : '';
 
@@ -1862,7 +1893,7 @@ function openCopyEditModal(ev, targetCal) {
 }
 
 function openEditEventModal(ev) {
-  if (ev.source === 'ical') { showToast(t('event_readonly'), true); return; }
+  if (ev.source === 'ical' || ev.read_only === true) { showToast(t('event_readonly'), true); return; }
   state.editingEvent = ev;
   state.selectedEventColor = ev.color || '';
 
