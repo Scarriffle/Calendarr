@@ -2013,7 +2013,29 @@ a { color: var(--primary); text-decoration: none; }
 }
 .share-user-item:last-child { border-bottom: none; }
 .share-user-item:hover { background: var(--bg-surface); }
-.share-user-item input[type=checkbox] { flex-shrink: 0; }
+.share-user-item input[type=checkbox] {
+  flex-shrink: 0; width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer;
+}
+/* Add-user row: match the app's dark inputs instead of raw white browser
+   controls, with a subtle focus ring for a modern feel. */
+#share-user-search,
+#share-permission {
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text-1);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+#share-user-search::placeholder { color: var(--text-3); }
+#share-permission { cursor: pointer; }
+#share-user-search:focus,
+#share-permission:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
+}
 /* "Shared with me" section header row inside the calendar-management table */
 .ct-section-row td {
   padding-top: 14px; font-size: 12px; font-weight: 600;
