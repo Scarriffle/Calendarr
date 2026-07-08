@@ -4,6 +4,9 @@ import SwiftUI
 // past 2100 — enough room for any vacation that's actually getting planned.
 private let weeksBack = 520
 private let weeksAhead = 4000
+// Paged mode uses one page per month over a bounded range (keeps the TabView light).
+private let monthsBack = 120
+private let monthsAhead = 600
 private let weekdayHeaderHeight: CGFloat = 28
 private let dayNumberRowHeight: CGFloat = 22
 private let laneHeight: CGFloat = 16
@@ -26,11 +29,27 @@ struct MonthView: View {
     @AppStorage("textColor")         private var textHex = "#FFFFFF"
     @AppStorage("lineColor")         private var lineHex = "#3A3A3C"
     @AppStorage("textContrast")      private var textContrast = 3
+    @AppStorage("monthViewPaged")    private var monthPaged = false
 
     @State private var scrolledWeek: Date? = nil
     @State private var didInitialScroll = false
+    @State private var pagedMonth: Date = Calendar.current.date(
+        from: Calendar.current.dateComponents([.year, .month], from: .now)) ?? .now
 
     private var cal: Calendar { store.userCalendar }
+
+    /// First day of the month containing `date`.
+    private func monthStart(for date: Date) -> Date {
+        cal.date(from: cal.dateComponents([.year, .month], from: date)) ?? date
+    }
+
+    /// One entry per month across the bounded paged range.
+    private var monthStarts: [Date] {
+        let base = monthStart(for: .now)
+        return (-monthsBack...monthsAhead).compactMap {
+            cal.date(byAdding: .month, value: $0, to: base)
+        }
+    }
 
     private var weekStarts: [Date] {
         let today = cal.startOfDay(for: .now)
@@ -51,46 +70,92 @@ struct MonthView: View {
         VStack(spacing: 0) {
             headerRow
             Divider()
-            ScrollView {
-                LazyVStack(spacing: 0) {                    ForEach(weekStarts, id: \.self) { ws in
-                        WeekRow(weekStart: ws,
-                                store: store,
-                                dividerColor: Color(hex: dividerHex),
-                                labelColor: Color(hex: labelHex),
-                                textColor: Color(hex: textHex),
-                                lineColor: Color(hex: lineHex),
-                                language: appLang,
-                                onDayTap: onDayTap,
-                                onEventTap: onEventTap,
-                                onCreateEvent: onCreateEvent,
-                                onShowWeek: onShowWeek,
-                                onShowDay: onShowDay)
-                            .id(ws)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .scrollIndicators(.hidden)
-            .scrollPosition(id: $scrolledWeek, anchor: .top)
-            .onAppear {
-                if !didInitialScroll {
-                    didInitialScroll = true
-                    scrolledWeek = weekStart(for: store.currentDate)
-                    publishVisibleMonth(from: scrolledWeek)
+            if monthPaged { pagedBody } else { scrollBody }
+        }
+    }
+
+    // Continuous vertical scroll feed (default).
+    private var scrollBody: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(weekStarts, id: \.self) { ws in
+                    weekRow(for: ws, fillHeight: false)
+                        .id(ws)
                 }
             }
-            .onChange(of: store.currentDate) { _, newDate in
-                let target = weekStart(for: newDate)
-                if scrolledWeek != target {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        scrolledWeek = target
-                    }
-                }
-            }
-            .onChange(of: scrolledWeek) { _, newWeek in
-                publishVisibleMonth(from: newWeek)
+            .scrollTargetLayout()
+        }
+        .scrollIndicators(.hidden)
+        .scrollPosition(id: $scrolledWeek, anchor: .top)
+        .onAppear {
+            if !didInitialScroll {
+                didInitialScroll = true
+                scrolledWeek = weekStart(for: store.currentDate)
+                publishVisibleMonth(from: scrolledWeek)
             }
         }
+        .onChange(of: store.currentDate) { _, newDate in
+            let target = weekStart(for: newDate)
+            if scrolledWeek != target {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    scrolledWeek = target
+                }
+            }
+        }
+        .onChange(of: scrolledWeek) { _, newWeek in
+            publishVisibleMonth(from: newWeek)
+        }
+    }
+
+    // One month per page, swipe left/right to change month.
+    private var pagedBody: some View {
+        TabView(selection: $pagedMonth) {
+            ForEach(monthStarts, id: \.self) { m in
+                monthGrid(for: m).tag(m)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .onAppear {
+            pagedMonth = monthStart(for: store.currentDate)
+            if store.visibleMonth != pagedMonth { store.visibleMonth = pagedMonth }
+        }
+        .onChange(of: pagedMonth) { _, m in
+            if store.visibleMonth != m { store.visibleMonth = m }
+            // Drive the shared date so events for the new month load; guard the
+            // month so we don't fight the reverse onChange below.
+            if monthStart(for: store.currentDate) != m { store.currentDate = m }
+        }
+        .onChange(of: store.currentDate) { _, d in
+            let m = monthStart(for: d)
+            if pagedMonth != m { withAnimation(.easeInOut(duration: 0.25)) { pagedMonth = m } }
+        }
+    }
+
+    /// A single month page: six height-filling week rows.
+    private func monthGrid(for month: Date) -> some View {
+        let firstWeek = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: month)) ?? month
+        let weeks = (0..<6).compactMap { cal.date(byAdding: .weekOfYear, value: $0, to: firstWeek) }
+        return VStack(spacing: 0) {
+            ForEach(weeks, id: \.self) { ws in
+                weekRow(for: ws, fillHeight: true)
+            }
+        }
+    }
+
+    private func weekRow(for ws: Date, fillHeight: Bool) -> some View {
+        WeekRow(weekStart: ws,
+                fillHeight: fillHeight,
+                store: store,
+                dividerColor: Color(hex: dividerHex),
+                labelColor: Color(hex: labelHex),
+                textColor: Color(hex: textHex),
+                lineColor: Color(hex: lineHex),
+                language: appLang,
+                onDayTap: onDayTap,
+                onEventTap: onEventTap,
+                onCreateEvent: onCreateEvent,
+                onShowWeek: onShowWeek,
+                onShowDay: onShowDay)
     }
 
     private var headerRow: some View {
@@ -126,6 +191,8 @@ struct MonthView: View {
 
 private struct WeekRow: View {
     let weekStart: Date
+    // Scroll mode uses a fixed row height; paged mode fills the page evenly.
+    var fillHeight: Bool = false
     let store: CalendarStore
     let dividerColor: Color
     let labelColor: Color
@@ -252,7 +319,7 @@ private struct WeekRow: View {
                                 onCreateEvent: { onCreateEvent(day) },
                                 onShowWeek: { onShowWeek(day) },
                                 onShowDay: { onShowDay(day) })
-                            .frame(width: cellW, height: rowHeight)
+                            .frame(width: cellW, height: geo.size.height)
                     }
                 }
 
@@ -271,12 +338,13 @@ private struct WeekRow: View {
                 if let b = midRowBoundaryCol {
                     Rectangle()
                         .fill(dividerColor)
-                        .frame(width: 1.5, height: rowHeight)
+                        .frame(width: 1.5, height: geo.size.height)
                         .offset(x: CGFloat(b) * cellW - 0.75, y: 0)
                 }
             }
         }
-        .frame(height: rowHeight)
+        .frame(height: fillHeight ? nil : rowHeight)
+        .frame(maxHeight: fillHeight ? .infinity : nil)
     }
 }
 

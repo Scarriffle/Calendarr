@@ -22,6 +22,8 @@ struct SettingsView: View {
     @AppStorage("defaultView")       private var defaultView = "month"
     @AppStorage("weekStartDay")      private var weekStartDay = "monday"
     @AppStorage("dimPastEvents")     private var dimPastEvents = false
+    // Device-local: month view as horizontal paged (swipe) vs. scroll feed.
+    @AppStorage("monthViewPaged")    private var monthViewPaged = false
     @AppStorage("defaultReminderMinutes") private var defaultReminderMinutes = -1
     @AppStorage("defaultEventDurationMinutes") private var defaultEventDurationMinutes = 60
 
@@ -386,6 +388,8 @@ struct SettingsView: View {
                 Text(L10n.t("settings.sunday", appLang)).tag("sunday")
             }
             Toggle(L10n.t("settings.dimpast", appLang), isOn: $dimPastEvents)
+                .tint(Color.accentColor)
+            Toggle(L10n.t("settings.month_paged", appLang), isOn: $monthViewPaged)
                 .tint(Color.accentColor)
         }
     }
