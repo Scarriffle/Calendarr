@@ -1,4 +1,4 @@
-import { isToday, isPast, isSameDay, dayOfWeek, weekStart, getISOWeekNumber } from '../utils.js';
+import { isToday, isPast, isSameDay, dayOfWeek, weekStart, getISOWeekNumber, eventTitle, birthdayIconSvg } from '../utils.js';
 import { t } from '../i18n.js';
 
 const LANE_H   = 20; // px per lane (event height 18px + 2px gap)
@@ -110,14 +110,15 @@ export function renderMonth(container, currentDate, events, onDayClick, onEventC
       const pastCls  = isPast(ev) ? 'past' : '';
       const cL = continuesLeft  ? 'continues-left'  : '';
       const cR = continuesRight ? 'continues-right' : '';
-      const titleEsc = escHtml(ev.title);
+      const titleEsc = escHtml(eventTitle(ev));
+      const icon = ev.is_birthday ? birthdayIconSvg() : '';
       const labelHtml = ev.allDay
-        ? titleEsc
-        : `<span class="month-event-time">${escHtml(fmtTime(new Date(ev.start)))}</span> ${titleEsc}`;
+        ? icon + titleEsc
+        : `<span class="month-event-time">${escHtml(fmtTime(new Date(ev.start)))}</span> ${icon}${titleEsc}`;
       eventsHtml += `<div class="month-span-event ${pastCls} ${cL} ${cR}"
         data-id="${ev.id}" data-url="${escAttr(ev.url)}"
         style="left:${leftPct.toFixed(3)}%;width:${widthPct.toFixed(3)}%;top:${topPx}px;background:${color}"
-        title="${escAttr(ev.title)}">${labelHtml}</div>`;
+        title="${escAttr(eventTitle(ev))}">${labelHtml}</div>`;
     });
 
     // "+N more" per column
@@ -292,7 +293,7 @@ function showOverflowPopup(anchor, date, events, onEventClick) {
         + (continuesLeft  ? ' continues-left'  : '')
         + (continuesRight ? ' continues-right' : '');
       bar.style.background = color;
-      bar.textContent = ev.title;
+      bar.innerHTML = (ev.is_birthday ? birthdayIconSvg() : '') + escHtml(eventTitle(ev));
       bar.addEventListener('click', e => {
         e.stopPropagation();
         popup.remove();
@@ -314,7 +315,7 @@ function showOverflowPopup(anchor, date, events, onEventClick) {
 
       const title = document.createElement('span');
       title.className = 'mop-title';
-      title.textContent = ev.title;
+      title.innerHTML = (ev.is_birthday ? birthdayIconSvg() : '') + escHtml(eventTitle(ev));
 
       row.append(dot, time, title);
       row.addEventListener('click', e => {

@@ -165,6 +165,15 @@ a { color: var(--primary); text-decoration: none; }
 }
 .btn-fab:active { transform: translateY(0) scale(.985); }
 
+/* Split create button: main "Erstellen" action + a caret that opens a small
+   menu (new event / new birthday). */
+.create-split { display: flex; align-items: stretch; gap: 4px; margin: 16px 12px 8px; }
+.create-split .btn-fab { margin: 0; }
+.create-split .create-main { flex: 1; justify-content: center; }
+.create-split .create-caret { flex: 0 0 auto; padding: 12px 12px; }
+.create-split .create-caret svg { width: 18px; height: 18px; }
+.create-menu { left: 0; right: auto; min-width: 200px; }
+
 /* Circular icon buttons (topbar nav, modal close, etc.) */
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;

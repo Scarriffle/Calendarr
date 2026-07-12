@@ -1,4 +1,4 @@
-import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber } from '../utils.js';
+import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber, eventTitle, birthdayIconSvg } from '../utils.js';
 import { t } from '../i18n.js';
 
 export function renderWeek(container, currentDate, events, onSlotClick, onEventClick, isSingleDay = false, weekStartDay = 'monday', hourH = 60) {
@@ -77,11 +77,12 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
     const cL = evStart < firstDay ? 'continues-left' : '';
     const cR = (ev.allDay ? evEnd > lastDay : evEnd > lastDayMidnight) ? 'continues-right' : '';
     const label = isMultiTimed && isSameDay(new Date(ev.start), days[colStart])
-      ? `${fmtTime(new Date(ev.start))} ${ev.title}`
-      : ev.title;
+      ? `${fmtTime(new Date(ev.start))} ${eventTitle(ev)}`
+      : eventTitle(ev);
+    const icon = ev.is_birthday ? birthdayIconSvg() : '';
     return `<div class="allday-span ${pastCls} ${multiCls} ${cL} ${cR}"
       style="left:calc(${left.toFixed(2)}% + 1px);width:calc(${width.toFixed(2)}% - 2px);top:${top}px;background:${color};color:#fff"
-      data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(ev.title)}">${escHtml(label)}</div>`;
+      data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(eventTitle(ev))}">${icon}${escHtml(label)}</div>`;
   }).join('');
 
   const alldayBgCols = days.map(day =>
@@ -129,11 +130,12 @@ export function renderWeek(container, currentDate, events, onSlotClick, onEventC
       const isShort = height < 34;
       const shortCls = isShort ? 'short' : '';
       const locHtml = (!isShort && ev.location) ? `<div class="ev-loc">${escHtml(ev.location)}</div>` : '';
+      const icon = ev.is_birthday ? birthdayIconSvg() : '';
       return `<div class="timed-event ${pastCls} ${shortCls}"
         style="top:${top}px;height:${height}px;left:${left}%;width:${width}%;background:${color};color:#fff"
-        data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(ev.title)}">
+        data-id="${ev.id}" data-url="${escAttr(ev.url)}" title="${escAttr(eventTitle(ev))}">
         <div class="ev-time">${startStr}</div>
-        <div class="ev-title">${escHtml(ev.title)}</div>
+        <div class="ev-title">${icon}${escHtml(eventTitle(ev))}</div>
         ${locHtml}
       </div>`;
     }).join('');

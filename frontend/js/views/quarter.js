@@ -1,4 +1,4 @@
-import { isToday, isPast, dayOfWeek } from '../utils.js';
+import { isToday, isPast, dayOfWeek, eventTitle } from '../utils.js';
 import { t } from '../i18n.js';
 
 export function renderQuarter(container, currentDate, events, onDayClick, onEventClick, weekStartDay = 'monday') {
@@ -64,7 +64,7 @@ export function renderQuarter(container, currentDate, events, onDayClick, onEven
         const dots = cellEvs.slice(0, 3).map(ev => {
           const color = ev.color || ev.calendarColor || '#4285f4';
           const pastCls = isPast(ev) ? 'past' : '';
-          return `<span class="qtr-dot ${pastCls}" style="background:${color}" title="${escAttr(ev.title)}" data-id="${ev.id}" data-url="${escAttr(ev.url || '')}"></span>`;
+          return `<span class="qtr-dot ${pastCls}" style="background:${color}" title="${escAttr(eventTitle(ev))}" data-id="${ev.id}" data-url="${escAttr(ev.url || '')}"></span>`;
         }).join('');
         const moreDot = cellEvs.length > 3
           ? `<span class="qtr-dot-more">+${cellEvs.length - 3}</span>`

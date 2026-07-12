@@ -158,10 +158,19 @@
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-inner">
-        <button class="btn btn-fab" id="btn-create-event">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          <span data-i18n="btn_create">Erstellen</span>
-        </button>
+        <div class="create-split add-cal-dropdown-wrap">
+          <button class="btn btn-fab create-main" id="btn-create-event">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            <span data-i18n="btn_create">Erstellen</span>
+          </button>
+          <button class="btn btn-fab create-caret" id="btn-create-menu" data-i18n-title="birthday_new" title="Neuer Geburtstag" aria-haspopup="menu" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M7 10l5 5 5-5z"/></svg>
+          </button>
+          <div class="add-cal-dropdown create-menu hidden" id="create-menu" role="menu">
+            <button data-action="event" data-i18n="create_event_option">Neuer Termin</button>
+            <button data-action="birthday" data-i18n="birthday_new">Neuer Geburtstag</button>
+          </div>
+        </div>
 
         <!-- Mini Calendar -->
         <div class="mini-cal" id="mini-cal">
@@ -581,10 +590,54 @@
           <div class="ev-color-preview" id="local-cal-color-preview" style="background:#34a853" title="Farbe wählen"></div>
         </div>
       </div>
+      <div class="form-group">
+        <label class="checkbox-row">
+          <input type="checkbox" id="local-cal-birthday" />
+          <span data-i18n="birthday_calendar">Geburtstagskalender</span>
+        </label>
+        <div class="form-hint" id="local-cal-birthday-hint" data-i18n="birthday_calendar_hint">Ganztägige, jährliche Termine mit Alter und Geburtstags-Icon.</div>
+      </div>
+      <div class="form-group hidden" id="local-cal-notify-group">
+        <label data-i18n="birthday_notify">Erinnerung</label>
+        <select id="local-cal-notify"></select>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" data-modal="modal-local-cal">Abbrechen</button>
       <button class="btn btn-primary" id="local-cal-save">Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Birthday modal -->
+<div id="modal-birthday" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-header">
+      <h3 data-i18n="birthday_modal_title">Neuen Geburtstag hinzufügen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-birthday">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="birthday-no-cals" class="form-hint hidden" data-i18n="birthday_no_calendars"></div>
+      <div class="form-group">
+        <label data-i18n="birthday_person">Name</label>
+        <input type="text" id="birthday-name" data-i18n-ph="birthday_person_ph" placeholder="Name der Person" />
+      </div>
+      <div class="form-group">
+        <label data-i18n="birthday_date">Geburtstag</label>
+        <input type="date" id="birthday-date" />
+        <label class="checkbox-inline" style="margin-top:8px">
+          <input type="checkbox" id="birthday-year-unknown" />
+          <span data-i18n="birthday_year_unknown">Jahr unbekannt</span>
+        </label>
+      </div>
+      <div class="form-group" id="birthday-cal-group">
+        <label data-i18n="birthday_target">Geburtstagskalender</label>
+        <select id="birthday-cal"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal="modal-birthday" data-i18n="cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="birthday-save" data-i18n="save">Speichern</button>
     </div>
   </div>
 </div>

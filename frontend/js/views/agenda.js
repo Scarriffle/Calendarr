@@ -1,4 +1,4 @@
-import { isPast } from '../utils.js';
+import { isPast, eventTitle, birthdayIconSvg } from '../utils.js';
 import { t, getLang } from '../i18n.js';
 
 export function renderAgenda(container, currentDate, events, onEventClick) {
@@ -45,7 +45,7 @@ export function renderAgenda(container, currentDate, events, onEventClick) {
         return `<div class="agenda-event ${pastCls}" data-id="${ev.id}" data-url="${escAttr(ev.url)}">
           <div class="agenda-ev-color" style="background:${color}"></div>
           <div class="agenda-ev-info">
-            <div class="agenda-ev-title">${escHtml(ev.title)}</div>
+            <div class="agenda-ev-title">${ev.is_birthday ? birthdayIconSvg() : ''}${escHtml(eventTitle(ev))}</div>
             <div class="agenda-ev-meta">${timeStr}${locHtml}</div>
           </div>
         </div>`;
