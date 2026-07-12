@@ -24,6 +24,11 @@ struct AccountsView: View {
     @State private var exportDoc: ExportedICS?
     @State private var infoMessage: String?
 
+    // Contacts → birthday-calendar sync (opt-in, bound to one birthday calendar).
+    @AppStorage("birthdaysSyncEnabled") private var birthdaysSyncEnabled = false
+    @AppStorage("birthdaysSyncCalendarId") private var birthdaysSyncCalendarId = 0
+    @State private var isSyncingBirthdays = false
+
     @AppStorage("appLanguage") private var appLang = "system"
 
     var body: some View {
@@ -36,9 +41,13 @@ struct AccountsView: View {
                         if !banishedKeys.isEmpty { banishedSection }
                         caldavSection
                         localSection
+                        birthdayContactsSection
                         icalSection
                         googleSection
                         haSection
+                    }
+                    .onChange(of: birthdaysSyncEnabled) { _, on in
+                        if on { Task { _ = await BirthdaysImporter.requestAccess() } }
                     }
                 }
             }
@@ -211,6 +220,52 @@ struct AccountsView: View {
         } header: {
             Text(L10n.t("accounts.local.header", appLang))
         }
+    }
+
+    private var birthdayCalendars: [LocalCalendar] {
+        localCalendars.filter { $0.isBirthday && ($0.owned || $0.permission == "read_write") }
+    }
+
+    @ViewBuilder var birthdayContactsSection: some View {
+        Section {
+            Toggle(L10n.t("birthday.contacts.sync", appLang), isOn: $birthdaysSyncEnabled)
+            if birthdaysSyncEnabled {
+                if birthdayCalendars.isEmpty {
+                    Text(L10n.t("birthday.contacts.need_calendar", appLang))
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Picker(L10n.t("birthday.contacts.target", appLang), selection: $birthdaysSyncCalendarId) {
+                        ForEach(birthdayCalendars) { c in Text(c.name).tag(c.id) }
+                    }
+                    Button {
+                        Task { await syncBirthdays() }
+                    } label: {
+                        HStack {
+                            Text(L10n.t("birthday.contacts.sync_now", appLang))
+                            if isSyncingBirthdays { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(isSyncingBirthdays || birthdaysSyncCalendarId == 0)
+                }
+            }
+        } header: {
+            Text(L10n.t("birthday.contacts.header", appLang))
+        } footer: {
+            Text(L10n.t("birthday.contacts.hint", appLang))
+        }
+    }
+
+    private func syncBirthdays() async {
+        isSyncingBirthdays = true
+        defer { isSyncingBirthdays = false }
+        guard await BirthdaysImporter.requestAccess() else {
+            errorAlert = L10n.t("birthday.contacts.denied", appLang)
+            return
+        }
+        await BirthdaysImporter.sync(api: api)
+        infoMessage = L10n.t("birthday.contacts.synced", appLang)
+        // Let the calendar refresh so imported birthdays show up right away.
+        NotificationCenter.default.post(name: .manualSyncRequested, object: nil)
     }
 
     var icalSection: some View {
@@ -419,6 +474,10 @@ struct AccountsView: View {
             CalendarStore.saveBanishedKeys(b)
             NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
         }
+        // Default the Contacts-sync target to the first birthday calendar.
+        if birthdaysSyncCalendarId == 0, let first = birthdayCalendars.first?.id {
+            birthdaysSyncCalendarId = first
+        }
         isLoading = false
     }
 
@@ -536,6 +595,8 @@ struct AddLocalCalSheet: View {
 
     @State private var name = ""
     @State private var color = Color(hex: "#34a853")
+    @State private var isBirthday = false
+    @State private var notifyDays = -1   // -1 = off, 0 = on the day, N = days before
     @State private var isLoading = false
     @State private var error = ""
 
@@ -545,6 +606,14 @@ struct AddLocalCalSheet: View {
                 Section {
                     TextField(L10n.t("local.name", appLang), text: $name)
                     ColorPicker(L10n.t("local.color", appLang), selection: $color, supportsOpacity: false)
+                }
+                Section {
+                    Toggle(L10n.t("birthday.is_calendar", appLang), isOn: $isBirthday)
+                    if isBirthday {
+                        BirthdayNotifyPicker(days: $notifyDays, appLang: appLang)
+                    }
+                } footer: {
+                    if isBirthday { Text(L10n.t("birthday.is_calendar.desc", appLang)) }
                 }
                 if !error.isEmpty {
                     Section { Text(error).foregroundStyle(.red) }
@@ -568,11 +637,32 @@ struct AddLocalCalSheet: View {
     private func save() async {
         isLoading = true
         do {
-            _ = try await api.addLocalCalendar(name: name, color: color.toHex())
+            _ = try await api.addLocalCalendar(
+                name: name, color: color.toHex(),
+                isBirthday: isBirthday,
+                birthdayNotifyDaysBefore: (isBirthday && notifyDays >= 0) ? notifyDays : nil)
             await onDone()
             dismiss()
         } catch { self.error = error.localizedDescription }
         isLoading = false
+    }
+}
+
+/// Reusable "notify N days before" picker for birthday calendars.
+/// -1 = off, 0 = on the day, N = N days before.
+struct BirthdayNotifyPicker: View {
+    @Binding var days: Int
+    let appLang: String
+
+    var body: some View {
+        Picker(L10n.t("birthday.notify", appLang), selection: $days) {
+            Text(L10n.t("birthday.notify.off", appLang)).tag(-1)
+            Text(L10n.t("birthday.notify.same_day", appLang)).tag(0)
+            Text(L10n.t("birthday.notify.one_day", appLang)).tag(1)
+            ForEach([2, 3, 7], id: \.self) { d in
+                Text(String(format: L10n.t("birthday.notify.days", appLang), d)).tag(d)
+            }
+        }
     }
 }
 

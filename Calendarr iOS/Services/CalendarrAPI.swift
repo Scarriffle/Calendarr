@@ -135,14 +135,37 @@ class CalendarrAPI {
         return (try? JSONDecoder().decode([LocalCalendar].self, from: data)) ?? []
     }
 
-    func addLocalCalendar(name: String, color: String) async throws -> LocalCalendar {
-        let data = try await request("/api/local/calendars", method: "POST", body: ["name": name, "color": color])
+    func addLocalCalendar(name: String, color: String,
+                          isBirthday: Bool = false,
+                          birthdayNotifyDaysBefore: Int? = nil) async throws -> LocalCalendar {
+        var body: [String: Any] = ["name": name, "color": color]
+        if isBirthday { body["is_birthday"] = true }
+        if let d = birthdayNotifyDaysBefore { body["birthday_notify_days_before"] = d }
+        let data = try await request("/api/local/calendars", method: "POST", body: body)
         guard let cal = try? JSONDecoder().decode(LocalCalendar.self, from: data) else { throw APIError.decodingError }
         return cal
     }
 
     func deleteLocalCalendar(id: Int) async throws {
         _ = try await request("/api/local/calendars/\(id)", method: "DELETE")
+    }
+
+    /// Update a local calendar's birthday settings. `is_birthday` marks it as a
+    /// birthday calendar; `notifyDaysBefore` sets the reminder (nil sends the -1
+    /// sentinel to clear it server-side).
+    func updateLocalCalendarBirthday(id: Int, isBirthday: Bool?, notifyDaysBefore: Int??) async throws {
+        var body: [String: Any] = [:]
+        if let b = isBirthday { body["is_birthday"] = b }
+        if let n = notifyDaysBefore { body["birthday_notify_days_before"] = n ?? -1 }
+        guard !body.isEmpty else { return }
+        _ = try await request("/api/local/calendars/\(id)", method: "PUT", body: body)
+    }
+
+    /// Raw (unexpanded) rows of a birthday calendar, used by the Contacts
+    /// importer to reconcile by `external_uid`.
+    func getBirthdayEntries(calendarId: Int) async throws -> [BirthdayEntry] {
+        let data = try await request("/api/local/calendars/\(calendarId)/birthdays")
+        return (try? JSONDecoder().decode([BirthdayEntry].self, from: data)) ?? []
     }
 
     func getICalSubscriptions() async throws -> [ICalSubscription] {
@@ -236,7 +259,9 @@ class CalendarrAPI {
 
     func createLocalEvent(calendarId: Int, title: String, start: Date, end: Date,
                           isAllDay: Bool, location: String, description: String, color: String?,
-                          isPrivate: Bool = false, reminders: [Int]? = nil) async throws -> CalEvent {
+                          isPrivate: Bool = false, reminders: [Int]? = nil,
+                          rrule: String? = nil, externalUid: String? = nil,
+                          birthYear: Int? = nil) async throws -> CalEvent {
         var body: [String: Any] = [
             "calendar_id": calendarId,
             "title": title,
@@ -249,6 +274,9 @@ class CalendarrAPI {
         ]
         if let c = color, !c.isEmpty { body["color"] = c }
         if let reminders { body["reminders"] = reminders }
+        if let rrule, !rrule.isEmpty { body["rrule"] = rrule }
+        if let externalUid { body["external_uid"] = externalUid }
+        if let birthYear { body["birth_year"] = birthYear }
         let data = try await request("/api/local/events", method: "POST", body: body)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let ev = CalEvent.from(json: json) else { throw APIError.decodingError }
@@ -257,7 +285,9 @@ class CalendarrAPI {
 
     func updateLocalEvent(uid: String, title: String, start: Date, end: Date,
                           isAllDay: Bool, location: String, description: String, color: String?,
-                          isPrivate: Bool = false, reminders: [Int]? = nil) async throws {
+                          isPrivate: Bool = false, reminders: [Int]? = nil,
+                          rrule: String? = nil, externalUid: String? = nil,
+                          birthYear: Int? = nil) async throws {
         var body: [String: Any] = [
             "title": title,
             "start": formatISO(start, allDay: isAllDay),
@@ -269,6 +299,9 @@ class CalendarrAPI {
         ]
         if let c = color { body["color"] = c }
         if let reminders { body["reminders"] = reminders }
+        if let rrule { body["rrule"] = rrule }
+        if let externalUid { body["external_uid"] = externalUid }
+        if let birthYear { body["birth_year"] = birthYear }
         _ = try await request("/api/local/events/\(uid)", method: "PUT", body: body)
     }
 

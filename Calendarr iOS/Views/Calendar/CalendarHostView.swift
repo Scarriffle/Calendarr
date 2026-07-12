@@ -30,6 +30,7 @@ struct CalendarHostView: View {
     @State private var showFilter = false
     @State private var didApplyDefaultView = false
     @State private var groups: [CalGroup] = []
+    @State private var showNewBirthday = false
 
     private var titleString: String {
         if store.viewType == .month {
@@ -380,6 +381,21 @@ struct CalendarHostView: View {
 
     // MARK: – FAB buttons
 
+    /// Long-press menu on the create button: a plain new event, or a new birthday
+    /// (which opens a minimal name + date mask that only targets birthday calendars).
+    @ViewBuilder private var fabMenu: some View {
+        Button {
+            editorContext = .create(.now)
+        } label: {
+            Label(L10n.t("event.new_title", appLang), systemImage: "plus")
+        }
+        Button {
+            showNewBirthday = true
+        } label: {
+            Label(L10n.t("birthday.new", appLang), systemImage: "birthday.cake.fill")
+        }
+    }
+
     /// Standard solid FAB (flat mode)
     private var solidFAB: some View {
         Button {
@@ -393,6 +409,7 @@ struct CalendarHostView: View {
                 .clipShape(Circle())
                 .shadow(radius: 4, y: 2)
         }
+        .contextMenu { fabMenu }
         .padding(.trailing, 20).padding(.bottom, 20)
     }
 
@@ -410,6 +427,7 @@ struct CalendarHostView: View {
             }
             .buttonStyle(.plain)
             .glassEffect(in: Circle())
+            .contextMenu { fabMenu }
             .padding(.trailing, 20).padding(.bottom, 20)
         } else {
             solidFAB
@@ -421,6 +439,7 @@ struct CalendarHostView: View {
     private var calendarSheets: CalendarSheets {
         CalendarSheets(store: store, editorContext: $editorContext,
                        selectedEvent: $selectedEvent, showFilter: $showFilter,
+                       showNewBirthday: $showNewBirthday,
                        api: api,
                        reload: { await onNavigate() },
                        reloadForce: { await reloadVisible(force: true) })
@@ -448,6 +467,14 @@ struct CalendarHostView: View {
         // 2. Background prefetch for the configured range (non-blocking)
         Task(priority: .background) {
             await store.prefetchBackground(api: api, months: cacheMonths)
+        }
+        // 2b. Mirror Contacts birthdays into the bound birthday calendar, if the
+        //     user enabled it, then refresh so new birthdays appear immediately.
+        if BirthdaysImporter.isEnabled {
+            Task(priority: .background) {
+                await BirthdaysImporter.sync(api: api)
+                await forceReload()
+            }
         }
         // 3. Periodic settings + visibility pull (tied to this .task's lifetime).
         while !Task.isCancelled {
@@ -538,12 +565,16 @@ private struct CalendarSheets: ViewModifier {
     @Binding var editorContext: CalEditorContext?
     @Binding var selectedEvent: CalEvent?
     @Binding var showFilter: Bool
+    @Binding var showNewBirthday: Bool
     let api: CalendarrAPI
     let reload: () async -> Void
     let reloadForce: () async -> Void
 
     func body(content: Content) -> some View {
         content
+            .sheet(isPresented: $showNewBirthday) {
+                BirthdayEditorSheet(api: api) { await reloadForce() }
+            }
             // Use sheet(item:) so the editing event is captured atomically –
             // avoiding the race where sheet(isPresented:) evaluates its content
             // before the editingEvent state update propagates.

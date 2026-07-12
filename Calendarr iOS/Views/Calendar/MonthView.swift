@@ -519,7 +519,7 @@ private struct DayPreviewAllDayBar: View {
         let dayEnd   = cal.date(byAdding: .day, value: 1, to: dayStart)!
         let cLeft    = event.startDate < dayStart
         let cRight   = event.endDate   > dayEnd   // endDate is exclusive for allDay
-        Text(event.title)
+        EventLabel(event: event)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.white)
             .lineLimit(1)
@@ -580,7 +580,7 @@ private struct DayPreviewTimedRow: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .frame(width: 44, alignment: .leading)
-            Text(event.title)
+            EventLabel(event: event)
                 .font(.system(size: 11, weight: .medium))
                 .lineLimit(1)
             Spacer(minLength: 0)
@@ -604,7 +604,7 @@ private struct EventBar: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            Text(event.title)
+            EventLabel(event: event)
                 .font(.system(size: 10, weight: .medium))
                 .lineLimit(1)
                 .foregroundStyle(.white)

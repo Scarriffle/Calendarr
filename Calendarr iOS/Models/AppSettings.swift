@@ -114,11 +114,17 @@ struct LocalCalendar: Codable, Identifiable {
     var permission: String? = nil
     var group: Bool = false
     var remindersEnabled: Bool = true
+    // Birthday calendar: events are all-day yearly; server renders age + cake icon.
+    var isBirthday: Bool = false
+    // Days before a birthday to remind (0 = on the day). nil = no reminder.
+    var birthdayNotifyDaysBefore: Int? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, name, color, enabled, owned, permission, group
         case sharedBy = "shared_by"
         case remindersEnabled = "reminders_enabled"
+        case isBirthday = "is_birthday"
+        case birthdayNotifyDaysBefore = "birthday_notify_days_before"
     }
 
     init(from decoder: Decoder) throws {
@@ -132,6 +138,8 @@ struct LocalCalendar: Codable, Identifiable {
         permission = try c.decodeIfPresent(String.self, forKey: .permission)
         group     = try c.decodeIfPresent(Bool.self, forKey: .group) ?? false
         remindersEnabled = try c.decodeIfPresent(Bool.self, forKey: .remindersEnabled) ?? true
+        isBirthday = try c.decodeIfPresent(Bool.self, forKey: .isBirthday) ?? false
+        birthdayNotifyDaysBefore = try c.decodeIfPresent(Int.self, forKey: .birthdayNotifyDaysBefore)
     }
 }
 

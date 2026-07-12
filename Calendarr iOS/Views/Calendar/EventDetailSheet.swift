@@ -62,7 +62,7 @@ struct EventDetailSheet: View {
                             .fill(Color(hex: event.effectiveColor))
                             .frame(width: 6, height: 44)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(event.title)
+                            Text(event.renderTitle)
                                 .font(.title3.bold())
                             Text(event.calendarName)
                                 .font(.caption)
@@ -156,7 +156,7 @@ struct EventDetailSheet: View {
                 }
                 Button(L10n.t("common.cancel", appLang), role: .cancel) {}
             } message: {
-                Text("\"\(event.title)\" \(L10n.t("detail.delete_msg_suffix", appLang))")
+                Text("\"\(event.renderTitle)\" \(L10n.t("detail.delete_msg_suffix", appLang))")
             }
             .sheet(isPresented: $showCopySheet) {
                 EventEditorSheet(

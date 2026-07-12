@@ -84,7 +84,7 @@ struct WeekView: View {
                 VStack(spacing: 1) {
                     ForEach(dayEvs.prefix(2)) { ev in
                         Button { onEventTap(ev) } label: {
-                            Text(ev.title)
+                            EventLabel(event: ev)
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.white)
                                 .lineLimit(1)

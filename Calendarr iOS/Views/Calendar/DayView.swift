@@ -81,7 +81,7 @@ struct DayView: View {
             HStack(spacing: 6) {
                 ForEach(allDayEvents) { ev in
                     Button(action: { onEventTap(ev) }) {
-                        Text(ev.title)
+                        EventLabel(event: ev)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8).padding(.vertical, 4)

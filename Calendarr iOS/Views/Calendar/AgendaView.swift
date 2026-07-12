@@ -79,7 +79,7 @@ private struct AgendaEventRow: View {
                 .frame(width: 4, height: 40)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(event.title)
+                EventLabel(event: event)
                     .font(.body.weight(.medium))
                     .foregroundStyle(.primary)
                 HStack(spacing: 6) {

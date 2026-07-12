@@ -67,9 +67,16 @@ struct CalEvent: Identifiable, Hashable {
     var reminders: [Int] = []
     // True for events from a calendar shared with the user read-only.
     var readOnly: Bool = false
+    // True for events from a birthday calendar — clients show a cake icon and the
+    // server bakes the age into `displayTitle`.
+    var isBirthday: Bool = false
 
     // Group view supplies a server-resolved colour; otherwise per-event then calendar colour.
     var effectiveColor: String { displayColor ?? color ?? calendarColor }
+
+    // Title to render: the server-decorated one (birthday age, group prefix) wins
+    // over the raw title, which is kept for editing.
+    var renderTitle: String { displayTitle ?? title }
 
     static func from(json: [String: Any]) -> CalEvent? {
         guard
@@ -110,7 +117,8 @@ struct CalEvent: Identifiable, Hashable {
             displayColor: (json["display_color"] as? String).flatMap { $0.isEmpty ? nil : $0 },
             displayTitle: (json["display_title"] as? String).flatMap { $0.isEmpty ? nil : $0 },
             reminders: (json["reminders"] as? [Int]) ?? (json["reminders"] as? [Any])?.compactMap { ($0 as? Int) ?? Int("\($0)") } ?? [],
-            readOnly: json["read_only"] as? Bool ?? false
+            readOnly: json["read_only"] as? Bool ?? false,
+            isBirthday: json["is_birthday"] as? Bool ?? false
         )
     }
 }
@@ -173,4 +181,22 @@ func formatISO(_ date: Date, allDay: Bool) -> String {
         return dateOnly.string(from: date)
     }
     return isoBasic.string(from: date)
+}
+
+/// Inline label for an event in a calendar grid: a leading birthday (cake) icon
+/// when the event is a birthday, followed by the render title (which carries the
+/// server-computed age). Icon and text inherit the surrounding font/colour, so
+/// the label matches whatever bar it's dropped into.
+struct EventLabel: View {
+    let event: CalEvent
+    var body: some View {
+        if event.isBirthday {
+            HStack(spacing: 3) {
+                Image(systemName: "birthday.cake.fill").imageScale(.small)
+                Text(event.renderTitle)
+            }
+        } else {
+            Text(event.renderTitle)
+        }
+    }
 }

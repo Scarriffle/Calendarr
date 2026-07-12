@@ -74,7 +74,7 @@ struct EventBlock: View {
             .fill(Color(hex: event.effectiveColor).opacity(0.85))
             .overlay(alignment: .topLeading) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(event.title)
+                    EventLabel(event: event)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(2)
