@@ -132,6 +132,25 @@ def build_local_event_dict(
         "private": bool(ev.is_private),
         "reminders": [int(x) for x in (ev.reminders or "").split(",") if x.strip().lstrip("-").isdigit()],
     }
+    # Birthday calendars: the server owns the presentation. It flags the event so
+    # clients can show a cake icon, appends the age computed for THIS occurrence
+    # (so it stays correct as years pass), and — when the calendar defines a
+    # "notify N days before" — injects a reminder so the mobile schedulers fire
+    # it. Web has no notification delivery, so the reminder is display-only there.
+    if getattr(cal, "is_birthday", False):
+        d["is_birthday"] = True
+        display = ev.title
+        if ev.birth_year:
+            try:
+                occ_year = int(str(d["start"])[:4])
+                age = occ_year - int(ev.birth_year)
+                if age >= 0:
+                    display = f"{ev.title} ({age})"
+            except (ValueError, TypeError):
+                pass
+        d["display_title"] = display
+        if not d["reminders"] and cal.birthday_notify_days_before is not None:
+            d["reminders"] = [int(cal.birthday_notify_days_before) * 1440]
     if owner is not None:
         d["owner"] = owner
     if is_group_event:

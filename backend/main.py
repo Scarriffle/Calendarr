@@ -259,6 +259,29 @@ def _migrate():
         except Exception:
             pass
 
+        # Birthday calendars: flag + per-calendar "notify N days before".
+        for col, ddl in (
+            ("is_birthday", "ALTER TABLE local_calendars ADD COLUMN is_birthday BOOLEAN DEFAULT 0"),
+            ("birthday_notify_days_before", "ALTER TABLE local_calendars ADD COLUMN birthday_notify_days_before INTEGER"),
+        ):
+            try:
+                conn.execute(text(ddl))
+                conn.commit()
+                logging.info("Migration: added %s to local_calendars", col)
+            except Exception:
+                pass
+        # Birthday events: stable external id (Contacts dedup) + birth year.
+        for col, ddl in (
+            ("external_uid", "ALTER TABLE local_events ADD COLUMN external_uid VARCHAR(255)"),
+            ("birth_year", "ALTER TABLE local_events ADD COLUMN birth_year INTEGER"),
+        ):
+            try:
+                conn.execute(text(ddl))
+                conn.commit()
+                logging.info("Migration: added %s to local_events", col)
+            except Exception:
+                pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)

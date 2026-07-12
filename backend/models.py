@@ -153,6 +153,12 @@ class LocalCalendar(Base):
     caldav_published = Column(Boolean, default=False, nullable=False)
     dav_token = Column(String(64), nullable=True, unique=True)
     dav_ctag = Column(String(32), nullable=True)
+    # Birthday calendar: events are all-day, yearly-recurring; the server adds the
+    # age suffix ("Anna (30)") and an is_birthday flag so clients show a cake icon.
+    is_birthday = Column(Boolean, default=False, nullable=False)
+    # How many days before a birthday to remind (0 = on the day). NULL = no reminder.
+    # Injected as an event reminder on read so the mobile schedulers fire it.
+    birthday_notify_days_before = Column(Integer, nullable=True)
 
     user = relationship("User", back_populates="local_calendars")
     events = relationship("LocalEvent", back_populates="calendar", cascade="all, delete-orphan")
@@ -183,6 +189,11 @@ class LocalEvent(Base):
     is_private = Column(Boolean, default=False)
     # CalDAV entity tag — changes on every write so CalDAV clients detect updates.
     etag = Column(String(32), nullable=True)
+    # Stable external identity for imported entries (e.g. a Contacts birthday keyed
+    # by "contact:<id>"), so a re-sync can mirror the address book without dupes.
+    external_uid = Column(String(255), nullable=True, index=True)
+    # Birth year for birthday events; NULL = year unknown (no age shown).
+    birth_year = Column(Integer, nullable=True)
 
     calendar = relationship("LocalCalendar", back_populates="events")
     creator = relationship("User")

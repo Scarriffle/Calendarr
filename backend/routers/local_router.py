@@ -25,6 +25,8 @@ def _now_iso() -> str:
 class CalendarCreate(BaseModel):
     name: str
     color: str = "#34a853"
+    is_birthday: bool = False
+    birthday_notify_days_before: Optional[int] = None
 
 
 class CalendarUpdate(BaseModel):
@@ -33,6 +35,8 @@ class CalendarUpdate(BaseModel):
     enabled: Optional[bool] = None
     reminders_enabled: Optional[bool] = None
     caldav_published: Optional[bool] = None
+    is_birthday: Optional[bool] = None
+    birthday_notify_days_before: Optional[int] = None
 
 
 class EventCreate(BaseModel):
@@ -47,6 +51,8 @@ class EventCreate(BaseModel):
     rrule: Optional[str] = None
     private: bool = False
     reminders: Optional[List[int]] = None  # minutes before start (0 = at start)
+    external_uid: Optional[str] = None  # stable id for imported entries (Contacts dedup)
+    birth_year: Optional[int] = None    # birthday events; NULL = year unknown
 
 
 class EventUpdate(BaseModel):
@@ -61,6 +67,8 @@ class EventUpdate(BaseModel):
     exdate: Optional[str] = None
     private: Optional[bool] = None
     reminders: Optional[List[int]] = None
+    external_uid: Optional[str] = None
+    birth_year: Optional[int] = None
 
 
 class ShareCreate(BaseModel):
@@ -80,6 +88,8 @@ def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
         "enabled": cal.enabled,
         "reminders_enabled": bool(cal.reminders_enabled),
         "caldav_published": bool(cal.caldav_published),
+        "is_birthday": bool(cal.is_birthday),
+        "birthday_notify_days_before": cal.birthday_notify_days_before,
         "type": "local",
         "owned": owned,
     }
@@ -205,6 +215,8 @@ def create_calendar(
         user_id=current_user.id,
         name=data.name,
         color=data.color,
+        is_birthday=data.is_birthday,
+        birthday_notify_days_before=data.birthday_notify_days_before,
     )
     db.add(cal)
     db.commit()
@@ -238,6 +250,14 @@ def update_calendar(
         cal.enabled = data.enabled
     if data.reminders_enabled is not None:
         cal.reminders_enabled = data.reminders_enabled
+    if data.is_birthday is not None:
+        cal.is_birthday = data.is_birthday
+    if data.birthday_notify_days_before is not None:
+        # -1 is the client's sentinel for "clear the reminder" (JSON has no way to
+        # send SQL NULL through an Optional that also means "unchanged").
+        cal.birthday_notify_days_before = (
+            None if data.birthday_notify_days_before < 0 else data.birthday_notify_days_before
+        )
     if data.caldav_published is not None:
         cal.caldav_published = data.caldav_published
         if data.caldav_published:
@@ -368,6 +388,8 @@ def create_event(
         rrule=data.rrule,
         is_private=data.private,
         reminders=(",".join(str(m) for m in data.reminders) if data.reminders else None),
+        external_uid=data.external_uid,
+        birth_year=data.birth_year,
         creator_id=current_user.id,  # server-side, never from the client
     )
     db.add(ev)
@@ -420,6 +442,11 @@ def update_event(
         ev.exdate = ",".join(dates)
     if data.reminders is not None:
         ev.reminders = ",".join(str(m) for m in data.reminders) if data.reminders else None
+    if data.external_uid is not None:
+        ev.external_uid = data.external_uid
+    if data.birth_year is not None:
+        # -1 is the client's sentinel for "clear" (year became unknown).
+        ev.birth_year = None if data.birth_year < 0 else data.birth_year
     dav_util.bump_dav(ev.calendar, ev)
     db.commit()
     return {"ok": True}
@@ -436,6 +463,42 @@ def delete_event(
     db.delete(ev)
     db.commit()
     return {"ok": True}
+
+
+@router.get("/calendars/{calendar_id}/birthdays")
+def list_birthday_entries(
+    calendar_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Raw (unexpanded) rows of a birthday calendar so a client importer can
+    reconcile against the address book by ``external_uid``. Contact-sourced rows
+    carry an ``external_uid``; manually added birthdays have ``None`` and must be
+    left untouched by the importer."""
+    cal = permissions.accessible_local_calendar(db, current_user, calendar_id, require_write=True)
+    events = (
+        db.query(models.LocalEvent)
+        .filter(models.LocalEvent.calendar_id == cal.id)
+        .all()
+    )
+    out = []
+    for ev in events:
+        month = day = None
+        try:
+            parts = (ev.start or "")[:10].split("-")
+            if len(parts) == 3:
+                month, day = int(parts[1]), int(parts[2])
+        except (ValueError, IndexError):
+            pass
+        out.append({
+            "uid": ev.uid,
+            "external_uid": ev.external_uid,
+            "title": ev.title,
+            "month": month,
+            "day": day,
+            "birth_year": ev.birth_year,
+        })
+    return out
 
 
 # ── Sharing (owner only) ──────────────────────────────────

@@ -420,10 +420,13 @@ def combined_events(
                 b["display_color"] = group_cal_color if is_group else member_color.get(owner_id)
                 # Decorated title (group icon / owner name) computed server-side
                 # so all clients render identically; raw `title` kept for editing.
-                b["display_title"] = _decorate_title(
-                    b.get("title", ""), is_group=is_group, creator=b.get("creator"),
-                    owner=owner, me_id=current_user.id,
-                )
+                # A birthday event already carries an age display_title from
+                # build_local_event_dict — keep it rather than clobber the age.
+                if not b.get("is_birthday"):
+                    b["display_title"] = _decorate_title(
+                        b.get("title", ""), is_group=is_group, creator=b.get("creator"),
+                        owner=owner, me_id=current_user.id,
+                    )
                 all_events.append(b)
 
     # Each member shares exactly one calendar into their groups, chosen in their
