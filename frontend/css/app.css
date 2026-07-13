@@ -1304,7 +1304,9 @@ a { color: var(--primary); text-decoration: none; }
   flex: 1; overflow-y: auto; padding: 24px 28px;
 }
 .settings-panel { display: none; }
-.settings-panel.active { display: block; }
+/* Constrain content to a comfortable reading column so fields don't stretch
+   edge-to-edge on wide screens. */
+.settings-panel.active { display: block; max-width: 680px; }
 
 /* Panel typography */
 .panel-title {
@@ -1498,7 +1500,9 @@ a { color: var(--primary); text-decoration: none; }
   background: var(--surface-2); color: var(--text-1);
 }
 .ct-dav-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; max-width: 640px; }
-.app-pw-create { display: flex; gap: 8px; align-items: center; }
+/* Row (not the column inherited from .form-group) so the "Erstellen" button
+   sits inline to the right of the name field instead of centred below it. */
+.app-pw-create { display: flex; flex-direction: row; gap: 8px; align-items: center; }
 .app-pw-create input { flex: 1; }
 
 /* Consistent placement for a section's action button: right-aligned, matching
