@@ -95,6 +95,21 @@ def update_settings(
     if data.private_event_visibility is not None and data.private_event_visibility not in ("hidden", "busy"):
         raise HTTPException(422, "private_event_visibility must be 'hidden' or 'busy'")
 
+    # A birthday calendar must never become the group-visible ("personal")
+    # calendar — it may be shared directly, but not stand in as your calendar in
+    # group views. Clients filter it out of the picker; this is the safety net.
+    if data.group_visible_calendar_id:
+        bcal = (
+            db.query(models.LocalCalendar)
+            .filter(
+                models.LocalCalendar.id == data.group_visible_calendar_id,
+                models.LocalCalendar.user_id == current_user.id,
+            )
+            .first()
+        )
+        if bcal is not None and bcal.is_birthday:
+            raise HTTPException(422, "A birthday calendar can't be your group-visible calendar")
+
     # For these three override colours, an explicit null is meaningful
     # ("reset to default") and must be persisted as NULL. All other fields
     # keep the previous behaviour where a null/missing value is ignored.

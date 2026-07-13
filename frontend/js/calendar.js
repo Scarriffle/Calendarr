@@ -3237,7 +3237,9 @@ function renderGroupVisibleList(selectedId) {
   const el = document.getElementById('cfg-group-visible-list');
   if (!el) return;
   el.dataset.selected = (selectedId == null) ? '' : String(selectedId);
-  const own = state.localCalendars.filter(c => c.owned !== false && !c.group);
+  // A birthday calendar may be shared directly, but never stand in as the
+  // group-visible personal calendar.
+  const own = state.localCalendars.filter(c => c.owned !== false && !c.group && !c.is_birthday);
   const selVal = el.dataset.selected;
   const row = (id, name, color) => {
     const val = (id == null) ? '' : String(id);
@@ -3631,7 +3633,26 @@ function renderBirthdaySettings() {
   const colorHint = document.createElement('div');
   colorHint.className = 'form-hint';
   colorHint.textContent = t('birthday_color_hint');
-  container.append(status, notifyWrap, colorHint);
+  const devicesWrap = document.createElement('div');
+  devicesWrap.style.marginTop = '12px';
+  container.append(status, notifyWrap, colorHint, devicesWrap);
+  // Which devices contribute birthdays (from Contacts sync).
+  api.get('/birthdays/devices').then(devs => {
+    if (!Array.isArray(devs) || !devs.length) return;
+    const title = document.createElement('div');
+    title.className = 'panel-desc';
+    title.style.margin = '0 0 4px';
+    title.textContent = t('birthday_devices_title');
+    devicesWrap.appendChild(title);
+    devs.forEach(d => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'form-hint';
+      rowEl.style.margin = '0 0 2px';
+      const when = d.last_sync ? new Date(d.last_sync).toLocaleDateString() : '';
+      rowEl.textContent = `${d.device_name} — ${t('birthday_devices_count', { n: d.count })}${when ? ' · ' + when : ''}`;
+      devicesWrap.appendChild(rowEl);
+    });
+  }).catch(() => {});
 }
 
 function renderHiddenCalendars() {

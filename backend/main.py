@@ -17,7 +17,7 @@ STATIC_CACHE = f"public, max-age={STATIC_MAX_AGE_SECONDS}, must-revalidate"
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import Base, engine
-from routers import auth_router, caldav_router, dav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
+from routers import auth_router, birthdays_router, caldav_router, dav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -325,6 +325,7 @@ app.include_router(caldav_router.router, prefix="/api/caldav", tags=["caldav"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 app.include_router(profile_router.router, prefix="/api/profile", tags=["profile"])
 app.include_router(local_router.router, prefix="/api/local", tags=["local"])
+app.include_router(birthdays_router.router, prefix="/api/birthdays", tags=["birthdays"])
 app.include_router(groups_router.router, prefix="/api/groups", tags=["groups"])
 app.include_router(ical_router.router, prefix="/api/ical", tags=["ical"])
 app.include_router(google_router.router, prefix="/api/google", tags=["google"])

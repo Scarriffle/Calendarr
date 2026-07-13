@@ -375,6 +375,26 @@ class GroupMember(Base):
     user = relationship("User")
 
 
+class BirthdaySyncDevice(Base):
+    """A device that has synced Contacts birthdays into the user's birthday
+    calendar. Powers the web "birthdays come from these devices" list. One row
+    per (user, device); the client sends a stable device_id + human name."""
+
+    __tablename__ = "birthday_sync_devices"
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", name="uq_birthday_sync_device"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    device_id = Column(String(64), nullable=False)
+    device_name = Column(String(120), nullable=False)
+    last_sync = Column(String(50), nullable=True)  # ISO 8601
+    count = Column(Integer, default=0)
+
+    user = relationship("User")
+
+
 class GroupCalendar(Base):
     """1:1 link between a group and its shared local calendar."""
 
