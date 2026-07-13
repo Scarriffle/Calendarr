@@ -165,14 +165,27 @@ a { color: var(--primary); text-decoration: none; }
 }
 .btn-fab:active { transform: translateY(0) scale(.985); }
 
-/* Split create button: main "Erstellen" action + a caret that opens a small
-   menu (new event / new birthday). */
-.create-split { display: flex; align-items: stretch; gap: 4px; margin: 16px 12px 8px; }
-.create-split .btn-fab { margin: 0; }
-.create-split .create-main { flex: 1; justify-content: center; }
-.create-split .create-caret { flex: 0 0 auto; padding: 12px 12px; }
+/* Split create button: one seamless pill — main "Erstellen" action on the left,
+   a caret section on the right that opens a small menu (new event / new birthday). */
+.create-split {
+  display: flex; align-items: stretch; margin: 16px 12px 8px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.create-split .btn-fab { margin: 0; box-shadow: none; border-radius: 0; }
+.create-split .btn-fab:hover { transform: none; box-shadow: none; filter: brightness(1.08); }
+.create-split .create-main { flex: 1; justify-content: center; border-radius: 999px 0 0 999px; }
+.create-split .create-caret {
+  flex: 0 0 auto; padding: 12px 14px; border-radius: 0 999px 999px 0;
+  border-left: 1px solid color-mix(in srgb, #fff 25%, transparent);
+}
 .create-split .create-caret svg { width: 18px; height: 18px; }
 .create-menu { left: 0; right: auto; min-width: 200px; }
+
+/* Birthday modal: day / month / year row */
+.birthday-date-row { display: flex; gap: 8px; }
+.birthday-date-row select { flex: 1; }
+.birthday-date-row #birthday-year { width: 90px; flex: 0 0 auto; }
 
 /* Circular icon buttons (topbar nav, modal close, etc.) */
 .icon-btn {
@@ -1487,6 +1500,10 @@ a { color: var(--primary); text-decoration: none; }
 .ct-dav-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; max-width: 640px; }
 .app-pw-create { display: flex; gap: 8px; align-items: center; }
 .app-pw-create input { flex: 1; }
+
+/* Consistent placement for a section's action button: right-aligned, matching
+   the sticky header save and the app-password create row. */
+.settings-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
 .app-pw-new { margin: 8px 0; }
 .app-pw-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); }
 .app-pw-name { font-weight: 500; }

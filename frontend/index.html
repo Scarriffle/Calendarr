@@ -590,17 +590,6 @@
           <div class="ev-color-preview" id="local-cal-color-preview" style="background:#34a853" title="Farbe wählen"></div>
         </div>
       </div>
-      <div class="form-group">
-        <label class="checkbox-row">
-          <input type="checkbox" id="local-cal-birthday" />
-          <span data-i18n="birthday_calendar">Geburtstagskalender</span>
-        </label>
-        <div class="form-hint" id="local-cal-birthday-hint" data-i18n="birthday_calendar_hint">Ganztägige, jährliche Termine mit Alter und Geburtstags-Icon.</div>
-      </div>
-      <div class="form-group hidden" id="local-cal-notify-group">
-        <label data-i18n="birthday_notify">Erinnerung</label>
-        <select id="local-cal-notify"></select>
-      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" data-modal="modal-local-cal">Abbrechen</button>
@@ -617,22 +606,27 @@
       <button class="icon-btn modal-close" data-modal="modal-birthday">&times;</button>
     </div>
     <div class="modal-body">
-      <div id="birthday-no-cals" class="form-hint hidden" data-i18n="birthday_no_calendars"></div>
-      <div class="form-group">
-        <label data-i18n="birthday_person">Name</label>
-        <input type="text" id="birthday-name" data-i18n-ph="birthday_person_ph" placeholder="Name der Person" />
+      <div id="birthday-no-cal" class="hidden">
+        <div class="form-hint" data-i18n="birthday_activate_hint">Aktiviere den Geburtstagskalender, um Geburtstage anzulegen. Er erscheint als eigener Kalender in der Seitenleiste.</div>
+        <button class="btn btn-primary btn-sm" id="birthday-activate" data-i18n="birthday_activate">Geburtstagskalender aktivieren</button>
       </div>
-      <div class="form-group">
-        <label data-i18n="birthday_date">Geburtstag</label>
-        <input type="date" id="birthday-date" />
-        <label class="checkbox-inline" style="margin-top:8px">
-          <input type="checkbox" id="birthday-year-unknown" />
-          <span data-i18n="birthday_year_unknown">Jahr unbekannt</span>
-        </label>
-      </div>
-      <div class="form-group" id="birthday-cal-group">
-        <label data-i18n="birthday_target">Geburtstagskalender</label>
-        <select id="birthday-cal"></select>
+      <div id="birthday-form">
+        <div class="form-group">
+          <label data-i18n="birthday_person">Name</label>
+          <input type="text" id="birthday-name" data-i18n-ph="birthday_person_ph" placeholder="Name der Person" />
+        </div>
+        <div class="form-group">
+          <label data-i18n="birthday_date">Geburtstag</label>
+          <div class="birthday-date-row">
+            <select id="birthday-day"></select>
+            <select id="birthday-month"></select>
+            <input type="number" id="birthday-year" min="1900" max="2100" data-i18n-ph="birthday_year_ph" placeholder="Jahr" />
+          </div>
+          <label class="checkbox-row" style="margin-top:10px;display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer">
+            <input type="checkbox" id="birthday-year-unknown" style="width:16px;height:16px;flex:none;margin:0" />
+            <span data-i18n="birthday_year_unknown">Jahr unbekannt</span>
+          </label>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -767,7 +761,9 @@
             <label>E-Mail</label>
             <input type="email" id="cfg-email" placeholder="Keine E-Mail hinterlegt" />
           </div>
-          <button class="btn btn-primary btn-sm" id="cfg-profile-save" data-i18n="save">Speichern</button>
+          <div class="settings-actions">
+            <button class="btn btn-primary btn-sm" id="cfg-profile-save" data-i18n="save">Speichern</button>
+          </div>
 
           <h4 class="panel-title" style="margin-top:24px" data-i18n="app_pw_title">App-Passwörter (CalDAV)</h4>
           <p class="panel-desc" data-i18n="app_pw_desc">Eigene Passwörter für CalDAV-Clients. Bei aktivem 2FA nötig, da Apps keinen 2FA-Code eingeben können. Jederzeit widerrufbar.</p>
@@ -944,6 +940,9 @@
             <button class="btn btn-secondary btn-sm" id="settings-btn-add-google">+ Google</button>
           </div>
           <div id="cal-settings-table" style="margin-top:16px;overflow-x:auto"></div>
+
+          <h4 class="panel-title" style="margin-top:24px" data-i18n="birthday_settings_title">Geburtstage</h4>
+          <div id="birthday-settings"></div>
         </div>
 
         <!-- Benutzerverwaltung -->

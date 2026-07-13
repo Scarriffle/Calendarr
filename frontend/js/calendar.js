@@ -2538,22 +2538,12 @@ function openLocalCalModal() {
   document.getElementById('local-cal-name').value = '';
   document.getElementById('local-cal-color-hex').value = '#34a853';
   document.getElementById('local-cal-color-preview').style.background = '#34a853';
-  const bday = document.getElementById('local-cal-birthday');
-  bday.checked = false;
-  document.getElementById('local-cal-notify').value = '-1';
-  document.getElementById('local-cal-notify-group').classList.add('hidden');
   openModal('modal-local-cal');
 }
 
 function bindLocalCalModal() {
   const preview = document.getElementById('local-cal-color-preview');
   const hex = document.getElementById('local-cal-color-hex');
-  const bday = document.getElementById('local-cal-birthday');
-  const notifyGroup = document.getElementById('local-cal-notify-group');
-  fillBirthdayNotifySelect(document.getElementById('local-cal-notify'));
-  bday.addEventListener('change', () => {
-    notifyGroup.classList.toggle('hidden', !bday.checked);
-  });
   preview.addEventListener('click', async () => {
     const picked = await openColorPicker(preview, hex.value || '#34a853');
     if (picked) { hex.value = picked.toUpperCase(); preview.style.background = picked; }
@@ -2568,15 +2558,8 @@ function bindLocalCalModal() {
     const name = document.getElementById('local-cal-name').value.trim();
     if (!name) { showToast(t('error_enter_name'), true); return; }
     const color = hex.value;
-    const isBirthday = bday.checked;
-    const notify = parseInt(document.getElementById('local-cal-notify').value, 10);
-    const body = { name, color };
-    if (isBirthday) {
-      body.is_birthday = true;
-      if (notify >= 0) body.birthday_notify_days_before = notify;
-    }
     try {
-      const cal = await api.post('/local/calendars', body);
+      const cal = await api.post('/local/calendars', { name, color });
       state.localCalendars.push(cal);
       renderCalendarList();
       closeModal('modal-local-cal');
@@ -2585,53 +2568,90 @@ function bindLocalCalModal() {
   };
 }
 
+// ── Birthdays (single dedicated calendar per user) ─────────
+const BIRTHDAY_DEFAULT_COLOR = '#e0407f';
+
+/** The user's single birthday calendar (owned, is_birthday), or null. */
+function birthdayCalendar() {
+  return (state.localCalendars || []).find(c => c.is_birthday && c.owned !== false) || null;
+}
+
+/** Create the single "Geburtstage" birthday calendar if none exists; returns it. */
+async function ensureBirthdayCalendar() {
+  const existing = birthdayCalendar();
+  if (existing) return existing;
+  const cal = await api.post('/local/calendars', {
+    name: t('birthday_calendar_name'), color: BIRTHDAY_DEFAULT_COLOR, is_birthday: true,
+  });
+  state.localCalendars.push(cal);
+  renderCalendarList();
+  return cal;
+}
+
 // ── Birthday Modal (manual entry) ─────────────────────────
-function birthdayCalendars() {
-  return (state.localCalendars || []).filter(
-    c => c.is_birthday && (c.owned !== false || c.permission === 'read_write')
-  );
+function fillBirthdayDateSelects() {
+  const daySel = document.getElementById('birthday-day');
+  const monthSel = document.getElementById('birthday-month');
+  if (daySel.options.length === 0) {
+    daySel.innerHTML = Array.from({ length: 31 }, (_, i) =>
+      `<option value="${i + 1}">${i + 1}</option>`).join('');
+  }
+  if (monthSel.options.length === 0) {
+    const months = t('months');
+    monthSel.innerHTML = months.map((m, i) => `<option value="${i + 1}">${escHtml(m)}</option>`).join('');
+  }
 }
 
 function openBirthdayModal() {
-  const cals = birthdayCalendars();
-  const sel = document.getElementById('birthday-cal');
-  sel.innerHTML = cals.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
-  const none = cals.length === 0;
-  document.getElementById('birthday-no-cals').classList.toggle('hidden', !none);
-  document.getElementById('birthday-cal-group').classList.toggle('hidden', none || cals.length === 1);
-  document.getElementById('birthday-name').value = '';
-  document.getElementById('birthday-year-unknown').checked = false;
-  const dateEl = document.getElementById('birthday-date');
-  const today = new Date();
-  dateEl.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-  document.getElementById('birthday-save').disabled = none;
+  const cal = birthdayCalendar();
+  document.getElementById('birthday-no-cal').classList.toggle('hidden', !!cal);
+  document.getElementById('birthday-form').classList.toggle('hidden', !cal);
+  document.getElementById('birthday-save').classList.toggle('hidden', !cal);
+  if (cal) {
+    fillBirthdayDateSelects();
+    const today = new Date();
+    document.getElementById('birthday-name').value = '';
+    document.getElementById('birthday-day').value = String(today.getDate());
+    document.getElementById('birthday-month').value = String(today.getMonth() + 1);
+    document.getElementById('birthday-year').value = String(today.getFullYear());
+    document.getElementById('birthday-year-unknown').checked = false;
+    document.getElementById('birthday-year').classList.remove('hidden');
+  }
   openModal('modal-birthday');
 }
 
 function bindBirthdayModal() {
+  const yearUnknown = document.getElementById('birthday-year-unknown');
+  const yearInput = document.getElementById('birthday-year');
+  yearUnknown.addEventListener('change', () => {
+    yearInput.classList.toggle('hidden', yearUnknown.checked);
+  });
+
+  document.getElementById('birthday-activate').onclick = async () => {
+    try {
+      await ensureBirthdayCalendar();
+      showToast(t('calendar_created', { name: t('birthday_calendar_name') }));
+      openBirthdayModal(); // re-render the modal in form mode
+    } catch (e) { showToast(e.message, true); }
+  };
+
   document.getElementById('birthday-save').onclick = async () => {
-    const cals = birthdayCalendars();
-    if (!cals.length) return;
+    const cal = birthdayCalendar();
+    if (!cal) return;
     const name = document.getElementById('birthday-name').value.trim();
     if (!name) { showToast(t('error_enter_name'), true); return; }
-    const dateStr = document.getElementById('birthday-date').value; // YYYY-MM-DD
-    if (!dateStr) return;
-    const [y, m, d] = dateStr.split('-').map(n => parseInt(n, 10));
-    const yearUnknown = document.getElementById('birthday-year-unknown').checked;
-    const calSel = document.getElementById('birthday-cal');
-    const calId = parseInt(calSel.value || cals[0].id, 10);
+    const d = parseInt(document.getElementById('birthday-day').value, 10);
+    const m = parseInt(document.getElementById('birthday-month').value, 10);
+    const unknown = yearUnknown.checked;
+    const y = unknown ? 1970 : parseInt(yearInput.value, 10) || new Date().getFullYear();
     // All-day anchor: birth year if known, else 1970 so FREQ=YEARLY expands
     // across any queried range. end = next day.
-    const anchorYear = yearUnknown ? 1970 : y;
     const pad = n => String(n).padStart(2, '0');
-    const start = `${anchorYear}-${pad(m)}-${pad(d)}`;
-    const endDate = new Date(Date.UTC(anchorYear, m - 1, d + 1));
-    const end = `${endDate.getUTCFullYear()}-${pad(endDate.getUTCMonth()+1)}-${pad(endDate.getUTCDate())}`;
-    const body = {
-      calendar_id: calId, title: name, start, end, allDay: true,
-      rrule: 'FREQ=YEARLY',
-    };
-    if (!yearUnknown) body.birth_year = y;
+    const start = `${y}-${pad(m)}-${pad(d)}`;
+    const endDate = new Date(Date.UTC(y, m - 1, d + 1));
+    const end = `${endDate.getUTCFullYear()}-${pad(endDate.getUTCMonth() + 1)}-${pad(endDate.getUTCDate())}`;
+    const body = { calendar_id: cal.id, title: name, start, end, allDay: true, rrule: 'FREQ=YEARLY' };
+    if (!unknown) body.birth_year = y;
     try {
       await api.post('/local/events', body);
       closeModal('modal-birthday');
@@ -3561,6 +3581,57 @@ function renderAllAccounts() {
   }
 
   renderCalendarTable();
+  renderBirthdaySettings();
+}
+
+/** Settings › Kalender › Geburtstage: activate the single birthday calendar,
+ *  or (when active) tweak its "notify N days before". Colour/visibility live in
+ *  the sidebar like any other calendar. */
+function renderBirthdaySettings() {
+  const container = document.getElementById('birthday-settings');
+  if (!container) return;
+  container.innerHTML = '';
+  const cal = birthdayCalendar();
+  if (!cal) {
+    const hint = document.createElement('div');
+    hint.className = 'form-hint';
+    hint.textContent = t('birthday_activate_hint');
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-sm';
+    btn.textContent = t('birthday_activate');
+    btn.onclick = async () => {
+      try {
+        await ensureBirthdayCalendar();
+        renderBirthdaySettings();
+        renderCalendarTable();
+        showToast(t('calendar_created', { name: t('birthday_calendar_name') }));
+      } catch (e) { showToast(e.message, true); }
+    };
+    container.append(hint, btn);
+    return;
+  }
+  const status = document.createElement('div');
+  status.className = 'form-hint';
+  status.textContent = t('birthday_active');
+  const notifyWrap = document.createElement('div');
+  notifyWrap.className = 'form-group';
+  const label = document.createElement('label');
+  label.textContent = t('birthday_notify');
+  const sel = document.createElement('select');
+  fillBirthdayNotifySelect(sel);
+  sel.value = String(cal.birthday_notify_days_before ?? -1);
+  sel.onchange = async () => {
+    const v = parseInt(sel.value, 10);
+    try {
+      await api.put(`/local/calendars/${cal.id}`, { birthday_notify_days_before: v });
+      cal.birthday_notify_days_before = v < 0 ? null : v;
+    } catch (e) { showToast(e.message, true); }
+  };
+  notifyWrap.append(label, sel);
+  const colorHint = document.createElement('div');
+  colorHint.className = 'form-hint';
+  colorHint.textContent = t('birthday_color_hint');
+  container.append(status, notifyWrap, colorHint);
 }
 
 function renderHiddenCalendars() {
