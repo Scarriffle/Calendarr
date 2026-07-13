@@ -211,6 +211,21 @@ def create_calendar(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    # Only ONE birthday calendar per account — hard server guarantee. If the
+    # user already has one, "create birthday calendar" is idempotent: return the
+    # existing one instead of creating a second.
+    if data.is_birthday:
+        existing = (
+            db.query(models.LocalCalendar)
+            .filter(
+                models.LocalCalendar.user_id == current_user.id,
+                models.LocalCalendar.is_birthday == True,
+            )
+            .first()
+        )
+        if existing is not None:
+            return _cal_dict(existing)
+
     cal = models.LocalCalendar(
         user_id=current_user.id,
         name=data.name,
@@ -251,6 +266,19 @@ def update_calendar(
     if data.reminders_enabled is not None:
         cal.reminders_enabled = data.reminders_enabled
     if data.is_birthday is not None:
+        # Never let a second calendar be marked as the birthday calendar.
+        if data.is_birthday and not cal.is_birthday:
+            other = (
+                db.query(models.LocalCalendar)
+                .filter(
+                    models.LocalCalendar.user_id == current_user.id,
+                    models.LocalCalendar.is_birthday == True,
+                    models.LocalCalendar.id != cal.id,
+                )
+                .first()
+            )
+            if other is not None:
+                raise HTTPException(422, "A birthday calendar already exists")
         cal.is_birthday = data.is_birthday
     if data.birthday_notify_days_before is not None:
         # -1 is the client's sentinel for "clear the reminder" (JSON has no way to
