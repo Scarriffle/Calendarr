@@ -512,7 +512,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0;
+				MARKETING_VERSION = 3.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios;
 				PRODUCT_NAME = "Calendarr iOS";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -557,7 +557,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0;
+				MARKETING_VERSION = 3.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios;
 				PRODUCT_NAME = "Calendarr iOS";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
