@@ -1307,6 +1307,9 @@ a { color: var(--primary); text-decoration: none; }
 /* Constrain content to a comfortable reading column so fields don't stretch
    edge-to-edge on wide screens. */
 .settings-panel.active { display: block; max-width: 680px; }
+/* …except the Kalender panel, whose wide multi-column table needs the full
+   width (otherwise it's squeezed into a horizontal scroll). */
+#settings-panel-accounts { max-width: none; }
 
 /* Panel typography */
 .panel-title {
