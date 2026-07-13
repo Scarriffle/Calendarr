@@ -375,24 +375,55 @@ def create_event(
         db, current_user, data.calendar_id, require_write=True
     )
 
-    ev = models.LocalEvent(
-        calendar_id=cal.id,
-        uid=str(uuid.uuid4()),
-        title=data.title,
-        start=data.start,
-        end=data.end,
-        all_day=data.allDay,
-        location=data.location,
-        description=data.description,
-        color=data.color,
-        rrule=data.rrule,
-        is_private=data.private,
-        reminders=(",".join(str(m) for m in data.reminders) if data.reminders else None),
-        external_uid=data.external_uid,
-        birth_year=data.birth_year,
-        creator_id=current_user.id,  # server-side, never from the client
-    )
-    db.add(ev)
+    # Idempotent on external_uid: repeated syncs of the same contact (stable
+    # "contact:<deviceId>:<contactId>") must NEVER create duplicates. If a row
+    # with this external_uid already exists in this calendar, update it in place
+    # instead of inserting a new one. Enforced server-side, so the client can
+    # never duplicate — even without the reconcile read.
+    existing = None
+    if data.external_uid:
+        existing = (
+            db.query(models.LocalEvent)
+            .filter(
+                models.LocalEvent.calendar_id == cal.id,
+                models.LocalEvent.external_uid == data.external_uid,
+            )
+            .first()
+        )
+
+    reminders = ",".join(str(m) for m in data.reminders) if data.reminders else None
+    if existing is not None:
+        ev = existing
+        ev.title = data.title
+        ev.start = data.start
+        ev.end = data.end
+        ev.all_day = data.allDay
+        ev.location = data.location
+        ev.description = data.description
+        ev.color = data.color
+        ev.rrule = data.rrule
+        ev.is_private = data.private
+        ev.reminders = reminders
+        ev.birth_year = data.birth_year
+    else:
+        ev = models.LocalEvent(
+            calendar_id=cal.id,
+            uid=str(uuid.uuid4()),
+            title=data.title,
+            start=data.start,
+            end=data.end,
+            all_day=data.allDay,
+            location=data.location,
+            description=data.description,
+            color=data.color,
+            rrule=data.rrule,
+            is_private=data.private,
+            reminders=reminders,
+            external_uid=data.external_uid,
+            birth_year=data.birth_year,
+            creator_id=current_user.id,  # server-side, never from the client
+        )
+        db.add(ev)
     dav_util.bump_dav(cal, ev)
     db.commit()
     db.refresh(ev)

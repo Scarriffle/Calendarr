@@ -282,6 +282,33 @@ def _migrate():
             except Exception:
                 pass
 
+        # One-time cleanup of duplicate imported events sharing the same
+        # (calendar_id, external_uid) — e.g. birthdays created repeatedly by an
+        # older build without idempotent upsert. Keep the earliest row.
+        # Idempotent: after cleanup there is nothing left to delete.
+        try:
+            conn.execute(text(
+                "DELETE FROM local_events WHERE external_uid IS NOT NULL AND id NOT IN "
+                "(SELECT MIN(id) FROM local_events WHERE external_uid IS NOT NULL "
+                "GROUP BY calendar_id, external_uid)"
+            ))
+            conn.commit()
+            logging.info("Migration: de-duplicated local_events by external_uid")
+        except Exception:
+            pass
+
+        # Hard guarantee: the DB itself forbids two events with the same
+        # external_uid in one calendar (imported entries only; NULLs unconstrained).
+        try:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_local_events_calendar_external "
+                "ON local_events(calendar_id, external_uid) WHERE external_uid IS NOT NULL"
+            ))
+            conn.commit()
+            logging.info("Migration: unique index on (calendar_id, external_uid)")
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
