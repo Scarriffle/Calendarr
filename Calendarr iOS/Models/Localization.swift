@@ -347,6 +347,9 @@ private let strings: [String: [String: String]] = [
 
         // Birthdays
         "birthday.new": "Neuer Geburtstag",
+        "birthday.calendar_name": "Geburtstage",
+        "birthday.activate": "Geburtstagskalender aktivieren",
+        "birthday.activate_hint": "Aktiviere den Geburtstagskalender, um Geburtstage anzulegen. Er erscheint als eigener Kalender in der Seitenleiste.",
         "birthday.person": "Name",
         "birthday.person_placeholder": "Name der Person",
         "birthday.date": "Geburtstag",
@@ -702,6 +705,9 @@ private let strings: [String: [String: String]] = [
 
         // Birthdays
         "birthday.new": "New birthday",
+        "birthday.calendar_name": "Birthdays",
+        "birthday.activate": "Enable birthday calendar",
+        "birthday.activate_hint": "Enable the birthday calendar to add birthdays. It appears as its own calendar in the sidebar.",
         "birthday.person": "Name",
         "birthday.person_placeholder": "Person's name",
         "birthday.date": "Birthday",

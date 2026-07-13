@@ -153,10 +153,10 @@ class CalendarrAPI {
     /// Update a local calendar's birthday settings. `is_birthday` marks it as a
     /// birthday calendar; `notifyDaysBefore` sets the reminder (nil sends the -1
     /// sentinel to clear it server-side).
-    func updateLocalCalendarBirthday(id: Int, isBirthday: Bool?, notifyDaysBefore: Int??) async throws {
+    func updateLocalCalendarBirthday(id: Int, isBirthday: Bool? = nil, notifyDaysBefore: Int? = nil) async throws {
         var body: [String: Any] = [:]
         if let b = isBirthday { body["is_birthday"] = b }
-        if let n = notifyDaysBefore { body["birthday_notify_days_before"] = n ?? -1 }
+        if let n = notifyDaysBefore { body["birthday_notify_days_before"] = n }  // -1 clears server-side
         guard !body.isEmpty else { return }
         _ = try await request("/api/local/calendars/\(id)", method: "PUT", body: body)
     }
@@ -166,6 +166,14 @@ class CalendarrAPI {
     func getBirthdayEntries(calendarId: Int) async throws -> [BirthdayEntry] {
         let data = try await request("/api/local/calendars/\(calendarId)/birthdays")
         return (try? JSONDecoder().decode([BirthdayEntry].self, from: data)) ?? []
+    }
+
+    /// Report that this device just synced its Contacts birthdays, so the web
+    /// can show "birthdays come from these devices".
+    func reportBirthdaySync(deviceId: String, deviceName: String, count: Int) async throws {
+        _ = try await request("/api/birthdays/sync-report", method: "POST", body: [
+            "device_id": deviceId, "device_name": deviceName, "count": count,
+        ])
     }
 
     func getICalSubscriptions() async throws -> [ICalSubscription] {

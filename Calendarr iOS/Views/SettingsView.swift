@@ -205,7 +205,9 @@ struct SettingsView: View {
             groupVisibleId = s.groupVisibleCalendarId ?? 0
         }
         if let cals = try? await api.getLocalCalendars() {
-            ownLocalCals = cals.filter { $0.owned && !$0.group }
+            // A birthday calendar may be shared directly, but never stand in as
+            // the group-visible personal calendar.
+            ownLocalCals = cals.filter { $0.owned && !$0.group && !$0.isBirthday }
         }
     }
 

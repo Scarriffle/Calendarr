@@ -26,8 +26,8 @@ struct AccountsView: View {
 
     // Contacts → birthday-calendar sync (opt-in, bound to one birthday calendar).
     @AppStorage("birthdaysSyncEnabled") private var birthdaysSyncEnabled = false
-    @AppStorage("birthdaysSyncCalendarId") private var birthdaysSyncCalendarId = 0
     @State private var isSyncingBirthdays = false
+    @State private var birthdayNotify = -1
 
     @AppStorage("appLanguage") private var appLang = "system"
 
@@ -47,7 +47,13 @@ struct AccountsView: View {
                         haSection
                     }
                     .onChange(of: birthdaysSyncEnabled) { _, on in
-                        if on { Task { _ = await BirthdaysImporter.requestAccess() } }
+                        if on {
+                            Task {
+                                _ = await BirthdaysImporter.requestAccess()
+                                _ = await BirthdaysImporter.ensureBirthdayCalendar(api: api)
+                                await load()
+                            }
+                        }
                     }
                 }
             }
@@ -222,31 +228,30 @@ struct AccountsView: View {
         }
     }
 
-    private var birthdayCalendars: [LocalCalendar] {
-        localCalendars.filter { $0.isBirthday && ($0.owned || $0.permission == "read_write") }
+    /// The user's single birthday calendar (created on first sync/activation).
+    private var birthdayCalendar: LocalCalendar? {
+        localCalendars.first { $0.isBirthday && $0.owned }
     }
 
     @ViewBuilder var birthdayContactsSection: some View {
         Section {
             Toggle(L10n.t("birthday.contacts.sync", appLang), isOn: $birthdaysSyncEnabled)
             if birthdaysSyncEnabled {
-                if birthdayCalendars.isEmpty {
-                    Text(L10n.t("birthday.contacts.need_calendar", appLang))
-                        .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Picker(L10n.t("birthday.contacts.target", appLang), selection: $birthdaysSyncCalendarId) {
-                        ForEach(birthdayCalendars) { c in Text(c.name).tag(c.id) }
-                    }
-                    Button {
-                        Task { await syncBirthdays() }
-                    } label: {
-                        HStack {
-                            Text(L10n.t("birthday.contacts.sync_now", appLang))
-                            if isSyncingBirthdays { Spacer(); ProgressView() }
+                if let cal = birthdayCalendar {
+                    BirthdayNotifyPicker(days: $birthdayNotify, appLang: appLang)
+                        .onChange(of: birthdayNotify) { _, v in
+                            Task { try? await api.updateLocalCalendarBirthday(id: cal.id, notifyDaysBefore: v) }
                         }
-                    }
-                    .disabled(isSyncingBirthdays || birthdaysSyncCalendarId == 0)
                 }
+                Button {
+                    Task { await syncBirthdays() }
+                } label: {
+                    HStack {
+                        Text(L10n.t("birthday.contacts.sync_now", appLang))
+                        if isSyncingBirthdays { Spacer(); ProgressView() }
+                    }
+                }
+                .disabled(isSyncingBirthdays)
             }
         } header: {
             Text(L10n.t("birthday.contacts.header", appLang))
@@ -263,6 +268,7 @@ struct AccountsView: View {
             return
         }
         await BirthdaysImporter.sync(api: api)
+        await load()   // pick up the (possibly newly created) birthday calendar
         infoMessage = L10n.t("birthday.contacts.synced", appLang)
         // Let the calendar refresh so imported birthdays show up right away.
         NotificationCenter.default.post(name: .manualSyncRequested, object: nil)
@@ -474,10 +480,8 @@ struct AccountsView: View {
             CalendarStore.saveBanishedKeys(b)
             NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
         }
-        // Default the Contacts-sync target to the first birthday calendar.
-        if birthdaysSyncCalendarId == 0, let first = birthdayCalendars.first?.id {
-            birthdaysSyncCalendarId = first
-        }
+        // Reflect the birthday calendar's current reminder setting in the picker.
+        birthdayNotify = birthdayCalendar?.birthdayNotifyDaysBefore ?? -1
         isLoading = false
     }
 
@@ -595,8 +599,6 @@ struct AddLocalCalSheet: View {
 
     @State private var name = ""
     @State private var color = Color(hex: "#34a853")
-    @State private var isBirthday = false
-    @State private var notifyDays = -1   // -1 = off, 0 = on the day, N = days before
     @State private var isLoading = false
     @State private var error = ""
 
@@ -606,14 +608,6 @@ struct AddLocalCalSheet: View {
                 Section {
                     TextField(L10n.t("local.name", appLang), text: $name)
                     ColorPicker(L10n.t("local.color", appLang), selection: $color, supportsOpacity: false)
-                }
-                Section {
-                    Toggle(L10n.t("birthday.is_calendar", appLang), isOn: $isBirthday)
-                    if isBirthday {
-                        BirthdayNotifyPicker(days: $notifyDays, appLang: appLang)
-                    }
-                } footer: {
-                    if isBirthday { Text(L10n.t("birthday.is_calendar.desc", appLang)) }
                 }
                 if !error.isEmpty {
                     Section { Text(error).foregroundStyle(.red) }
@@ -637,10 +631,7 @@ struct AddLocalCalSheet: View {
     private func save() async {
         isLoading = true
         do {
-            _ = try await api.addLocalCalendar(
-                name: name, color: color.toHex(),
-                isBirthday: isBirthday,
-                birthdayNotifyDaysBefore: (isBirthday && notifyDays >= 0) ? notifyDays : nil)
+            _ = try await api.addLocalCalendar(name: name, color: color.toHex())
             await onDone()
             dismiss()
         } catch { self.error = error.localizedDescription }

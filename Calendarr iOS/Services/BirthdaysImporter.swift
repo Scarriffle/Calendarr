@@ -1,5 +1,6 @@
 import Foundation
 import Contacts
+import UIKit
 
 /// One stored birthday row as returned by GET /api/local/calendars/{id}/birthdays.
 /// Contact-sourced rows carry an `externalUid`; manually added ones have `nil`.
@@ -19,31 +20,41 @@ struct BirthdayEntry: Codable, Identifiable {
     }
 }
 
-/// Reads birthdays from the system Contacts and mirrors them into a chosen
-/// birthday `LocalCalendar` on the backend, so they show on every client.
+/// Reads birthdays from the system Contacts and mirrors them into the user's
+/// single birthday calendar on the backend, so they show on every client.
 ///
-/// The sync is a **mirror**: it reconciles contact-sourced rows by
-/// `external_uid` (adds new, updates changed, deletes removed) and never touches
-/// manually added birthdays (which have no `external_uid`). The heavy lifting —
-/// age suffix, cake icon, "notify N days before" reminder — is done server-side;
-/// this only uploads name + date + birth year.
+/// The sync is a **mirror**, scoped to THIS device: it reconciles rows whose
+/// `external_uid` starts with `contact:<deviceId>:` (adds new, updates changed,
+/// deletes removed) and never touches other devices' rows or manually added
+/// birthdays. Age suffix, cake icon and "notify N days before" are done
+/// server-side; this only uploads name + date + birth year, and reports the
+/// device so the web can list "birthdays come from these devices".
 enum BirthdaysImporter {
 
-    // MARK: – Persisted binding (which calendar receives Contacts birthdays)
+    // MARK: – Persisted state
 
     enum Key {
-        static let enabled = "birthdaysSyncEnabled"        // Bool
-        static let calendarId = "birthdaysSyncCalendarId"  // Int (0 = none)
+        static let enabled = "birthdaysSyncEnabled"   // Bool
+        static let deviceId = "birthdaysDeviceId"     // stable per-install UUID
     }
 
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: Key.enabled) }
-    static var targetCalendarId: Int? {
-        let v = UserDefaults.standard.object(forKey: Key.calendarId) as? Int ?? 0
-        return v > 0 ? v : nil
-    }
     static func setEnabled(_ on: Bool) { UserDefaults.standard.set(on, forKey: Key.enabled) }
-    static func setTargetCalendarId(_ id: Int?) {
-        UserDefaults.standard.set(id ?? 0, forKey: Key.calendarId)
+
+    static var deviceId: String {
+        if let id = UserDefaults.standard.string(forKey: Key.deviceId) { return id }
+        let id = UUID().uuidString
+        UserDefaults.standard.set(id, forKey: Key.deviceId)
+        return id
+    }
+
+    @MainActor static var deviceName: String {
+        let n = UIDevice.current.name
+        return n.isEmpty ? "iPhone" : n
+    }
+
+    private static var appLang: String {
+        UserDefaults.standard.string(forKey: "appLanguage") ?? "system"
     }
 
     // MARK: – Contacts access
@@ -55,7 +66,6 @@ enum BirthdaysImporter {
         return false
     }
 
-    /// Request Contacts access once. Returns true if usable for enumeration.
     @discardableResult
     static func requestAccess() async -> Bool {
         let status = CNContactStore.authorizationStatus(for: .contacts)
@@ -72,11 +82,11 @@ enum BirthdaysImporter {
     // MARK: – Reading contact birthdays
 
     struct ContactBirthday {
-        let externalUid: String   // "contact:<identifier>"
+        let contactId: String
         let name: String
         let month: Int
         let day: Int
-        let year: Int?            // nil = year unknown
+        let year: Int?
     }
 
     static func readContactBirthdays() throws -> [ContactBirthday] {
@@ -101,54 +111,77 @@ enum BirthdaysImporter {
             guard !name.isEmpty else { return }
             let year = bday.year.flatMap { $0 > 0 ? $0 : nil }
             out.append(ContactBirthday(
-                externalUid: "contact:\(contact.identifier)",
-                name: name, month: m, day: d, year: year
+                contactId: contact.identifier, name: name, month: m, day: d, year: year
             ))
         }
         return out
     }
 
+    // MARK: – The single birthday calendar
+
+    /// The user's birthday calendar, creating the single "Geburtstage" calendar
+    /// if none exists yet.
+    static func ensureBirthdayCalendar(api: CalendarrAPI) async -> LocalCalendar? {
+        let cals = (try? await api.getLocalCalendars()) ?? []
+        if let existing = cals.first(where: { $0.isBirthday && $0.owned }) { return existing }
+        let name = L10n.t("birthday.calendar_name", appLang)
+        return try? await api.addLocalCalendar(name: name, color: "#E0407F", isBirthday: true)
+    }
+
+    static func birthdayCalendar(api: CalendarrAPI) async -> LocalCalendar? {
+        let cals = (try? await api.getLocalCalendars()) ?? []
+        return cals.first(where: { $0.isBirthday && $0.owned })
+    }
+
     // MARK: – Sync
 
-    /// Mirror the address book into the bound birthday calendar. No-op unless the
-    /// sync is enabled, a target calendar is set, and access is granted.
+    /// Mirror the address book into the birthday calendar (creating it if
+    /// needed). No-op unless enabled and Contacts access is granted.
     static func sync(api: CalendarrAPI) async {
-        guard isEnabled, let calId = targetCalendarId else { return }
+        guard isEnabled else { return }
         guard await requestAccess() else { return }
         guard let contacts = try? readContactBirthdays() else { return }
-        guard let existing = try? await api.getBirthdayEntries(calendarId: calId) else { return }
+        guard let cal = await ensureBirthdayCalendar(api: api) else { return }
+        guard let existing = try? await api.getBirthdayEntries(calendarId: cal.id) else { return }
 
-        // Only reconcile contact-sourced rows; leave manual entries untouched.
+        // Only reconcile THIS device's contact rows; leave other devices'
+        // rows and manual entries untouched.
+        let prefix = "contact:\(deviceId):"
         var byExt: [String: BirthdayEntry] = [:]
-        for e in existing { if let ext = e.externalUid { byExt[ext] = e } }
+        for e in existing {
+            if let ext = e.externalUid, ext.hasPrefix(prefix) { byExt[ext] = e }
+        }
 
         var seen = Set<String>()
         for c in contacts {
-            seen.insert(c.externalUid)
+            let ext = prefix + c.contactId
+            seen.insert(ext)
             let (start, end) = allDayRange(month: c.month, day: c.day, year: c.year)
-            if let match = byExt[c.externalUid] {
+            if let match = byExt[ext] {
                 let changed = match.title != c.name || match.month != c.month
                     || match.day != c.day || match.birthYear != c.year
                 if changed {
                     try? await api.updateLocalEvent(
                         uid: match.uid, title: c.name, start: start, end: end,
                         isAllDay: true, location: "", description: "", color: nil,
-                        rrule: "FREQ=YEARLY", externalUid: c.externalUid,
-                        birthYear: c.year ?? -1  // -1 clears birth_year server-side
+                        rrule: "FREQ=YEARLY", externalUid: ext, birthYear: c.year ?? -1
                     )
                 }
             } else {
                 _ = try? await api.createLocalEvent(
-                    calendarId: calId, title: c.name, start: start, end: end,
+                    calendarId: cal.id, title: c.name, start: start, end: end,
                     isAllDay: true, location: "", description: "", color: nil,
-                    rrule: "FREQ=YEARLY", externalUid: c.externalUid, birthYear: c.year
+                    rrule: "FREQ=YEARLY", externalUid: ext, birthYear: c.year
                 )
             }
         }
-        // Remove contact-sourced rows whose contact no longer has a birthday.
         for (ext, entry) in byExt where !seen.contains(ext) {
             try? await api.deleteLocalEvent(uid: entry.uid)
         }
+
+        // Report this device so the web can list where birthdays come from.
+        let name = await deviceName
+        try? await api.reportBirthdaySync(deviceId: deviceId, deviceName: name, count: contacts.count)
     }
 
     /// All-day [start, end) for a birthday. Anchor year = birth year when known,

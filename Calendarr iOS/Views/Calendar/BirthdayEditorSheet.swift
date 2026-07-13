@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Minimal "new birthday" mask: pick a birthday calendar, enter a name and a
-/// date (day + month, optionally a year). Saves an all-day, yearly-recurring
-/// local event; the server adds the age suffix and cake icon on read.
+/// Minimal "new birthday" mask for the single birthday calendar: enter a name
+/// and a date (optionally "year unknown"). Saves an all-day, yearly-recurring
+/// local event; the server adds the age suffix and cake icon on read. If no
+/// birthday calendar exists yet, offers to activate one.
 struct BirthdayEditorSheet: View {
     let api: CalendarrAPI
     var onDone: () async -> Void
@@ -10,20 +11,16 @@ struct BirthdayEditorSheet: View {
     @AppStorage("appLanguage") private var appLang = "system"
     @Environment(\.dismiss) private var dismiss
 
-    @State private var calendars: [LocalCalendar] = []
-    @State private var selectedCalId: Int? = nil
+    @State private var calendar: LocalCalendar? = nil
     @State private var name = ""
     @State private var date = Date()
     @State private var yearUnknown = false
     @State private var loading = true
     @State private var saving = false
-
-    private var birthdayCalendars: [LocalCalendar] {
-        calendars.filter { $0.isBirthday && ($0.owned || $0.permission == "read_write") }
-    }
+    @State private var activating = false
 
     private var canSave: Bool {
-        !saving && selectedCalId != nil
+        !saving && calendar != nil
             && !name.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
@@ -32,9 +29,13 @@ struct BirthdayEditorSheet: View {
             Form {
                 if loading {
                     HStack { Spacer(); ProgressView(); Spacer() }
-                } else if birthdayCalendars.isEmpty {
-                    Text(L10n.t("birthday.no_calendars", appLang))
-                        .foregroundStyle(.secondary)
+                } else if calendar == nil {
+                    Section {
+                        Text(L10n.t("birthday.activate_hint", appLang))
+                            .foregroundStyle(.secondary)
+                        Button(L10n.t("birthday.activate", appLang)) { Task { await activate() } }
+                            .disabled(activating)
+                    }
                 } else {
                     Section(L10n.t("birthday.person", appLang)) {
                         TextField(L10n.t("birthday.person_placeholder", appLang), text: $name)
@@ -43,15 +44,6 @@ struct BirthdayEditorSheet: View {
                         DatePicker(L10n.t("birthday.date", appLang), selection: $date,
                                    displayedComponents: [.date])
                         Toggle(L10n.t("birthday.year_unknown", appLang), isOn: $yearUnknown)
-                    }
-                    if birthdayCalendars.count > 1 {
-                        Section(L10n.t("birthday.contacts.target", appLang)) {
-                            Picker(L10n.t("birthday.contacts.target", appLang), selection: $selectedCalId) {
-                                ForEach(birthdayCalendars) { c in
-                                    Text(c.name).tag(Optional(c.id))
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -71,16 +63,21 @@ struct BirthdayEditorSheet: View {
     }
 
     private func load() async {
-        calendars = (try? await api.getLocalCalendars()) ?? []
-        if selectedCalId == nil { selectedCalId = birthdayCalendars.first?.id }
+        calendar = await BirthdaysImporter.birthdayCalendar(api: api)
         loading = false
     }
 
+    private func activate() async {
+        activating = true
+        calendar = await BirthdaysImporter.ensureBirthdayCalendar(api: api)
+        activating = false
+    }
+
     private func save() async {
-        guard let calId = selectedCalId else { return }
+        guard let cal = calendar else { return }
         saving = true
-        let cal = Calendar.current
-        let comps = cal.dateComponents([.year, .month, .day], from: date)
+        let calc = Calendar.current
+        let comps = calc.dateComponents([.year, .month, .day], from: date)
         let month = comps.month ?? 1
         let day = comps.day ?? 1
         let year = yearUnknown ? nil : comps.year
@@ -91,10 +88,10 @@ struct BirthdayEditorSheet: View {
         anchor.month = month
         anchor.day = day
         anchor.hour = 12
-        let start = cal.date(from: anchor) ?? date
-        let end = cal.date(byAdding: .day, value: 1, to: start) ?? start
+        let start = calc.date(from: anchor) ?? date
+        let end = calc.date(byAdding: .day, value: 1, to: start) ?? start
         _ = try? await api.createLocalEvent(
-            calendarId: calId, title: name.trimmingCharacters(in: .whitespaces),
+            calendarId: cal.id, title: name.trimmingCharacters(in: .whitespaces),
             start: start, end: end, isAllDay: true, location: "", description: "",
             color: nil, rrule: "FREQ=YEARLY", birthYear: year
         )

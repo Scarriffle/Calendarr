@@ -535,6 +535,9 @@ struct CalendarHostView: View {
     /// shows up without the user opening the filter sheet.
     private func syncFromServer(force: Bool = false) async {
         await SettingsSync.pull(api: api)
+        // Mirror Contacts birthdays on every server sync (manual, resume,
+        // periodic) — the user expects "sync with server" to include birthdays.
+        if BirthdaysImporter.isEnabled { await BirthdaysImporter.sync(api: api) }
         let changed = await store.reconcileCalendarVisibility(api: api)
         if changed || force { await forceReload() }
     }
