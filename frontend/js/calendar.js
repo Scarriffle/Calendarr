@@ -1367,6 +1367,10 @@ function bindSidebar() {
     dropdown.classList.add('hidden');
     openLocalCalModal();
   };
+  dropdown.querySelector('[data-action="birthday"]').onclick = () => {
+    dropdown.classList.add('hidden');
+    addBirthdayCalendar();
+  };
   dropdown.querySelector('[data-action="ical"]').onclick = () => {
     dropdown.classList.add('hidden');
     openICalSubModal();
@@ -2588,6 +2592,19 @@ async function ensureBirthdayCalendar() {
   return cal;
 }
 
+/** Explicit "add birthday calendar" action (sidebar dropdown + settings). Only
+ *  one per account — if one exists, just inform the user. */
+async function addBirthdayCalendar() {
+  if (birthdayCalendar()) { showToast(t('birthday_calendar_exists')); return; }
+  try {
+    await ensureBirthdayCalendar();
+    renderBirthdaySettings();
+    renderCalendarTable();
+    fetchAndRender();
+    showToast(t('calendar_created', { name: t('birthday_calendar_name') }));
+  } catch (e) { showToast(e.message, true); }
+}
+
 // ── Birthday Modal (manual entry) ─────────────────────────
 function fillBirthdayDateSelects() {
   const daySel = document.getElementById('birthday-day');
@@ -3595,21 +3612,11 @@ function renderBirthdaySettings() {
   container.innerHTML = '';
   const cal = birthdayCalendar();
   if (!cal) {
+    // Creation lives in the add row ("+ Geburtstage") / sidebar dropdown now.
     const hint = document.createElement('div');
     hint.className = 'form-hint';
-    hint.textContent = t('birthday_activate_hint');
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary btn-sm';
-    btn.textContent = t('birthday_activate');
-    btn.onclick = async () => {
-      try {
-        await ensureBirthdayCalendar();
-        renderBirthdaySettings();
-        renderCalendarTable();
-        showToast(t('calendar_created', { name: t('birthday_calendar_name') }));
-      } catch (e) { showToast(e.message, true); }
-    };
-    container.append(hint, btn);
+    hint.textContent = t('birthday_settings_hint');
+    container.append(hint);
     return;
   }
   const status = document.createElement('div');
@@ -3724,12 +3731,14 @@ function initResizableCalTable(table) {
   const ths = Array.from(table.tHead.rows[0].cells);
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem('calTableColWidths') || 'null'); } catch { saved = null; }
-  // Measure natural widths, then lock to px + fixed layout so dragging one
-  // column doesn't reflow the others.
-  const natural = ths.map(th => th.offsetWidth);
+  // Lock to px + fixed layout so dragging one column doesn't reflow the others.
+  // Sensible defaults per column (Name / Herkunft / Sichtbar / Benachrichtigungen
+  // / Export-Import / Sync / trash); user drags override and persist.
+  const DEFAULTS = [200, 90, 80, 150, 240, 90, 44];
   ths.forEach((th, i) => {
-    const w = (Array.isArray(saved) && saved[i]) ? saved[i] : natural[i];
-    th.style.width = Math.max(60, w || 80) + 'px';
+    const w = (Array.isArray(saved) && saved[i]) ? saved[i]
+            : (DEFAULTS[i] || th.offsetWidth || 100);
+    th.style.width = Math.max(50, w) + 'px';
   });
   table.style.tableLayout = 'fixed';
   const sync = () => {
@@ -4329,6 +4338,10 @@ function bindSettingsModal() {
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener('click', () => { closeModal('modal-settings'); fn(); });
   });
+  // Birthday calendar is created inline (no modal) — keep settings open so the
+  // new calendar + its options show up immediately.
+  const bdayBtn = document.getElementById('settings-btn-add-birthday');
+  if (bdayBtn) bdayBtn.addEventListener('click', () => addBirthdayCalendar());
 }
 
 // ── Profile Modal ─────────────────────────────────────────
