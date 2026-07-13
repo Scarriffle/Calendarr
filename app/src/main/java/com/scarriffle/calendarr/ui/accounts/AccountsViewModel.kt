@@ -61,8 +61,12 @@ class AccountsViewModel @Inject constructor(
         }
     }
 
-    fun addLocal(name: String, color: String, onChanged: () -> Unit) =
-        mutate(onChanged) { repository.addLocalCalendar(name, color) }
+    fun addLocal(
+        name: String, color: String, onChanged: () -> Unit,
+        isBirthday: Boolean = false, birthdayNotifyDaysBefore: Int? = null,
+    ) = mutate(onChanged) {
+        repository.addLocalCalendar(name, color, isBirthday, birthdayNotifyDaysBefore)
+    }
 
     fun deleteLocal(id: Int, onChanged: () -> Unit) =
         mutate(onChanged) { repository.deleteLocalCalendar(id) }

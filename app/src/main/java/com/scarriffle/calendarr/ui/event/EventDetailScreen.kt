@@ -98,7 +98,7 @@ fun EventDetailScreen(
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(event.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        Text(event.renderTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                         if (event.calendarName.isNotBlank()) {
                             Text(event.calendarName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

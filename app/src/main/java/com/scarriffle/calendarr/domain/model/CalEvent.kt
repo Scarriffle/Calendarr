@@ -38,7 +38,16 @@ data class CalEvent(
     val reminders: List<Int> = emptyList(),
     // True for events from a calendar shared with the user read-only.
     val readOnly: Boolean = false,
+    // True for events from a birthday calendar — clients show a cake icon and
+    // the server bakes the age into `displayTitle`.
+    val isBirthday: Boolean = false,
 ) {
+    /**
+     * Title to render: the server-decorated one (birthday age, group prefix)
+     * wins over the raw title, which is kept for editing.
+     */
+    val renderTitle: String
+        get() = displayTitle?.takeIf { it.isNotBlank() } ?: title
     /**
      * Group view supplies a server-resolved colour (display_color); otherwise
      * per-event override colour, then the calendar's colour, then a stable
@@ -129,6 +138,7 @@ data class CalEvent(
                     (0 until arr.length()).mapNotNull { (arr.opt(it) as? Number)?.toInt() }
                 } ?: emptyList(),
                 readOnly = json.optBoolean("read_only", false),
+                isBirthday = json.optBoolean("is_birthday", false),
             )
         }
     }

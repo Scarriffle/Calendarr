@@ -154,13 +154,11 @@ private fun AllDayPreviewBar(event: CalEvent, date: LocalDate, onClick: () -> Un
                 bottom = 4.dp,
             ),
     ) {
-        Text(
-            event.title,
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        EventLabel(
+            event = event,
+            color = color.contrastingTextColor(),
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            color = color.contrastingTextColor(),
         )
     }
 }
@@ -186,10 +184,9 @@ private fun TimedPreviewRow(event: CalEvent, lang: String, onClick: () -> Unit) 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 8.dp).width(42.dp),
         )
-        Text(
-            event.title,
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        EventLabel(
+            event = event,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f),

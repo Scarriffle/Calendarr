@@ -9,7 +9,9 @@ import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
 import com.scarriffle.calendarr.domain.model.Group
 import com.scarriffle.calendarr.domain.model.GroupMember
+import com.scarriffle.calendarr.domain.model.LocalCalendar
 import com.scarriffle.calendarr.domain.model.WritableCalendar
+import com.scarriffle.calendarr.util.Dates
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -498,6 +500,33 @@ class CalendarViewModel @Inject constructor(
                 entries += CalendarFilterEntry(calendarKey("ical", s.id.toString()), s.name, s.color, "ical")
             }
             _state.update { st -> st.copy(allCalendars = entries.filter { it.key !in banished }) }
+        }
+    }
+
+    /** Birthday calendars the user may write to (own or shared read/write). */
+    suspend fun birthdayCalendars(): List<LocalCalendar> =
+        runCatching { repository.getLocalCalendars() }.getOrDefault(emptyList())
+            .filter { it.isBirthday && (it.owned || it.permission == "read_write") }
+
+    /**
+     * Create a manual birthday: an all-day, yearly-recurring local event whose
+     * age suffix and cake icon are added server-side. When the year is unknown
+     * we anchor to 1970 and send no birth_year (so no age is shown).
+     */
+    fun createBirthday(
+        calendarId: Int, name: String, date: LocalDate, yearKnown: Boolean, onDone: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            val anchor = LocalDate.of(if (yearKnown) date.year else 1970, date.monthValue, date.dayOfMonth)
+            val start = Dates.startOfDay(anchor)
+            val end = Dates.startOfDay(anchor.plusDays(1))
+            runCatching {
+                repository.createLocalEvent(
+                    calendarId, name, start, end, isAllDay = true,
+                    location = "", description = "", color = null,
+                    rrule = "FREQ=YEARLY", birthYear = if (yearKnown) date.year else null,
+                )
+            }.onSuccess { loadVisible(force = true); onDone() }
         }
     }
 

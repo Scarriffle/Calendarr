@@ -5,8 +5,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -78,7 +80,7 @@ private enum class Overlay { NONE, PROFILE, SETTINGS, ACCOUNTS, GROUPS }
 
 data class EditorRequest(val existing: CalEvent?, val date: LocalDate, val prefill: CalEvent? = null)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CalendarScreen(
     onLogout: () -> Unit,
@@ -129,6 +131,9 @@ fun CalendarScreen(
     var editor by remember { mutableStateOf<EditorRequest?>(null) }
     var overlay by remember { mutableStateOf(Overlay.NONE) }
     var dayPreview by remember { mutableStateOf<LocalDate?>(null) }
+    var fabMenuOpen by remember { mutableStateOf(false) }
+    var showBirthday by remember { mutableStateOf(false) }
+    var birthdayCals by remember { mutableStateOf<List<com.scarriffle.calendarr.domain.model.LocalCalendar>>(emptyList()) }
 
     // Continuous month scrolling
     val monthListState = rememberLazyListState()
@@ -167,14 +172,37 @@ fun CalendarScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { editor = EditorRequest(null, if (isMonth) visibleMonth else state.currentDate) },
-                shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.navigationBarsPadding(),
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = tr("cal.new_event"))
+            // Tap = new event; long-press opens a small menu (new event / new
+            // birthday). A transparent overlay carries the combined click so the
+            // long-press is reliable on the Material FAB.
+            Box(Modifier.navigationBarsPadding()) {
+                FloatingActionButton(
+                    onClick = {},
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = tr("cal.new_event"))
+                }
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .clip(CircleShape)
+                        .combinedClickable(
+                            onClick = { editor = EditorRequest(null, if (isMonth) visibleMonth else state.currentDate) },
+                            onLongClick = { fabMenuOpen = true },
+                        ),
+                )
+                DropdownMenu(expanded = fabMenuOpen, onDismissRequest = { fabMenuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(tr("cal.new_event")) },
+                        onClick = { fabMenuOpen = false; editor = EditorRequest(null, if (isMonth) visibleMonth else state.currentDate) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(tr("birthday.new")) },
+                        onClick = { fabMenuOpen = false; showBirthday = true },
+                    )
+                }
             }
         },
         // Edge-to-edge: we place the system-bar insets ourselves (top bar gets
@@ -248,6 +276,18 @@ fun CalendarScreen(
             onCreateEvent = { dayPreview = null; editor = EditorRequest(null, date) },
             onOpenDay = { dayPreview = null; vm.goToDate(date, CalViewType.DAY) },
             onOpenWeek = { dayPreview = null; vm.goToDate(date, CalViewType.WEEK) },
+        )
+    }
+
+    if (showBirthday) {
+        androidx.compose.runtime.LaunchedEffect(Unit) { birthdayCals = vm.birthdayCalendars() }
+        BirthdayDialog(
+            calendars = birthdayCals,
+            onDismiss = { showBirthday = false },
+            onSave = { name, date, yearKnown, calId ->
+                vm.createBirthday(calId, name, date, yearKnown) {}
+                showBirthday = false
+            },
         )
     }
 

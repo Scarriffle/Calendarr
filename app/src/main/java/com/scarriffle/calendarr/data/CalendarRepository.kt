@@ -186,8 +186,17 @@ class CalendarRepository @Inject constructor(
 
     suspend fun getLocalCalendars(): List<LocalCalendar> = guarded { api.getLocalCalendars() }
 
-    suspend fun addLocalCalendar(name: String, color: String) =
-        guarded { api.addLocalCalendar(jsonBody("name" to name, "color" to color)) }
+    suspend fun addLocalCalendar(
+        name: String, color: String,
+        isBirthday: Boolean = false, birthdayNotifyDaysBefore: Int? = null,
+    ) = guarded {
+        api.addLocalCalendar(jsonBody(buildMap {
+            put("name", name)
+            put("color", color)
+            if (isBirthday) put("is_birthday", true)
+            if (birthdayNotifyDaysBefore != null) put("birthday_notify_days_before", birthdayNotifyDaysBefore)
+        }))
+    }
 
     suspend fun deleteLocalCalendar(id: Int) = guarded { api.deleteLocalCalendar(id).ensureSuccess() }
 
@@ -342,8 +351,9 @@ class CalendarRepository @Inject constructor(
         calendarId: Int, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
         isPrivate: Boolean = false, reminders: List<Int>? = null,
+        rrule: String? = null, birthYear: Int? = null,
     ) = guarded {
-        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate, reminders))
+        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate, reminders, rrule, birthYear))
             .ensureSuccess()
     }
 
@@ -599,6 +609,7 @@ class CalendarRepository @Inject constructor(
         calendarId: Int?, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
         isPrivate: Boolean = false, reminders: List<Int>? = null,
+        rrule: String? = null, birthYear: Int? = null,
     ) = jsonBody(
         buildMap {
             calendarId?.let { put("calendar_id", it) }
@@ -611,6 +622,8 @@ class CalendarRepository @Inject constructor(
             if (!color.isNullOrBlank()) put("color", color)
             put("private", isPrivate)
             if (reminders != null) put("reminders", org.json.JSONArray(reminders))
+            if (!rrule.isNullOrBlank()) put("rrule", rrule)
+            if (birthYear != null) put("birth_year", birthYear)
         }
     )
 }

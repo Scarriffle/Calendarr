@@ -354,13 +354,11 @@ private fun EventBar(bar: PlacedBar, cellW: Dp, dimmed: Boolean, onClick: () -> 
             .padding(horizontal = 4.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Text(
-            bar.event.title,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        EventLabel(
+            event = bar.event,
+            color = bar.textColor,
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
-            color = bar.textColor,
         )
     }
 }

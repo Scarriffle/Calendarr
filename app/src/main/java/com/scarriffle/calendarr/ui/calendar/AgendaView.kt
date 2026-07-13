@@ -98,7 +98,12 @@ private fun AgendaRow(event: CalEvent, lang: String, dimmed: Boolean, onClick: (
         Box(Modifier.size(10.dp).clip(CircleShape).background(colorFromHex(event.effectiveColor)))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(event.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            EventLabel(
+                event = event,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                fontWeight = FontWeight.Medium,
+            )
             if (event.location.isNotBlank()) {
                 Text(event.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

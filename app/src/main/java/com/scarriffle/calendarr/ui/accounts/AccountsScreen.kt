@@ -233,8 +233,8 @@ fun AccountsScreen(
     }
 
     when (addDialog) {
-        AddType.LOCAL -> LocalDialog(onDismiss = { addDialog = null }) { name, color ->
-            vm.addLocal(name, color, onChanged); addDialog = null
+        AddType.LOCAL -> LocalDialog(onDismiss = { addDialog = null }) { name, color, isBirthday, notify ->
+            vm.addLocal(name, color, onChanged, isBirthday, notify); addDialog = null
         }
         AddType.CALDAV -> CalDAVDialog(onDismiss = { addDialog = null }) { n, u, us, p, c ->
             vm.addCalDAV(n, u, us, p, c, onChanged); addDialog = null
@@ -488,12 +488,45 @@ private fun SharingSheet(vm: AccountsViewModel, calendarId: Int, onDismiss: () -
 // ---- Add dialogs ----
 
 @Composable
-private fun LocalDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
+@OptIn(ExperimentalMaterial3Api::class)
+private fun LocalDialog(onDismiss: () -> Unit, onConfirm: (String, String, Boolean, Int?) -> Unit) {
     var name by remember { mutableStateOf("") }
+    var birthday by remember { mutableStateOf(false) }
+    var notify by remember { mutableStateOf(-1) }   // -1 off, 0 on the day, N days before
+    var notifyMenu by remember { mutableStateOf(false) }
     val color = "#34a853"
-    FormDialog(tr("accounts.local.add"), onDismiss, confirmEnabled = name.isNotBlank(), onConfirm = { onConfirm(name.trim(), color) }) {
+    FormDialog(
+        tr("accounts.local.add"), onDismiss,
+        confirmEnabled = name.isNotBlank(),
+        onConfirm = { onConfirm(name.trim(), color, birthday, if (birthday && notify >= 0) notify else null) },
+    ) {
         OutlinedTextField(name, { name = it }, label = { Text(tr("local.name")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.size(8.dp))
+        FilterChip(selected = birthday, onClick = { birthday = !birthday }, label = { Text(tr("birthday.is_calendar")) })
+        if (birthday) {
+            Spacer(Modifier.size(8.dp))
+            Box {
+                FilterChip(
+                    selected = notify >= 0,
+                    onClick = { notifyMenu = true },
+                    label = { Text("${tr("birthday.notify")}: ${notifyLabel(notify)}") },
+                )
+                DropdownMenu(expanded = notifyMenu, onDismissRequest = { notifyMenu = false }) {
+                    listOf(-1, 0, 1, 2, 3, 7).forEach { d ->
+                        DropdownMenuItem(text = { Text(notifyLabel(d)) }, onClick = { notify = d; notifyMenu = false })
+                    }
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun notifyLabel(d: Int): String = when {
+    d < 0 -> tr("birthday.notify.off")
+    d == 0 -> tr("birthday.notify.same_day")
+    d == 1 -> tr("birthday.notify.one_day")
+    else -> tr("birthday.notify.days", d)
 }
 
 @Composable

@@ -167,13 +167,12 @@ private fun TimedEvent(
             .padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
         Column {
-            Text(
-                event.title,
-                fontSize = 10.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            EventLabel(
+                event = event,
                 color = color.contrastingTextColor(),
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
+                maxLines = 2,
             )
             if (height > 36.dp) {
                 Text(
@@ -212,7 +211,7 @@ private fun AllDayChip(event: CalEvent, dimmed: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 3.dp, vertical = 1.dp),
     ) {
-        Text(event.title, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = color.contrastingTextColor())
+        EventLabel(event = event, color = color.contrastingTextColor(), fontSize = 9.sp)
     }
 }
 

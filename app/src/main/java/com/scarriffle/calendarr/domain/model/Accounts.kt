@@ -36,6 +36,8 @@ data class LocalCalendar(
     val permission: String? = null,
     val group: Boolean = false,
     @Json(name = "reminders_enabled") val remindersEnabled: Boolean = true,
+    @Json(name = "is_birthday") val isBirthday: Boolean = false,
+    @Json(name = "birthday_notify_days_before") val birthdayNotifyDaysBefore: Int? = null,
 )
 
 @JsonClass(generateAdapter = false)
