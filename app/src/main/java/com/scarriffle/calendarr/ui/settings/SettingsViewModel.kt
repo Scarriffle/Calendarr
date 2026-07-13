@@ -69,7 +69,9 @@ class SettingsViewModel @Inject constructor(
                 groupVisibleId = s.groupVisibleCalendarId ?: 0
             }
             runCatching { repository.getLocalCalendars() }.onSuccess { cals ->
-                ownLocalCalendars = cals.filter { it.owned && !it.group }
+                // A birthday calendar may be shared directly, but never stand in
+                // as the group-visible personal calendar.
+                ownLocalCalendars = cals.filter { it.owned && !it.group && !it.isBirthday }
             }
         }
     }

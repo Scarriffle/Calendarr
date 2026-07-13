@@ -49,6 +49,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,6 +75,7 @@ import com.scarriffle.calendarr.ui.menu.MenuSheet
 import com.scarriffle.calendarr.ui.profile.ProfileScreen
 import com.scarriffle.calendarr.ui.settings.SettingsScreen
 import com.scarriffle.calendarr.ui.tr
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 private enum class Overlay { NONE, PROFILE, SETTINGS, ACCOUNTS, GROUPS }
@@ -133,7 +135,9 @@ fun CalendarScreen(
     var dayPreview by remember { mutableStateOf<LocalDate?>(null) }
     var fabMenuOpen by remember { mutableStateOf(false) }
     var showBirthday by remember { mutableStateOf(false) }
-    var birthdayCals by remember { mutableStateOf<List<com.scarriffle.calendarr.domain.model.LocalCalendar>>(emptyList()) }
+    var birthdayCal by remember { mutableStateOf<com.scarriffle.calendarr.domain.model.LocalCalendar?>(null) }
+    val birthdayScope = rememberCoroutineScope()
+    val birthdayCalName = tr("birthday.calendar_name")
 
     // Continuous month scrolling
     val monthListState = rememberLazyListState()
@@ -280,12 +284,13 @@ fun CalendarScreen(
     }
 
     if (showBirthday) {
-        androidx.compose.runtime.LaunchedEffect(Unit) { birthdayCals = vm.birthdayCalendars() }
+        androidx.compose.runtime.LaunchedEffect(Unit) { birthdayCal = vm.birthdayCalendar() }
         BirthdayDialog(
-            calendars = birthdayCals,
+            calendar = birthdayCal,
             onDismiss = { showBirthday = false },
-            onSave = { name, date, yearKnown, calId ->
-                vm.createBirthday(calId, name, date, yearKnown) {}
+            onActivate = { birthdayScope.launch { birthdayCal = vm.ensureBirthdayCalendar(birthdayCalName) } },
+            onSave = { name, date, yearKnown ->
+                birthdayCal?.let { vm.createBirthday(it.id, name, date, yearKnown) {} }
                 showBirthday = false
             },
         )

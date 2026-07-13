@@ -1,6 +1,5 @@
 package com.scarriffle.calendarr.ui.calendar
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,8 +7,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -32,33 +29,31 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
- * Minimal "new birthday" mask (parity with iOS/web): pick a birthday calendar,
- * enter a name and a date (with an optional "year unknown"). Saves an all-day,
- * yearly-recurring local event; the server adds the age suffix and cake icon.
+ * Minimal "new birthday" mask for the user's single birthday calendar: name +
+ * date (with an optional "year unknown"). Saves an all-day, yearly-recurring
+ * local event; the server adds the age suffix and cake icon. If no birthday
+ * calendar exists yet, offers to activate one.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BirthdayDialog(
-    calendars: List<LocalCalendar>,
+    calendar: LocalCalendar?,
     onDismiss: () -> Unit,
-    onSave: (name: String, date: LocalDate, yearKnown: Boolean, calendarId: Int) -> Unit,
+    onActivate: () -> Unit,
+    onSave: (name: String, date: LocalDate, yearKnown: Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var yearUnknown by remember { mutableStateOf(false) }
-    var selectedCalId by remember { mutableStateOf(calendars.firstOrNull()?.id ?: -1) }
     var pickedDate by remember { mutableStateOf(LocalDate.now()) }
     var showPicker by remember { mutableStateOf(false) }
-    var calMenu by remember { mutableStateOf(false) }
-
-    val hasCalendars = calendars.isNotEmpty()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(tr("birthday.new_title")) },
         text = {
             Column {
-                if (!hasCalendars) {
-                    Text(tr("birthday.no_calendars"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (calendar == null) {
+                    Text(tr("birthday.activate_hint"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     OutlinedTextField(
                         name, { name = it },
@@ -75,28 +70,18 @@ fun BirthdayDialog(
                         selected = yearUnknown, onClick = { yearUnknown = !yearUnknown },
                         label = { Text(tr("birthday.year_unknown")) },
                     )
-                    if (calendars.size > 1) {
-                        Spacer(Modifier.size(8.dp))
-                        Box {
-                            FilterChip(
-                                selected = false, onClick = { calMenu = true },
-                                label = { Text(calendars.firstOrNull { it.id == selectedCalId }?.name ?: tr("birthday.target")) },
-                            )
-                            DropdownMenu(expanded = calMenu, onDismissRequest = { calMenu = false }) {
-                                calendars.forEach { c ->
-                                    DropdownMenuItem(text = { Text(c.name) }, onClick = { selectedCalId = c.id; calMenu = false })
-                                }
-                            }
-                        }
-                    }
                 }
             }
         },
         confirmButton = {
-            TextButton(
-                enabled = hasCalendars && name.isNotBlank(),
-                onClick = { onSave(name.trim(), pickedDate, !yearUnknown, selectedCalId) },
-            ) { Text(tr("common.save")) }
+            if (calendar == null) {
+                TextButton(onClick = onActivate) { Text(tr("birthday.activate")) }
+            } else {
+                TextButton(
+                    enabled = name.isNotBlank(),
+                    onClick = { onSave(name.trim(), pickedDate, !yearUnknown) },
+                ) { Text(tr("common.save")) }
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("common.cancel")) } },
     )

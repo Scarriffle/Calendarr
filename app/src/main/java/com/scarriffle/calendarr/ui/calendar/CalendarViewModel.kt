@@ -503,10 +503,18 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    /** Birthday calendars the user may write to (own or shared read/write). */
-    suspend fun birthdayCalendars(): List<LocalCalendar> =
+    /** The user's single birthday calendar, or null if not activated yet. */
+    suspend fun birthdayCalendar(): LocalCalendar? =
         runCatching { repository.getLocalCalendars() }.getOrDefault(emptyList())
-            .filter { it.isBirthday && (it.owned || it.permission == "read_write") }
+            .firstOrNull { it.isBirthday && it.owned }
+
+    /** The birthday calendar, creating the single one (named [name]) if none. */
+    suspend fun ensureBirthdayCalendar(name: String): LocalCalendar? {
+        birthdayCalendar()?.let { return it }
+        return runCatching {
+            repository.addLocalCalendar(name, "#E0407F", isBirthday = true)
+        }.getOrNull()
+    }
 
     /**
      * Create a manual birthday: an all-day, yearly-recurring local event whose
