@@ -141,7 +141,10 @@ enum BirthdaysImporter {
         guard isEnabled else { return }
         guard await requestAccess() else { return }
         guard let contacts = try? readContactBirthdays() else { return }
-        guard let cal = await ensureBirthdayCalendar(api: api) else { return }
+        // Only fill an EXISTING birthday calendar — never auto-create it. The
+        // calendar is created explicitly; deleting it means sync has nowhere to
+        // go (and must not resurrect it).
+        guard let cal = await birthdayCalendar(api: api) else { return }
         guard let existing = try? await api.getBirthdayEntries(calendarId: cal.id) else { return }
 
         // Only reconcile THIS device's contact rows; leave other devices'

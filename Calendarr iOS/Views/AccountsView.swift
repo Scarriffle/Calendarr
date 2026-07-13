@@ -47,13 +47,9 @@ struct AccountsView: View {
                         haSection
                     }
                     .onChange(of: birthdaysSyncEnabled) { _, on in
-                        if on {
-                            Task {
-                                _ = await BirthdaysImporter.requestAccess()
-                                _ = await BirthdaysImporter.ensureBirthdayCalendar(api: api)
-                                await load()
-                            }
-                        }
+                        // Enabling only asks for Contacts access — it must NOT create
+                        // the birthday calendar. That's an explicit action.
+                        if on { Task { _ = await BirthdaysImporter.requestAccess() } }
                     }
                 }
             }
@@ -64,6 +60,12 @@ struct AccountsView: View {
                     Menu {
                         Button(L10n.t("accounts.add.caldav", appLang)) { showAddCalDAV = true }
                         Button(L10n.t("accounts.add.local",  appLang)) { showAddLocal  = true }
+                        // Only one birthday calendar per account.
+                        if birthdayCalendar == nil {
+                            Button(L10n.t("accounts.add.birthday", appLang)) {
+                                Task { await createBirthdayCalendar() }
+                            }
+                        }
                         Button(L10n.t("accounts.add.ical",   appLang)) { showAddICal   = true }
                         Button(L10n.t("accounts.add.ha",     appLang)) { showAddHA     = true }
                     } label: {
@@ -235,29 +237,40 @@ struct AccountsView: View {
 
     @ViewBuilder var birthdayContactsSection: some View {
         Section {
-            Toggle(L10n.t("birthday.contacts.sync", appLang), isOn: $birthdaysSyncEnabled)
-            if birthdaysSyncEnabled {
-                if let cal = birthdayCalendar {
+            if let cal = birthdayCalendar {
+                Toggle(L10n.t("birthday.contacts.sync", appLang), isOn: $birthdaysSyncEnabled)
+                if birthdaysSyncEnabled {
                     BirthdayNotifyPicker(days: $birthdayNotify, appLang: appLang)
                         .onChange(of: birthdayNotify) { _, v in
                             Task { try? await api.updateLocalCalendarBirthday(id: cal.id, notifyDaysBefore: v) }
                         }
-                }
-                Button {
-                    Task { await syncBirthdays() }
-                } label: {
-                    HStack {
-                        Text(L10n.t("birthday.contacts.sync_now", appLang))
-                        if isSyncingBirthdays { Spacer(); ProgressView() }
+                    Button {
+                        Task { await syncBirthdays() }
+                    } label: {
+                        HStack {
+                            Text(L10n.t("birthday.contacts.sync_now", appLang))
+                            if isSyncingBirthdays { Spacer(); ProgressView() }
+                        }
                     }
+                    .disabled(isSyncingBirthdays)
                 }
-                .disabled(isSyncingBirthdays)
+            } else {
+                // No birthday calendar yet — sync has nothing to fill. Create one
+                // first via the + menu (never auto-created by sync).
+                Text(L10n.t("birthday.contacts.need_calendar", appLang))
+                    .font(.caption).foregroundStyle(.secondary)
             }
         } header: {
             Text(L10n.t("birthday.contacts.header", appLang))
         } footer: {
             Text(L10n.t("birthday.contacts.hint", appLang))
         }
+    }
+
+    /// Explicitly create the single birthday calendar (from the + menu).
+    private func createBirthdayCalendar() async {
+        _ = await BirthdaysImporter.ensureBirthdayCalendar(api: api)
+        await load()
     }
 
     private func syncBirthdays() async {
