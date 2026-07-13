@@ -3717,6 +3717,55 @@ function renderHiddenCalendars() {
   });
 }
 
+/** Make the calendar-management table's columns drag-resizable. Widths persist
+ *  in localStorage and are re-applied on every re-render. */
+function initResizableCalTable(table) {
+  if (!table || !table.tHead) return;
+  const ths = Array.from(table.tHead.rows[0].cells);
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('calTableColWidths') || 'null'); } catch { saved = null; }
+  // Measure natural widths, then lock to px + fixed layout so dragging one
+  // column doesn't reflow the others.
+  const natural = ths.map(th => th.offsetWidth);
+  ths.forEach((th, i) => {
+    const w = (Array.isArray(saved) && saved[i]) ? saved[i] : natural[i];
+    th.style.width = Math.max(60, w || 80) + 'px';
+  });
+  table.style.tableLayout = 'fixed';
+  const sync = () => {
+    const total = ths.reduce((s, t) => s + (parseFloat(t.style.width) || 0), 0);
+    table.style.width = total + 'px';
+  };
+  sync();
+  ths.forEach((th, i) => {
+    if (i >= ths.length - 1) return;   // no handle on the last (trash) column
+    const res = document.createElement('div');
+    res.className = 'col-resizer';
+    th.appendChild(res);
+    res.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX, startW = th.offsetWidth;
+      document.body.style.cursor = 'col-resize';
+      const onMove = ev => {
+        th.style.width = Math.max(60, startW + (ev.clientX - startX)) + 'px';
+        sync();
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+        try {
+          localStorage.setItem('calTableColWidths',
+            JSON.stringify(ths.map(t => Math.round(parseFloat(t.style.width) || 0))));
+        } catch {}
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
+
 function renderCalendarTable() {
   const container = document.getElementById('cal-settings-table');
   if (!container) return;
@@ -3879,6 +3928,8 @@ function renderCalendarTable() {
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
+
+  initResizableCalTable(container.querySelector('.cal-manage-table'));
 
   // Visibility eye toggle
   container.querySelectorAll('.ct-eye[data-ct-hid]').forEach(btn => {
