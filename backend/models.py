@@ -113,6 +113,16 @@ class UserSettings(Base):
     default_event_duration_minutes = Column(Integer, default=60)
     # Icon key (from GROUP_ICON_KEYS) shown next to calendars this user shares with groups.
     share_calendar_icon = Column(String(16), nullable=True)
+    # How many months around the visible range clients preload/cache. Device-local
+    # by default (only shared when its sync flag is on).
+    cache_months = Column(Integer, default=3)
+    # Whether the month view uses horizontal paging (swipe) instead of a vertical
+    # scroll feed. Device-local by default (only shared when its sync flag is on).
+    month_view_paged = Column(Boolean, default=False)
+    # Per-setting cross-device sync overrides as JSON {key: bool}. Absent keys fall
+    # back to settings_router.DEFAULT_SYNC. Account-wide (one map per user); it is
+    # the single authority for which settings each client sends/fetches.
+    sync_flags = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="settings")
 

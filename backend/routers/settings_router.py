@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,6 +10,48 @@ from auth import get_current_user
 from database import get_db
 
 router = APIRouter()
+
+
+# Which settings can sync across a user's devices, and the default flag applied to
+# an existing/new account until the user overrides it. This map is the single
+# authority: GET returns the fully-resolved flags so no client duplicates default
+# logic. Rollout rule: settings that already lived on the server default to True;
+# the four newly-syncable device-local prefs default to False.
+DEFAULT_SYNC = {
+    "default_view": True,
+    "week_start_day": True,
+    "dim_past_events": True,
+    "hour_height": True,
+    "primary_color": True,
+    "accent_color": True,
+    "today_color": True,
+    "text_color": True,
+    "line_color": True,
+    "bg_color": True,
+    "month_divider_color": True,
+    "month_label_color": True,
+    "default_event_duration_minutes": True,
+    "default_reminder_minutes": True,
+    "language": False,
+    "share_calendar_icon": False,
+    "cache_months": False,
+    "month_view_paged": False,
+}
+
+
+def _resolve_sync_flags(s: models.UserSettings) -> dict:
+    """Fully-resolved {key: bool} for every syncable setting: stored overrides on
+    top of DEFAULT_SYNC, junk keys dropped."""
+    stored = {}
+    if s.sync_flags:
+        try:
+            stored = json.loads(s.sync_flags) or {}
+        except (ValueError, TypeError):
+            stored = {}
+    return {
+        key: bool(stored[key]) if key in stored else default
+        for key, default in DEFAULT_SYNC.items()
+    }
 
 
 class SettingsUpdate(BaseModel):
@@ -32,6 +75,9 @@ class SettingsUpdate(BaseModel):
     default_reminder_minutes: Optional[int] = None  # null = off
     default_event_duration_minutes: Optional[int] = None
     share_calendar_icon: Optional[str] = None
+    cache_months: Optional[int] = None
+    month_view_paged: Optional[bool] = None
+    sync_flags: Optional[dict] = None  # partial {key: bool}, merged into stored map
 
 
 def _settings_dict(s: models.UserSettings) -> dict:
@@ -56,6 +102,9 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "default_reminder_minutes": s.default_reminder_minutes,
         "default_event_duration_minutes": s.default_event_duration_minutes or 60,
         "share_calendar_icon": s.share_calendar_icon,
+        "cache_months": s.cache_months or 3,
+        "month_view_paged": bool(s.month_view_paged),
+        "sync_flags": _resolve_sync_flags(s),
     }
 
 
@@ -115,6 +164,22 @@ def update_settings(
     # keep the previous behaviour where a null/missing value is ignored.
     NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "group_visible_calendar_id", "default_reminder_minutes", "default_event_duration_minutes", "share_calendar_icon"}
     update_data = data.model_dump(exclude_unset=True)
+
+    # Merge sync-flag overrides into the stored account-wide JSON map. Only known
+    # syncable keys are kept; a partial map leaves untouched flags as they were.
+    if "sync_flags" in update_data:
+        incoming = update_data.pop("sync_flags") or {}
+        current = {}
+        if settings.sync_flags:
+            try:
+                current = json.loads(settings.sync_flags) or {}
+            except (ValueError, TypeError):
+                current = {}
+        for key, val in incoming.items():
+            if key in DEFAULT_SYNC:
+                current[key] = bool(val)
+        settings.sync_flags = json.dumps(current)
+
     for field, value in update_data.items():
         if field in NULLABLE_OVERRIDES:
             setattr(settings, field, value or None)

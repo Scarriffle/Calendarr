@@ -225,6 +225,20 @@ def _migrate():
         except Exception:
             pass
 
+        # Per-setting cross-device sync: value columns for the two newly syncable
+        # device-local prefs, plus the JSON map of which settings sync.
+        for col, ddl in (
+            ("cache_months",     "ALTER TABLE user_settings ADD COLUMN cache_months INTEGER DEFAULT 3"),
+            ("month_view_paged", "ALTER TABLE user_settings ADD COLUMN month_view_paged BOOLEAN DEFAULT 0"),
+            ("sync_flags",       "ALTER TABLE user_settings ADD COLUMN sync_flags TEXT"),
+        ):
+            try:
+                conn.execute(text(ddl))
+                conn.commit()
+                logging.info("Migration: added %s to user_settings", col)
+            except Exception:
+                pass
+
         # CalDAV publishing of local calendars (opt-in, secret token URL).
         for col, ddl in (
             ("caldav_published", "ALTER TABLE local_calendars ADD COLUMN caldav_published BOOLEAN DEFAULT 0"),
