@@ -1352,6 +1352,69 @@ a { color: var(--primary); text-decoration: none; }
 }
 .contrast-btn.active .hour-preview { color: #fff; }
 
+/* ── Settings sync table (Sync-Icon | Name | Wert) ─────────── */
+.sync-global-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 14px; margin-bottom: 12px;
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
+}
+.sync-global-text { display: flex; flex-direction: column; gap: 2px; }
+.sync-global-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
+.sync-global-row .panel-desc { margin: 0; }
+
+.settings-table { display: flex; flex-direction: column; }
+.settings-table-section {
+  font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-3); margin: 18px 0 6px; padding: 0 2px;
+}
+.settings-table-section:first-child { margin-top: 0; }
+.settings-row {
+  display: grid; grid-template-columns: 40px 1fr minmax(140px, auto);
+  align-items: center; gap: 12px;
+  padding: 10px 4px; border-bottom: 1px solid var(--border-light);
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row-name { font-size: 14px; color: var(--text-1); }
+.settings-row-value { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.settings-row-value select {
+  min-width: 130px; max-width: 100%;
+}
+
+/* Sync toggle switch — used per row and (larger) globally */
+.sync-toggle {
+  position: relative; flex: 0 0 auto;
+  width: 34px; height: 20px; padding: 0;
+  border: none; border-radius: 999px; cursor: pointer;
+  background: var(--bg-active); transition: background var(--transition);
+}
+.sync-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; transition: transform var(--transition);
+}
+.sync-toggle.on { background: var(--primary); }
+.sync-toggle.on::after { transform: translateX(14px); }
+.sync-toggle-lg { width: 44px; height: 26px; }
+.sync-toggle-lg::after { width: 22px; height: 22px; }
+.sync-toggle-lg.on::after { transform: translateX(18px); }
+.settings-row .sync-toggle { justify-self: center; }
+
+/* Per-row colour control: swatch + hex + reset, right-aligned */
+.settings-color-ctl { display: flex; align-items: center; gap: 6px; }
+.settings-color-ctl .ev-color-hex { width: 92px; }
+.settings-color-ctl .ev-color-reset {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; color: var(--text-3);
+}
+
+/* Compact inline share-icon picker inside a value cell */
+.settings-icon-ctl { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 220px; }
+
+@media (max-width: 640px) {
+  .settings-row { grid-template-columns: 34px 1fr; grid-auto-rows: auto; }
+  .settings-row-value { grid-column: 1 / -1; justify-content: flex-start; padding-left: 46px; }
+}
+
 /* ── Settings (legacy) ──────────────────────────────────── */
 .settings-section { margin-bottom: 28px; }
 .settings-section h4 { font-size: 14px; font-weight: 600; color: var(--text-1); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }

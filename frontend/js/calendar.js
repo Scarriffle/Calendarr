@@ -1,5 +1,5 @@
 ﻿import { api } from './api.js';
-import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart, renderDescriptionHtml, DEFAULT_TEXT_COLOR, DEFAULT_LINE_COLOR, DEFAULT_BG_COLOR } from './utils.js';
+import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart, renderDescriptionHtml } from './utils.js';
 import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
@@ -7,6 +7,7 @@ import { renderQuarter } from './views/quarter.js';
 import { openColorPicker } from './color-picker.js';
 import { openDatePicker, formatDtDisplay } from './date-picker.js';
 import { t, setLang, getLang } from './i18n.js';
+import { DEFAULT_COLORS, SETTING_GROUPS, SYNCABLE_KEYS, loadLocal, saveLocal, mergeEffective } from './settings-sync.js';
 import { APP_VERSION } from './version.js';
 
 // Version im Impressum/Sidebar sichtbar, nicht im Tab-Titel.
@@ -123,15 +124,22 @@ export async function initCalendar() {
     api.get('/homeassistant/accounts').catch(() => []),
   ]);
 
-  state.settings = settings;
+  // Per-setting sync: the server's raw response is the shared source; effective
+  // settings resolve each syncable key against the account-wide sync flags and
+  // this browser's local copy (see settings-sync.js / backend/SETTINGS_SYNC.md).
+  state.serverSettings = settings;
+  state.syncFlags = { ...(settings.sync_flags || {}) };
+  state.settings = mergeEffective(settings, state.syncFlags, loadLocal());
   state.accounts = accounts;
   state.localCalendars = localCalendars;
   state.icalSubscriptions = icalSubscriptions;
   state.googleAccounts = googleAccounts;
   state.haAccounts = haAccounts;
-  state.currentView = settings.default_view || 'month';
-  state.dimPast = settings.dim_past_events;
-  weekStartDay = settings.week_start_day || 'monday';
+  state.currentView = state.settings.default_view || 'month';
+  state.dimPast = state.settings.dim_past_events;
+  weekStartDay = state.settings.week_start_day || 'monday';
+  // Follow the effective (possibly synced) UI language.
+  if (state.settings.language) setLang(state.settings.language);
 
   // URL state takes precedence over defaults (settings + today)
   const urlState = readUrlState();
@@ -3296,53 +3304,13 @@ function openSettingsModal() {
 }
 
 function populateSettings() {
-  const s = state.settings;
-  document.getElementById('cfg-default-view').value  = s.default_view   || 'month';
-  document.getElementById('cfg-week-start').value    = s.week_start_day || 'monday';
-  const colors = [
-    { id: 'cfg-primary',        val: s.primary_color        || '#4285f4' },
-    { id: 'cfg-accent',         val: s.accent_color         || '#ea4335' },
-    { id: 'cfg-today',          val: s.today_color          || '#4285f4' },
-    { id: 'cfg-month-divider',  val: s.month_divider_color  || '#7090c0' },
-    { id: 'cfg-month-label',    val: s.month_label_color    || '#7090c0' },
-  ];
-  colors.forEach(({ id, val }) => {
-    document.getElementById(id + '-hex').value = val.toUpperCase();
-    document.getElementById(id + '-preview').style.background = val;
-  });
+  // Appearance / syncable settings render into the unified sync table.
+  renderSettingsTable();
 
-  // Override-Farben — leeres Hex-Input bedeutet "Default verwenden",
-  // aber die Preview zeigt trotzdem die aktuell wirksame Farbe.
-  [
-    { id: 'cfg-text-color', val: s.text_color, fallback: DEFAULT_TEXT_COLOR },
-    { id: 'cfg-line-color', val: s.line_color, fallback: DEFAULT_LINE_COLOR },
-    { id: 'cfg-bg-color',   val: s.bg_color,   fallback: DEFAULT_BG_COLOR },
-  ].forEach(({ id, val, fallback }) => {
-    const hex = document.getElementById(id + '-hex');
-    const prev = document.getElementById(id + '-preview');
-    if (!hex || !prev) return;
-    hex.value = val ? String(val).toUpperCase() : '';
-    prev.style.background = val || fallback;
-  });
-  document.getElementById('cfg-dim-past').checked = !!s.dim_past_events;
-  document.getElementById('cfg-language').value = getLang();
+  // Account settings (kept as a dedicated profile block, not synced per-device).
+  const s = state.settings;
   document.getElementById('cfg-private-visibility').value = s.private_event_visibility || 'busy';
   renderGroupVisibleList(s.group_visible_calendar_id);
-
-  // Share-Icon-Picker in Darstellung
-  const shareIconPicker = document.getElementById('cfg-share-icon');
-  if (shareIconPicker) {
-    const cur = s.share_calendar_icon || 'share';
-    shareIconPicker.innerHTML = SHARE_ICON_KEYS.map(k =>
-      `<button type="button" class="group-icon-opt ${cur === k ? 'on' : ''}" data-share-icon="${k}" title="${k}">${shareIconSvg(k, 20)}</button>`
-    ).join('');
-    shareIconPicker.querySelectorAll('.group-icon-opt').forEach(btn => {
-      btn.addEventListener('click', () => {
-        shareIconPicker.querySelectorAll('.group-icon-opt').forEach(b => b.classList.remove('on'));
-        btn.classList.add('on');
-      });
-    });
-  }
 
   // Profile chapter: name (from cached user) + email (fresh from /profile).
   const pu = JSON.parse(localStorage.getItem('user') || '{}');
@@ -3354,20 +3322,6 @@ function populateSettings() {
     if (dh) dh.checked = !!p.directory_hidden;
   }).catch(() => {});
   initAppPasswords();
-
-  // Set active contrast/hour-height/duration buttons
-  [
-    { id: 'cfg-text-contrast',  val: s.text_contrast || 3 },
-    { id: 'cfg-line-contrast',  val: s.line_contrast || 3 },
-    { id: 'cfg-hour-height',    val: s.hour_height   || 60 },
-    { id: 'cfg-event-duration', val: s.default_event_duration_minutes || 60 },
-  ].forEach(({ id, val }) => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    sel.querySelectorAll('.contrast-btn').forEach(btn => {
-      btn.classList.toggle('active', String(btn.dataset.val) === String(val));
-    });
-  });
 
   // Show users nav button only for admins
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -3383,6 +3337,189 @@ function populateSettings() {
 
   // Render unified calendar table
   renderAllAccounts();
+}
+
+// ── Settings sync table ───────────────────────────────────
+const SYNC_ICON_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0020 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 004 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
+const RESET_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>';
+
+function normalizeHex(raw, fallback) {
+  let v = (raw || '').trim();
+  if (!v) return fallback;
+  if (!v.startsWith('#')) v = '#' + v;
+  return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toUpperCase() : fallback;
+}
+
+function renderSettingsTable() {
+  const container = document.getElementById('settings-appearance-table');
+  if (!container) return;
+  container.innerHTML = SETTING_GROUPS.map(group =>
+    `<div class="settings-table-section">${escHtml(t(group.titleKey))}</div>` +
+    group.rows.map(settingRowHtml).join('')
+  ).join('');
+  SETTING_GROUPS.forEach(g => g.rows.forEach(wireSettingRow));
+  updateSyncAllToggle();
+}
+
+function settingRowHtml(def) {
+  const synced = !!state.syncFlags[def.key];
+  const val = state.settings[def.key];
+  let valueHtml = '';
+  if (def.type === 'select') {
+    valueHtml = `<select data-skey="${def.key}">` + def.opts.map(o => {
+      const lbl = o.tk ? t(o.tk) : o.label;
+      const sel = String(o.v) === String(val) ? ' selected' : '';
+      return `<option value="${o.v}"${sel}>${escHtml(lbl)}</option>`;
+    }).join('') + '</select>';
+  } else if (def.type === 'toggle') {
+    valueHtml = `<button type="button" class="sync-toggle ${val ? 'on' : ''}" data-vtoggle="${def.key}" role="switch" aria-checked="${!!val}"></button>`;
+  } else if (def.type === 'color') {
+    const hex = normalizeHex(val, DEFAULT_COLORS[def.key]);
+    valueHtml = `<div class="settings-color-ctl">
+      <input type="text" class="ev-color-hex" data-shex="${def.key}" maxlength="7" spellcheck="false" value="${hex}" />
+      <div class="ev-color-preview" data-sprev="${def.key}" style="background:${hex}" title="${escHtml(t('color_pick'))}"></div>
+      <button type="button" class="icon-btn ev-color-reset" data-sreset="${def.key}" title="${escHtml(t('reset'))}">${RESET_ICON_SVG}</button>
+    </div>`;
+  } else if (def.type === 'icon') {
+    const cur = val || 'share';
+    valueHtml = `<div class="settings-icon-ctl" data-sicon="${def.key}">` + SHARE_ICON_KEYS.map(k =>
+      `<button type="button" class="group-icon-opt ${cur === k ? 'on' : ''}" data-share-icon="${k}" title="${k}">${shareIconSvg(k, 18)}</button>`
+    ).join('') + '</div>';
+  }
+  return `<div class="settings-row" data-row="${def.key}">
+    <button type="button" class="sync-icon ${synced ? 'on' : ''}" data-sync="${def.key}" role="switch" aria-checked="${synced}" title="${escHtml(t('settings_sync_this'))}">${SYNC_ICON_SVG}</button>
+    <div class="settings-row-name">${escHtml(t(def.labelKey))}</div>
+    <div class="settings-row-value">${valueHtml}</div>
+  </div>`;
+}
+
+function wireSettingRow(def) {
+  const row = document.querySelector(`.settings-row[data-row="${def.key}"]`);
+  if (!row) return;
+
+  const syncBtn = row.querySelector('[data-sync]');
+  if (syncBtn) syncBtn.addEventListener('click', () => {
+    const on = !state.syncFlags[def.key];
+    state.syncFlags[def.key] = on;
+    syncBtn.classList.toggle('on', on);
+    syncBtn.setAttribute('aria-checked', String(on));
+    updateSyncAllToggle();
+  });
+
+  if (def.type === 'select') {
+    // Hour height affects the theme — preview it live; other selects apply on Save.
+    if (def.key === 'hour_height') {
+      const sel = row.querySelector('[data-skey]');
+      if (sel) sel.addEventListener('change', () => {
+        state.settings.hour_height = Number(sel.value);
+        applyTheme(state.settings);
+      });
+    }
+  } else if (def.type === 'toggle') {
+    const vt = row.querySelector('[data-vtoggle]');
+    if (vt) vt.addEventListener('click', () => {
+      const on = !vt.classList.contains('on');
+      vt.classList.toggle('on', on);
+      vt.setAttribute('aria-checked', String(on));
+    });
+  } else if (def.type === 'color') {
+    const hex = row.querySelector('[data-shex]');
+    const prev = row.querySelector('[data-sprev]');
+    const reset = row.querySelector('[data-sreset]');
+    const apply = (color) => {
+      prev.style.background = color;
+      state.settings[def.key] = color;
+      applyTheme(state.settings);
+    };
+    prev.addEventListener('click', async () => {
+      const picked = await openColorPicker(prev, hex.value || DEFAULT_COLORS[def.key]);
+      if (picked) { hex.value = picked.toUpperCase(); apply(picked); }
+    });
+    hex.addEventListener('input', () => {
+      const norm = normalizeHex(hex.value, null);
+      if (norm) apply(norm);
+    });
+    hex.addEventListener('change', () => {
+      const norm = normalizeHex(hex.value, DEFAULT_COLORS[def.key]);
+      hex.value = norm; apply(norm);
+    });
+    reset.addEventListener('click', () => {
+      const d = DEFAULT_COLORS[def.key];
+      hex.value = d; apply(d);
+    });
+  } else if (def.type === 'icon') {
+    row.querySelectorAll('.group-icon-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        row.querySelectorAll('.group-icon-opt').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+      });
+    });
+  }
+}
+
+// Read the current value of every syncable web setting from the table DOM.
+function readAppearanceTable() {
+  const out = {};
+  const numKeys = new Set(['hour_height', 'default_event_duration_minutes']);
+  SETTING_GROUPS.forEach(g => g.rows.forEach(def => {
+    if (def.type === 'select') {
+      const el = document.querySelector(`[data-skey="${def.key}"]`);
+      let v = el ? el.value : state.settings[def.key];
+      if (numKeys.has(def.key)) v = Number(v);
+      out[def.key] = v;
+    } else if (def.type === 'toggle') {
+      const el = document.querySelector(`[data-vtoggle="${def.key}"]`);
+      out[def.key] = el ? el.classList.contains('on') : !!state.settings[def.key];
+    } else if (def.type === 'color') {
+      const el = document.querySelector(`[data-shex="${def.key}"]`);
+      out[def.key] = normalizeHex(el && el.value, DEFAULT_COLORS[def.key]);
+    } else if (def.type === 'icon') {
+      const on = document.querySelector(`[data-sicon="${def.key}"] .group-icon-opt.on`);
+      out[def.key] = on ? on.dataset.shareIcon : (state.settings[def.key] || 'share');
+    }
+  }));
+  return out;
+}
+
+function updateSyncAllToggle() {
+  const btn = document.getElementById('cfg-sync-all');
+  if (!btn) return;
+  const allOn = SYNCABLE_KEYS.every(k => state.syncFlags[k]);
+  btn.classList.toggle('on', allOn);
+  btn.setAttribute('aria-checked', String(allOn));
+}
+
+function toggleSyncAll() {
+  const next = !SYNCABLE_KEYS.every(k => state.syncFlags[k]);
+  SYNCABLE_KEYS.forEach(k => { state.syncFlags[k] = next; });
+  document.querySelectorAll('.settings-row .sync-icon[data-sync]').forEach(el => {
+    const on = !!state.syncFlags[el.dataset.sync];
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-checked', String(on));
+  });
+  updateSyncAllToggle();
+}
+
+// Save profile identity fields (name/login/email/hidden) — server rotates the
+// JWT if the login name changed.
+async function saveProfileFields() {
+  const email = document.getElementById('cfg-email').value.trim();
+  const displayName = document.getElementById('cfg-display-name').value.trim();
+  const loginName = document.getElementById('cfg-login-name').value.trim();
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const body = { email: email || null };
+  if (displayName) body.display_name = displayName;
+  if (loginName && loginName.toLowerCase() !== (user.username || '')) body.username = loginName;
+  const dh = document.getElementById('cfg-directory-hidden');
+  if (dh) body.directory_hidden = dh.checked;
+  const res = await api.put('/profile/', body);
+  if (res && res.access_token) localStorage.setItem('token', res.access_token);
+  const updated = { ...user };
+  if (displayName) updated.display_name = displayName;
+  if (body.username) updated.username = body.username.toLowerCase();
+  localStorage.setItem('user', JSON.stringify(updated));
+  const dd = document.getElementById('dropdown-username');
+  if (dd) dd.textContent = updated.display_name || updated.username || 'Benutzer';
 }
 
 function activateSettingsPanel(panel) {
@@ -4139,95 +4276,13 @@ async function loadUsers() {
 }
 
 function bindSettingsModal() {
-  ['cfg-primary','cfg-accent','cfg-today','cfg-month-divider','cfg-month-label'].forEach(prefix => {
-    const preview = document.getElementById(prefix + '-preview');
-    const hex = document.getElementById(prefix + '-hex');
-    preview.addEventListener('click', async () => {
-      const picked = await openColorPicker(preview, hex.value || '#4285f4');
-      if (picked) { hex.value = picked.toUpperCase(); preview.style.background = picked; }
-    });
-    hex.addEventListener('change', () => {
-      let val = hex.value.trim();
-      if (!val.startsWith('#')) val = '#' + val;
-      if (/^#[0-9a-fA-F]{6}$/.test(val)) { hex.value = val.toUpperCase(); preview.style.background = val; }
-    });
-  });
-
-  // Optional override colours (text / line / background) — empty = use default.
-  // Live-apply to the page so the user sees the effect while typing, not only after Save.
-  const overrideFieldMap = {
-    'cfg-text-color': 'text_color',
-    'cfg-line-color': 'line_color',
-    'cfg-bg-color':   'bg_color',
-  };
-  const liveApplyOverride = (prefix, value) => {
-    const field = overrideFieldMap[prefix];
-    if (!field) return;
-    state.settings[field] = value || null;
-    applyTheme(state.settings);
-  };
-  [
-    { prefix: 'cfg-text-color', defaultColor: DEFAULT_TEXT_COLOR },
-    { prefix: 'cfg-line-color', defaultColor: DEFAULT_LINE_COLOR },
-    { prefix: 'cfg-bg-color',   defaultColor: DEFAULT_BG_COLOR },
-  ].forEach(({ prefix, defaultColor }) => {
-    const preview = document.getElementById(prefix + '-preview');
-    const hex = document.getElementById(prefix + '-hex');
-    const reset = document.getElementById(prefix + '-reset');
-    if (!preview || !hex || !reset) return;
-
-    const normalize = (raw) => {
-      let v = (raw || '').trim();
-      if (!v) return '';
-      if (!v.startsWith('#')) v = '#' + v;
-      return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toUpperCase() : null;
-    };
-
-    preview.addEventListener('click', async () => {
-      const picked = await openColorPicker(preview, hex.value || defaultColor);
-      if (picked) {
-        hex.value = picked.toUpperCase();
-        preview.style.background = picked;
-        liveApplyOverride(prefix, picked);
-      }
-    });
-
-    const onTyped = () => {
-      const norm = normalize(hex.value);
-      if (norm === '') {
-        preview.style.background = defaultColor;
-        liveApplyOverride(prefix, null);
-      } else if (norm) {
-        preview.style.background = norm;
-        liveApplyOverride(prefix, norm);
-      }
-    };
-    hex.addEventListener('input', onTyped);
-    hex.addEventListener('change', () => {
-      const norm = normalize(hex.value);
-      if (norm) hex.value = norm;
-    });
-
-    reset.addEventListener('click', () => {
-      hex.value = '';
-      preview.style.background = defaultColor;
-      liveApplyOverride(prefix, null);
-    });
-  });
+  // Global "sync everything" master toggle (per-row toggles are wired per render).
+  const syncAllBtn = document.getElementById('cfg-sync-all');
+  if (syncAllBtn) syncAllBtn.addEventListener('click', toggleSyncAll);
 
   // Panel navigation
   document.querySelectorAll('.settings-nav-btn').forEach(btn => {
     btn.addEventListener('click', () => activateSettingsPanel(btn.dataset.panel));
-  });
-
-  // Contrast / hour-height selectors
-  document.querySelectorAll('.contrast-selector').forEach(sel => {
-    sel.addEventListener('click', e => {
-      const btn = e.target.closest('.contrast-btn');
-      if (!btn) return;
-      sel.querySelectorAll('.contrast-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
   });
 
   document.getElementById('btn-add-user').onclick = () => {
@@ -4249,71 +4304,35 @@ function bindSettingsModal() {
     } catch (e) { showToast(e.message, true); }
   };
 
-  // Profile chapter save (name/login/email → /profile, separate from settings).
-  const profileSaveBtn = document.getElementById('cfg-profile-save');
-  if (profileSaveBtn) profileSaveBtn.onclick = async () => {
-    const email = document.getElementById('cfg-email').value.trim();
-    const displayName = document.getElementById('cfg-display-name').value.trim();
-    const loginName = document.getElementById('cfg-login-name').value.trim();
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const body = { email: email || null };
-    if (displayName) body.display_name = displayName;
-    if (loginName && loginName.toLowerCase() !== (user.username || '')) body.username = loginName;
-    const dh = document.getElementById('cfg-directory-hidden');
-    if (dh) body.directory_hidden = dh.checked;
-    try {
-      const res = await api.put('/profile/', body);
-      if (res && res.access_token) localStorage.setItem('token', res.access_token);
-      const updated = { ...user };
-      if (displayName) updated.display_name = displayName;
-      if (body.username) updated.username = body.username.toLowerCase();
-      localStorage.setItem('user', JSON.stringify(updated));
-      const dd = document.getElementById('dropdown-username');
-      if (dd) dd.textContent = updated.display_name || updated.username || 'Benutzer';
-      showToast(t('profile_saved'));
-    } catch (e) { showToast(e.message, true); }
-  };
-
+  // Unified save: appearance sync table + sync flags + account settings + profile.
   document.getElementById('settings-save').onclick = async () => {
-    const getActive = (id) => {
-      const btn = document.querySelector(`#${id} .contrast-btn.active`);
-      return btn ? Number(btn.dataset.val) : null;
-    };
-    // Optional override colours: empty input → null (use default).
-    // Tolerant: accepts both "ff0000" and "#ff0000".
-    const colourOrNull = (id) => {
-      let v = (document.getElementById(id).value || '').trim();
-      if (!v) return null;
-      if (!v.startsWith('#')) v = '#' + v;
-      return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toUpperCase() : null;
-    };
-    const settings = {
-      default_view:        document.getElementById('cfg-default-view').value,
-      week_start_day:      document.getElementById('cfg-week-start').value,
-      primary_color:       document.getElementById('cfg-primary-hex').value,
-      accent_color:        document.getElementById('cfg-accent-hex').value,
-      today_color:         document.getElementById('cfg-today-hex').value,
-      month_divider_color: document.getElementById('cfg-month-divider-hex').value,
-      month_label_color:   document.getElementById('cfg-month-label-hex').value,
-      text_color:          colourOrNull('cfg-text-color-hex'),
-      line_color:          colourOrNull('cfg-line-color-hex'),
-      bg_color:            colourOrNull('cfg-bg-color-hex'),
-      dim_past_events:     document.getElementById('cfg-dim-past').checked,
-      default_event_duration_minutes: getActive('cfg-event-duration') || 60,
-      hour_height:         getActive('cfg-hour-height')   || 44,
-      language:            document.getElementById('cfg-language').value,
-      private_event_visibility: document.getElementById('cfg-private-visibility').value,
-    };
-    const gvVal = document.getElementById('cfg-group-visible-list')?.dataset.selected;
-    settings.group_visible_calendar_id = gvVal ? parseInt(gvVal) : null;
-    const shareIconPicker = document.getElementById('cfg-share-icon');
-    settings.share_calendar_icon = shareIconPicker?.querySelector('.group-icon-opt.on')?.dataset.shareIcon || null;
     try {
-      await api.put('/settings/', settings);
-      state.settings = { ...state.settings, ...settings };
-      state.dimPast  = settings.dim_past_events;
-      weekStartDay   = settings.week_start_day;
-      setLang(settings.language);
+      const appearance = readAppearanceTable();
+      // Persist every syncable value into this browser's local copy so that
+      // "not synced" keys survive per-device.
+      const local = loadLocal();
+      for (const k of SYNCABLE_KEYS) local[k] = appearance[k];
+      saveLocal(local);
+      // Account settings (kept out of the sync table — always account-wide).
+      const gvVal = document.getElementById('cfg-group-visible-list')?.dataset.selected;
+      const payload = {
+        sync_flags: state.syncFlags,
+        private_event_visibility: document.getElementById('cfg-private-visibility').value,
+        group_visible_calendar_id: gvVal ? parseInt(gvVal) : null,
+      };
+      // Push only the values whose sync flag is on.
+      for (const k of SYNCABLE_KEYS) {
+        if (state.syncFlags[k]) payload[k] = appearance[k];
+      }
+      await api.put('/settings/', payload);
+      await saveProfileFields();
+      // Recompute effective settings: server holds the synced values, unsynced
+      // keys resolve from the freshly-saved local copy.
+      state.serverSettings = { ...state.serverSettings, ...payload };
+      state.settings = mergeEffective(state.serverSettings, state.syncFlags, loadLocal());
+      state.dimPast = state.settings.dim_past_events;
+      weekStartDay  = state.settings.week_start_day;
+      setLang(appearance.language);
       applyTheme(state.settings);
       showToast(t('settings_saved'));
       closeModal('modal-settings');
