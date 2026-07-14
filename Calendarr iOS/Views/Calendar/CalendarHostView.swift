@@ -21,6 +21,8 @@ struct CalendarHostView: View {
     @AppStorage("backgroundColor") private var bgHex = "#000000"
     @AppStorage("weekStartDay") private var weekStartDay = "monday"
     @AppStorage("defaultView")  private var defaultView = "month"
+    // Opt-in: empty keeps the translucent `.bar` material; a hex tints the top bar.
+    @AppStorage("surfaceColor") private var surfaceHex = ""
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -31,6 +33,8 @@ struct CalendarHostView: View {
     @State private var didApplyDefaultView = false
     @State private var groups: [CalGroup] = []
     @State private var showNewBirthday = false
+    @State private var showDrawer = false
+    @State private var drawerDestination: DrawerDestination? = nil
 
     private var titleString: String {
         if store.viewType == .month {
@@ -43,11 +47,66 @@ struct CalendarHostView: View {
     }
 
     var body: some View {
-        if liquidGlass {
-            glassVariant
-        } else {
-            flatVariant
+        ZStack(alignment: .leading) {
+            Group {
+                if liquidGlass { glassVariant } else { flatVariant }
+            }
+            // Dim scrim behind the open drawer.
+            if showDrawer {
+                Color.black.opacity(0.35)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .onTapGesture { closeDrawer() }
+            }
+            // Off-canvas left drawer.
+            CalendarDrawer(
+                api: api, store: store, groups: groups,
+                onSwitchGroup: { g in closeDrawer(); switchGroup(g) },
+                onSelectView: { vt in store.viewType = vt; closeDrawer() },
+                onOpenDestination: { dest in closeDrawer(); drawerDestination = dest },
+                onSync: { closeDrawer(); Task { await syncFromServer(force: true) } },
+                onClose: { closeDrawer() }
+            )
+            .frame(width: drawerWidth)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .shadow(color: .black.opacity(showDrawer ? 0.25 : 0), radius: 12, x: 4)
+            .offset(x: showDrawer ? 0 : -(drawerWidth + 60))
+            .animation(.easeInOut(duration: 0.25), value: showDrawer)
         }
+        // A narrow leading strip opens the drawer via edge-swipe (kept off the
+        // content area so month paging / week swipe stay free).
+        .overlay(alignment: .leading) {
+            if !showDrawer {
+                Color.clear
+                    .frame(width: 18)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+                            .onEnded { v in
+                                if v.translation.width > 45,
+                                   abs(v.translation.width) > abs(v.translation.height) {
+                                    withAnimation(.easeInOut(duration: 0.25)) { showDrawer = true }
+                                }
+                            }
+                    )
+            }
+        }
+        .sheet(item: $drawerDestination) { dest in
+            switch dest {
+            case .profile:  ProfileView(api: api)
+            case .settings: SettingsView(api: api)
+            case .accounts: AccountsView(api: api)
+            case .groups:   GroupsView(api: api)
+            case .server:   ServerView()
+            }
+        }
+    }
+
+    private var drawerWidth: CGFloat { min(UIScreen.main.bounds.width - 40, 360) }
+
+    private func closeDrawer() {
+        withAnimation(.easeInOut(duration: 0.25)) { showDrawer = false }
     }
 
     // MARK: – Loading indicator
@@ -205,7 +264,9 @@ struct CalendarHostView: View {
     }
 
     private var topBar: some View {
-        barContents.background(.bar)
+        barContents.background(
+            surfaceHex.isEmpty ? AnyShapeStyle(Material.bar) : AnyShapeStyle(Color(hex: surfaceHex))
+        )
     }
 
     @ViewBuilder private var groupBanner: some View {
@@ -231,51 +292,11 @@ struct CalendarHostView: View {
         Task { await forceReload() }
     }
 
-    /// The single top-bar action: a compact popup holding view / filter /
-    /// groups / sync, plus an "Einstellungen" entry that opens the full menu.
-    /// (Replaces the separate view / filter / group icons in the bar.)
+    /// Opens the side drawer (calendars + groups + navigation). Tinted when a
+    /// filter/group is active so the user sees state at a glance.
     private var menuButton: some View {
-        Menu {
-            // View (fixed icon, not per-view)
-            Menu {
-                ForEach(CalViewType.allCases, id: \.self) { vt in
-                    Button { store.viewType = vt } label: {
-                        Label(vt.label(appLang), systemImage: store.viewType == vt ? "checkmark" : vt.systemImage)
-                    }
-                }
-            } label: {
-                Label(L10n.t("view.change", appLang), systemImage: "rectangle.3.group")
-            }
-            // Filter
-            Button { showFilter = true } label: {
-                Label(L10n.t("filter.button", appLang), systemImage: "line.3.horizontal.decrease.circle")
-            }
-            // Groups
-            if !groups.isEmpty {
-                Menu {
-                    Button { switchGroup(nil) } label: {
-                        Label(L10n.t("groups.personal", appLang),
-                              systemImage: store.activeGroup == nil ? "checkmark" : "person")
-                    }
-                    ForEach(groups) { g in
-                        Button { switchGroup(g) } label: {
-                            Label(g.name,
-                                  systemImage: store.activeGroup?.id == g.id ? "checkmark" : GroupIcons.symbol(g.icon))
-                        }
-                    }
-                } label: {
-                    Label(L10n.t("groups.title", appLang), systemImage: "person.2")
-                }
-            }
-            // Sync
-            Button { Task { await syncFromServer(force: true) } } label: {
-                Label(L10n.t("menu.sync", appLang), systemImage: "arrow.triangle.2.circlepath")
-            }
-            Divider()
-            // Full settings menu
-            Button { showMenu = true } label: {
-                Label(L10n.t("menu.section.settings", appLang), systemImage: "gearshape")
-            }
+        Button {
+            withAnimation(.easeInOut(duration: 0.25)) { showDrawer = true }
         } label: {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 18, weight: .medium))

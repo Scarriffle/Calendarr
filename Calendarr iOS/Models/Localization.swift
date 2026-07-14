@@ -86,6 +86,8 @@ private let strings: [String: [String: String]] = [
         "settings.sync_this": "Zwischen Geräten synchronisieren",
         "settings.reset": "Zurücksetzen",
         "settings.appearance": "Ansicht",
+        "settings.color.surface": "Topbar-/Oberflächenfarbe",
+        "settings.surface.auto": "Auto (Milchglas)",
         "settings.device": "Nur auf diesem Gerät",
         "settings.device.footer": "Diese Einstellungen gelten nur auf diesem Gerät und werden nicht synchronisiert.",
 
@@ -452,6 +454,8 @@ private let strings: [String: [String: String]] = [
         "settings.sync_this": "Sync across devices",
         "settings.reset": "Reset",
         "settings.appearance": "View",
+        "settings.color.surface": "Top bar / surface color",
+        "settings.surface.auto": "Auto (translucent)",
         "settings.device": "This device only",
         "settings.device.footer": "These settings apply to this device only and are not synced.",
 

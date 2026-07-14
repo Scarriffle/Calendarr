@@ -11,6 +11,8 @@ struct SettingsView: View {
     @AppStorage("textColor")         private var textHex = "#FFFFFF"
     @AppStorage("backgroundColor")   private var bgHex = "#000000"
     @AppStorage("lineColor")         private var lineHex = "#3A3A52"
+    // Device-local top-bar/surface colour. Empty = translucent .bar material.
+    @AppStorage("surfaceColor")      private var surfaceHex = ""
     @AppStorage("primaryColor")      private var primaryHex = "#4285F4"
     @AppStorage("accentColor")       private var accentHex = "#EA4335"
     // iOS-only opacity controls (drive secondary text / grid-line opacity in the
@@ -105,6 +107,15 @@ struct SettingsView: View {
 
     private func colorBinding(_ hex: Binding<String>) -> Binding<Color> {
         Binding(get: { Color(hex: hex.wrappedValue) }, set: { hex.wrappedValue = $0.toHex() })
+    }
+
+    // Surface colour: empty string means "auto" (translucent .bar); the picker
+    // shows a neutral dark until the user chooses a concrete colour.
+    private var surfaceBinding: Binding<Color> {
+        Binding(
+            get: { Color(hex: surfaceHex.isEmpty ? "#1C1C1E" : surfaceHex) },
+            set: { surfaceHex = $0.toHex() }
+        )
     }
 
     @ViewBuilder
@@ -386,6 +397,19 @@ struct SettingsView: View {
                 }
             }
             .tint(Color.accentColor)
+            HStack(spacing: 12) {
+                Text(L10n.t("settings.color.surface", appLang))
+                Spacer()
+                Text(surfaceHex.isEmpty ? L10n.t("settings.surface.auto", appLang) : surfaceHex.uppercased())
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                ColorPicker("", selection: surfaceBinding, supportsOpacity: false)
+                    .labelsHidden()
+                Button { surfaceHex = "" } label: { Image(systemName: "arrow.uturn.backward") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(L10n.t("settings.surface.auto", appLang))
+            }
         } header: {
             Text(L10n.t("settings.device", appLang))
         } footer: {
