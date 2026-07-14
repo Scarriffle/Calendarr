@@ -62,12 +62,12 @@ class MainViewModel @Inject constructor(
         _route.value = computeRoute()
     }
 
-    /** Pull appearance settings from the server, caching them locally. */
+    /** Pull settings from the server and merge them with local values honouring
+     *  each setting's sync flag (synced keys take the server value). */
     fun refreshSettings() {
         viewModelScope.launch {
             runCatching { repository.getSettings() }.onSuccess { s ->
-                settingsStore.saveSettings(s)
-                _settings.value = s
+                _settings.value = settingsStore.applyServerPull(s)
             }
         }
     }

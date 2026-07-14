@@ -7,50 +7,60 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import com.scarriffle.calendarr.domain.model.AppSettings
 import com.scarriffle.calendarr.util.colorFromHex
 import com.scarriffle.calendarr.util.contrastingTextColor
 
-/**
- * The Calendarr brand accent — the green from the iOS `AccentColor` asset
- * (#20A050). This drives the global control tint (buttons, FAB, switches,
- * top bar) regardless of the server's per-calendar colours, matching iOS
- * where the app tint is fixed and `primary_color` only styles calendar
- * elements (e.g. the "today" highlight, read from [AppSettings]).
- */
+/** Fallback brand accent (iOS `AccentColor` #20A050) used only when the user's
+ *  primary colour is unset. */
 val BrandGreen = Color(0xFF20A050)
 
+/**
+ * Fully dynamic theme: every colour is derived from [AppSettings] so the whole
+ * app follows the user's palette (matching the web client). primary/accent tint
+ * the controls; background/text/line drive `background`/`onBackground`/`outline`,
+ * which the calendar views already read (grid, secondary text). "today", divider
+ * and label colours are read directly in the views.
+ */
 @Composable
 fun CalendarrTheme(
     settings: AppSettings = AppSettings(),
     content: @Composable () -> Unit,
 ) {
-    val primary = BrandGreen
+    val primary = colorFromHex(settings.primaryColor, BrandGreen)
+    val accent = colorFromHex(settings.accentColor, primary)
+    val bg = colorFromHex(settings.backgroundColor, Color(0xFF000000))
+    val onBg = colorFromHex(settings.textColor, Color(0xFFF2F2F7))
+    val line = colorFromHex(settings.lineColor, Color(0xFF3A3A52))
 
-    val container = Color(0xFF14532D)
-    val onContainer = Color(0xFFB7F0C6)
+    val surface = lerp(bg, Color.White, 0.10f)
+    val surfaceVariant = lerp(bg, Color.White, 0.17f)
+    val container = lerp(primary, Color.Black, 0.55f)
+    val onContainer = lerp(primary, Color.White, 0.75f)
+
     val colors = darkColorScheme(
         primary = primary,
         onPrimary = primary.contrastingTextColor(),
         primaryContainer = container,
         onPrimaryContainer = onContainer,
-        secondary = primary,
-        onSecondary = primary.contrastingTextColor(),
+        secondary = accent,
+        onSecondary = accent.contrastingTextColor(),
         secondaryContainer = container,
         onSecondaryContainer = onContainer,
-        tertiary = primary,
-        onTertiary = primary.contrastingTextColor(),
+        tertiary = accent,
+        onTertiary = accent.contrastingTextColor(),
         tertiaryContainer = container,
         onTertiaryContainer = onContainer,
         surfaceTint = primary,
-        background = Color(0xFF000000),
-        onBackground = Color(0xFFF2F2F7),
-        surface = Color(0xFF1C1C1E),
-        onSurface = Color(0xFFF2F2F7),
-        surfaceVariant = Color(0xFF2C2C2E),
-        onSurfaceVariant = Color(0xFFBEBEC4),
-        outline = Color(0xFF3A3A3C),
+        background = bg,
+        onBackground = onBg,
+        surface = surface,
+        onSurface = onBg,
+        surfaceVariant = surfaceVariant,
+        onSurfaceVariant = onBg.copy(alpha = 0.7f),
+        outline = line,
     )
 
     MaterialTheme(

@@ -19,29 +19,43 @@ class SettingsViewModel @Inject constructor(
     private val settingsStore: SettingsStore,
 ) : ViewModel() {
 
-    /** Persist locally immediately, then sync to the server in the background. */
+    /** Persist locally immediately, then push the synced values to the server. */
     fun apply(settings: AppSettings, onSynced: () -> Unit) {
         settingsStore.saveSettings(settings)
         viewModelScope.launch {
-            runCatching { repository.updateSettings(settings) }
+            runCatching { repository.updateSettings(settings, settingsStore.loadSyncFlags()) }
             onSynced()
         }
     }
 
-    var cacheMonths: Int
-        get() = settingsStore.cacheMonths
-        set(value) { settingsStore.cacheMonths = value }
+    // ---- Per-setting sync flags ----
 
-    /** Device-local: month view as horizontal paged (swipe) vs. scroll feed. */
-    var monthViewPaged: Boolean
-        get() = settingsStore.monthViewPaged
-        set(value) { settingsStore.monthViewPaged = value }
+    val syncableKeys: List<String> get() = settingsStore.syncableKeys
+    var syncFlags by mutableStateOf(settingsStore.loadSyncFlags())
+        private set
+
+    /** Toggle one setting's flag. Enabling adopts this device's current value
+     *  (pushes the synced values up); disabling keeps the value local. */
+    fun toggleSync(key: String, current: AppSettings, onSynced: () -> Unit) {
+        settingsStore.setSyncFlag(key, !(syncFlags[key] ?: false))
+        syncFlags = settingsStore.loadSyncFlags()
+        viewModelScope.launch { runCatching { repository.updateSettings(current, syncFlags) }; onSynced() }
+    }
+
+    /** Global "sync everything" switch. */
+    fun setAllSync(on: Boolean, current: AppSettings, onSynced: () -> Unit) {
+        settingsStore.setAllSyncFlags(on)
+        syncFlags = settingsStore.loadSyncFlags()
+        viewModelScope.launch { runCatching { repository.updateSettings(current, syncFlags) }; onSynced() }
+    }
 
     // ---- Profile chapter (server-backed) ----
 
     var displayName by mutableStateOf("")
     var loginName by mutableStateOf("")
     var email by mutableStateOf("")
+        private set
+    var directoryHidden by mutableStateOf(false)
         private set
     var privateVisibility by mutableStateOf("busy")
         private set
@@ -56,6 +70,7 @@ class SettingsViewModel @Inject constructor(
 
     fun onDisplayNameChange(v: String) { displayName = v }
     fun onEmailChange(v: String) { email = v }
+    fun onDirectoryHiddenChange(v: Boolean) { directoryHidden = v }
 
     private fun loadProfile() {
         viewModelScope.launch {
@@ -63,6 +78,7 @@ class SettingsViewModel @Inject constructor(
                 displayName = p.displayName ?: p.username
                 loginName = p.username
                 email = p.email ?: ""
+                directoryHidden = p.directoryHidden
             }
             runCatching { repository.getSettings() }.onSuccess { s ->
                 privateVisibility = s.privateEventVisibility
@@ -83,6 +99,7 @@ class SettingsViewModel @Inject constructor(
                     displayName = displayName.trim().ifEmpty { null },
                     username = null,
                     email = email.trim(),
+                    directoryHidden = directoryHidden,
                 )
             }
                 .onSuccess { profileMessage = savedLabel }

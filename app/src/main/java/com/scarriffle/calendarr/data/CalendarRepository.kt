@@ -118,27 +118,31 @@ class CalendarRepository @Inject constructor(
 
     suspend fun getSettings(): AppSettings = guarded { api.getSettings() }
 
-    suspend fun updateSettings(s: AppSettings) = guarded {
-        api.updateSettings(
-            jsonBody(
-                "default_view" to s.defaultView,
-                "week_start_day" to s.weekStartDay,
-                "primary_color" to s.primaryColor,
-                "accent_color" to s.accentColor,
-                "today_color" to s.todayColor,
-                "dim_past_events" to s.dimPastEvents,
-                "text_contrast" to s.textContrast,
-                "line_contrast" to s.lineContrast,
-                "hour_height" to s.hourHeight,
-                "language" to s.language,
-                "month_divider_color" to s.monthDividerColor,
-                "month_label_color" to s.monthLabelColor,
-                "private_event_visibility" to s.privateEventVisibility,
-                // Explicit JSON null clears it (off); jsonBody drops Kotlin nulls.
-                "default_reminder_minutes" to (s.defaultReminderMinutes ?: org.json.JSONObject.NULL),
-                "default_event_duration_minutes" to s.defaultEventDurationMinutes,
-            )
-        ).ensureSuccess()
+    /** Push only the values whose sync flag is on (partial update; the server
+     *  leaves unsynced columns untouched), plus the account-wide flag map. */
+    suspend fun updateSettings(s: AppSettings, flags: Map<String, Boolean>) = guarded {
+        val body = mutableMapOf<String, Any?>()
+        fun addIf(key: String, value: Any?) { if (flags[key] == true) body[key] = value }
+        addIf("default_view", s.defaultView)
+        addIf("week_start_day", s.weekStartDay)
+        addIf("dim_past_events", s.dimPastEvents)
+        addIf("hour_height", s.hourHeight)
+        addIf("default_event_duration_minutes", s.defaultEventDurationMinutes)
+        // Explicit JSON null clears it (off); jsonBody drops Kotlin nulls.
+        addIf("default_reminder_minutes", s.defaultReminderMinutes ?: org.json.JSONObject.NULL)
+        addIf("primary_color", s.primaryColor)
+        addIf("accent_color", s.accentColor)
+        addIf("today_color", s.todayColor)
+        addIf("text_color", s.textColor)
+        addIf("bg_color", s.backgroundColor)
+        addIf("line_color", s.lineColor)
+        addIf("month_divider_color", s.monthDividerColor)
+        addIf("month_label_color", s.monthLabelColor)
+        addIf("cache_months", s.cacheMonths)
+        addIf("month_view_paged", s.monthViewPaged)
+        // The flag map is always account-wide; send it every push.
+        body["sync_flags"] = org.json.JSONObject(flags as Map<*, *>)
+        api.updateSettings(jsonBody(body)).ensureSuccess()
     }
 
     suspend fun getProfile(): UserProfile = guarded { api.getProfile() }
@@ -499,8 +503,13 @@ class CalendarRepository @Inject constructor(
 
     // ---- Profile & targeted settings ----
 
-    suspend fun updateProfile(displayName: String?, username: String?, email: String?): String? = guarded {
-        val resp = api.updateProfile(jsonBody("display_name" to displayName, "username" to username, "email" to email))
+    suspend fun updateProfile(displayName: String?, username: String?, email: String?, directoryHidden: Boolean? = null): String? = guarded {
+        val resp = api.updateProfile(jsonBody(
+            "display_name" to displayName,
+            "username" to username,
+            "email" to email,
+            "directory_hidden" to directoryHidden,
+        ))
         resp.ensureSuccess()
         runCatching { JSONObject(resp.body()?.string() ?: "{}").optString("access_token").ifBlank { null } }.getOrNull()
     }

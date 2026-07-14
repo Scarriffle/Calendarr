@@ -98,6 +98,7 @@ data class UserProfile(
     @Json(name = "is_admin") val isAdmin: Boolean = false,
     @Json(name = "has_avatar") val hasAvatar: Boolean = false,
     @Json(name = "totp_enabled") val totpEnabled: Boolean = false,
+    @Json(name = "directory_hidden") val directoryHidden: Boolean = false,
 )
 
 /** A calendar the user can create events in (resolved from all writable sources). */

@@ -34,8 +34,13 @@ class SettingsStore @Inject constructor(
         language = prefs.getString(K_LANGUAGE, null) ?: "de",
         monthDividerColor = prefs.getString(K_DIVIDER, null) ?: "#7090c0",
         monthLabelColor = prefs.getString(K_LABEL, null) ?: "#7090c0",
+        textColor = prefs.getString(K_TEXT_COLOR, null) ?: "#FFFFFF",
+        backgroundColor = prefs.getString(K_BG_COLOR, null) ?: "#000000",
+        lineColor = prefs.getString(K_LINE_COLOR, null) ?: "#3A3A52",
         defaultReminderMinutes = prefs.getInt(K_DEFAULT_REMINDER, -1).takeIf { it >= 0 },
         defaultEventDurationMinutes = prefs.getInt(K_DEFAULT_DURATION, 60),
+        cacheMonths = prefs.getInt(K_CACHE_MONTHS, 3),
+        monthViewPaged = prefs.getBoolean(K_MONTH_PAGED, false),
     )
 
     fun saveSettings(s: AppSettings) {
@@ -52,9 +57,95 @@ class SettingsStore @Inject constructor(
             .putString(K_LANGUAGE, s.language)
             .putString(K_DIVIDER, s.monthDividerColor)
             .putString(K_LABEL, s.monthLabelColor)
+            .putString(K_TEXT_COLOR, s.textColor)
+            .putString(K_BG_COLOR, s.backgroundColor)
+            .putString(K_LINE_COLOR, s.lineColor)
             .putInt(K_DEFAULT_REMINDER, s.defaultReminderMinutes ?: -1)
             .putInt(K_DEFAULT_DURATION, s.defaultEventDurationMinutes)
+            .putInt(K_CACHE_MONTHS, s.cacheMonths)
+            .putBoolean(K_MONTH_PAGED, s.monthViewPaged)
             .apply()
+    }
+
+    // --- Per-setting cross-device sync flags (account-wide; server is authority) ---
+
+    /** Keys this Android client can sync. Excludes language (device "system" has
+     *  no server value) and text/line contrast (iOS-style opacity, device-local). */
+    val syncableKeys: List<String> = listOf(
+        "default_view", "week_start_day", "dim_past_events", "hour_height",
+        "default_event_duration_minutes", "default_reminder_minutes",
+        "primary_color", "accent_color", "today_color",
+        "text_color", "bg_color", "line_color",
+        "month_divider_color", "month_label_color",
+        "cache_months", "month_view_paged",
+    )
+
+    private val defaultSync: Map<String, Boolean> = syncableKeys.associateWith { key ->
+        key != "cache_months" && key != "month_view_paged"
+    }
+
+    fun loadSyncFlags(): Map<String, Boolean> {
+        val result = defaultSync.toMutableMap()
+        val raw = prefs.getString(K_SYNC_FLAGS, null)
+        if (!raw.isNullOrBlank()) {
+            runCatching { org.json.JSONObject(raw) }.getOrNull()?.let { obj ->
+                for (key in syncableKeys) if (obj.has(key)) result[key] = obj.getBoolean(key)
+            }
+        }
+        return result
+    }
+
+    private fun writeSyncFlags(f: Map<String, Boolean>) {
+        prefs.edit().putString(K_SYNC_FLAGS, org.json.JSONObject(f as Map<*, *>).toString()).apply()
+    }
+
+    fun storeServerFlags(server: Map<String, Boolean>?) {
+        if (server == null) return
+        val f = loadSyncFlags().toMutableMap()
+        for (key in syncableKeys) server[key]?.let { f[key] = it }
+        writeSyncFlags(f)
+    }
+
+    fun setSyncFlag(key: String, on: Boolean) {
+        val f = loadSyncFlags().toMutableMap(); f[key] = on; writeSyncFlags(f)
+    }
+
+    fun setAllSyncFlags(on: Boolean) {
+        val f = loadSyncFlags().toMutableMap(); for (key in syncableKeys) f[key] = on; writeSyncFlags(f)
+    }
+
+    /** Merge a server snapshot with local values honouring the (refreshed) flags:
+     *  synced keys take the server value, others keep the local value. Persists
+     *  the result and returns the effective settings. */
+    fun applyServerPull(server: AppSettings): AppSettings {
+        storeServerFlags(server.syncFlags)
+        val flags = loadSyncFlags()
+        val local = loadSettings()
+        fun on(key: String) = flags[key] == true
+        val eff = local.copy(
+            defaultView = if (on("default_view")) server.defaultView else local.defaultView,
+            weekStartDay = if (on("week_start_day")) server.weekStartDay else local.weekStartDay,
+            dimPastEvents = if (on("dim_past_events")) server.dimPastEvents else local.dimPastEvents,
+            hourHeight = if (on("hour_height")) server.hourHeight else local.hourHeight,
+            defaultEventDurationMinutes = if (on("default_event_duration_minutes")) server.defaultEventDurationMinutes else local.defaultEventDurationMinutes,
+            defaultReminderMinutes = if (on("default_reminder_minutes")) server.defaultReminderMinutes else local.defaultReminderMinutes,
+            primaryColor = if (on("primary_color")) server.primaryColor else local.primaryColor,
+            accentColor = if (on("accent_color")) server.accentColor else local.accentColor,
+            todayColor = if (on("today_color")) server.todayColor else local.todayColor,
+            textColor = if (on("text_color")) server.textColor else local.textColor,
+            backgroundColor = if (on("bg_color")) server.backgroundColor else local.backgroundColor,
+            lineColor = if (on("line_color")) server.lineColor else local.lineColor,
+            monthDividerColor = if (on("month_divider_color")) server.monthDividerColor else local.monthDividerColor,
+            monthLabelColor = if (on("month_label_color")) server.monthLabelColor else local.monthLabelColor,
+            cacheMonths = if (on("cache_months")) server.cacheMonths else local.cacheMonths,
+            monthViewPaged = if (on("month_view_paged")) server.monthViewPaged else local.monthViewPaged,
+            // Device-local (never synced): language + contrast levels.
+            language = local.language,
+            textContrast = local.textContrast,
+            lineContrast = local.lineContrast,
+        )
+        saveSettings(eff)
+        return eff
     }
 
     /** Device-local cache range in months around today (default 3). */
@@ -102,6 +193,10 @@ class SettingsStore @Inject constructor(
         const val K_LANGUAGE = "language"
         const val K_DIVIDER = "month_divider_color"
         const val K_LABEL = "month_label_color"
+        const val K_TEXT_COLOR = "text_color"
+        const val K_BG_COLOR = "bg_color"
+        const val K_LINE_COLOR = "line_color"
+        const val K_SYNC_FLAGS = "sync_flags"
         const val K_DEFAULT_REMINDER = "default_reminder_minutes"
         const val K_DEFAULT_DURATION = "default_event_duration_minutes"
         const val K_CACHE_MONTHS = "cache_months"

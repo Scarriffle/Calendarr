@@ -3,31 +3,29 @@ package com.scarriffle.calendarr.ui.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +34,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,8 +55,11 @@ import com.scarriffle.calendarr.ui.tr
 import com.scarriffle.calendarr.util.colorFromHex
 import com.scarriffle.calendarr.util.toHex
 
-private val PALETTE = listOf(
-    "#4285f4", "#ea4335", "#34a853", "#fbbc05", "#46bdc6", "#9c27b0", "#ff7043", "#7090c0",
+// Canonical default colours (single source for the reset buttons).
+private val DEFAULT_COLORS = mapOf(
+    "primary_color" to "#4285F4", "accent_color" to "#EA4335", "today_color" to "#4285F4",
+    "text_color" to "#FFFFFF", "bg_color" to "#000000", "line_color" to "#3A3A52",
+    "month_divider_color" to "#7090C0", "month_label_color" to "#7090C0",
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,14 +72,16 @@ fun SettingsScreen(
 ) {
     val initialSettings = LocalAppSettings.current
     var settings by remember { mutableStateOf(initialSettings) }
-    var cacheMonths by remember { mutableStateOf(vm.cacheMonths) }
-    var monthPaged by remember { mutableStateOf(vm.monthViewPaged) }
 
     fun update(newSettings: AppSettings) {
         settings = newSettings
         onSettingsChanged(newSettings)
         vm.apply(newSettings, onSettingsSynced)
     }
+
+    // Per-row sync toggle: enabling adopts this device's current value.
+    fun toggle(key: String) { vm.toggleSync(key, settings, onSettingsSynced) }
+    fun synced(key: String) = vm.syncFlags[key] == true
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Scaffold(
@@ -92,105 +96,107 @@ fun SettingsScreen(
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)) {
 
+                // Global "sync everything" master switch.
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(tr("settings.sync_all"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(tr("settings.sync_all.desc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = vm.syncableKeys.all { vm.syncFlags[it] == true },
+                        onCheckedChange = { on -> vm.setAllSync(on, settings, onSettingsSynced) },
+                    )
+                }
+                Divider(Modifier.padding(vertical = 16.dp))
+
                 ProfileChapter(vm)
-                Spacer(Modifier.size(16.dp))
-                Section(tr("settings.default_duration"))
-                ChipRow(
-                    options = listOf(
-                        "15" to "15 min", "30" to "30 min", "45" to "45 min",
-                        "60" to "1 h", "90" to "1.5 h", "120" to "2 h",
-                    ),
-                    selected = settings.defaultEventDurationMinutes.toString(),
-                    onSelect = { update(settings.copy(defaultEventDurationMinutes = it.toInt())) },
-                )
                 Divider(Modifier.padding(vertical = 16.dp))
 
+                // ---- Termine (synced) ----
                 Section(tr("settings.calview"))
-                ChipRow(
-                    options = CalViewType.entries.map { it.key to tr("view.${it.key}") },
-                    selected = settings.defaultView,
-                    onSelect = { update(settings.copy(defaultView = it)) },
+                SyncDropdownRow(
+                    tr("settings.default_duration"),
+                    listOf("15" to "15 min", "30" to "30 min", "45" to "45 min", "60" to "1 h", "90" to "1.5 h", "120" to "2 h"),
+                    settings.defaultEventDurationMinutes.toString(),
+                    { update(settings.copy(defaultEventDurationMinutes = it.toInt())) },
+                    synced("default_event_duration_minutes"), { toggle("default_event_duration_minutes") },
                 )
-                Spacer(Modifier.size(16.dp))
-
-                Section(tr("settings.firstweekday"))
-                ChipRow(
-                    options = listOf("monday" to tr("settings.monday"), "sunday" to tr("settings.sunday")),
-                    selected = settings.weekStartDay,
-                    onSelect = { update(settings.copy(weekStartDay = it)) },
-                )
-                Spacer(Modifier.size(16.dp))
-
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(tr("settings.dimpast"), style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = settings.dimPastEvents, onCheckedChange = { update(settings.copy(dimPastEvents = it)) })
-                }
-                Spacer(Modifier.size(16.dp))
-
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(tr("settings.month_paged"), style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = monthPaged, onCheckedChange = { monthPaged = it; vm.monthViewPaged = it })
-                }
-                Spacer(Modifier.size(16.dp))
-
-                Divider(Modifier.padding(vertical = 16.dp))
-
-                Section(tr("settings.language"))
-                ChipRow(
-                    options = listOf("system" to tr("lang.system"), "de" to tr("lang.german"), "en" to tr("lang.english")),
-                    selected = settings.language,
-                    onSelect = { update(settings.copy(language = it)) },
+                SyncDropdownRow(
+                    tr("settings.defaultreminder"),
+                    reminderOptions(),
+                    (settings.defaultReminderMinutes ?: -1).toString(),
+                    { update(settings.copy(defaultReminderMinutes = it.toInt().takeIf { m -> m >= 0 })) },
+                    synced("default_reminder_minutes"), { toggle("default_reminder_minutes") },
                 )
                 Divider(Modifier.padding(vertical = 16.dp))
 
+                // ---- Ansicht (synced) ----
+                Section(tr("settings.appearance"))
+                SyncDropdownRow(
+                    tr("settings.defaultview"),
+                    CalViewType.entries.map { it.key to tr("view.${it.key}") },
+                    settings.defaultView,
+                    { update(settings.copy(defaultView = it)) },
+                    synced("default_view"), { toggle("default_view") },
+                )
+                SyncDropdownRow(
+                    tr("settings.firstweekday"),
+                    listOf("monday" to tr("settings.monday"), "sunday" to tr("settings.sunday")),
+                    settings.weekStartDay,
+                    { update(settings.copy(weekStartDay = it)) },
+                    synced("week_start_day"), { toggle("week_start_day") },
+                )
+                SyncSwitchRow(tr("settings.dimpast"), settings.dimPastEvents, { update(settings.copy(dimPastEvents = it)) }, synced("dim_past_events"), { toggle("dim_past_events") })
+                SyncSwitchRow(tr("settings.month_paged"), settings.monthViewPaged, { update(settings.copy(monthViewPaged = it)) }, synced("month_view_paged"), { toggle("month_view_paged") })
+                SyncDropdownRow(
+                    tr("settings.hourheight"),
+                    listOf("28" to tr("settings.hourheight.compact"), "44" to tr("settings.hourheight.normal"), "60" to tr("settings.hourheight.comfort"), "80" to tr("settings.hourheight.large")),
+                    settings.hourHeight.toString(),
+                    { update(settings.copy(hourHeight = it.toInt())) },
+                    synced("hour_height"), { toggle("hour_height") },
+                )
+                Divider(Modifier.padding(vertical = 16.dp))
+
+                // ---- Farben (synced) ----
                 Section(tr("settings.colors"))
-                ColorRow(tr("settings.color.primary"), settings.primaryColor) { update(settings.copy(primaryColor = it)) }
-                ColorRow(tr("settings.color.accent"), settings.accentColor) { update(settings.copy(accentColor = it)) }
-                ColorRow(tr("settings.color.today"), settings.todayColor) { update(settings.copy(todayColor = it)) }
-                ColorRow(tr("settings.color.divider"), settings.monthDividerColor) { update(settings.copy(monthDividerColor = it)) }
-                ColorRow(tr("settings.color.label"), settings.monthLabelColor) { update(settings.copy(monthLabelColor = it)) }
+                SyncColorRow("primary_color", tr("settings.color.primary"), settings.primaryColor, synced("primary_color"), { toggle("primary_color") }) { update(settings.copy(primaryColor = it)) }
+                SyncColorRow("accent_color", tr("settings.color.accent"), settings.accentColor, synced("accent_color"), { toggle("accent_color") }) { update(settings.copy(accentColor = it)) }
+                SyncColorRow("today_color", tr("settings.color.today"), settings.todayColor, synced("today_color"), { toggle("today_color") }) { update(settings.copy(todayColor = it)) }
+                SyncColorRow("text_color", tr("settings.color.text"), settings.textColor, synced("text_color"), { toggle("text_color") }) { update(settings.copy(textColor = it)) }
+                SyncColorRow("bg_color", tr("settings.color.background"), settings.backgroundColor, synced("bg_color"), { toggle("bg_color") }) { update(settings.copy(backgroundColor = it)) }
+                SyncColorRow("line_color", tr("settings.color.line"), settings.lineColor, synced("line_color"), { toggle("line_color") }) { update(settings.copy(lineColor = it)) }
+                SyncColorRow("month_divider_color", tr("settings.color.divider"), settings.monthDividerColor, synced("month_divider_color"), { toggle("month_divider_color") }) { update(settings.copy(monthDividerColor = it)) }
+                SyncColorRow("month_label_color", tr("settings.color.label"), settings.monthLabelColor, synced("month_label_color"), { toggle("month_label_color") }) { update(settings.copy(monthLabelColor = it)) }
                 Divider(Modifier.padding(vertical = 16.dp))
 
-                Section(tr("settings.hourheight"))
-                ChipRow(
-                    options = listOf(
-                        "28" to tr("settings.hourheight.compact"),
-                        "44" to tr("settings.hourheight.normal"),
-                        "60" to tr("settings.hourheight.comfort"),
-                        "80" to tr("settings.hourheight.large"),
-                    ),
-                    selected = settings.hourHeight.toString(),
-                    onSelect = { update(settings.copy(hourHeight = it.toInt())) },
-                )
-                Spacer(Modifier.size(16.dp))
-
-                Section(tr("settings.textcontrast"))
-                ChipRow(
-                    options = listOf(
-                        "1" to tr("settings.contrast.dark"), "2" to tr("settings.contrast.medium"),
-                        "3" to tr("settings.contrast.bright"), "4" to tr("settings.contrast.max"),
-                    ),
-                    selected = settings.textContrast.toString(),
-                    onSelect = { update(settings.copy(textContrast = it.toInt())) },
-                )
-                Spacer(Modifier.size(16.dp))
-                Section(tr("settings.linecontrast"))
-                ChipRow(
-                    options = listOf(
-                        "1" to tr("settings.linecontrast.barely"), "2" to tr("settings.linecontrast.subtle"),
-                        "3" to tr("settings.linecontrast.normal"), "4" to tr("settings.linecontrast.strong"),
-                    ),
-                    selected = settings.lineContrast.toString(),
-                    onSelect = { update(settings.copy(lineContrast = it.toInt())) },
+                // ---- Cache (synced) ----
+                SyncDropdownRow(
+                    tr("settings.cache.range"),
+                    listOf("1" to tr("settings.cache.1m"), "3" to tr("settings.cache.3m"), "6" to tr("settings.cache.6m"), "12" to tr("settings.cache.1y")),
+                    settings.cacheMonths.toString(),
+                    { update(settings.copy(cacheMonths = it.toInt())) },
+                    synced("cache_months"), { toggle("cache_months") },
                 )
                 Divider(Modifier.padding(vertical = 16.dp))
 
-                Section(tr("settings.cache.title"))
-                ChipRow(
-                    options = listOf("1" to tr("settings.cache.1m"), "3" to tr("settings.cache.3m"), "6" to tr("settings.cache.6m"), "12" to tr("settings.cache.1y")),
-                    selected = cacheMonths.toString(),
-                    onSelect = { cacheMonths = it.toInt(); vm.cacheMonths = it.toInt() },
-                )
+                // ---- Gerät (device-local: language + contrast) ----
+                Section(tr("settings.device"))
+                DeviceDropdownRow(
+                    tr("settings.language"),
+                    listOf("system" to tr("lang.system"), "de" to tr("lang.german"), "en" to tr("lang.english")),
+                    settings.language,
+                ) { update(settings.copy(language = it)) }
+                DeviceDropdownRow(
+                    tr("settings.textcontrast"),
+                    listOf("1" to tr("settings.contrast.dark"), "2" to tr("settings.contrast.medium"), "3" to tr("settings.contrast.bright"), "4" to tr("settings.contrast.max")),
+                    settings.textContrast.toString(),
+                ) { update(settings.copy(textContrast = it.toInt())) }
+                DeviceDropdownRow(
+                    tr("settings.linecontrast"),
+                    listOf("1" to tr("settings.linecontrast.barely"), "2" to tr("settings.linecontrast.subtle"), "3" to tr("settings.linecontrast.normal"), "4" to tr("settings.linecontrast.strong")),
+                    settings.lineContrast.toString(),
+                ) { update(settings.copy(lineContrast = it.toInt())) }
+                Text(tr("settings.device.footer"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 44.dp, top = 6.dp))
                 Spacer(Modifier.size(40.dp))
             }
         }
@@ -198,11 +204,128 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun reminderOptions(): List<Pair<String, String>> = listOf(
+    "-1" to tr("reminder.off"), "0" to tr("reminder.at_start"), "5" to "5 min", "15" to "15 min",
+    "30" to "30 min", "60" to "1 h", "1440" to tr("reminder.1d"), "10080" to tr("reminder.1w"),
+)
+
+@Composable
 private fun Section(title: String) {
     Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
 }
 
-/** Server-backed "Profil" chapter: display name, login name, email, privacy, shared calendar. */
+/** Leading per-row sync toggle: highlighted = synced across devices. */
+@Composable
+private fun SyncIcon(on: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+        Icon(
+            Icons.Filled.Refresh,
+            contentDescription = tr("settings.sync_this"),
+            tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Dropdown(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.first == selected }?.second ?: selected
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = Modifier.width(170.dp)) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { (key, label) ->
+                DropdownMenuItem(text = { Text(label) }, onClick = { onSelect(key); expanded = false })
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncDropdownRow(
+    label: String,
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    synced: Boolean,
+    onToggleSync: () -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        SyncIcon(synced, onToggleSync)
+        Spacer(Modifier.size(8.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Dropdown(options, selected, onSelect)
+    }
+}
+
+@Composable
+private fun DeviceDropdownRow(
+    label: String,
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.size(44.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Dropdown(options, selected, onSelect)
+    }
+}
+
+@Composable
+private fun SyncSwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, synced: Boolean, onToggleSync: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        SyncIcon(synced, onToggleSync)
+        Spacer(Modifier.size(8.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun SyncColorRow(
+    syncKey: String,
+    label: String,
+    current: String,
+    synced: Boolean,
+    onToggleSync: () -> Unit,
+    onPick: (String) -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        SyncIcon(synced, onToggleSync)
+        Spacer(Modifier.size(8.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(colorFromHex(current).toHex(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.size(12.dp))
+        Box(
+            Modifier.size(28.dp).clip(CircleShape).background(colorFromHex(current))
+                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                .clickable { showPicker = true },
+        )
+        TextButton(onClick = { onPick(DEFAULT_COLORS[syncKey] ?: "#000000") }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Text(tr("settings.reset"), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+    if (showPicker) {
+        ColorPickerDialog(
+            initial = current,
+            title = label,
+            onDismiss = { showPicker = false },
+            onConfirm = { showPicker = false; onPick(it) },
+        )
+    }
+}
+
+/** Server-backed "Profil" chapter: name, login, email, hide-profile, privacy, shared calendar. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProfileChapter(vm: SettingsViewModel) {
     val savedLabel = tr("settings.saved")
@@ -229,6 +352,14 @@ private fun ProfileChapter(vm: SettingsViewModel) {
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.size(8.dp))
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(tr("settings.directory_hidden"), style = MaterialTheme.typography.bodyLarge)
+            Text(tr("settings.directory_hidden.desc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = vm.directoryHidden, onCheckedChange = vm::onDirectoryHiddenChange)
+    }
+    Spacer(Modifier.size(8.dp))
     Button(onClick = { vm.saveProfile(savedLabel) }) { Text(tr("event.save")) }
     vm.profileMessage?.let {
         Spacer(Modifier.size(8.dp))
@@ -237,11 +368,14 @@ private fun ProfileChapter(vm: SettingsViewModel) {
     Divider(Modifier.padding(vertical = 16.dp))
 
     Section(tr("settings.privacy"))
-    ChipRow(
-        options = listOf("busy" to tr("settings.private.busy"), "hidden" to tr("settings.private.hidden")),
-        selected = vm.privateVisibility,
-        onSelect = vm::changePrivateVisibility,
-    )
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(tr("settings.private_visibility"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Dropdown(
+            listOf("busy" to tr("settings.private.busy"), "hidden" to tr("settings.private.hidden")),
+            vm.privateVisibility,
+            vm::changePrivateVisibility,
+        )
+    }
     Spacer(Modifier.size(6.dp))
     Text(tr("settings.private_visibility.desc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Divider(Modifier.padding(vertical = 16.dp))
@@ -273,37 +407,5 @@ private fun CalendarDropdown(vm: SettingsViewModel) {
                 DropdownMenuItem(text = { Text(cal.name) }, onClick = { vm.changeGroupVisible(cal.id); expanded = false })
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ChipRow(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { (key, label) ->
-            FilterChip(selected = key == selected, onClick = { onSelect(key) }, label = { Text(label) })
-        }
-    }
-}
-
-@Composable
-private fun ColorRow(label: String, current: String, onPick: (String) -> Unit) {
-    var showPicker by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(28.dp).clip(CircleShape).background(colorFromHex(current)).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape))
-        Spacer(Modifier.size(12.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Text(colorFromHex(current).toHex(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if (showPicker) {
-        ColorPickerDialog(
-            initial = current,
-            title = label,
-            onDismiss = { showPicker = false },
-            onConfirm = { showPicker = false; onPick(it) },
-        )
     }
 }
