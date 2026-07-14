@@ -579,7 +579,7 @@ class CalendarStore {
             todayColorHex:      defaults.string(forKey: "todayColor")       ?? "#4285f4",
             textColorHex:       defaults.string(forKey: "textColor")        ?? "#FFFFFF",
             backgroundColorHex: defaults.string(forKey: "backgroundColor")  ?? "#000000",
-            lineColorHex:       defaults.string(forKey: "lineColor")        ?? "#3A3A3C",
+            lineColorHex:       defaults.string(forKey: "lineColor")        ?? "#3A3A52",
             primaryColorHex:    defaults.string(forKey: "primaryColor")     ?? "#4285f4",
             accentColorHex:     defaults.string(forKey: "accentColor")      ?? "#ea4335",
             language:           defaults.string(forKey: "appLanguage")      ?? "system"

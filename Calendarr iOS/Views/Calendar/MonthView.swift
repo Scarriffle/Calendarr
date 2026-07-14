@@ -27,7 +27,7 @@ struct MonthView: View {
     @AppStorage("monthDividerColor") private var dividerHex = "#7090c0"
     @AppStorage("monthLabelColor")   private var labelHex = "#7090c0"
     @AppStorage("textColor")         private var textHex = "#FFFFFF"
-    @AppStorage("lineColor")         private var lineHex = "#3A3A3C"
+    @AppStorage("lineColor")         private var lineHex = "#3A3A52"
     @AppStorage("textContrast")      private var textContrast = 3
     @AppStorage("monthViewPaged")    private var monthPaged = false
 

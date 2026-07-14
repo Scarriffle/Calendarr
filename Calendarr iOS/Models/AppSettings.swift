@@ -15,11 +15,14 @@ struct AppSettings: Codable {
     var monthLabelColor: String = "#7090c0"
     var textColor: String = "#FFFFFF"
     var backgroundColor: String = "#000000"
-    var lineColor: String = "#3A3A3C"
+    var lineColor: String = "#3A3A52"
     var privateEventVisibility: String = "busy"   // 'hidden' | 'busy'
     var groupVisibleCalendarId: Int? = nil
     var defaultReminderMinutes: Int? = nil         // minutes before start; nil = off
     var defaultEventDurationMinutes: Int = 60      // applied to a new event's end time
+    var cacheMonths: Int = 3                       // preloaded month range (device-local by default)
+    var monthViewPaged: Bool = false               // month view swipe-paging (device-local by default)
+    var syncFlags: [String: Bool]? = nil           // server-resolved per-setting sync flags
 
     enum CodingKeys: String, CodingKey {
         case defaultView = "default_view"
@@ -35,21 +38,24 @@ struct AppSettings: Codable {
         case monthDividerColor = "month_divider_color"
         case monthLabelColor = "month_label_color"
         case textColor = "text_color"
-        case backgroundColor = "background_color"
+        case backgroundColor = "bg_color"
         case lineColor = "line_color"
         case privateEventVisibility = "private_event_visibility"
         case groupVisibleCalendarId = "group_visible_calendar_id"
         case defaultReminderMinutes = "default_reminder_minutes"
         case defaultEventDurationMinutes = "default_event_duration_minutes"
+        case cacheMonths = "cache_months"
+        case monthViewPaged = "month_view_paged"
+        case syncFlags = "sync_flags"
     }
 
     init() {}
 
-    /// Resilient decoding: the server only stores a subset of these fields
-    /// (e.g. it has no `text_color`/`background_color`/`line_color`, which are
-    /// iOS-only). Using `decodeIfPresent` with the property defaults means a
-    /// missing key no longer aborts the whole decode — otherwise the entire
-    /// settings sync silently breaks.
+    /// Resilient decoding: a server may omit some keys. Using `decodeIfPresent`
+    /// with the property defaults means a missing key no longer aborts the whole
+    /// decode — otherwise the entire settings sync silently breaks. (Note:
+    /// `background_color` was previously mis-mapped; the server column is
+    /// `bg_color`, now corrected above.)
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = AppSettings()
@@ -72,6 +78,9 @@ struct AppSettings: Codable {
         groupVisibleCalendarId = try c.decodeIfPresent(Int.self, forKey: .groupVisibleCalendarId)
         defaultReminderMinutes = try c.decodeIfPresent(Int.self, forKey: .defaultReminderMinutes)
         defaultEventDurationMinutes = try c.decodeIfPresent(Int.self, forKey: .defaultEventDurationMinutes) ?? d.defaultEventDurationMinutes
+        cacheMonths = try c.decodeIfPresent(Int.self, forKey: .cacheMonths) ?? d.cacheMonths
+        monthViewPaged = try c.decodeIfPresent(Bool.self, forKey: .monthViewPaged) ?? d.monthViewPaged
+        syncFlags = try c.decodeIfPresent([String: Bool].self, forKey: .syncFlags)
     }
 }
 

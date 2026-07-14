@@ -10,7 +10,7 @@ struct WeekView: View {
     @AppStorage("appLanguage")   private var appLang = "system"
     @AppStorage("todayColor")    private var todayHex = "#4285f4"
     @AppStorage("textColor")     private var textHex = "#FFFFFF"
-    @AppStorage("lineColor")     private var lineHex = "#3A3A3C"
+    @AppStorage("lineColor")     private var lineHex = "#3A3A52"
     @AppStorage("textContrast")  private var textContrast = 3
     @AppStorage("lineContrast")  private var lineContrast = 3
     @AppStorage("hourHeight")    private var hourHeightPref = 60   // observed for live re-layout
@@ -213,7 +213,7 @@ struct HourSlot: View {
     let onShowMonth: (Date) -> Void
     let onShowDay: (Date) -> Void
 
-    @AppStorage("lineColor")    private var lineHex = "#3A3A3C"
+    @AppStorage("lineColor")    private var lineHex = "#3A3A52"
     @AppStorage("lineContrast") private var lineContrast = 3
 
     private var date: Date {
