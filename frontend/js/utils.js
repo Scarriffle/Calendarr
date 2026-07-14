@@ -132,12 +132,15 @@ export function applyTheme(settings) {
   root.style.setProperty('--border',       lineColor);
   root.style.setProperty('--border-light', shadeHex(lineColor, -0.25));
 
+  // Surface family (sidebar / top bar / cards). Explicit surface_color drives
+  // it; otherwise derive from the app background as before.
+  const surfaceBase = settings.surface_color || shadeHex(bgColor, 0.10);
   root.style.setProperty('--bg-app',     bgColor);
-  root.style.setProperty('--bg-topbar',  shadeHex(bgColor, 0.10));
-  root.style.setProperty('--bg-sidebar', shadeHex(bgColor, 0.10));
-  root.style.setProperty('--bg-surface', shadeHex(bgColor, 0.18));
-  root.style.setProperty('--bg-hover',   shadeHex(bgColor, 0.26));
-  root.style.setProperty('--bg-active',  shadeHex(bgColor, 0.40));
+  root.style.setProperty('--bg-topbar',  surfaceBase);
+  root.style.setProperty('--bg-sidebar', surfaceBase);
+  root.style.setProperty('--bg-surface', shadeHex(surfaceBase, 0.10));
+  root.style.setProperty('--bg-hover',   shadeHex(surfaceBase, 0.20));
+  root.style.setProperty('--bg-active',  shadeHex(surfaceBase, 0.34));
 
   const hh = settings.hour_height || 44;
   root.style.setProperty('--hour-h', hh + 'px');

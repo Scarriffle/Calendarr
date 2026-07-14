@@ -100,6 +100,9 @@ class UserSettings(Base):
     text_color = Column(String(7), nullable=True)   # Override für --text-1 (NULL = nutze text_contrast)
     line_color = Column(String(7), nullable=True)   # Override für --border  (NULL = nutze line_contrast)
     bg_color   = Column(String(7), nullable=True)   # Override für --bg-app  (NULL = Default)
+    # Surface/sidebar/topbar colour (web sidebar + top bar, iOS top bar).
+    # NULL = derive from bg_color. Device-local by default (not synced).
+    surface_color = Column(String(7), nullable=True)
     # How this user's private events appear to other group members:
     # 'hidden' = invisible, 'busy' = anonymous busy block (default).
     private_event_visibility = Column(String(10), default="busy")

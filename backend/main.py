@@ -231,6 +231,7 @@ def _migrate():
             ("cache_months",     "ALTER TABLE user_settings ADD COLUMN cache_months INTEGER DEFAULT 3"),
             ("month_view_paged", "ALTER TABLE user_settings ADD COLUMN month_view_paged BOOLEAN DEFAULT 0"),
             ("sync_flags",       "ALTER TABLE user_settings ADD COLUMN sync_flags TEXT"),
+            ("surface_color",    "ALTER TABLE user_settings ADD COLUMN surface_color VARCHAR(7)"),
         ):
             try:
                 conn.execute(text(ddl))

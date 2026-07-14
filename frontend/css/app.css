@@ -1410,6 +1410,23 @@ a { color: var(--primary); text-decoration: none; }
 .sync-toggle-lg.on::after { transform: translateX(18px); }
 .settings-row .sync-toggle { justify-self: center; }
 
+/* Per-row sync toggle icon: ON = primary + pill, OFF = muted + slashed icon */
+.sync-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 28px; padding: 0;
+  border: none; border-radius: 8px; cursor: pointer;
+  background: transparent; color: var(--text-3);
+  transition: color var(--transition), background var(--transition);
+  justify-self: center;
+}
+.sync-icon:hover { background: var(--bg-hover); color: var(--text-2); }
+.sync-icon.on { color: var(--primary); background: var(--primary-dim); }
+.sync-icon .si-on, .sync-icon .si-off { align-items: center; }
+.sync-icon .si-on { display: none; }
+.sync-icon .si-off { display: inline-flex; }
+.sync-icon.on .si-off { display: none; }
+.sync-icon.on .si-on { display: inline-flex; }
+
 /* Per-row colour control: swatch + hex + reset, right-aligned */
 .settings-color-ctl { display: flex; align-items: center; gap: 12px; }
 .settings-color-ctl .ev-color-hex { width: 92px; }

@@ -3341,6 +3341,8 @@ function populateSettings() {
 
 // ── Settings sync table ───────────────────────────────────
 const SYNC_ICON_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0020 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 004 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
+// Same sync glyph with a diagonal slash — the clear "not synced" state.
+const SYNC_OFF_ICON_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0020 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 004 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/><path d="M3.2 2.4l18.4 18.4" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" fill="none"/></svg>';
 const RESET_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>';
 
 function normalizeHex(raw, fallback) {
@@ -3387,7 +3389,7 @@ function settingRowHtml(def) {
     ).join('') + '</div>';
   }
   return `<div class="settings-row" data-row="${def.key}">
-    <button type="button" class="sync-icon ${synced ? 'on' : ''}" data-sync="${def.key}" role="switch" aria-checked="${synced}" title="${escHtml(t('settings_sync_this'))}">${SYNC_ICON_SVG}</button>
+    <button type="button" class="sync-icon ${synced ? 'on' : ''}" data-sync="${def.key}" role="switch" aria-checked="${synced}" title="${escHtml(t('settings_sync_this'))}"><span class="si-on">${SYNC_ICON_SVG}</span><span class="si-off">${SYNC_OFF_ICON_SVG}</span></button>
     <div class="settings-row-name">${escHtml(t(def.labelKey))}</div>
     <div class="settings-row-value">${valueHtml}</div>
   </div>`;

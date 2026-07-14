@@ -13,6 +13,7 @@ export const DEFAULT_COLORS = {
   text_color:          '#FFFFFF',
   bg_color:            '#000000',
   line_color:          '#3A3A52',
+  surface_color:       '#1A1A1A',
   month_divider_color: '#7090C0',
   month_label_color:   '#7090C0',
 };
@@ -60,6 +61,7 @@ export const SETTING_GROUPS = [
       { key: 'today_color',         labelKey: 'settings_today_color',         type: 'color' },
       { key: 'text_color',          labelKey: 'settings_text_color',          type: 'color' },
       { key: 'bg_color',            labelKey: 'settings_bg_color',            type: 'color' },
+      { key: 'surface_color',       labelKey: 'settings_surface_color',       type: 'color' },
       { key: 'line_color',          labelKey: 'settings_line_color',          type: 'color' },
       { key: 'month_divider_color', labelKey: 'settings_month_divider_color', type: 'color' },
       { key: 'month_label_color',   labelKey: 'settings_month_label_color',   type: 'color' },

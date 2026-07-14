@@ -36,6 +36,7 @@ DEFAULT_SYNC = {
     "share_calendar_icon": False,
     "cache_months": False,
     "month_view_paged": False,
+    "surface_color": False,
 }
 
 
@@ -70,6 +71,7 @@ class SettingsUpdate(BaseModel):
     text_color: Optional[str] = None
     line_color: Optional[str] = None
     bg_color:   Optional[str] = None
+    surface_color: Optional[str] = None
     private_event_visibility: Optional[str] = None
     group_visible_calendar_id: Optional[int] = None
     default_reminder_minutes: Optional[int] = None  # null = off
@@ -97,6 +99,7 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "text_color": s.text_color,
         "line_color": s.line_color,
         "bg_color":   s.bg_color,
+        "surface_color": s.surface_color,
         "private_event_visibility": s.private_event_visibility or "busy",
         "group_visible_calendar_id": s.group_visible_calendar_id,
         "default_reminder_minutes": s.default_reminder_minutes,
@@ -162,7 +165,7 @@ def update_settings(
     # For these three override colours, an explicit null is meaningful
     # ("reset to default") and must be persisted as NULL. All other fields
     # keep the previous behaviour where a null/missing value is ignored.
-    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "group_visible_calendar_id", "default_reminder_minutes", "default_event_duration_minutes", "share_calendar_icon"}
+    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "surface_color", "group_visible_calendar_id", "default_reminder_minutes", "default_event_duration_minutes", "share_calendar_icon"}
     update_data = data.model_dump(exclude_unset=True)
 
     # Merge sync-flag overrides into the stored account-wide JSON map. Only known
