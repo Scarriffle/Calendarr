@@ -1377,8 +1377,19 @@ a { color: var(--primary); text-decoration: none; }
 .settings-row-name { font-size: 14px; color: var(--text-1); }
 .settings-row-value { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .settings-row-value select {
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-1);
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
   min-width: 130px; max-width: 100%;
+  transition: border-color var(--transition);
 }
+.settings-row-value select:hover:not(:focus) { border-color: var(--text-3); }
+.settings-row-value select:focus { border-color: var(--primary); }
 
 /* Sync toggle switch — used per row and (larger) globally */
 .sync-toggle {
@@ -1400,15 +1411,16 @@ a { color: var(--primary); text-decoration: none; }
 .settings-row .sync-toggle { justify-self: center; }
 
 /* Per-row colour control: swatch + hex + reset, right-aligned */
-.settings-color-ctl { display: flex; align-items: center; gap: 6px; }
+.settings-color-ctl { display: flex; align-items: center; gap: 12px; }
 .settings-color-ctl .ev-color-hex { width: 92px; }
+.settings-color-ctl .ev-color-preview { margin-left: 2px; }
 .settings-color-ctl .ev-color-reset {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; padding: 0; color: var(--text-3);
 }
 
-/* Compact inline share-icon picker inside a value cell */
-.settings-icon-ctl { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 220px; }
+/* Inline share-icon picker inside a value cell — one even row */
+.settings-icon-ctl { display: flex; flex-wrap: nowrap; gap: 6px; justify-content: flex-end; }
 
 @media (max-width: 640px) {
   .settings-row { grid-template-columns: 34px 1fr; grid-auto-rows: auto; }
@@ -1541,6 +1553,10 @@ a { color: var(--primary); text-decoration: none; }
   border-bottom: 1px solid var(--border-light);
 }
 .cal-manage-table td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--border-light); vertical-align: middle; }
+/* Fixed layout + narrow drags must clip, not overlap the next column (Excel-like). */
+.cal-manage-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Full-width detail/section rows (account headers, CalDAV boxes, empty state) wrap normally. */
+.cal-manage-table td[colspan] { overflow: visible; white-space: normal; }
 .cal-manage-table tbody tr:last-child td { border-bottom: none; }
 /* Drag-resizable columns: a grab handle on each header's right edge. */
 .cal-manage-table th { position: relative; }

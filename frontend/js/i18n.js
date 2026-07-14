@@ -212,6 +212,7 @@ const translations = {
 
     // User management
     users_add: 'Benutzer hinzufügen', users_is_admin: 'Administrator',
+    users_make_admin: 'Zu Admin machen', users_revoke_admin: 'Admin entziehen',
 
     // Profile
     profile_title: 'Profil', profile_upload: 'Bild hochladen',
@@ -564,6 +565,7 @@ const translations = {
 
     // User management
     users_add: 'Add user', users_is_admin: 'Administrator',
+    users_make_admin: 'Make admin', users_revoke_admin: 'Revoke admin',
 
     // Profile
     profile_title: 'Profile', profile_upload: 'Upload image',

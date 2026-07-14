@@ -23,6 +23,10 @@ class ChangePasswordRequest(BaseModel):
     password: str
 
 
+class SetAdminRequest(BaseModel):
+    is_admin: bool
+
+
 def _user_dict(u: models.User) -> dict:
     return {
         "id": u.id,
@@ -98,6 +102,28 @@ def delete_user(
     if not user:
         raise HTTPException(404, "User not found")
     db.delete(user)
+    db.commit()
+    return {"ok": True}
+
+
+@router.put("/{user_id}/admin")
+def set_admin(
+    user_id: int,
+    req: SetAdminRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_admin),
+):
+    if user_id == current_user.id:
+        raise HTTPException(400, "Cannot change your own admin status")
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    # Never leave the instance without an admin.
+    if user.is_admin and not req.is_admin:
+        admin_count = db.query(models.User).filter(models.User.is_admin == True).count()  # noqa: E712
+        if admin_count <= 1:
+            raise HTTPException(400, "At least one admin must remain")
+    user.is_admin = req.is_admin
     db.commit()
     return {"ok": True}
 

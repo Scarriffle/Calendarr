@@ -1,3 +1,5 @@
+import { DEFAULT_COLORS } from './settings-sync.js';
+
 export function isToday(d) {
   const now = new Date();
   return d.getFullYear() === now.getFullYear() &&
@@ -96,18 +98,18 @@ const LINE_CONTRAST = {
   4: { border: '#5a5a78', light: '#484860' },
 };
 
-// Defaults wenn kein Custom-Override gesetzt ist.
-// Bewusst hart "weiss auf schwarz" damit man nie unsichtbar landet.
-export const DEFAULT_TEXT_COLOR = '#FFFFFF';
-export const DEFAULT_LINE_COLOR = '#3A3A52';
-export const DEFAULT_BG_COLOR   = '#000000';
+// Default-Farben: EINZIGE Quelle ist DEFAULT_COLORS in settings-sync.js.
+// Dort ändern → wirkt für Reset (Tabelle) und diese Theme-Fallbacks gleichzeitig.
+export const DEFAULT_TEXT_COLOR = DEFAULT_COLORS.text_color;
+export const DEFAULT_LINE_COLOR = DEFAULT_COLORS.line_color;
+export const DEFAULT_BG_COLOR   = DEFAULT_COLORS.bg_color;
 
 export function applyTheme(settings) {
   const root = document.documentElement;
-  root.style.setProperty('--primary',     settings.primary_color || '#4285f4');
-  root.style.setProperty('--primary-dim', hexToRgba(settings.primary_color || '#4285f4', 0.15));
-  root.style.setProperty('--accent',      settings.accent_color  || '#ea4335');
-  root.style.setProperty('--today-color', settings.today_color   || '#4285f4');
+  root.style.setProperty('--primary',     settings.primary_color || DEFAULT_COLORS.primary_color);
+  root.style.setProperty('--primary-dim', hexToRgba(settings.primary_color || DEFAULT_COLORS.primary_color, 0.15));
+  root.style.setProperty('--accent',      settings.accent_color  || DEFAULT_COLORS.accent_color);
+  root.style.setProperty('--today-color', settings.today_color   || DEFAULT_COLORS.today_color);
 
   // Effektive Farben bestimmen (Override > Default).
   let textColor = settings.text_color || DEFAULT_TEXT_COLOR;
@@ -140,8 +142,8 @@ export function applyTheme(settings) {
   const hh = settings.hour_height || 44;
   root.style.setProperty('--hour-h', hh + 'px');
 
-  root.style.setProperty('--month-divider-color', settings.month_divider_color || '#7090c0');
-  root.style.setProperty('--month-label-color',   settings.month_label_color   || '#7090c0');
+  root.style.setProperty('--month-divider-color', settings.month_divider_color || DEFAULT_COLORS.month_divider_color);
+  root.style.setProperty('--month-label-color',   settings.month_label_color   || DEFAULT_COLORS.month_label_color);
 }
 
 function luminance(hex) {

@@ -4248,20 +4248,32 @@ async function loadUsers() {
   try {
     const users = await api.get('/users/');
     const list = document.getElementById('users-list');
-    list.innerHTML = users.map(u =>
-      `<div class="users-list-item">
+    const selfId = JSON.parse(localStorage.getItem('user') || '{}').id;
+    list.innerHTML = users.map(u => {
+      const isSelf = u.id === selfId;
+      return `<div class="users-list-item">
         <div>
           <div class="uname">${escHtml(u.username)}</div>
           ${u.email ? `<div class="uemail">${escHtml(u.email)}</div>` : ''}
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           ${u.is_admin ? '<span class="ubadge">Admin</span>' : ''}
-          ${u.id !== JSON.parse(localStorage.getItem('user')||'{}').id
-            ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" data-del-user="${u.id}">Löschen</button>`
-            : ''}
+          ${isSelf ? '' :
+            `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" data-admin-user="${u.id}" data-admin-next="${u.is_admin ? '0' : '1'}">${u.is_admin ? t('users_revoke_admin') : t('users_make_admin')}</button>`}
+          ${isSelf ? '' :
+            `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" data-del-user="${u.id}">${t('delete')}</button>`}
         </div>
-      </div>`
-    ).join('');
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll('[data-admin-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await api.put(`/users/${btn.dataset.adminUser}/admin`, { is_admin: btn.dataset.adminNext === '1' });
+          loadUsers();
+        } catch (e) { showToast(e.message, true); }
+      });
+    });
 
     list.querySelectorAll('[data-del-user]').forEach(btn => {
       btn.addEventListener('click', async () => {
