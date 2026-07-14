@@ -1280,6 +1280,7 @@ a { color: var(--primary); text-decoration: none; }
   display: flex; align-items: center; gap: 8px;
   padding: 14px 20px; border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  background: var(--bg-topbar);
 }
 .settings-page-header h3 { font-size: 16px; font-weight: 600; color: var(--text-1); margin: 0; }
 .settings-page-body {
@@ -1290,6 +1291,7 @@ a { color: var(--primary); text-decoration: none; }
   border-right: 1px solid var(--border);
   padding: 12px 8px;
   display: flex; flex-direction: column; gap: 2px;
+  background: var(--bg-sidebar);
 }
 .settings-nav-btn {
   display: block; width: 100%; text-align: left;
