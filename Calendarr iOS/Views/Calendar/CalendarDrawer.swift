@@ -34,40 +34,40 @@ struct CalendarDrawer: View {
     // MARK: – Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Circle()
                 .fill(Color.accentColor)
-                .frame(width: 40, height: 40)
+                .frame(width: 48, height: 48)
                 .overlay {
                     Text(appState.username.prefix(1).uppercased())
-                        .font(.headline).foregroundStyle(.white)
+                        .font(.title3.bold()).foregroundStyle(.white)
                 }
             VStack(alignment: .leading, spacing: 2) {
-                Text(appState.username).font(.headline).lineLimit(1)
+                Text(appState.username).font(.title3.weight(.semibold)).lineLimit(1)
                 Text(appState.serverURL
                     .replacingOccurrences(of: "https://", with: "")
                     .replacingOccurrences(of: "http://", with: ""))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
-            HStack(spacing: 18) {
+            HStack(spacing: 20) {
                 Button { onSync() } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 16, weight: .medium))
+                    Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 19, weight: .medium))
                 }
                 .buttonStyle(.plain).foregroundStyle(Color.accentColor)
                 .accessibilityLabel(L10n.t("menu.sync", appLang))
                 Button { onOpenMenu() } label: {
-                    Image(systemName: "gearshape").font(.system(size: 16, weight: .medium))
+                    Image(systemName: "gearshape").font(.system(size: 19, weight: .medium))
                 }
                 .buttonStyle(.plain).foregroundStyle(Color.accentColor)
                 .accessibilityLabel(L10n.t("menu.section.settings", appLang))
                 Button { onClose() } label: {
-                    Image(systemName: "xmark").font(.system(size: 15, weight: .semibold))
+                    Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
+        .padding(.horizontal, 18).padding(.top, 20).padding(.bottom, 16)
     }
 
     // MARK: – View switcher
@@ -88,7 +88,7 @@ struct CalendarDrawer: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 8)
+            .padding(.horizontal, 16).padding(.vertical, 13)
         }
     }
 
@@ -106,7 +106,7 @@ struct CalendarDrawer: View {
                          selected: store.activeGroup?.id == g.id) { onSwitchGroup(g) }
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 8)
+            .padding(.horizontal, 16).padding(.vertical, 13)
         }
     }
 

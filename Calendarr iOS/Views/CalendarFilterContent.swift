@@ -61,24 +61,22 @@ struct CalendarFilterContent: View {
         .task { await load() }
     }
 
-    // Above the list so it stays tappable even while the list is in edit mode.
+    // Section header + sort toggle, above the list so it stays tappable while
+    // the list is in edit mode. (No show/hide-all buttons — rarely needed with a
+    // handful of calendars, and the web has none either.)
     private var controlBar: some View {
-        HStack(spacing: 8) {
-            Button(L10n.t("filter.show_all", appLang)) {
-                hidden = []; store.setHiddenCalendars(hidden)
-            }
-            .buttonStyle(.bordered)
-            Button(L10n.t("filter.hide_all", appLang)) {
-                hidden = allKeys; store.setHiddenCalendars(hidden)
-            }
-            .buttonStyle(.bordered)
+        HStack {
+            Text(L10n.t("filter.title", appLang))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
             Spacer()
             Button(isSorting ? L10n.t("filter.done", appLang) : L10n.t("filter.sort", appLang)) {
                 withAnimation { isSorting.toggle() }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderless)
+            .font(.subheadline)
         }
-        .padding(.horizontal, 16).padding(.vertical, 8)
+        .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 4)
     }
 
     private func move(from source: IndexSet, to destination: Int) {
