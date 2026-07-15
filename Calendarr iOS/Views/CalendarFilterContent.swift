@@ -44,6 +44,8 @@ struct CalendarFilterContent: View {
                             .buttonStyle(.bordered).frame(maxWidth: .infinity)
                         }
                         .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                        // No surrounding grouped-section card — just the two button pills.
+                        .listRowBackground(Color.clear)
                     }
                     let visibleLocals = localCalendars.filter {
                         !banished.contains(CalendarStore.calendarKey(source: "local", calendarId: "\($0.id)"))
