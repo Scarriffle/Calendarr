@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     let api: CalendarrAPI
     @AppStorage("liquidGlass")       private var liquidGlass = false
+    @AppStorage("hideMenuButton")    private var hideMenuButton = false
     @AppStorage("cacheMonths")       private var cacheMonths = 3
     @AppStorage("appLanguage")       private var appLang = "system"
     @AppStorage("monthDividerColor") private var dividerHex = "#7090C0"
@@ -416,6 +417,8 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityLabel(L10n.t("settings.surface.auto", appLang))
             }
+            Toggle(L10n.t("settings.hide_menu_button", appLang), isOn: $hideMenuButton)
+                .tint(Color.accentColor)
         } header: {
             Text(L10n.t("settings.device", appLang))
         } footer: {

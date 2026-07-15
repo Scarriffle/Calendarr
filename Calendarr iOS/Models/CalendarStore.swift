@@ -165,6 +165,49 @@ class CalendarStore {
         return "\(source):\(id)"
     }
 
+    // MARK: – Calendar order (device-local, mirrors the web `cal_order`)
+
+    private static let orderDefaultsKey = "calendarOrder"
+
+    /// Persisted display order of calendar keys ("source:id"). Device-local; the
+    /// drawer's flat calendar list is sorted by this.
+    private(set) var calendarOrder: [String] = CalendarStore.loadOrder()
+
+    private static func loadOrder() -> [String] {
+        guard let raw = UserDefaults.standard.string(forKey: orderDefaultsKey),
+              let data = raw.data(using: .utf8),
+              let arr = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
+        return arr
+    }
+
+    private func saveOrder() {
+        if let data = try? JSONEncoder().encode(calendarOrder),
+           let s = String(data: data, encoding: .utf8) {
+            UserDefaults.standard.set(s, forKey: Self.orderDefaultsKey)
+        }
+    }
+
+    /// Replace the stored order (after a drag-reorder).
+    func setCalendarOrder(_ keys: [String]) {
+        calendarOrder = keys
+        saveOrder()
+    }
+
+    /// Sort the given keys by the stored order (unknown keys → end), then persist
+    /// the normalized order so newly-added calendars stick (mirrors the web).
+    func ordered(_ keys: [String]) -> [String] {
+        let current = calendarOrder
+        func idx(_ key: String) -> Int { current.firstIndex(of: key) ?? Int.max }
+        let sorted = keys.sorted { a, b in
+            let ia = idx(a), ib = idx(b)
+            return ia != ib ? ia < ib : a < b
+        }
+        calendarOrder = sorted
+        saveOrder()
+        return sorted
+    }
+
     // MARK: – Banished-calendar persistence
 
     private static let banishedKeysDefaultsKey = "banishedCalendarKeys"

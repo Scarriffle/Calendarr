@@ -89,6 +89,7 @@ private let strings: [String: [String: String]] = [
         "settings.color.surface": "Topbar-/Oberflächenfarbe",
         "settings.surface.auto": "Auto (Milchglas)",
         "settings.device": "Nur auf diesem Gerät",
+        "settings.hide_menu_button": "Menü-Button ausblenden",
         "settings.device.footer": "Diese Einstellungen gelten nur auf diesem Gerät und werden nicht synchronisiert.",
 
         "settings.cache.header": "Vorladen",
@@ -331,6 +332,8 @@ private let strings: [String: [String: String]] = [
         "filter.empty": "Keine Kalender vorhanden",
         "filter.show_all": "Alle anzeigen",
         "filter.hide_all": "Alle ausblenden",
+        "filter.sort": "Sortieren",
+        "filter.done": "Fertig",
         "filter.button": "Kalender ein-/ausblenden",
         "filter.banish": "Dauerhaft ausblenden",
         "filter.reminders_on": "Benachrichtigungen an",
@@ -460,6 +463,7 @@ private let strings: [String: [String: String]] = [
         "settings.color.surface": "Top bar / surface color",
         "settings.surface.auto": "Auto (translucent)",
         "settings.device": "This device only",
+        "settings.hide_menu_button": "Hide menu button",
         "settings.device.footer": "These settings apply to this device only and are not synced.",
 
         "settings.cache.header": "Preloading",
@@ -702,6 +706,8 @@ private let strings: [String: [String: String]] = [
         "filter.empty": "No calendars available",
         "filter.show_all": "Show all",
         "filter.hide_all": "Hide all",
+        "filter.sort": "Sort",
+        "filter.done": "Done",
         "filter.button": "Show/hide calendars",
         "filter.banish": "Hide permanently",
         "filter.reminders_on": "Reminders on",

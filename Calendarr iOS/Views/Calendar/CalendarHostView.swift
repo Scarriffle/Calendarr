@@ -23,6 +23,8 @@ struct CalendarHostView: View {
     @AppStorage("defaultView")  private var defaultView = "month"
     // Opt-in: empty keeps the translucent `.bar` material; a hex tints the top bar.
     @AppStorage("surfaceColor") private var surfaceHex = ""
+    // Device-local: hide the hamburger (drawer then opens only via edge-swipe).
+    @AppStorage("hideMenuButton") private var hideMenuButton = false
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -63,6 +65,7 @@ struct CalendarHostView: View {
                 onSwitchGroup: { g in closeDrawer(); switchGroup(g) },
                 onSelectView: { vt in store.viewType = vt; closeDrawer() },
                 onOpenMenu: { closeDrawer(); showMenu = true },
+                onSync: { closeDrawer(); Task { await syncFromServer(force: true) } },
                 onClose: { closeDrawer() }
             )
             .frame(width: drawerWidth)
@@ -70,6 +73,16 @@ struct CalendarHostView: View {
             .shadow(color: .black.opacity(showDrawer ? 0.25 : 0), radius: 12, x: 4)
             .offset(x: showDrawer ? 0 : -(drawerWidth + 60))
             .animation(.easeInOut(duration: 0.25), value: showDrawer)
+            // Swipe the drawer toward the left edge to close it.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20)
+                    .onEnded { v in
+                        if showDrawer, v.translation.width < -45,
+                           abs(v.translation.width) > abs(v.translation.height) {
+                            closeDrawer()
+                        }
+                    }
+            )
         }
         // A narrow leading strip opens the drawer via edge-swipe (kept off the
         // content area so month paging / week swipe stay free).
@@ -169,15 +182,13 @@ struct CalendarHostView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         HStack(spacing: 2) {
+                            if !hideMenuButton { menuButton }
                             Button { store.navigatePrev() } label: { Image(systemName: "chevron.left") }
                             Button { store.navigateNext() } label: { Image(systemName: "chevron.right") }
                         }
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        HStack(spacing: 8) {
-                            Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
-                            menuButton
-                        }
+                        Button(L10n.t("nav.today", appLang)) { store.moveToToday() }.font(.callout)
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) {
@@ -223,6 +234,8 @@ struct CalendarHostView: View {
     /// updates reliably on month change — is identical in both modes.
     @ViewBuilder private var barContents: some View {
         HStack(spacing: 0) {
+            // Menu (hamburger) on the left — the drawer opens from the left.
+            if !hideMenuButton { menuButton.padding(.leading, 2) }
             HStack(spacing: 2) {
                 Button { store.navigatePrev() } label: {
                     Image(systemName: "chevron.left")
@@ -235,7 +248,7 @@ struct CalendarHostView: View {
                         .frame(width: 36, height: 36)
                 }
             }
-            .padding(.leading, 6)
+            .padding(.leading, hideMenuButton ? 6 : 0)
             Spacer(minLength: 6)
             Text(titleString)
                 .font(.headline)
@@ -246,8 +259,7 @@ struct CalendarHostView: View {
             Button(L10n.t("nav.today", appLang)) { store.moveToToday() }
                 .font(.callout).padding(.horizontal, 6)
                 .lineLimit(1).fixedSize()
-            menuButton
-                .padding(.trailing, 2)
+                .padding(.trailing, 4)
         }
         .frame(height: 48)
     }

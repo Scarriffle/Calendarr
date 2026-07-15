@@ -9,6 +9,7 @@ struct CalendarDrawer: View {
     let onSwitchGroup: (CalGroup?) -> Void
     let onSelectView: (CalViewType) -> Void
     let onOpenMenu: () -> Void
+    let onSync: () -> Void
     let onClose: () -> Void
 
     @Environment(AppState.self) private var appState
@@ -25,8 +26,6 @@ struct CalendarDrawer: View {
             }
             Divider()
             CalendarFilterContent(api: api, store: store)
-            Divider()
-            navFooter
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(.systemBackground))
@@ -51,10 +50,22 @@ struct CalendarDrawer: View {
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
-            Button { onClose() } label: {
-                Image(systemName: "xmark").font(.system(size: 15, weight: .semibold))
+            HStack(spacing: 18) {
+                Button { onSync() } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 16, weight: .medium))
+                }
+                .buttonStyle(.plain).foregroundStyle(Color.accentColor)
+                .accessibilityLabel(L10n.t("menu.sync", appLang))
+                Button { onOpenMenu() } label: {
+                    Image(systemName: "gearshape").font(.system(size: 16, weight: .medium))
+                }
+                .buttonStyle(.plain).foregroundStyle(Color.accentColor)
+                .accessibilityLabel(L10n.t("menu.section.settings", appLang))
+                Button { onClose() } label: {
+                    Image(systemName: "xmark").font(.system(size: 15, weight: .semibold))
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
     }
@@ -111,20 +122,4 @@ struct CalendarDrawer: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: – Nav footer (single entry into the full menu)
-
-    private var navFooter: some View {
-        Button { onOpenMenu() } label: {
-            Label(L10n.t("menu.section.settings", appLang), systemImage: "gearshape")
-                .font(.body.weight(.medium))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Color.accentColor)
-        .padding(.horizontal, 16)
-        // Extra bottom inset so the button clears the home indicator and the
-        // screen's rounded corners.
-        .padding(.bottom, 20)
-    }
 }
