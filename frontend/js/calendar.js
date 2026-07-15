@@ -1209,9 +1209,14 @@ function bindSwipeNavigation() {
 function navigate(dir) {
   const d = state.currentDate;
   if (state.currentView === 'month') {
-    // Buttons jump 4 weeks (one screenful)
-    state.currentDate = new Date(d);
-    state.currentDate.setDate(d.getDate() + dir * 28);
+    if (state.settings && state.settings.month_view_paged) {
+      // Paged mode: jump a whole calendar month.
+      state.currentDate = new Date(d.getFullYear(), d.getMonth() + dir, Math.min(d.getDate(), 28));
+    } else {
+      // Scroll mode: buttons jump 4 weeks (one screenful of the rolling grid).
+      state.currentDate = new Date(d);
+      state.currentDate.setDate(d.getDate() + dir * 28);
+    }
   } else if (state.currentView === 'week') {
     state.currentDate = new Date(d);
     state.currentDate.setDate(d.getDate() + dir * 7);
@@ -1335,6 +1340,8 @@ function bindTopbar() {
     _wheelLast = now;
     const dir = e.deltaY > 0 ? 1 : -1;
     if (state.currentView === 'month') {
+      // Paged mode: no scroll navigation — only buttons / horizontal swipe.
+      if (state.settings && state.settings.month_view_paged) return;
       state.currentDate = new Date(state.currentDate);
       state.currentDate.setDate(state.currentDate.getDate() + dir * 7);
       fetchAndRender();
@@ -3463,11 +3470,13 @@ function wireSettingRow(def) {
 function readAppearanceTable() {
   const out = {};
   const numKeys = new Set(['hour_height', 'default_event_duration_minutes']);
+  const boolKeys = new Set(['month_view_paged']);
   SETTING_GROUPS.forEach(g => g.rows.forEach(def => {
     if (def.type === 'select') {
       const el = document.querySelector(`[data-skey="${def.key}"]`);
       let v = el ? el.value : state.settings[def.key];
       if (numKeys.has(def.key)) v = Number(v);
+      else if (boolKeys.has(def.key)) v = (String(v) === 'true');
       out[def.key] = v;
     } else if (def.type === 'toggle') {
       const el = document.querySelector(`[data-vtoggle="${def.key}"]`);

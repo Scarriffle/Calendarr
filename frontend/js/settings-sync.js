@@ -34,6 +34,9 @@ export const SETTING_GROUPS = [
         { v: 'monday', tk: 'week_start_monday' }, { v: 'sunday', tk: 'week_start_sunday' },
       ] },
       { key: 'dim_past_events', labelKey: 'settings_dim_past', type: 'toggle' },
+      { key: 'month_view_paged', labelKey: 'settings_month_mode', type: 'select', opts: [
+        { v: false, tk: 'settings_month_mode_scroll' }, { v: true, tk: 'settings_month_mode_paged' },
+      ] },
       { key: 'hour_height', labelKey: 'settings_hour_height', type: 'select', opts: [
         { v: 28, tk: 'hour_compact' }, { v: 44, tk: 'hour_normal' },
         { v: 60, tk: 'hour_comfort' }, { v: 80, tk: 'hour_large' },
