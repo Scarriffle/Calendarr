@@ -28,6 +28,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** Device-local: hide the top-bar menu button (drawer opens via edge-swipe). */
+    var hideMenuButton: Boolean
+        get() = settingsStore.hideMenuButton
+        set(value) { settingsStore.hideMenuButton = value }
+
     // ---- Per-setting sync flags ----
 
     val syncableKeys: List<String> get() = settingsStore.syncableKeys

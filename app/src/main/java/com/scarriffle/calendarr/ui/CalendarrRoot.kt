@@ -69,6 +69,8 @@ fun CalendarrRoot(vm: MainViewModel = hiltViewModel()) {
                             onSwitchServer = vm::switchServer,
                             onSettingsChanged = vm::applyLocalSettings,
                             onSettingsSynced = vm::refreshSettings,
+                            username = vm.username,
+                            serverUrl = vm.serverUrl,
                         )
                     } ?: SplashScreen()
                 }

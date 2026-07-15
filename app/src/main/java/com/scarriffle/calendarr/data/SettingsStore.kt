@@ -159,6 +159,11 @@ class SettingsStore @Inject constructor(
         get() = prefs.getBoolean(K_MONTH_PAGED, false)
         set(value) = prefs.edit().putBoolean(K_MONTH_PAGED, value).apply()
 
+    /** Device-local: hide the top-bar menu button (drawer opens via edge-swipe). */
+    var hideMenuButton: Boolean
+        get() = prefs.getBoolean(K_HIDE_MENU, false)
+        set(value) = prefs.edit().putBoolean(K_HIDE_MENU, value).apply()
+
     // --- Hidden calendars ("source:id") ---
 
     var hiddenCalendarKeys: Set<String>
@@ -179,6 +184,18 @@ class SettingsStore @Inject constructor(
     var reminderDisabledCalendarKeys: Set<String>
         get() = prefs.getStringSet(K_REMINDER_DISABLED, emptySet())?.toSet() ?: emptySet()
         set(value) = prefs.edit().putStringSet(K_REMINDER_DISABLED, value).apply()
+
+    // --- Calendar display order ("source:id" keys), device-local (mirrors web cal_order) ---
+
+    var calendarOrder: List<String>
+        get() {
+            val raw = prefs.getString(K_CAL_ORDER, null) ?: return emptyList()
+            return runCatching {
+                val arr = org.json.JSONArray(raw)
+                (0 until arr.length()).map { arr.getString(it) }
+            }.getOrDefault(emptyList())
+        }
+        set(value) = prefs.edit().putString(K_CAL_ORDER, org.json.JSONArray(value).toString()).apply()
 
     private companion object {
         const val K_DEFAULT_VIEW = "default_view"
@@ -201,8 +218,10 @@ class SettingsStore @Inject constructor(
         const val K_DEFAULT_DURATION = "default_event_duration_minutes"
         const val K_CACHE_MONTHS = "cache_months"
         const val K_MONTH_PAGED = "month_view_paged"
+        const val K_HIDE_MENU = "hide_menu_button"
         const val K_HIDDEN = "hidden_calendar_keys"
         const val K_BANISHED = "banished_calendar_keys"
         const val K_REMINDER_DISABLED = "reminder_disabled_calendar_keys"
+        const val K_CAL_ORDER = "calendar_order"
     }
 }

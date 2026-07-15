@@ -25,15 +25,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -89,6 +91,8 @@ fun CalendarScreen(
     onSwitchServer: () -> Unit,
     onSettingsChanged: (AppSettings) -> Unit,
     onSettingsSynced: () -> Unit,
+    username: String = "",
+    serverUrl: String = "",
     vm: CalendarViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsState()
@@ -128,7 +132,6 @@ fun CalendarScreen(
 
     var viewMenuOpen by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
-    var showFilter by remember { mutableStateOf(false) }
     var detailEvent by remember { mutableStateOf<CalEvent?>(null) }
     var editor by remember { mutableStateOf<EditorRequest?>(null) }
     var overlay by remember { mutableStateOf(Overlay.NONE) }
@@ -138,6 +141,14 @@ fun CalendarScreen(
     var birthdayCal by remember { mutableStateOf<com.scarriffle.calendarr.domain.model.LocalCalendar?>(null) }
     val birthdayScope = rememberCoroutineScope()
     val birthdayCalName = tr("birthday.calendar_name")
+
+    // Side navigation drawer (calendars + groups + view + menu).
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerScope = rememberCoroutineScope()
+    val drawerCalendars = remember(state.events, state.banishedKeys, state.allCalendars) { allKnownCalendars(vm) }
+    androidx.compose.runtime.LaunchedEffect(drawerState.currentValue) {
+        if (drawerState.isOpen) vm.loadAllCalendars()
+    }
 
     // Continuous month scrolling
     val monthListState = rememberLazyListState()
@@ -159,6 +170,18 @@ fun CalendarScreen(
         if (isMonth) todaySignal++ else vm.moveToToday()
     }
 
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            CalendarDrawerContent(
+                state = state, vm = vm, username = username, serverUrl = serverUrl,
+                calendars = drawerCalendars,
+                onOpenMenu = { drawerScope.launch { drawerState.close() }; showMenu = true },
+                onSync = { drawerScope.launch { drawerState.close() }; vm.syncWithServer() },
+                onClose = { drawerScope.launch { drawerState.close() } },
+            )
+        },
+    ) {
     Scaffold(
         topBar = {
             CompactTopBar(
@@ -166,11 +189,11 @@ fun CalendarScreen(
                 viewType = state.viewType,
                 loading = state.isLoading || state.isBackgroundCaching,
                 viewMenuOpen = viewMenuOpen,
-                onMenu = { showMenu = true },
+                showMenuButton = !state.hideMenuButton,
+                onMenu = { drawerScope.launch { drawerState.open() } },
                 onPrev = { goPrev() },
                 onToday = { goToday() },
                 onNext = { goNext() },
-                onFilter = { showFilter = true },
                 onViewMenuToggle = { viewMenuOpen = it },
                 onSelectView = { vm.setViewType(it) },
             )
@@ -242,6 +265,7 @@ fun CalendarScreen(
             }
         }
     }
+    }
 
     // ---- Sheets ----
 
@@ -259,15 +283,6 @@ fun CalendarScreen(
             onSync = { showMenu = false; vm.syncWithServer() },
             onLogout = { showMenu = false; onLogout() },
             onSwitchServer = { showMenu = false; onSwitchServer() },
-        )
-    }
-
-    if (showFilter) {
-        androidx.compose.runtime.LaunchedEffect(Unit) { vm.loadAllCalendars() }
-        CalendarFilterSheet(
-            events = remember(state.events, state.banishedKeys, state.allCalendars) { allKnownCalendars(vm) },
-            vm = vm,
-            onDismiss = { showFilter = false },
         )
     }
 
@@ -450,11 +465,11 @@ private fun CompactTopBar(
     viewType: CalViewType,
     loading: Boolean,
     viewMenuOpen: Boolean,
+    showMenuButton: Boolean,
     onMenu: () -> Unit,
     onPrev: () -> Unit,
     onToday: () -> Unit,
     onNext: () -> Unit,
-    onFilter: () -> Unit,
     onViewMenuToggle: (Boolean) -> Unit,
     onSelectView: (CalViewType) -> Unit,
 ) {
@@ -487,7 +502,6 @@ private fun CompactTopBar(
                     strokeWidth = 2.dp,
                 )
             }
-            CompactIcon(Icons.Filled.FilterList, onFilter, tr("filter.button"))
             Box {
                 CompactIcon(viewType.icon, { onViewMenuToggle(true) }, tr("view.change"))
                 DropdownMenu(expanded = viewMenuOpen, onDismissRequest = { onViewMenuToggle(false) }) {
@@ -500,7 +514,7 @@ private fun CompactTopBar(
                     }
                 }
             }
-            CompactIcon(Icons.Filled.Menu, onMenu, tr("nav.menu"))
+            if (showMenuButton) CompactIcon(Icons.Filled.Menu, onMenu, tr("nav.menu"))
         }
         Divider(
             thickness = 0.5.dp,

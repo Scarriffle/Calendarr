@@ -147,7 +147,13 @@ fun SettingsScreen(
                     synced("week_start_day"), { toggle("week_start_day") },
                 )
                 SyncSwitchRow(tr("settings.dimpast"), settings.dimPastEvents, { update(settings.copy(dimPastEvents = it)) }, synced("dim_past_events"), { toggle("dim_past_events") })
-                SyncSwitchRow(tr("settings.month_paged"), settings.monthViewPaged, { update(settings.copy(monthViewPaged = it)) }, synced("month_view_paged"), { toggle("month_view_paged") })
+                SyncDropdownRow(
+                    tr("settings.month_mode"),
+                    listOf("false" to tr("settings.month_mode.scroll"), "true" to tr("settings.month_mode.paged")),
+                    settings.monthViewPaged.toString(),
+                    { update(settings.copy(monthViewPaged = it.toBoolean())) },
+                    synced("month_view_paged"), { toggle("month_view_paged") },
+                )
                 SyncDropdownRow(
                     tr("settings.hourheight"),
                     listOf("28" to tr("settings.hourheight.compact"), "44" to tr("settings.hourheight.normal"), "60" to tr("settings.hourheight.comfort"), "80" to tr("settings.hourheight.large")),
@@ -196,6 +202,12 @@ fun SettingsScreen(
                     listOf("1" to tr("settings.linecontrast.barely"), "2" to tr("settings.linecontrast.subtle"), "3" to tr("settings.linecontrast.normal"), "4" to tr("settings.linecontrast.strong")),
                     settings.lineContrast.toString(),
                 ) { update(settings.copy(lineContrast = it.toInt())) }
+                var hideMenu by remember { mutableStateOf(vm.hideMenuButton) }
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.size(44.dp))
+                    Text(tr("settings.hide_menu_button"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    Switch(checked = hideMenu, onCheckedChange = { hideMenu = it; vm.hideMenuButton = it })
+                }
                 Text(tr("settings.device.footer"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 44.dp, top = 6.dp))
                 Spacer(Modifier.size(40.dp))
             }

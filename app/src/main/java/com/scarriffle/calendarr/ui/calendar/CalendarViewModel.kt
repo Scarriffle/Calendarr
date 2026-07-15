@@ -62,6 +62,8 @@ data class CalendarUiState(
     val allCalendars: List<CalendarFilterEntry> = emptyList(),
     // Device-local: month view as horizontal paged (swipe) vs. scroll feed.
     val monthViewPaged: Boolean = false,
+    // Device-local: hide the top-bar menu button (drawer opens via edge-swipe).
+    val hideMenuButton: Boolean = false,
 )
 
 fun groupMemberKey(ownerId: Int): String = "gm:$ownerId"
@@ -127,13 +129,21 @@ class CalendarViewModel @Inject constructor(
             banishedKeys = settingsStore.banishedCalendarKeys,
             reminderDisabledKeys = settingsStore.reminderDisabledCalendarKeys,
             monthViewPaged = settingsStore.monthViewPaged,
+            hideMenuButton = settingsStore.hideMenuButton,
         )
     }
 
-    /** Re-read the device-local month-view mode (called when settings close). */
+    /** Re-read the device-local view prefs (called when settings close). */
     fun refreshMonthViewMode() {
-        _state.update { it.copy(monthViewPaged = settingsStore.monthViewPaged) }
+        _state.update { it.copy(
+            monthViewPaged = settingsStore.monthViewPaged,
+            hideMenuButton = settingsStore.hideMenuButton,
+        ) }
     }
+
+    // Device-local calendar order ("source:id"), mirrors the web cal_order.
+    val calendarOrder: List<String> get() = settingsStore.calendarOrder
+    fun setCalendarOrder(keys: List<String>) { settingsStore.calendarOrder = keys }
 
     /** Default duration (minutes) for a new event's end time. */
     val defaultEventDurationMinutes: Int get() = settingsStore.loadSettings().defaultEventDurationMinutes
