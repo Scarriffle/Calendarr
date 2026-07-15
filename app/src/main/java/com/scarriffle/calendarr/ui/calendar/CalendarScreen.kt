@@ -73,13 +73,14 @@ import com.scarriffle.calendarr.ui.event.EventDetailScreen
 import com.scarriffle.calendarr.ui.event.EventEditorSheet
 import com.scarriffle.calendarr.ui.groups.GroupIcon
 import com.scarriffle.calendarr.ui.groups.GroupsScreen
+import com.scarriffle.calendarr.ui.menu.MenuScreen
 import com.scarriffle.calendarr.ui.profile.ProfileScreen
 import com.scarriffle.calendarr.ui.settings.SettingsScreen
 import com.scarriffle.calendarr.ui.tr
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-private enum class Overlay { NONE, PROFILE, SETTINGS, ACCOUNTS, GROUPS }
+private enum class Overlay { NONE, MENU, PROFILE, SETTINGS, ACCOUNTS, GROUPS }
 
 data class EditorRequest(val existing: CalEvent?, val date: LocalDate, val prefill: CalEvent? = null)
 
@@ -198,7 +199,7 @@ fun CalendarScreen(
             CalendarDrawerContent(
                 state = state, vm = vm, username = username, serverUrl = serverUrl,
                 calendars = drawerCalendars,
-                onOpenMenu = { drawerScope.launch { drawerState.close() }; overlay = Overlay.SETTINGS },
+                onOpenMenu = { drawerScope.launch { drawerState.close() }; overlay = Overlay.MENU },
                 onSync = { drawerScope.launch { drawerState.close() }; vm.syncWithServer() },
                 onClose = { drawerScope.launch { drawerState.close() } },
             )
@@ -363,23 +364,30 @@ fun CalendarScreen(
     }
 
     when (overlay) {
-        Overlay.PROFILE -> ProfileScreen(onClose = { overlay = Overlay.NONE })
-        Overlay.SETTINGS -> SettingsScreen(
-            onClose = { overlay = Overlay.NONE; vm.refreshMonthViewMode() },
-            onSettingsChanged = onSettingsChanged,
-            onSettingsSynced = onSettingsSynced,
-            onOpenProfile = { overlay = Overlay.PROFILE },
-            onOpenAccounts = { overlay = Overlay.ACCOUNTS },
-            onOpenGroups = { overlay = Overlay.GROUPS },
+        Overlay.MENU -> MenuScreen(
+            username = username,
+            serverUrl = serverUrl,
+            onClose = { overlay = Overlay.NONE },
+            onProfile = { overlay = Overlay.PROFILE },
+            onAppearance = { overlay = Overlay.SETTINGS },
+            onAccounts = { overlay = Overlay.ACCOUNTS },
+            onGroups = { overlay = Overlay.GROUPS },
+            onSync = { overlay = Overlay.NONE; vm.syncWithServer() },
             onSwitchServer = onSwitchServer,
             onLogout = onLogout,
         )
+        Overlay.PROFILE -> ProfileScreen(onClose = { overlay = Overlay.MENU })
+        Overlay.SETTINGS -> SettingsScreen(
+            onClose = { overlay = Overlay.MENU; vm.refreshMonthViewMode() },
+            onSettingsChanged = onSettingsChanged,
+            onSettingsSynced = onSettingsSynced,
+        )
         Overlay.ACCOUNTS -> AccountsScreen(
-            onClose = { overlay = Overlay.NONE },
+            onClose = { overlay = Overlay.MENU },
             onChanged = { vm.loadWritableCalendars(); vm.syncWithServer() },
         )
         Overlay.GROUPS -> GroupsScreen(
-            onClose = { overlay = Overlay.NONE },
+            onClose = { overlay = Overlay.MENU },
             onChanged = { vm.loadGroups(); vm.loadWritableCalendars() },
             onOpenGroupView = { g -> overlay = Overlay.NONE; vm.switchGroup(g) },
         )

@@ -22,6 +22,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -68,11 +71,6 @@ fun SettingsScreen(
     onClose: () -> Unit,
     onSettingsChanged: (AppSettings) -> Unit,
     onSettingsSynced: () -> Unit,
-    onOpenProfile: () -> Unit = {},
-    onOpenAccounts: () -> Unit = {},
-    onOpenGroups: () -> Unit = {},
-    onSwitchServer: () -> Unit = {},
-    onLogout: () -> Unit = {},
     vm: SettingsViewModel = hiltViewModel(),
 ) {
     val initialSettings = LocalAppSettings.current
@@ -214,14 +212,6 @@ fun SettingsScreen(
                     Switch(checked = hideMenu, onCheckedChange = { hideMenu = it; vm.hideMenuButton = it })
                 }
                 Text(tr("settings.device.footer"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 44.dp, top = 6.dp))
-
-                Divider(Modifier.padding(vertical = 16.dp))
-                Section(tr("settings.more"))
-                NavRow(tr("menu.accounts"), onOpenAccounts)
-                NavRow(tr("groups.title"), onOpenGroups)
-                NavRow(tr("menu.profile"), onOpenProfile)
-                NavRow(tr("menu.server"), onSwitchServer)
-                NavRow(tr("menu.logout"), onLogout, destructive = true)
                 Spacer(Modifier.size(40.dp))
             }
         }
@@ -239,47 +229,39 @@ private fun Section(title: String) {
     Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
 }
 
-@Composable
-private fun NavRow(label: String, onClick: () -> Unit, destructive: Boolean = false) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
 
 /** Leading per-row sync toggle: highlighted = synced across devices. */
 @Composable
 private fun SyncIcon(on: Boolean, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+    IconButton(onClick = onClick, modifier = Modifier.size(32.dp)) {
         Icon(
             Icons.Filled.Refresh,
             contentDescription = tr("settings.sync_this"),
+            modifier = Modifier.size(18.dp),
             tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Compact dropdown trigger (a small outlined chip) — much shorter than a full
+// OutlinedTextField, so the settings rows aren't inflated.
 @Composable
 private fun Dropdown(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val selectedLabel = options.firstOrNull { it.first == selected }?.second ?: selected
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = Modifier.width(170.dp)) {
-        OutlinedTextField(
-            value = selectedLabel,
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+    Box {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                .clickable { expanded = true }
+                .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(selectedLabel, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { (key, label) ->
                 DropdownMenuItem(text = { Text(label) }, onClick = { onSelect(key); expanded = false })
             }
@@ -299,7 +281,7 @@ private fun SyncDropdownRow(
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         SyncIcon(synced, onToggleSync)
         Spacer(Modifier.size(8.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Dropdown(options, selected, onSelect)
     }
 }
@@ -313,7 +295,7 @@ private fun DeviceDropdownRow(
 ) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.size(44.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Dropdown(options, selected, onSelect)
     }
 }
@@ -323,7 +305,7 @@ private fun SyncSwitchRow(label: String, checked: Boolean, onChange: (Boolean) -
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         SyncIcon(synced, onToggleSync)
         Spacer(Modifier.size(8.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onChange)
     }
 }
@@ -341,7 +323,7 @@ private fun SyncColorRow(
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         SyncIcon(synced, onToggleSync)
         Spacer(Modifier.size(8.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(colorFromHex(current).toHex(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.size(12.dp))
         Box(
