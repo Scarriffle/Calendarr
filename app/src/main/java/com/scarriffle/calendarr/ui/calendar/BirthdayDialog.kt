@@ -40,6 +40,7 @@ fun BirthdayDialog(
     calendar: LocalCalendar?,
     onDismiss: () -> Unit,
     onActivate: () -> Unit,
+    onImportContacts: () -> Unit,
     onSave: (name: String, date: LocalDate, yearKnown: Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
@@ -70,6 +71,8 @@ fun BirthdayDialog(
                         selected = yearUnknown, onClick = { yearUnknown = !yearUnknown },
                         label = { Text(tr("birthday.year_unknown")) },
                     )
+                    Spacer(Modifier.size(4.dp))
+                    TextButton(onClick = onImportContacts) { Text(tr("birthday.import_contacts")) }
                 }
             }
         },

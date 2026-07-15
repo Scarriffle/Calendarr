@@ -130,6 +130,30 @@ fun CalendarScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Contacts birthday import (mirrors iOS): request permission on demand; sync
+    // this device's contact birthdays into the birthday calendar.
+    val deviceName = android.os.Build.MODEL ?: "Android"
+    fun runBirthdayImport() {
+        vm.birthdaysSyncEnabled = true
+        vm.syncContactBirthdays(com.scarriffle.calendarr.data.ContactsReader.readBirthdays(context), deviceName)
+    }
+    val contactsPermLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) runBirthdayImport() }
+    fun startBirthdayImport() {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.READ_CONTACTS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) runBirthdayImport() else contactsPermLauncher.launch(android.Manifest.permission.READ_CONTACTS)
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (vm.birthdaysSyncEnabled &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.READ_CONTACTS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) runBirthdayImport()
+    }
+
     var viewMenuOpen by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var detailEvent by remember { mutableStateOf<CalEvent?>(null) }
@@ -304,6 +328,7 @@ fun CalendarScreen(
             calendar = birthdayCal,
             onDismiss = { showBirthday = false },
             onActivate = { birthdayScope.launch { birthdayCal = vm.ensureBirthdayCalendar(birthdayCalName) } },
+            onImportContacts = { showBirthday = false; startBirthdayImport() },
             onSave = { name, date, yearKnown ->
                 birthdayCal?.let { vm.createBirthday(it.id, name, date, yearKnown) {} }
                 showBirthday = false

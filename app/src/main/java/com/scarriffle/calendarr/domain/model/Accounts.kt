@@ -101,6 +101,18 @@ data class UserProfile(
     @Json(name = "directory_hidden") val directoryHidden: Boolean = false,
 )
 
+/** One stored birthday (GET /api/local/calendars/{id}/birthdays). Contact-sourced
+ *  rows carry an external_uid ("contact:<deviceId>:<contactId>"); manual ones null. */
+@JsonClass(generateAdapter = false)
+data class BirthdayEntry(
+    val uid: String,
+    @Json(name = "external_uid") val externalUid: String? = null,
+    val title: String = "",
+    val month: Int? = null,
+    val day: Int? = null,
+    @Json(name = "birth_year") val birthYear: Int? = null,
+)
+
 /** A calendar the user can create events in (resolved from all writable sources). */
 data class WritableCalendar(
     val id: String,

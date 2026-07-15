@@ -222,6 +222,12 @@ interface CalendarrApi {
     @DELETE("api/local/events/{uid}")
     suspend fun deleteLocalEvent(@Path("uid") uid: String): Response<ResponseBody>
 
+    @GET("api/local/calendars/{id}/birthdays")
+    suspend fun getBirthdays(@Path("id") id: Int): List<com.scarriffle.calendarr.domain.model.BirthdayEntry>
+
+    @POST("api/birthdays/sync-report")
+    suspend fun reportBirthdaySync(@Body body: RequestBody): Response<ResponseBody>
+
     @POST("api/caldav/events")
     suspend fun createCalDAVEvent(@Body body: RequestBody): Response<ResponseBody>
 

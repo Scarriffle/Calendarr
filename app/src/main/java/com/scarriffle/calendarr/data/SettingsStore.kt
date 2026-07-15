@@ -164,6 +164,20 @@ class SettingsStore @Inject constructor(
         get() = prefs.getBoolean(K_HIDE_MENU, false)
         set(value) = prefs.edit().putBoolean(K_HIDE_MENU, value).apply()
 
+    /** Whether this device mirrors its Contacts birthdays into the birthday calendar. */
+    var birthdaysSyncEnabled: Boolean
+        get() = prefs.getBoolean(K_BDAY_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(K_BDAY_ENABLED, value).apply()
+
+    /** Stable per-install id used to scope this device's contact-birthday rows. */
+    val birthdaysDeviceId: String
+        get() {
+            prefs.getString(K_BDAY_DEVICE, null)?.let { return it }
+            val id = java.util.UUID.randomUUID().toString()
+            prefs.edit().putString(K_BDAY_DEVICE, id).apply()
+            return id
+        }
+
     // --- Hidden calendars ("source:id") ---
 
     var hiddenCalendarKeys: Set<String>
@@ -219,6 +233,8 @@ class SettingsStore @Inject constructor(
         const val K_CACHE_MONTHS = "cache_months"
         const val K_MONTH_PAGED = "month_view_paged"
         const val K_HIDE_MENU = "hide_menu_button"
+        const val K_BDAY_ENABLED = "birthdays_sync_enabled"
+        const val K_BDAY_DEVICE = "birthdays_device_id"
         const val K_HIDDEN = "hidden_calendar_keys"
         const val K_BANISHED = "banished_calendar_keys"
         const val K_REMINDER_DISABLED = "reminder_disabled_calendar_keys"

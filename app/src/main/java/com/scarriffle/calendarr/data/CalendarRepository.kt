@@ -355,9 +355,9 @@ class CalendarRepository @Inject constructor(
         calendarId: Int, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
         isPrivate: Boolean = false, reminders: List<Int>? = null,
-        rrule: String? = null, birthYear: Int? = null,
+        rrule: String? = null, birthYear: Int? = null, externalUid: String? = null,
     ) = guarded {
-        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate, reminders, rrule, birthYear))
+        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate, reminders, rrule, birthYear, externalUid))
             .ensureSuccess()
     }
 
@@ -365,8 +365,9 @@ class CalendarRepository @Inject constructor(
         uid: String, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
         isPrivate: Boolean = false, reminders: List<Int>? = null,
+        rrule: String? = null, birthYear: Int? = null, externalUid: String? = null,
     ) = guarded {
-        api.updateLocalEvent(uid, eventBody(null, title, start, end, isAllDay, location, description, color, isPrivate, reminders))
+        api.updateLocalEvent(uid, eventBody(null, title, start, end, isAllDay, location, description, color, isPrivate, reminders, rrule, birthYear, externalUid))
             .ensureSuccess()
     }
 
@@ -618,7 +619,7 @@ class CalendarRepository @Inject constructor(
         calendarId: Int?, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?,
         isPrivate: Boolean = false, reminders: List<Int>? = null,
-        rrule: String? = null, birthYear: Int? = null,
+        rrule: String? = null, birthYear: Int? = null, externalUid: String? = null,
     ) = jsonBody(
         buildMap {
             calendarId?.let { put("calendar_id", it) }
@@ -633,6 +634,17 @@ class CalendarRepository @Inject constructor(
             if (reminders != null) put("reminders", org.json.JSONArray(reminders))
             if (!rrule.isNullOrBlank()) put("rrule", rrule)
             if (birthYear != null) put("birth_year", birthYear)
+            if (!externalUid.isNullOrBlank()) put("external_uid", externalUid)
         }
     )
+
+    // ---- Birthdays (Contacts import) ----
+
+    suspend fun getBirthdayEntries(calendarId: Int): List<com.scarriffle.calendarr.domain.model.BirthdayEntry> =
+        guarded { api.getBirthdays(calendarId) }
+
+    suspend fun reportBirthdaySync(deviceId: String, deviceName: String, count: Int) = guarded {
+        api.reportBirthdaySync(jsonBody("device_id" to deviceId, "device_name" to deviceName, "count" to count))
+            .ensureSuccess()
+    }
 }

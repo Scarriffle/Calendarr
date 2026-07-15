@@ -145,6 +145,64 @@ class CalendarViewModel @Inject constructor(
     val calendarOrder: List<String> get() = settingsStore.calendarOrder
     fun setCalendarOrder(keys: List<String>) { settingsStore.calendarOrder = keys }
 
+    // ---- Contacts birthday import (mirrors the iOS BirthdaysImporter) ----
+
+    var birthdaysSyncEnabled: Boolean
+        get() = settingsStore.birthdaysSyncEnabled
+        set(value) { settingsStore.birthdaysSyncEnabled = value }
+
+    /** Mirror this device's contact birthdays into the (existing) birthday
+     *  calendar: reconcile rows scoped to this device's external_uid prefix
+     *  (add / update / delete), then report the device. No-op if disabled or
+     *  the birthday calendar hasn't been created. */
+    fun syncContactBirthdays(contacts: List<com.scarriffle.calendarr.data.ContactBirthday>, deviceName: String) {
+        if (!settingsStore.birthdaysSyncEnabled) return
+        viewModelScope.launch {
+            runCatching {
+                val cal = repository.getLocalCalendars().firstOrNull { it.isBirthday && it.owned }
+                    ?: return@runCatching
+                val existing = repository.getBirthdayEntries(cal.id)
+                val deviceId = settingsStore.birthdaysDeviceId
+                val prefix = "contact:$deviceId:"
+                val byExt = existing.filter { it.externalUid?.startsWith(prefix) == true }
+                    .associateBy { it.externalUid!! }
+                val seen = mutableSetOf<String>()
+                for (c in contacts) {
+                    val ext = prefix + c.contactId
+                    seen.add(ext)
+                    val (start, end) = birthdayRange(c.month, c.day, c.year)
+                    val match = byExt[ext]
+                    if (match != null) {
+                        val changed = match.title != c.name || match.month != c.month ||
+                            match.day != c.day || match.birthYear != c.year
+                        if (changed) repository.updateLocalEvent(
+                            uid = match.uid, title = c.name, start = start, end = end,
+                            isAllDay = true, location = "", description = "", color = null,
+                            rrule = "FREQ=YEARLY", birthYear = c.year, externalUid = ext,
+                        )
+                    } else {
+                        repository.createLocalEvent(
+                            calendarId = cal.id, title = c.name, start = start, end = end,
+                            isAllDay = true, location = "", description = "", color = null,
+                            rrule = "FREQ=YEARLY", birthYear = c.year, externalUid = ext,
+                        )
+                    }
+                }
+                byExt.filterKeys { it !in seen }.values.forEach { repository.deleteLocalEvent(it.uid) }
+                repository.reportBirthdaySync(deviceId, deviceName, contacts.size)
+            }
+            loadVisible(force = true)
+        }
+    }
+
+    private fun birthdayRange(month: Int, day: Int, year: Int?): Pair<Instant, Instant> {
+        val anchor = year ?: 2000 // leap-safe anchor for Feb 29 with unknown year
+        val date = LocalDate.of(anchor, month, day)
+        val start = date.atTime(12, 0).atZone(zone).toInstant()
+        val end = date.plusDays(1).atTime(12, 0).atZone(zone).toInstant()
+        return start to end
+    }
+
     /** Default duration (minutes) for a new event's end time. */
     val defaultEventDurationMinutes: Int get() = settingsStore.loadSettings().defaultEventDurationMinutes
 
