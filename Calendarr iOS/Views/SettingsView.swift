@@ -309,7 +309,13 @@ struct SettingsView: View {
             }
             HStack(spacing: 12) {
                 syncIcon("month_view_paged")
-                Toggle(L10n.t("settings.month_paged", appLang), isOn: $monthViewPaged).tint(Color.accentColor)
+                Text(L10n.t("settings.month_mode", appLang))
+                Spacer()
+                Picker("", selection: $monthViewPaged) {
+                    Text(L10n.t("settings.month_mode.scroll", appLang)).tag(false)
+                    Text(L10n.t("settings.month_mode.paged", appLang)).tag(true)
+                }
+                .pickerStyle(.menu).labelsHidden()
             }
             HStack(spacing: 12) {
                 syncIcon("hour_height")
