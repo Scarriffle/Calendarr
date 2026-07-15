@@ -33,12 +33,17 @@ struct CalendarFilterContent: View {
             } else {
                 List {
                     Section {
-                        Button(L10n.t("filter.show_all", appLang)) {
-                            hidden = []; store.setHiddenCalendars(hidden)
+                        HStack(spacing: 10) {
+                            Button(L10n.t("filter.show_all", appLang)) {
+                                hidden = []; store.setHiddenCalendars(hidden)
+                            }
+                            .buttonStyle(.bordered).frame(maxWidth: .infinity)
+                            Button(L10n.t("filter.hide_all", appLang)) {
+                                hidden = allKeys; store.setHiddenCalendars(hidden)
+                            }
+                            .buttonStyle(.bordered).frame(maxWidth: .infinity)
                         }
-                        Button(L10n.t("filter.hide_all", appLang)) {
-                            hidden = allKeys; store.setHiddenCalendars(hidden)
-                        }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                     }
                     let visibleLocals = localCalendars.filter {
                         !banished.contains(CalendarStore.calendarKey(source: "local", calendarId: "\($0.id)"))

@@ -34,7 +34,6 @@ struct CalendarHostView: View {
     @State private var groups: [CalGroup] = []
     @State private var showNewBirthday = false
     @State private var showDrawer = false
-    @State private var drawerDestination: DrawerDestination? = nil
 
     private var titleString: String {
         if store.viewType == .month {
@@ -63,8 +62,7 @@ struct CalendarHostView: View {
                 api: api, store: store, groups: groups,
                 onSwitchGroup: { g in closeDrawer(); switchGroup(g) },
                 onSelectView: { vt in store.viewType = vt; closeDrawer() },
-                onOpenDestination: { dest in closeDrawer(); drawerDestination = dest },
-                onSync: { closeDrawer(); Task { await syncFromServer(force: true) } },
+                onOpenMenu: { closeDrawer(); showMenu = true },
                 onClose: { closeDrawer() }
             )
             .frame(width: drawerWidth)
@@ -90,15 +88,6 @@ struct CalendarHostView: View {
                                 }
                             }
                     )
-            }
-        }
-        .sheet(item: $drawerDestination) { dest in
-            switch dest {
-            case .profile:  ProfileView(api: api)
-            case .settings: SettingsView(api: api)
-            case .accounts: AccountsView(api: api)
-            case .groups:   GroupsView(api: api)
-            case .server:   ServerView()
             }
         }
     }

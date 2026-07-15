@@ -1,21 +1,14 @@
 import SwiftUI
 
-/// Destinations the drawer can open (presented as sheets by the host).
-enum DrawerDestination: Int, Identifiable {
-    case profile, settings, accounts, groups, server
-    var id: Int { rawValue }
-}
-
-/// The left side drawer: central navigation + calendar visibility + group
-/// switching. Replaces the old menu popup and filter sheet.
+/// The left side drawer: calendar visibility + group/view switching, plus a
+/// single entry into the full menu (Settings/Accounts/Profile/…/Sync/Logout).
 struct CalendarDrawer: View {
     let api: CalendarrAPI
     let store: CalendarStore
     let groups: [CalGroup]
     let onSwitchGroup: (CalGroup?) -> Void
     let onSelectView: (CalViewType) -> Void
-    let onOpenDestination: (DrawerDestination) -> Void
-    let onSync: () -> Void
+    let onOpenMenu: () -> Void
     let onClose: () -> Void
 
     @Environment(AppState.self) private var appState
@@ -118,34 +111,20 @@ struct CalendarDrawer: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: – Nav footer (quick access)
+    // MARK: – Nav footer (single entry into the full menu)
 
     private var navFooter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                navButton(L10n.t("menu.appearance", appLang), "paintpalette") { onOpenDestination(.settings) }
-                navButton(L10n.t("menu.accounts", appLang), "tray.2") { onOpenDestination(.accounts) }
-                navButton(L10n.t("menu.profile", appLang), "person.circle") { onOpenDestination(.profile) }
-                navButton(L10n.t("groups.title", appLang), "person.2") { onOpenDestination(.groups) }
-                navButton(L10n.t("menu.server", appLang), "server.rack") { onOpenDestination(.server) }
-                navButton(L10n.t("menu.sync", appLang), "arrow.triangle.2.circlepath") { onSync() }
-                navButton(L10n.t("menu.logout", appLang), "rectangle.portrait.and.arrow.right", role: .destructive) {
-                    appState.logout()
-                }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-        }
-    }
-
-    private func navButton(_ label: String, _ systemImage: String, role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
-        Button(role: role, action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: systemImage).font(.system(size: 18))
-                Text(label).font(.caption2).lineLimit(1)
-            }
-            .frame(width: 64)
-            .foregroundStyle(role == .destructive ? Color.red : Color.accentColor)
+        Button { onOpenMenu() } label: {
+            Label(L10n.t("menu.section.settings", appLang), systemImage: "gearshape")
+                .font(.body.weight(.medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
         }
         .buttonStyle(.plain)
+        .foregroundStyle(Color.accentColor)
+        .padding(.horizontal, 16)
+        // Extra bottom inset so the button clears the home indicator and the
+        // screen's rounded corners.
+        .padding(.bottom, 20)
     }
 }
