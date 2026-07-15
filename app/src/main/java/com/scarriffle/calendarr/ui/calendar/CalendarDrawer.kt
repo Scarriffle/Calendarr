@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +41,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -148,31 +149,31 @@ private fun header(
     onClose: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().statusBarsPadding().padding(start = 18.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+        Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+            Modifier.size(38.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center,
         ) {
             Text(username.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
         }
-        Column(Modifier.weight(1f).padding(start = 14.dp)) {
-            Text(username, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(username, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
             Text(serverUrl.removePrefix("https://").removePrefix("http://"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        IconButton(onClick = onSync) {
-            Icon(Icons.Filled.Refresh, contentDescription = tr("menu.sync"), tint = MaterialTheme.colorScheme.primary)
+        IconButton(onClick = onSync, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Filled.Refresh, contentDescription = tr("menu.sync"), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
         }
-        IconButton(onClick = onOpenMenu) {
-            Icon(Icons.Filled.Settings, contentDescription = tr("menu.appearance"), tint = MaterialTheme.colorScheme.primary)
+        IconButton(onClick = onOpenMenu, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Filled.Settings, contentDescription = tr("menu.appearance"), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
         }
-        IconButton(onClick = onClose) {
-            Icon(Icons.Filled.Close, contentDescription = tr("common.close"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Filled.Close, contentDescription = tr("common.close"), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -181,7 +182,7 @@ private fun header(
 @Composable
 private fun viewSwitcher(current: CalViewType, onSelect: (CalViewType) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         CalViewType.entries.forEach { type ->
@@ -199,7 +200,7 @@ private fun viewSwitcher(current: CalViewType, onSelect: (CalViewType) -> Unit) 
 @Composable
 private fun groupSwitcher(groups: List<Group>, active: Group?, onSwitch: (Group?) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         FilterChip(
@@ -239,29 +240,41 @@ private fun CalendarRow(
                     onClick = { if (!sorting) onToggle(visible) },
                     onLongClick = { if (!sorting) menuOpen = true },
                 )
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(start = 16.dp, end = 4.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(14.dp).clip(CircleShape).background(colorFromHex(entry.color)))
+            Box(Modifier.size(12.dp).clip(CircleShape).background(colorFromHex(entry.color)))
             Text(
                 entry.name,
                 modifier = Modifier.weight(1f).padding(start = 12.dp),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
                 color = if (visible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (entry.readOnly) {
                 Icon(Icons.Filled.Lock, contentDescription = tr("filter.read_only"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 6.dp).size(15.dp))
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 4.dp).size(14.dp))
             }
             if (sorting) {
-                IconButton(onClick = onMoveUp) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = tr("filter.move_up")) }
-                IconButton(onClick = onMoveDown) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = tr("filter.move_down")) }
+                IconButton(onClick = onMoveUp, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = tr("filter.move_up"))
+                }
+                IconButton(onClick = onMoveDown, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = tr("filter.move_down"))
+                }
             } else {
                 if (reminderDisabled) {
                     Icon(Icons.Filled.NotificationsOff, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 6.dp).size(16.dp))
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 2.dp).size(15.dp))
                 }
-                Switch(checked = visible, onCheckedChange = onToggle)
+                IconButton(onClick = { onToggle(visible) }, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        if (visible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = if (visible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {

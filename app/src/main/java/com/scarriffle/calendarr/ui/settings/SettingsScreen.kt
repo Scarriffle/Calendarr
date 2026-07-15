@@ -68,6 +68,11 @@ fun SettingsScreen(
     onClose: () -> Unit,
     onSettingsChanged: (AppSettings) -> Unit,
     onSettingsSynced: () -> Unit,
+    onOpenProfile: () -> Unit = {},
+    onOpenAccounts: () -> Unit = {},
+    onOpenGroups: () -> Unit = {},
+    onSwitchServer: () -> Unit = {},
+    onLogout: () -> Unit = {},
     vm: SettingsViewModel = hiltViewModel(),
 ) {
     val initialSettings = LocalAppSettings.current
@@ -209,6 +214,14 @@ fun SettingsScreen(
                     Switch(checked = hideMenu, onCheckedChange = { hideMenu = it; vm.hideMenuButton = it })
                 }
                 Text(tr("settings.device.footer"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 44.dp, top = 6.dp))
+
+                Divider(Modifier.padding(vertical = 16.dp))
+                Section(tr("settings.more"))
+                NavRow(tr("menu.accounts"), onOpenAccounts)
+                NavRow(tr("groups.title"), onOpenGroups)
+                NavRow(tr("menu.profile"), onOpenProfile)
+                NavRow(tr("menu.server"), onSwitchServer)
+                NavRow(tr("menu.logout"), onLogout, destructive = true)
                 Spacer(Modifier.size(40.dp))
             }
         }
@@ -224,6 +237,20 @@ private fun reminderOptions(): List<Pair<String, String>> = listOf(
 @Composable
 private fun Section(title: String) {
     Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+}
+
+@Composable
+private fun NavRow(label: String, onClick: () -> Unit, destructive: Boolean = false) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
 /** Leading per-row sync toggle: highlighted = synced across devices. */

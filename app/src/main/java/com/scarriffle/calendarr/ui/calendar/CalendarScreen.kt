@@ -73,7 +73,6 @@ import com.scarriffle.calendarr.ui.event.EventDetailScreen
 import com.scarriffle.calendarr.ui.event.EventEditorSheet
 import com.scarriffle.calendarr.ui.groups.GroupIcon
 import com.scarriffle.calendarr.ui.groups.GroupsScreen
-import com.scarriffle.calendarr.ui.menu.MenuSheet
 import com.scarriffle.calendarr.ui.profile.ProfileScreen
 import com.scarriffle.calendarr.ui.settings.SettingsScreen
 import com.scarriffle.calendarr.ui.tr
@@ -155,7 +154,6 @@ fun CalendarScreen(
     }
 
     var viewMenuOpen by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
     var detailEvent by remember { mutableStateOf<CalEvent?>(null) }
     var editor by remember { mutableStateOf<EditorRequest?>(null) }
     var overlay by remember { mutableStateOf(Overlay.NONE) }
@@ -200,7 +198,7 @@ fun CalendarScreen(
             CalendarDrawerContent(
                 state = state, vm = vm, username = username, serverUrl = serverUrl,
                 calendars = drawerCalendars,
-                onOpenMenu = { drawerScope.launch { drawerState.close() }; showMenu = true },
+                onOpenMenu = { drawerScope.launch { drawerState.close() }; overlay = Overlay.SETTINGS },
                 onSync = { drawerScope.launch { drawerState.close() }; vm.syncWithServer() },
                 onClose = { drawerScope.launch { drawerState.close() } },
             )
@@ -293,23 +291,6 @@ fun CalendarScreen(
 
     // ---- Sheets ----
 
-    if (showMenu) {
-        MenuSheet(
-            isAdmin = false,
-            groups = state.groups,
-            activeGroup = state.activeGroup,
-            onSwitchGroup = { showMenu = false; vm.switchGroup(it) },
-            onDismiss = { showMenu = false },
-            onProfile = { showMenu = false; overlay = Overlay.PROFILE },
-            onAppearance = { showMenu = false; overlay = Overlay.SETTINGS },
-            onAccounts = { showMenu = false; overlay = Overlay.ACCOUNTS },
-            onGroups = { showMenu = false; overlay = Overlay.GROUPS },
-            onSync = { showMenu = false; vm.syncWithServer() },
-            onLogout = { showMenu = false; onLogout() },
-            onSwitchServer = { showMenu = false; onSwitchServer() },
-        )
-    }
-
     dayPreview?.let { date ->
         DayPreviewDialog(
             date = date,
@@ -387,6 +368,11 @@ fun CalendarScreen(
             onClose = { overlay = Overlay.NONE; vm.refreshMonthViewMode() },
             onSettingsChanged = onSettingsChanged,
             onSettingsSynced = onSettingsSynced,
+            onOpenProfile = { overlay = Overlay.PROFILE },
+            onOpenAccounts = { overlay = Overlay.ACCOUNTS },
+            onOpenGroups = { overlay = Overlay.GROUPS },
+            onSwitchServer = onSwitchServer,
+            onLogout = onLogout,
         )
         Overlay.ACCOUNTS -> AccountsScreen(
             onClose = { overlay = Overlay.NONE },
@@ -506,6 +492,8 @@ private fun CompactTopBar(
             Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Menu (hamburger) on the left — the drawer opens from the left.
+            if (showMenuButton) CompactIcon(Icons.Filled.Menu, onMenu, tr("nav.menu"))
             CompactIcon(Icons.Filled.ChevronLeft, onPrev)
             TextButton(onClick = onToday, contentPadding = PaddingValues(horizontal = 6.dp)) {
                 Text(tr("nav.today"), fontSize = 13.sp)
@@ -539,7 +527,6 @@ private fun CompactTopBar(
                     }
                 }
             }
-            if (showMenuButton) CompactIcon(Icons.Filled.Menu, onMenu, tr("nav.menu"))
         }
         Divider(
             thickness = 0.5.dp,
