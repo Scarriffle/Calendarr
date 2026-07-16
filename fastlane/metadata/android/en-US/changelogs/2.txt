@@ -1,0 +1,5 @@
+* Per-setting cross-device sync with a unified settings table
+* New left navigation drawer: show/hide & reorder calendars, group switch, quick menu
+* Import birthdays from your contacts
+* Fully dynamic theme colours (8 configurable colours with reset)
+* Fix: multi-day all-day events now span correctly in week/day view

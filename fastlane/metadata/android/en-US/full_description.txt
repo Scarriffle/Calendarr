@@ -1,0 +1,19 @@
+Calendarr is the Android client for your own self-hosted Calendarr server — a private, ad-free calendar whose data stays on your infrastructure.
+
+Bring together the sources you already use:
+* Local calendars on the server
+* CalDAV accounts
+* iCal / ICS subscriptions
+* Google Calendar
+* Home Assistant
+
+Features:
+* Month, week, day, quarter and agenda views
+* A left drawer to show/hide and reorder your calendars, switch groups, and reach the menu
+* Share calendars with other users and organise them in groups
+* Birthdays: a dedicated birthday calendar with age and reminders, optionally imported from your contacts
+* Per-setting cross-device sync — choose exactly which settings follow you across web, iOS and Android
+* Fully customisable colours and a dark interface
+* Event reminders / notifications
+
+Calendarr requires access to a Calendarr server (self-hosted). Enter your server URL, then sign in.
