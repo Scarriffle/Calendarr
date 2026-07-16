@@ -19,40 +19,51 @@ so it is F-Droid-eligible. Store-listing metadata lives in `fastlane/metadata/�
 
 ## A) Your own repo (fdroid.scarriffle.com)
 
-Needs the `fdroidserver` tool + Android SDK build-tools (for `aapt`).
+The repo is just static files (APKs + a signed index). Host + generate it on an
+always-on **Debian/Ubuntu LXC on Proxmox**, and keep the APK build/signing on the
+Mac (where the keystore lives).
+
+### One-time: set up the LXC
 
 ```bash
-# 1. Install the tool (macOS)
-brew install fdroidserver          # or: pipx install fdroidserver
+# Debian/Ubuntu LXC — fdroidserver + the Android build-tools it reads APKs with,
+# plus a webserver.
+apt update
+apt install -y fdroidserver android-sdk-build-tools default-jdk nginx
+# (if the distro has no android-sdk-build-tools pkg, install Android command-line
+#  tools and `sdkmanager "build-tools;34.0.0"`, then point $ANDROID_HOME at it)
 
-# 2. Build a SIGNED release APK (uses keystore.properties; F-Droid repos serve
-#    APKs, not AABs)
-./gradlew assembleRelease
-# → app/build/outputs/apk/release/app-release.apk
-
-# 3. Create the repo (once). Generates config.yml + an index-signing key.
-mkdir -p ~/calendarr-fdroid && cd ~/calendarr-fdroid
+# Create the repo once (generates config.yml + an index-signing key)
+mkdir -p /srv/fdroid && cd /srv/fdroid
 fdroid init
 
-# 4. Drop the signed APK in and copy the store metadata
-cp "/path/to/Calendarr Android/app/build/outputs/apk/release/app-release.apk" repo/
-mkdir -p metadata
-# copy the fastlane texts/icons so descriptions show in the client:
-cp -r "/path/to/Calendarr Android/fastlane/metadata/android" metadata/com.scarriffle.calendarr
+# Serve /srv/fdroid via nginx/caddy at https://fdroid.scarriffle.com/fdroid
+#   (document root = /srv/fdroid; TLS via your existing reverse proxy / certbot)
+```
 
-# 5. Generate/refresh the signed index
-fdroid update -c --pretty
+### Each release
 
-# 6. Upload the whole ~/calendarr-fdroid/repo directory to your webserver at:
-#    https://fdroid.scarriffle.com/fdroid/repo
+```bash
+# 1. On the MAC: build a SIGNED release APK (F-Droid repos serve APKs, not AABs)
+./gradlew assembleRelease            # → app/build/outputs/apk/release/app-release.apk
+
+# 2. Copy APK + store metadata to the LXC
+scp app/build/outputs/apk/release/app-release.apk  root@lxc:/srv/fdroid/repo/
+rsync -a "fastlane/metadata/android/"  root@lxc:/srv/fdroid/metadata/com.scarriffle.calendarr/
+
+# 3. On the LXC: regenerate the signed index
+cd /srv/fdroid && fdroid update -c --pretty
 ```
 
 Users then open F-Droid → Settings → Repositories → **+** →
 `https://fdroid.scarriffle.com/fdroid/repo` → Calendarr appears and auto-updates.
 
-**Each new release:** bump `versionCode`/`versionName` in `app/build.gradle.kts`,
-`./gradlew assembleRelease`, copy the new APK into `repo/`, `fdroid update -c`,
-re-upload. Keep the OLD apks in `repo/` too (users on older versions still update).
+Keep the OLD apks in `repo/` too (users on older versions still update). For each
+new version bump `versionCode`/`versionName` in `app/build.gradle.kts` first.
+
+*(Fully hands-off alternative: build on the LXC too — then copy the keystore +
+`keystore.properties` there and run `assembleRelease` in a checkout. The Mac
+split above avoids putting the signing key on the server.)*
 
 ---
 
