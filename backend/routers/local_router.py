@@ -82,7 +82,9 @@ def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
               request: Optional[Request] = None) -> dict:
     d = {
         "id": cal.id,
-        "name": cal.name,
+        # A shared calendar is labelled by the person/group it comes from — the
+        # owner's real calendar name must never reach recipients.
+        "name": shared_by if (not owned and shared_by is not None) else cal.name,
         # A recipient's own colour for a shared calendar wins over the owner's.
         "color": color_override or cal.color,
         "enabled": cal.enabled,
