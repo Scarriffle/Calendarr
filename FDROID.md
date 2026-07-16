@@ -26,20 +26,25 @@ Mac (where the keystore lives).
 ### One-time: set up the LXC
 
 ```bash
-# Debian/Ubuntu LXC — fdroidserver + the Android build-tools it reads APKs with,
-# plus a webserver.
+# Debian/Ubuntu LXC — fdroidserver + the Android build-tools it reads APKs with.
 apt update
-apt install -y fdroidserver android-sdk-build-tools default-jdk nginx
+apt install -y fdroidserver android-sdk-build-tools default-jdk
 # (if the distro has no android-sdk-build-tools pkg, install Android command-line
 #  tools and `sdkmanager "build-tools;34.0.0"`, then point $ANDROID_HOME at it)
 
 # Create the repo once (generates config.yml + an index-signing key)
 mkdir -p /srv/fdroid && cd /srv/fdroid
 fdroid init
-
-# Serve /srv/fdroid via nginx/caddy at https://fdroid.scarriffle.com/fdroid
-#   (document root = /srv/fdroid; TLS via your existing reverse proxy / certbot)
 ```
+
+**Serving:** you already run a reverse proxy, so it terminates TLS for
+`fdroid.scarriffle.com`. Either point the reverse proxy straight at the
+`/srv/fdroid` directory (no webserver on the LXC needed — just `fdroidserver` to
+generate), or run a tiny static server on the LXC over plain HTTP and forward to
+it, e.g. `darkhttpd /srv/fdroid --port 8080` (or `caddy file-server` /
+`python3 -m http.server`). Only requirement: the public URL is reachable over
+**HTTPS** (the reverse proxy does that); it's plain static file serving, no
+directory listing needed.
 
 ### Each release
 
