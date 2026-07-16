@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 private val GUTTER = 48.dp
+
+/** An all-day event laid out as a bar spanning columns [start]..[end] in lane [lane]. */
+private data class AllDayBar(val ev: CalEvent, val start: Int, val end: Int, val lane: Int)
 
 @Composable
 fun TimeGridView(
@@ -76,16 +80,48 @@ fun TimeGridView(
             }
         }
 
-        // All-day row
-        val allDay = days.map { d -> d to vm.eventsOn(d, state.events).filter { it.isAllDay } }
-        if (allDay.any { it.second.isNotEmpty() }) {
-            Row(Modifier.fillMaxWidth().padding(bottom = 2.dp)) {
-                Box(Modifier.width(GUTTER), contentAlignment = Alignment.Center) {
-                    Text(com.scarriffle.calendarr.ui.tr("cal.allday"), fontSize = 8.sp, color = MaterialTheme.colorScheme.outline)
+        // All-day row: continuous bars spanning an event's start→end columns and
+        // packed into lanes, instead of repeating a multi-day event once per day.
+        val perDay = days.map { d -> vm.eventsOn(d, state.events).filter { it.isAllDay } }
+        if (perDay.any { it.isNotEmpty() }) {
+            // event id -> [minCol, maxCol] within this week
+            val range = LinkedHashMap<String, IntArray>()
+            val evById = HashMap<String, CalEvent>()
+            perDay.forEachIndexed { i, evs ->
+                evs.forEach { ev ->
+                    evById[ev.id] = ev
+                    val r = range[ev.id]
+                    if (r == null) range[ev.id] = intArrayOf(i, i) else r[1] = i
                 }
-                allDay.forEach { (_, evs) ->
-                    Column(Modifier.weight(1f).padding(horizontal = 1.dp)) {
-                        evs.forEach { ev -> AllDayChip(ev, dimmed = dimPast && ev.endDate.isBefore(now), onClick = { onEventClick(ev) }) }
+            }
+            // earlier / longer first, then greedily pack into lanes
+            val spans = range.entries
+                .map { Triple(evById.getValue(it.key), it.value[0], it.value[1]) }
+                .sortedWith(compareBy({ it.second }, { -(it.third - it.second) }))
+            val laneEnd = ArrayList<Int>()
+            val bars = ArrayList<AllDayBar>()
+            for ((ev, s, e) in spans) {
+                var lane = 0
+                while (lane < laneEnd.size && laneEnd[lane] >= s) lane++
+                if (lane == laneEnd.size) laneEnd.add(e) else laneEnd[lane] = e
+                bars.add(AllDayBar(ev, s, e, lane))
+            }
+            val laneCount = (bars.maxOfOrNull { it.lane } ?: -1) + 1
+            Column(Modifier.fillMaxWidth().padding(bottom = 2.dp)) {
+                for (lane in 0 until laneCount) {
+                    Row(Modifier.fillMaxWidth()) {
+                        Box(Modifier.width(GUTTER), contentAlignment = Alignment.Center) {
+                            if (lane == 0) Text(com.scarriffle.calendarr.ui.tr("cal.allday"), fontSize = 8.sp, color = MaterialTheme.colorScheme.outline)
+                        }
+                        var col = 0
+                        bars.filter { it.lane == lane }.sortedBy { it.start }.forEach { bar ->
+                            if (bar.start > col) { Spacer(Modifier.weight((bar.start - col).toFloat())); col = bar.start }
+                            Box(Modifier.weight((bar.end - bar.start + 1).toFloat()).padding(horizontal = 1.dp)) {
+                                AllDayChip(bar.ev, dimmed = dimPast && bar.ev.endDate.isBefore(now), onClick = { onEventClick(bar.ev) })
+                            }
+                            col = bar.end + 1
+                        }
+                        if (col < days.size) Spacer(Modifier.weight((days.size - col).toFloat()))
                     }
                 }
             }
