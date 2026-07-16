@@ -72,37 +72,66 @@ struct WeekView: View {
 
     // MARK: – All-day strip
 
+    private let allDayLaneHeight: CGFloat = 16
+
+    /// All-day / multi-day events laid out as continuous bars: each event spans
+    /// its start→end columns (clamped to this week) and is packed into lanes so
+    /// overlapping bars stack — mirrors the month view instead of repeating the
+    /// event once per day.
+    private func allDayBars() -> [(ev: CalEvent, start: Int, end: Int, lane: Int)] {
+        var spans: [(ev: CalEvent, start: Int, end: Int)] = []
+        for ev in allDayEvents {
+            var start: Int? = nil
+            var end = 0
+            for (i, day) in weekDays.enumerated() {
+                let ds = cal.startOfDay(for: day)
+                let de = cal.date(byAdding: .day, value: 1, to: ds)!
+                if ev.startDate < de && ev.endDate > ds {
+                    if start == nil { start = i }
+                    end = i
+                }
+            }
+            if let s = start { spans.append((ev, s, end)) }
+        }
+        // Longer / earlier bars first, then greedily pack into lanes.
+        spans.sort { a, b in a.start != b.start ? a.start < b.start : (a.end - a.start) > (b.end - b.start) }
+        var laneEnd: [Int] = []   // last occupied column index per lane
+        var out: [(ev: CalEvent, start: Int, end: Int, lane: Int)] = []
+        for s in spans {
+            var lane = 0
+            while lane < laneEnd.count && laneEnd[lane] >= s.start { lane += 1 }
+            if lane == laneEnd.count { laneEnd.append(s.end) } else { laneEnd[lane] = s.end }
+            out.append((s.ev, s.start, s.end, lane))
+        }
+        return out
+    }
+
     private var allDayRow: some View {
-        HStack(spacing: 0) {
-            Spacer().frame(width: timeColumnWidth)
-            ForEach(weekDays, id: \.self) { day in
-                let dayEvs = allDayEvents.filter { ev in
-                    let ds = cal.startOfDay(for: day)
-                    let de = cal.date(byAdding: .day, value: 1, to: ds)!
-                    return ev.startDate < de && ev.endDate > ds
-                }
-                VStack(spacing: 1) {
-                    ForEach(dayEvs.prefix(2)) { ev in
-                        Button { onEventTap(ev) } label: {
-                            EventLabel(event: ev)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 2)
-                                .background(Color(hex: ev.effectiveColor))
-                                .clipShape(RoundedRectangle(cornerRadius: 2))
-                        }
-                        .buttonStyle(.plain)
+        let bars = allDayBars()
+        let laneCount = max(1, (bars.map { $0.lane }.max() ?? -1) + 1)
+        return GeometryReader { geo in
+            let colW = (geo.size.width - timeColumnWidth) / 7
+            ZStack(alignment: .topLeading) {
+                ForEach(bars, id: \.ev.id) { bar in
+                    Button { onEventTap(bar.ev) } label: {
+                        EventLabel(event: bar.ev)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 3)
+                            .frame(height: allDayLaneHeight - 2)
+                            .background(Color(hex: bar.ev.effectiveColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 2))
                     }
-                }
-                .padding(.horizontal, 1)
-                .frame(maxWidth: .infinity)
-                .overlay(alignment: .trailing) {
-                    Rectangle().fill(Color(hex: lineHex).opacity(gridLineOpacity(lineContrast))).frame(width: 0.5)
+                    .buttonStyle(.plain)
+                    .frame(width: colW * CGFloat(bar.end - bar.start + 1) - 3)
+                    .offset(x: timeColumnWidth + colW * CGFloat(bar.start) + 1.5,
+                            y: CGFloat(bar.lane) * allDayLaneHeight)
                 }
             }
         }
+        .frame(height: CGFloat(laneCount) * allDayLaneHeight)
         .padding(.vertical, 4)
         .overlay(alignment: .bottom) { Divider() }
     }
