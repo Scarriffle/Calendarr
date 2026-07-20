@@ -16,6 +16,16 @@ export const DEFAULT_COLORS = {
   surface_color:       '#1A1A1A',
   month_divider_color: '#7090C0',
   month_label_color:   '#7090C0',
+  // Fine-grained element colours. Defaults equal the previously-derived look
+  // (see THEME.md). day_selected/today_bg are applied as a subtle tint of the
+  // chosen colour; the rest are applied solid.
+  hover_highlight_color: '#2A2A38',
+  icon_inactive_color:   '#9090AA',
+  icon_active_color:     '#E8E8F0',
+  day_hover_color:       '#2A2A38',
+  day_selected_color:    '#4285F4',
+  day_bg_color:          '#000000',
+  today_bg_color:        '#4285F4',
 };
 
 // The syncable settings the web client exposes, grouped into table sections.
@@ -68,6 +78,13 @@ export const SETTING_GROUPS = [
       { key: 'line_color',          labelKey: 'settings_line_color',          type: 'color' },
       { key: 'month_divider_color', labelKey: 'settings_month_divider_color', type: 'color' },
       { key: 'month_label_color',   labelKey: 'settings_month_label_color',   type: 'color' },
+      { key: 'hover_highlight_color', labelKey: 'settings_hover_highlight_color', type: 'color' },
+      { key: 'icon_inactive_color',   labelKey: 'settings_icon_inactive_color',   type: 'color' },
+      { key: 'icon_active_color',     labelKey: 'settings_icon_active_color',     type: 'color' },
+      { key: 'day_hover_color',       labelKey: 'settings_day_hover_color',       type: 'color' },
+      { key: 'day_selected_color',    labelKey: 'settings_day_selected_color',    type: 'color' },
+      { key: 'day_bg_color',          labelKey: 'settings_day_bg_color',          type: 'color' },
+      { key: 'today_bg_color',        labelKey: 'settings_today_bg_color',        type: 'color' },
     ],
   },
 ];

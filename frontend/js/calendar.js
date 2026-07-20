@@ -1,5 +1,5 @@
 ﻿import { api } from './api.js';
-import { applyTheme, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart, renderDescriptionHtml } from './utils.js';
+import { applyTheme, applyFavicon, isToday, isSameDay, toLocalDatetimeInput, toDateInput, dateKey, dayOfWeek, weekStart, renderDescriptionHtml } from './utils.js';
 import { renderMonth }  from './views/month.js';
 import { renderWeek }   from './views/week.js';
 import { renderAgenda } from './views/agenda.js';
@@ -151,6 +151,7 @@ export async function initCalendar() {
 
   setLang(settings.language || 'de');
   applyTheme(settings);
+  applyFavicon(settings.primary_color);
   updateViewButtons();
   renderCalendarList();
   renderMiniCal();
@@ -775,7 +776,7 @@ function renderCalendarList() {
     });
   });
   const groupVisibleId = state.settings && state.settings.group_visible_calendar_id;
-  state.localCalendars.filter(c => c.owned !== false && !c.group).forEach(cal => {
+  state.localCalendars.filter(c => c.owned !== false && !c.group && !c.sidebar_hidden).forEach(cal => {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.name, color: cal.color, enabled: cal.enabled,
       reminders: true, remindersEnabled: cal.reminders_enabled !== false,
@@ -802,7 +803,7 @@ function renderCalendarList() {
       sourceLabel: `${t('groups_title')} · ${cal.shared_by || ''}`,
       isGroupCal: true, groupIcon: groupIconForLocalCal(cal.id), remove: null });
   });
-  state.icalSubscriptions.forEach(sub => {
+  state.icalSubscriptions.filter(s => !s.sidebar_hidden).forEach(sub => {
     entries.push({ key: `ical:${sub.id}`, source: 'ical', dataId: `data-sub-id="${sub.id}"`,
       name: sub.name, color: sub.color, enabled: sub.enabled,
       reminders: true, remindersEnabled: sub.reminders_enabled !== false,
@@ -1095,13 +1096,13 @@ function renderCalendarList() {
         }
         cacheCalId = calId;
       } else if (source === 'local') {
-        if (!confirm(t('confirm_delete_local_cal'))) return;
+        if (!await confirmModal(t('confirm_delete_local_cal'), { title: t('confirm_delete_cal_title'), okLabel: t('delete') })) return;
         const calId = parseInt(btn.dataset.calId);
         await api.delete(`/local/calendars/${calId}`);
         state.localCalendars = state.localCalendars.filter(c => c.id !== calId);
         cacheCalId = `local-${calId}`;
       } else if (source === 'ical') {
-        if (!confirm(t('confirm_remove_ical'))) return;
+        if (!await confirmModal(t('confirm_remove_ical'), { title: t('confirm_remove_ical_title'), okLabel: t('delete') })) return;
         const subId = parseInt(btn.dataset.subId);
         await api.delete(`/ical/subscriptions/${subId}`);
         state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== subId);
@@ -1486,6 +1487,30 @@ function showDeleteConfirm(ev) {
 
     modal.querySelectorAll('[data-modal="modal-delete-confirm"]').forEach(b => {
       b.onclick = () => { cleanup(); closeModal('modal-delete-confirm'); resolve(null); };
+    });
+  });
+}
+
+// Styled yes/no dialog — a drop-in replacement for window.confirm().
+// Returns a Promise<boolean>. `danger` (default true) shows a red confirm button.
+function confirmModal(message, { title, okLabel, danger = true } = {}) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('modal-confirm');
+    document.getElementById('confirm-title').textContent = title || t('confirm_generic_title');
+    document.getElementById('confirm-text').textContent = message || '';
+    const okBtn = document.getElementById('confirm-ok');
+    okBtn.textContent = okLabel || t('confirm');
+    okBtn.classList.toggle('btn-danger', danger);
+    okBtn.classList.toggle('btn-primary', !danger);
+    openModal('modal-confirm');
+
+    const cleanup = () => {
+      okBtn.onclick = null;
+      modal.querySelectorAll('[data-modal="modal-confirm"]').forEach(b => b.onclick = null);
+    };
+    okBtn.onclick = () => { cleanup(); closeModal('modal-confirm'); resolve(true); };
+    modal.querySelectorAll('[data-modal="modal-confirm"]').forEach(b => {
+      b.onclick = () => { cleanup(); closeModal('modal-confirm'); resolve(false); };
     });
   });
 }
@@ -3511,6 +3536,114 @@ function toggleSyncAll() {
   updateSyncAllToggle();
 }
 
+// Human-facing docs describing every theme parameter (linked from export files).
+const THEME_DOCS_URL = 'https://git.scarriffle.com/Scarriffle/Calendarr/src/branch/beta/THEME.md';
+
+// Keys that are colours (validated on import).
+function colorSettingKeys() {
+  const out = new Set();
+  SETTING_GROUPS.forEach(g => g.rows.forEach(r => { if (r.type === 'color') out.add(r.key); }));
+  return out;
+}
+
+// Export the current appearance (colours + display settings) as a .theme file
+// named after the local date+time, with a link to the parameter docs.
+function exportTheme() {
+  const now = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}_${p(now.getHours())}-${p(now.getMinutes())}`;
+  const payload = {
+    _format: 'calendarr-theme',
+    _version: 1,
+    _docs: THEME_DOCS_URL,
+    exported_at: now.toISOString(),
+    settings: readAppearanceTable(),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${stamp}.theme`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Read a chosen .theme file locally and apply its values. A theme may be
+// partial (only some parameters) — only the keys present are written; omitted
+// keys are left untouched (the server accepts partial updates). If the file
+// contains parameters this version doesn't know, the user is asked whether to
+// import the rest anyway.
+async function importThemeFile(input) {
+  const file = input.files && input.files[0];
+  input.value = '';               // allow re-importing the same file later
+  if (!file) return;
+
+  let incoming;
+  try {
+    const data = JSON.parse(await file.text());
+    incoming = (data && typeof data === 'object' && data.settings && typeof data.settings === 'object')
+      ? data.settings : data;
+    if (!incoming || typeof incoming !== 'object') throw new Error('bad');
+  } catch (e) {
+    showToast(t('theme_import_invalid'), true);
+    return;
+  }
+
+  const known = new Set(SYNCABLE_KEYS);
+  const unknownKeys = Object.keys(incoming).filter(k => !known.has(k));
+  if (unknownKeys.length) {
+    const ok = await confirmModal(
+      t('theme_unknown_params', { count: unknownKeys.length, names: unknownKeys.join(', ') }),
+      { title: t('theme_unknown_title'), okLabel: t('theme_import_rest'), danger: false }
+    );
+    if (!ok) return;              // user declined → import nothing
+  }
+
+  // Collect the known, valid parameters to apply.
+  const colorKeys = colorSettingKeys();
+  const toApply = {};
+  for (const key of SYNCABLE_KEYS) {
+    if (!(key in incoming)) continue;
+    let val = incoming[key];
+    if (colorKeys.has(key)) {
+      const norm = normalizeHex(val, null);
+      if (!norm) continue;         // skip invalid colour values
+      val = norm;
+    }
+    toApply[key] = val;
+  }
+  const applied = Object.keys(toApply);
+  if (!applied.length) { showToast(t('theme_import_invalid'), true); return; }
+
+  // Persist ONLY the present keys (partial). Keys whose sync flag is on are sent
+  // to the server; the rest just update this browser's local copy.
+  const local = loadLocal();
+  const serverPayload = {};
+  for (const key of applied) {
+    state.settings[key] = toApply[key];
+    local[key] = toApply[key];
+    if (state.syncFlags[key]) serverPayload[key] = toApply[key];
+  }
+  saveLocal(local);
+  try {
+    if (Object.keys(serverPayload).length) await api.put('/settings/', serverPayload);
+    state.serverSettings = { ...state.serverSettings, ...serverPayload };
+    state.settings = mergeEffective(state.serverSettings, state.syncFlags, loadLocal());
+    renderSettingsTable();
+    applyTheme(state.settings);
+    applyFavicon(state.settings.primary_color);
+    setLang(state.settings.language);
+    renderCalendarList();
+    renderMiniCal();
+    fetchAndRender();
+    showToast(t('theme_imported_saved', { count: applied.length }));
+  } catch (e) {
+    showToast(e.message, true);
+  }
+}
+
 // Save profile identity fields (name/login/email/hidden) — server rotates the
 // JWT if the login name changed.
 async function saveProfileFields() {
@@ -3572,7 +3705,7 @@ function renderGoogleAccounts() {
   });
   list.querySelectorAll('[data-disconnect-acc]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm(t('confirm_google_disconnect'))) return;
+      if (!await confirmModal(t('confirm_google_disconnect'), { title: t('disconnect'), okLabel: t('disconnect') })) return;
       try {
         await api.delete(`/google/accounts/${btn.dataset.disconnectAcc}`);
         state.googleAccounts = state.googleAccounts.filter(a => a.id !== parseInt(btn.dataset.disconnectAcc));
@@ -3617,7 +3750,7 @@ function renderAllAccounts() {
       });
       caldavList.querySelectorAll('[data-caldav-disconnect]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          if (!confirm(t('confirm_caldav_disconnect'))) return;
+          if (!await confirmModal(t('confirm_caldav_disconnect'), { title: t('disconnect'), okLabel: t('disconnect') })) return;
           try {
             await api.delete(`/caldav/accounts/${btn.dataset.caldavDisconnect}`);
             state.accounts = state.accounts.filter(a => a.id !== parseInt(btn.dataset.caldavDisconnect));
@@ -3691,7 +3824,7 @@ function renderAllAccounts() {
       ).join('');
       icalList.querySelectorAll('[data-ical-delete]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          if (!confirm(t('confirm_remove_ical'))) return;
+          if (!await confirmModal(t('confirm_remove_ical'), { title: t('confirm_remove_ical_title'), okLabel: t('delete') })) return;
           try {
             await api.delete(`/ical/subscriptions/${btn.dataset.icalDelete}`);
             state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== parseInt(btn.dataset.icalDelete));
@@ -3735,7 +3868,7 @@ function renderAllAccounts() {
       });
       haList.querySelectorAll('[data-ha-disconnect]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          if (!confirm('Home Assistant Konto wirklich trennen?')) return;
+          if (!await confirmModal(t('confirm_ha_disconnect'), { title: t('disconnect'), okLabel: t('disconnect') })) return;
           try {
             await api.delete(`/homeassistant/accounts/${btn.dataset.haDisconnect}`);
             state.haAccounts = state.haAccounts.filter(a => a.id !== parseInt(btn.dataset.haDisconnect));
@@ -3951,7 +4084,7 @@ function renderCalendarTable() {
     rows += `<tr>
       <td>${dot(cal.color, '#34a853')}${escHtml(cal.name)}</td>
       <td class="ct-src">Lokal</td>
-      <td>—</td>
+      <td>${hid('local', cal.id, !cal.sidebar_hidden)}</td>
       <td>${rem('local', cal.id, cal.reminders_enabled !== false)}</td>
       <td>
         <button class="btn btn-ghost btn-sm" data-ct-share="${cal.id}">${t('share')}</button>
@@ -4095,9 +4228,13 @@ function renderCalendarTable() {
       const hidden = btn.dataset.ctVisible === '1'; // currently visible → we're hiding it
       try {
         if (src === 'ical') {
-          await api.put(`/ical/subscriptions/${id}`, { sidebar_hidden: hidden });
+          await api.put(`/ical/subscriptions/${id}`, { enabled: !hidden, sidebar_hidden: hidden });
           const s = state.icalSubscriptions.find(s => s.id === id);
-          if (s) s.sidebar_hidden = hidden;
+          if (s) { s.sidebar_hidden = hidden; s.enabled = !hidden; }
+        } else if (src === 'local') {
+          await api.put(`/local/calendars/${id}`, { enabled: !hidden, sidebar_hidden: hidden });
+          const c = state.localCalendars.find(c => c.id === id);
+          if (c) { c.sidebar_hidden = hidden; c.enabled = !hidden; }
         } else if (src === 'caldav') {
           await api.put(`/caldav/calendars/${id}`, { enabled: !hidden, sidebar_hidden: hidden });
           for (const acc of state.accounts) { const c = acc.calendars.find(c => c.id === id); if (c) { c.sidebar_hidden = hidden; c.enabled = !hidden; } }
@@ -4164,8 +4301,8 @@ function renderCalendarTable() {
       const src = btn.dataset.ctDisc, id = parseInt(btn.dataset.ctId);
       const msg = src === 'caldav' ? t('confirm_caldav_disconnect')
                 : src === 'google' ? t('confirm_google_disconnect')
-                : 'Konto wirklich trennen?';
-      if (!confirm(msg)) return;
+                : t('confirm_ha_disconnect');
+      if (!await confirmModal(msg, { title: t('disconnect'), okLabel: t('disconnect') })) return;
       try {
         if (src === 'caldav') {
           await api.delete(`/caldav/accounts/${id}`);
@@ -4240,7 +4377,8 @@ function renderCalendarTable() {
     btn.addEventListener('click', async () => {
       const src = btn.dataset.ctDel, id = parseInt(btn.dataset.ctId);
       const msg = src === 'local' ? t('confirm_delete_local_cal') : t('confirm_remove_ical');
-      if (!confirm(msg)) return;
+      const title = src === 'local' ? t('confirm_delete_cal_title') : t('confirm_remove_ical_title');
+      if (!await confirmModal(msg, { title, okLabel: t('delete') })) return;
       try {
         if (src === 'local') {
           await api.delete(`/local/calendars/${id}`);
@@ -4303,6 +4441,16 @@ function bindSettingsModal() {
   const syncAllBtn = document.getElementById('cfg-sync-all');
   if (syncAllBtn) syncAllBtn.addEventListener('click', toggleSyncAll);
 
+  // Theme export / import (client-side .theme files).
+  const themeExportBtn = document.getElementById('cfg-theme-export');
+  if (themeExportBtn) themeExportBtn.addEventListener('click', exportTheme);
+  const themeImportBtn = document.getElementById('cfg-theme-import');
+  const themeFileInput = document.getElementById('cfg-theme-file');
+  if (themeImportBtn && themeFileInput) {
+    themeImportBtn.addEventListener('click', () => themeFileInput.click());
+    themeFileInput.addEventListener('change', () => importThemeFile(themeFileInput));
+  }
+
   // Panel navigation
   document.querySelectorAll('.settings-nav-btn').forEach(btn => {
     btn.addEventListener('click', () => activateSettingsPanel(btn.dataset.panel));
@@ -4357,6 +4505,7 @@ function bindSettingsModal() {
       weekStartDay  = state.settings.week_start_day;
       setLang(appearance.language);
       applyTheme(state.settings);
+      applyFavicon(state.settings.primary_color);
       showToast(t('settings_saved'));
       closeModal('modal-settings');
       renderCalendarList();

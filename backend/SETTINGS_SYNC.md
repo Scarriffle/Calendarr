@@ -1,5 +1,8 @@
 # Settings sync contract (Web / iOS / Android)
 
+> For a human-facing description of each theme colour parameter (and the
+> `.theme` import/export format), see [../THEME.md](../THEME.md).
+
 Per-setting, cross-device synchronisation of user settings. The **server is the
 sole authority** for *which* settings sync; clients must not duplicate that logic.
 This document is the shared contract all three clients implement identically.

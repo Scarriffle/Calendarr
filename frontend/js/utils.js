@@ -147,6 +147,43 @@ export function applyTheme(settings) {
 
   root.style.setProperty('--month-divider-color', settings.month_divider_color || DEFAULT_COLORS.month_divider_color);
   root.style.setProperty('--month-label-color',   settings.month_label_color   || DEFAULT_COLORS.month_label_color);
+
+  // Fine-grained element colours. Each is applied ONLY when the user set an
+  // explicit value; otherwise the :root default (which references a derived
+  // variable) stays in effect, so the look is unchanged until customised.
+  // day_selected_color / today_bg_color feed a *-base variable that CSS turns
+  // into a subtle tint via color-mix; the rest are applied as-is.
+  const setIf = (varName, value) => { if (value) root.style.setProperty(varName, value); };
+  setIf('--hover-highlight',      settings.hover_highlight_color);
+  setIf('--icon-inactive-color',  settings.icon_inactive_color);
+  setIf('--icon-active-color',    settings.icon_active_color);
+  setIf('--day-hover-color',      settings.day_hover_color);
+  setIf('--day-selected-base',   settings.day_selected_color);
+  setIf('--day-bg',              settings.day_bg_color);
+  setIf('--today-bg-base',       settings.today_bg_color);
+}
+
+// Tint the favicon (and browser theme-colour) to the current primary colour so
+// the tab icon reflects the user's theme. Called at load and after saving —
+// NOT on every live keystroke. Reuses the calendar glyph from favicon.svg.
+export function applyFavicon(primaryColor) {
+  const color = primaryColor || DEFAULT_COLORS.primary_color;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`
+    + '<rect x="3" y="4" width="18" height="18" rx="2"/>'
+    + '<line x1="16" y1="2" x2="16" y2="6"/>'
+    + '<line x1="8" y1="2" x2="8" y2="6"/>'
+    + '<line x1="3" y1="10" x2="21" y2="10"/></svg>';
+  const href = 'data:image/svg+xml;base64,' + btoa(svg);
+  let link = document.querySelector('link[rel="icon"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  link.type = 'image/svg+xml';
+  link.href = href;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', color);
 }
 
 function luminance(hex) {

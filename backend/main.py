@@ -240,6 +240,29 @@ def _migrate():
             except Exception:
                 pass
 
+        # Fine-grained web element theme colours (all optional overrides).
+        for col in (
+            "hover_highlight_color", "icon_inactive_color", "icon_active_color",
+            "day_hover_color", "day_selected_color",
+            "day_bg_color", "today_bg_color",
+        ):
+            try:
+                conn.execute(text(f"ALTER TABLE user_settings ADD COLUMN {col} VARCHAR(7)"))
+                conn.commit()
+                logging.info("Migration: added %s to user_settings", col)
+            except Exception:
+                pass
+
+        # Allow hiding local (incl. birthday) calendars and iCal subscriptions
+        # from the sidebar, matching caldav/google/ha.
+        for tbl in ("local_calendars", "ical_subscriptions"):
+            try:
+                conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN sidebar_hidden BOOLEAN DEFAULT 0"))
+                conn.commit()
+                logging.info("Migration: added sidebar_hidden to %s", tbl)
+            except Exception:
+                pass
+
         # CalDAV publishing of local calendars (opt-in, secret token URL).
         for col, ddl in (
             ("caldav_published", "ALTER TABLE local_calendars ADD COLUMN caldav_published BOOLEAN DEFAULT 0"),

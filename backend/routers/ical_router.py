@@ -31,6 +31,7 @@ class SubscriptionUpdate(BaseModel):
     url: Optional[str] = None
     color: Optional[str] = None
     enabled: Optional[bool] = None
+    sidebar_hidden: Optional[bool] = None
     refresh_minutes: Optional[int] = None
     reminders_enabled: Optional[bool] = None
 
@@ -42,6 +43,7 @@ def _sub_dict(sub: models.ICalSubscription) -> dict:
         "url": sub.url,
         "color": sub.color,
         "enabled": sub.enabled,
+        "sidebar_hidden": bool(sub.sidebar_hidden),
         "reminders_enabled": bool(sub.reminders_enabled),
         "refresh_minutes": sub.refresh_minutes,
         "last_fetched": sub.last_fetched.isoformat() if sub.last_fetched else None,
@@ -273,6 +275,8 @@ def update_subscription(
         sub.color = data.color
     if data.enabled is not None:
         sub.enabled = data.enabled
+    if data.sidebar_hidden is not None:
+        sub.sidebar_hidden = data.sidebar_hidden
     if data.refresh_minutes is not None:
         sub.refresh_minutes = data.refresh_minutes
     if data.reminders_enabled is not None:

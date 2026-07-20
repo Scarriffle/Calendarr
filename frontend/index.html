@@ -487,6 +487,24 @@
   </div>
 </div>
 
+<!-- Generic Confirm Dialog (styled replacement for window.confirm) -->
+<div id="modal-confirm" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-header">
+      <h3 id="confirm-title">Bestätigen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-confirm">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-text"></p>
+    </div>
+    <div class="modal-footer">
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" id="confirm-cancel" data-modal="modal-confirm" data-i18n="cancel">Abbrechen</button>
+      <button class="btn btn-danger" id="confirm-ok" data-i18n="delete">Löschen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Event Detail Popup -->
 <div id="popup-event" class="event-popup hidden">
   <div class="popup-header">
@@ -815,6 +833,12 @@
             <button type="button" class="sync-toggle sync-toggle-lg" id="cfg-sync-all" role="switch" aria-checked="false"></button>
           </div>
           <div class="settings-table" id="settings-appearance-table"></div>
+          <div class="theme-io-row">
+            <button type="button" class="btn btn-secondary btn-sm" id="cfg-theme-export" data-i18n="theme_export">Theme exportieren</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="cfg-theme-import" data-i18n="theme_import">Theme importieren</button>
+            <a class="theme-io-help" id="cfg-theme-help" href="https://git.scarriffle.com/Scarriffle/Calendarr/src/branch/beta/THEME.md" target="_blank" rel="noopener noreferrer" data-i18n-title="theme_docs_hint" title="Erklärung der Theme-Parameter">?</a>
+            <input type="file" id="cfg-theme-file" accept=".theme,application/json,.json" hidden />
+          </div>
         </div>
 
         <!-- Kalender: einheitliche Tabelle aller Kalender aus allen Quellen -->

@@ -103,6 +103,15 @@ class UserSettings(Base):
     # Surface/sidebar/topbar colour (web sidebar + top bar, iOS top bar).
     # NULL = derive from bg_color. Device-local by default (not synced).
     surface_color = Column(String(7), nullable=True)
+    # Fine-grained web element colours (all optional overrides; NULL = derive the
+    # previous default). See frontend THEME.md for what each one paints.
+    hover_highlight_color = Column(String(7), nullable=True)  # general interactive hover (buttons, rows)
+    icon_inactive_color   = Column(String(7), nullable=True)  # sidebar action icons: resting/off state
+    icon_active_color     = Column(String(7), nullable=True)  # sidebar action icons: hovered/on state
+    day_hover_color       = Column(String(7), nullable=True)  # calendar day-cell hover
+    day_selected_color    = Column(String(7), nullable=True)  # selected day background
+    day_bg_color          = Column(String(7), nullable=True)  # normal day background
+    today_bg_color        = Column(String(7), nullable=True)  # today's day-cell background
     # How this user's private events appear to other group members:
     # 'hidden' = invisible, 'busy' = anonymous busy block (default).
     private_event_visibility = Column(String(10), default="busy")
@@ -158,6 +167,8 @@ class LocalCalendar(Base):
     name = Column(String(100), nullable=False)
     color = Column(String(7), default="#34a853")
     enabled = Column(Boolean, default=True)
+    # Hidden from the sidebar calendar list (still owned/kept; just not shown).
+    sidebar_hidden = Column(Boolean, default=False, nullable=False)
     # Whether events of this calendar generate reminders/notifications on clients.
     reminders_enabled = Column(Boolean, default=True, nullable=False)
     # CalDAV publishing (opt-in): expose this calendar as a two-way CalDAV
@@ -221,6 +232,8 @@ class ICalSubscription(Base):
     url = Column(String(1000), nullable=False)
     color = Column(String(7), default="#46bdc6")
     enabled = Column(Boolean, default=True)
+    # Hidden from the sidebar calendar list (still subscribed; just not shown).
+    sidebar_hidden = Column(Boolean, default=False, nullable=False)
     # Whether events of this subscription generate reminders/notifications on clients.
     reminders_enabled = Column(Boolean, default=True, nullable=False)
     refresh_minutes = Column(Integer, default=60)

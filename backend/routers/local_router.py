@@ -33,6 +33,7 @@ class CalendarUpdate(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None
     enabled: Optional[bool] = None
+    sidebar_hidden: Optional[bool] = None
     reminders_enabled: Optional[bool] = None
     caldav_published: Optional[bool] = None
     is_birthday: Optional[bool] = None
@@ -88,6 +89,7 @@ def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
         # A recipient's own colour for a shared calendar wins over the owner's.
         "color": color_override or cal.color,
         "enabled": cal.enabled,
+        "sidebar_hidden": bool(cal.sidebar_hidden),
         "reminders_enabled": bool(cal.reminders_enabled),
         "caldav_published": bool(cal.caldav_published),
         "is_birthday": bool(cal.is_birthday),
@@ -265,6 +267,8 @@ def update_calendar(
         cal.color = data.color
     if data.enabled is not None:
         cal.enabled = data.enabled
+    if data.sidebar_hidden is not None:
+        cal.sidebar_hidden = data.sidebar_hidden
     if data.reminders_enabled is not None:
         cal.reminders_enabled = data.reminders_enabled
     if data.is_birthday is not None:
