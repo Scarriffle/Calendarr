@@ -1401,15 +1401,20 @@ a { color: var(--primary); text-decoration: none; }
 .admin-theme-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
 .admin-theme-name { font-size: 13px; color: var(--text-2); }
 .admin-theme-actions { display: flex; gap: 8px; margin-top: 14px; }
-.admin-brand-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-.admin-brand-label { width: 70px; font-size: 13px; color: var(--text-2); }
+.admin-brand-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.admin-brand-label { width: 70px; font-size: 13px; color: var(--text-2); flex-shrink: 0; }
 .admin-brand-preview {
   width: 48px; height: 48px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: var(--bg-hover); border-radius: var(--radius-sm); overflow: hidden;
+  background: var(--bg-hover); border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm); overflow: hidden;
 }
+/* Logo preview mirrors its real topbar footprint (max 150×40). */
+.admin-brand-preview-logo { width: 150px; height: 40px; }
 .admin-brand-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.admin-brand-none { font-size: 10px; color: var(--text-3); text-align: center; padding: 2px; }
+.admin-brand-controls { display: flex; flex-direction: column; gap: 4px; }
+.admin-brand-btns { display: flex; gap: 8px; }
+.admin-brand-dims { font-size: 11px; color: var(--text-3); }
 .settings-table-section {
   font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   color: var(--text-3); margin: 18px 0 6px; padding: 0 2px;

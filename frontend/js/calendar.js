@@ -4505,9 +4505,8 @@ function renderAdminThemeGrid() {
 function renderAdminBranding() {
   const logoPrev = document.getElementById('admin-logo-preview');
   const favPrev = document.getElementById('admin-favicon-preview');
-  const ph = `<span class="admin-brand-none">${escHtml(t('admin_brand_default'))}</span>`;
-  if (logoPrev) logoPrev.innerHTML = instanceConfig.has_logo ? `<img src="${instanceConfig.logo_url}" alt="">` : ph;
-  if (favPrev) favPrev.innerHTML = instanceConfig.has_favicon ? `<img src="${instanceConfig.favicon_url}" alt="">` : ph;
+  if (logoPrev) logoPrev.innerHTML = instanceConfig.has_logo ? `<img src="${instanceConfig.logo_url}" alt="">` : '';
+  if (favPrev) favPrev.innerHTML = instanceConfig.has_favicon ? `<img src="${instanceConfig.favicon_url}" alt="">` : '';
   const logoRemove = document.getElementById('admin-logo-remove');
   const favRemove = document.getElementById('admin-favicon-remove');
   if (logoRemove) logoRemove.classList.toggle('hidden', !instanceConfig.has_logo);
@@ -4519,6 +4518,33 @@ function loadAdminPanel() {
   adminThemeDraft = { ...(instanceConfig.default_theme || {}) };
   renderAdminThemeGrid();
   renderAdminBranding();
+}
+
+// Import a .theme.json into the default-theme editor (colours only). Fills the
+// draft + live preview; the admin still clicks "Standard speichern" to persist.
+async function importAdminTheme(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  let incoming;
+  try {
+    const data = JSON.parse(await file.text());
+    incoming = (data && data.settings && typeof data.settings === 'object') ? data.settings : data;
+    if (!incoming || typeof incoming !== 'object') throw new Error('bad');
+  } catch (e) { showToast(t('theme_import_invalid'), true); return; }
+  const colorKeys = colorSettingKeys();
+  let applied = 0;
+  for (const key of colorKeys) {
+    if (!(key in incoming)) continue;
+    const norm = normalizeHex(incoming[key], null);
+    if (!norm) continue;
+    adminThemeDraft[key] = norm;
+    applied++;
+  }
+  if (!applied) { showToast(t('theme_import_invalid'), true); return; }
+  renderAdminThemeGrid();
+  previewAdminTheme();
+  showToast(t('admin_theme_imported', { count: applied }));
 }
 
 async function uploadBranding(kind, input) {
@@ -4561,6 +4587,12 @@ function bindAdminPanel() {
     renderAdminThemeGrid();
     restoreOwnTheme();
   });
+  const themeImport = document.getElementById('admin-theme-import');
+  const themeFile = document.getElementById('admin-theme-file');
+  if (themeImport && themeFile) {
+    themeImport.addEventListener('click', () => themeFile.click());
+    themeFile.addEventListener('change', () => importAdminTheme(themeFile));
+  }
 
   const bindUpload = (btnId, fileId, kind) => {
     const btn = document.getElementById(btnId);

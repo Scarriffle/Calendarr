@@ -884,7 +884,9 @@
           <div id="admin-theme-grid" class="admin-theme-grid"></div>
           <div class="admin-theme-actions">
             <button class="btn btn-primary btn-sm" id="admin-theme-save" data-i18n="admin_theme_save">Standard speichern</button>
+            <button class="btn btn-secondary btn-sm" id="admin-theme-import" data-i18n="admin_theme_import">Theme importieren</button>
             <button class="btn btn-ghost btn-sm" id="admin-theme-discard" data-i18n="admin_theme_discard">Verwerfen</button>
+            <input type="file" id="admin-theme-file" accept=".theme.json,.json,.theme,application/json" hidden />
           </div>
 
           <!-- Branding: Logo & Favicon -->
@@ -892,16 +894,26 @@
           <p class="panel-desc" data-i18n="admin_branding_desc">Eigenes Logo (oben links) und Favicon (Tab-Symbol) für die ganze Instanz. PNG/JPEG/WebP, max. 5 MB.</p>
           <div class="admin-brand-row">
             <span class="admin-brand-label" data-i18n="admin_logo">Logo</span>
-            <div class="admin-brand-preview" id="admin-logo-preview"></div>
-            <button class="btn btn-secondary btn-sm" id="admin-logo-upload" data-i18n="admin_upload">Hochladen</button>
-            <button class="btn btn-ghost btn-sm" id="admin-logo-remove" data-i18n="admin_remove">Entfernen</button>
+            <div class="admin-brand-preview admin-brand-preview-logo" id="admin-logo-preview"></div>
+            <div class="admin-brand-controls">
+              <div class="admin-brand-btns">
+                <button class="btn btn-secondary btn-sm" id="admin-logo-upload" data-i18n="admin_upload">Hochladen</button>
+                <button class="btn btn-ghost btn-sm" id="admin-logo-remove" data-i18n="admin_remove">Entfernen</button>
+              </div>
+              <span class="admin-brand-dims" data-i18n="admin_logo_dims">PNG/JPEG/WebP · Anzeige max. 150 × 40 px</span>
+            </div>
             <input type="file" id="admin-logo-file" accept="image/png,image/jpeg,image/webp" hidden />
           </div>
           <div class="admin-brand-row">
             <span class="admin-brand-label" data-i18n="admin_favicon">Favicon</span>
             <div class="admin-brand-preview" id="admin-favicon-preview"></div>
-            <button class="btn btn-secondary btn-sm" id="admin-favicon-upload" data-i18n="admin_upload">Hochladen</button>
-            <button class="btn btn-ghost btn-sm" id="admin-favicon-remove" data-i18n="admin_remove">Entfernen</button>
+            <div class="admin-brand-controls">
+              <div class="admin-brand-btns">
+                <button class="btn btn-secondary btn-sm" id="admin-favicon-upload" data-i18n="admin_upload">Hochladen</button>
+                <button class="btn btn-ghost btn-sm" id="admin-favicon-remove" data-i18n="admin_remove">Entfernen</button>
+              </div>
+              <span class="admin-brand-dims" data-i18n="admin_favicon_dims">PNG/JPEG/WebP · 128 × 128 px (quadratisch)</span>
+            </div>
             <input type="file" id="admin-favicon-file" accept="image/png,image/jpeg,image/webp" hidden />
           </div>
         </div>
