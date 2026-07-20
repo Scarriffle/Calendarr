@@ -139,6 +139,20 @@ class UserSettings(Base):
     user = relationship("User", back_populates="settings")
 
 
+class InstanceSettings(Base):
+    """Server-wide (singleton, id=1) branding + default theme set by an admin.
+    Applies to everyone; a user's own settings still override the default theme."""
+    __tablename__ = "instance_settings"
+
+    id = Column(Integer, primary_key=True)  # always 1
+    # JSON {colorKey: "#RRGGBB"} — the instance default theme. Empty/NULL = use the
+    # client's built-in defaults. A user's own colour wins over this.
+    default_theme = Column(Text, nullable=True)
+    # Uploaded branding files (stored under DATA_DIR/branding). NULL = use bundled.
+    logo_filename = Column(String(255), nullable=True)
+    favicon_filename = Column(String(255), nullable=True)
+
+
 class AppPassword(Base):
     """Per-device app-specific password for CalDAV (Basic Auth).
 

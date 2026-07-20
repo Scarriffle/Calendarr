@@ -759,7 +759,7 @@
         <button class="settings-nav-btn active" data-panel="profile" data-i18n="settings_nav_profile">Profil</button>
         <button class="settings-nav-btn" data-panel="general" data-i18n="settings_nav_appearance">Darstellung</button>
         <button class="settings-nav-btn" data-panel="accounts" data-i18n="settings_nav_calendars">Kalender</button>
-        <button class="settings-nav-btn hidden" data-panel="users" id="settings-nav-users" data-i18n="settings_nav_users">Benutzerverwaltung</button>
+        <button class="settings-nav-btn hidden" data-panel="users" id="settings-nav-users" data-i18n="settings_nav_admin">Admin</button>
       </nav>
 
       <div class="settings-panels">
@@ -837,7 +837,7 @@
             <button type="button" class="btn btn-secondary btn-sm" id="cfg-theme-export" data-i18n="theme_export">Theme exportieren</button>
             <button type="button" class="btn btn-secondary btn-sm" id="cfg-theme-import" data-i18n="theme_import">Theme importieren</button>
             <a class="theme-io-help" id="cfg-theme-help" href="https://git.scarriffle.com/Scarriffle/Calendarr/src/branch/beta/THEME.md" target="_blank" rel="noopener noreferrer" data-i18n-title="theme_docs_hint" title="Erklärung der Theme-Parameter">?</a>
-            <input type="file" id="cfg-theme-file" accept=".theme,application/json,.json" hidden />
+            <input type="file" id="cfg-theme-file" accept=".theme.json,.json,.theme,application/json" hidden />
           </div>
         </div>
 
@@ -858,7 +858,7 @@
           <div id="birthday-settings"></div>
         </div>
 
-        <!-- Benutzerverwaltung -->
+        <!-- Admin: Benutzerverwaltung + Standard-Theme + Branding -->
         <div class="settings-panel" id="settings-panel-users">
           <h4 class="panel-title"><span data-i18n="settings_nav_users">Benutzerverwaltung</span> <span class="badge-admin">Admin</span></h4>
           <div id="users-list"></div>
@@ -876,6 +876,33 @@
               <input type="checkbox" id="new-is-admin" /> Administrator
             </label>
             <button class="btn btn-primary" id="new-user-save">Erstellen</button>
+          </div>
+
+          <!-- Instanz-Standardtheme -->
+          <h4 class="panel-title" style="margin-top:28px" data-i18n="admin_default_theme">Standard-Theme</h4>
+          <p class="panel-desc" data-i18n="admin_default_theme_desc">Gilt für alle Nutzer, die keine eigene Farbe gesetzt haben. „Zurück" bei einer Farbe springt auf diesen Standard.</p>
+          <div id="admin-theme-grid" class="admin-theme-grid"></div>
+          <div class="admin-theme-actions">
+            <button class="btn btn-primary btn-sm" id="admin-theme-save" data-i18n="admin_theme_save">Standard speichern</button>
+            <button class="btn btn-ghost btn-sm" id="admin-theme-discard" data-i18n="admin_theme_discard">Verwerfen</button>
+          </div>
+
+          <!-- Branding: Logo & Favicon -->
+          <h4 class="panel-title" style="margin-top:28px" data-i18n="admin_branding">Branding</h4>
+          <p class="panel-desc" data-i18n="admin_branding_desc">Eigenes Logo (oben links) und Favicon (Tab-Symbol) für die ganze Instanz. PNG/JPEG/WebP, max. 5 MB.</p>
+          <div class="admin-brand-row">
+            <span class="admin-brand-label" data-i18n="admin_logo">Logo</span>
+            <div class="admin-brand-preview" id="admin-logo-preview"></div>
+            <button class="btn btn-secondary btn-sm" id="admin-logo-upload" data-i18n="admin_upload">Hochladen</button>
+            <button class="btn btn-ghost btn-sm" id="admin-logo-remove" data-i18n="admin_remove">Entfernen</button>
+            <input type="file" id="admin-logo-file" accept="image/png,image/jpeg,image/webp" hidden />
+          </div>
+          <div class="admin-brand-row">
+            <span class="admin-brand-label" data-i18n="admin_favicon">Favicon</span>
+            <div class="admin-brand-preview" id="admin-favicon-preview"></div>
+            <button class="btn btn-secondary btn-sm" id="admin-favicon-upload" data-i18n="admin_upload">Hochladen</button>
+            <button class="btn btn-ghost btn-sm" id="admin-favicon-remove" data-i18n="admin_remove">Entfernen</button>
+            <input type="file" id="admin-favicon-file" accept="image/png,image/jpeg,image/webp" hidden />
           </div>
         </div>
 

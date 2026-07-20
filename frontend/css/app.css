@@ -1390,6 +1390,26 @@ a { color: var(--primary); text-decoration: none; }
   font-size: 12px; font-weight: 700; text-decoration: none;
 }
 .theme-io-help:hover { background: var(--hover-highlight); color: var(--text-1); }
+
+/* Custom instance logo (replaces the glyph+text). Hard-capped so it can only
+   scale DOWN and never pushes the topbar/auth layout. */
+.topbar-logo-img { max-height: 40px; max-width: 150px; width: auto; height: auto; object-fit: contain; display: block; }
+.auth-logo-img   { max-height: 56px; max-width: 220px; width: auto; height: auto; object-fit: contain; display: block; }
+
+/* Admin panel: default-theme editor + branding */
+.admin-theme-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.admin-theme-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+.admin-theme-name { font-size: 13px; color: var(--text-2); }
+.admin-theme-actions { display: flex; gap: 8px; margin-top: 14px; }
+.admin-brand-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.admin-brand-label { width: 70px; font-size: 13px; color: var(--text-2); }
+.admin-brand-preview {
+  width: 48px; height: 48px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-hover); border-radius: var(--radius-sm); overflow: hidden;
+}
+.admin-brand-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.admin-brand-none { font-size: 10px; color: var(--text-3); text-align: center; padding: 2px; }
 .settings-table-section {
   font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   color: var(--text-3); margin: 18px 0 6px; padding: 0 2px;

@@ -92,6 +92,14 @@ export const SETTING_GROUPS = [
 // Flat list of every syncable key the web manages (table order).
 export const SYNCABLE_KEYS = SETTING_GROUPS.flatMap(g => g.rows.map(r => r.key));
 
+// Instance-wide default theme set by an admin (from GET /api/instance/). It is
+// the base a user inherits and the target that a per-colour "Reset" returns to.
+// A user's own value always overrides it. See backend/routers/admin_router.py.
+export let INSTANCE_DEFAULTS = {};
+export function setInstanceDefaults(obj) { INSTANCE_DEFAULTS = obj || {}; }
+// The effective default for a colour key: admin instance default → built-in.
+export function baseColor(key) { return INSTANCE_DEFAULTS[key] || DEFAULT_COLORS[key]; }
+
 const LOCAL_KEY = 'settingsLocal';
 
 export function loadLocal() {

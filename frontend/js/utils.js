@@ -1,4 +1,4 @@
-import { DEFAULT_COLORS } from './settings-sync.js';
+import { DEFAULT_COLORS, INSTANCE_DEFAULTS, baseColor } from './settings-sync.js';
 
 export function isToday(d) {
   const now = new Date();
@@ -106,15 +106,18 @@ export const DEFAULT_BG_COLOR   = DEFAULT_COLORS.bg_color;
 
 export function applyTheme(settings) {
   const root = document.documentElement;
-  root.style.setProperty('--primary',     settings.primary_color || DEFAULT_COLORS.primary_color);
-  root.style.setProperty('--primary-dim', hexToRgba(settings.primary_color || DEFAULT_COLORS.primary_color, 0.15));
-  root.style.setProperty('--accent',      settings.accent_color  || DEFAULT_COLORS.accent_color);
-  root.style.setProperty('--today-color', settings.today_color   || DEFAULT_COLORS.today_color);
+  // Fallback chain for a colour that has no per-user value: admin instance
+  // default → built-in default (baseColor()).
+  const primary = settings.primary_color || baseColor('primary_color');
+  root.style.setProperty('--primary',     primary);
+  root.style.setProperty('--primary-dim', hexToRgba(primary, 0.15));
+  root.style.setProperty('--accent',      settings.accent_color  || baseColor('accent_color'));
+  root.style.setProperty('--today-color', settings.today_color   || baseColor('today_color'));
 
-  // Effektive Farben bestimmen (Override > Default).
-  let textColor = settings.text_color || DEFAULT_TEXT_COLOR;
-  let lineColor = settings.line_color || DEFAULT_LINE_COLOR;
-  let bgColor   = settings.bg_color   || DEFAULT_BG_COLOR;
+  // Effektive Farben bestimmen (Override > Admin-Default > eingebauter Default).
+  let textColor = settings.text_color || baseColor('text_color');
+  let lineColor = settings.line_color || baseColor('line_color');
+  let bgColor   = settings.bg_color   || baseColor('bg_color');
 
   // Sicherheitsbremse: Wenn Schrift- und Hintergrundfarbe nicht genug
   // Kontrast haben (passiert wenn man aus Versehen text=bg eingibt),
@@ -145,43 +148,58 @@ export function applyTheme(settings) {
   const hh = settings.hour_height || 44;
   root.style.setProperty('--hour-h', hh + 'px');
 
-  root.style.setProperty('--month-divider-color', settings.month_divider_color || DEFAULT_COLORS.month_divider_color);
-  root.style.setProperty('--month-label-color',   settings.month_label_color   || DEFAULT_COLORS.month_label_color);
+  root.style.setProperty('--month-divider-color', settings.month_divider_color || baseColor('month_divider_color'));
+  root.style.setProperty('--month-label-color',   settings.month_label_color   || baseColor('month_label_color'));
 
   // Fine-grained element colours. Each is applied ONLY when the user set an
   // explicit value; otherwise the :root default (which references a derived
   // variable) stays in effect, so the look is unchanged until customised.
   // day_selected_color / today_bg_color feed a *-base variable that CSS turns
   // into a subtle tint via color-mix; the rest are applied as-is.
-  const setIf = (varName, value) => { if (value) root.style.setProperty(varName, value); };
-  setIf('--hover-highlight',      settings.hover_highlight_color);
-  setIf('--icon-inactive-color',  settings.icon_inactive_color);
-  setIf('--icon-active-color',    settings.icon_active_color);
-  setIf('--day-hover-color',      settings.day_hover_color);
-  setIf('--day-selected-base',   settings.day_selected_color);
-  setIf('--day-bg',              settings.day_bg_color);
-  setIf('--today-bg-base',       settings.today_bg_color);
+  // User value → admin instance default (if any). When neither is set the
+  // property stays unset so the derived :root default keeps the current look.
+  const setIf = (varName, key) => {
+    const value = settings[key] || INSTANCE_DEFAULTS[key];
+    if (value) root.style.setProperty(varName, value);
+  };
+  setIf('--hover-highlight',     'hover_highlight_color');
+  setIf('--icon-inactive-color', 'icon_inactive_color');
+  setIf('--icon-active-color',   'icon_active_color');
+  setIf('--day-hover-color',     'day_hover_color');
+  setIf('--day-selected-base',   'day_selected_color');
+  setIf('--day-bg',              'day_bg_color');
+  setIf('--today-bg-base',       'today_bg_color');
 }
+
+// Instance custom favicon URL (set by the branding loader). When present it
+// overrides the primary-colour tinting.
+let customFaviconUrl = null;
+export function setCustomFavicon(url) { customFaviconUrl = url || null; }
 
 // Tint the favicon (and browser theme-colour) to the current primary colour so
 // the tab icon reflects the user's theme. Called at load and after saving —
 // NOT on every live keystroke. Reuses the calendar glyph from favicon.svg.
 export function applyFavicon(primaryColor) {
-  const color = primaryColor || DEFAULT_COLORS.primary_color;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`
-    + '<rect x="3" y="4" width="18" height="18" rx="2"/>'
-    + '<line x1="16" y1="2" x2="16" y2="6"/>'
-    + '<line x1="8" y1="2" x2="8" y2="6"/>'
-    + '<line x1="3" y1="10" x2="21" y2="10"/></svg>';
-  const href = 'data:image/svg+xml;base64,' + btoa(svg);
+  const color = primaryColor || baseColor('primary_color');
   let link = document.querySelector('link[rel="icon"]');
   if (!link) {
     link = document.createElement('link');
     link.rel = 'icon';
     document.head.appendChild(link);
   }
-  link.type = 'image/svg+xml';
-  link.href = href;
+  if (customFaviconUrl) {
+    // Admin-uploaded favicon: use as-is (no primary-colour tinting).
+    link.type = 'image/png';
+    link.href = customFaviconUrl;
+  } else {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`
+      + '<rect x="3" y="4" width="18" height="18" rx="2"/>'
+      + '<line x1="16" y1="2" x2="16" y2="6"/>'
+      + '<line x1="8" y1="2" x2="8" y2="6"/>'
+      + '<line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    link.type = 'image/svg+xml';
+    link.href = 'data:image/svg+xml;base64,' + btoa(svg);
+  }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', color);
 }

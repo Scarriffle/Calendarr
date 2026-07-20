@@ -17,7 +17,7 @@ STATIC_CACHE = f"public, max-age={STATIC_MAX_AGE_SECONDS}, must-revalidate"
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import Base, engine
-from routers import auth_router, birthdays_router, caldav_router, dav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
+from routers import admin_router, auth_router, birthdays_router, caldav_router, dav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -395,6 +395,7 @@ app.include_router(groups_router.router, prefix="/api/groups", tags=["groups"])
 app.include_router(ical_router.router, prefix="/api/ical", tags=["ical"])
 app.include_router(google_router.router, prefix="/api/google", tags=["google"])
 app.include_router(homeassistant_router.router, prefix="/api/homeassistant", tags=["homeassistant"])
+app.include_router(admin_router.router, prefix="/api/instance", tags=["instance"])
 # CalDAV publishing lives at root scope (no /api prefix) and must be registered
 # before the SPA catch-all so /dav/... isn't swallowed by the index fallback.
 app.include_router(dav_router.router, tags=["dav"])

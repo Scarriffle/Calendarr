@@ -7,7 +7,8 @@ import { renderQuarter } from './views/quarter.js';
 import { openColorPicker } from './color-picker.js';
 import { openDatePicker, formatDtDisplay } from './date-picker.js';
 import { t, setLang, getLang } from './i18n.js';
-import { DEFAULT_COLORS, SETTING_GROUPS, SYNCABLE_KEYS, loadLocal, saveLocal, mergeEffective } from './settings-sync.js';
+import { DEFAULT_COLORS, SETTING_GROUPS, SYNCABLE_KEYS, loadLocal, saveLocal, mergeEffective, baseColor, setInstanceDefaults } from './settings-sync.js';
+import { loadInstance, reloadInstance, instanceConfig } from './instance.js';
 import { APP_VERSION } from './version.js';
 
 // Version im Impressum/Sidebar sichtbar, nicht im Tab-Titel.
@@ -123,6 +124,9 @@ export async function initCalendar() {
     api.get('/google/accounts').catch(() => []),
     api.get('/homeassistant/accounts').catch(() => []),
   ]);
+  // Ensure the instance default theme + branding are loaded before the first
+  // applyTheme(), so per-colour fallbacks resolve to the admin default.
+  await loadInstance();
 
   // Per-setting sync: the server's raw response is the shared source; effective
   // settings resolve each syncable key against the account-wide sync flags and
@@ -3359,7 +3363,7 @@ function populateSettings() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const usersNavBtn = document.getElementById('settings-nav-users');
   if (usersNavBtn) usersNavBtn.classList.toggle('hidden', !user.is_admin);
-  if (user.is_admin) loadUsers();
+  if (user.is_admin) { loadUsers(); loadAdminPanel(); }
 
   // Activate panel from URL or fall back to first visible
   const urlTab = readUrlState().stab;
@@ -3408,7 +3412,7 @@ function settingRowHtml(def) {
   } else if (def.type === 'toggle') {
     valueHtml = `<button type="button" class="sync-toggle ${val ? 'on' : ''}" data-vtoggle="${def.key}" role="switch" aria-checked="${!!val}"></button>`;
   } else if (def.type === 'color') {
-    const hex = normalizeHex(val, DEFAULT_COLORS[def.key]);
+    const hex = normalizeHex(val, baseColor(def.key));
     valueHtml = `<div class="settings-color-ctl">
       <input type="text" class="ev-color-hex" data-shex="${def.key}" maxlength="7" spellcheck="false" value="${hex}" />
       <div class="ev-color-preview" data-sprev="${def.key}" style="background:${hex}" title="${escHtml(t('color_pick'))}"></div>
@@ -3466,7 +3470,7 @@ function wireSettingRow(def) {
       applyTheme(state.settings);
     };
     prev.addEventListener('click', async () => {
-      const picked = await openColorPicker(prev, hex.value || DEFAULT_COLORS[def.key]);
+      const picked = await openColorPicker(prev, hex.value || baseColor(def.key));
       if (picked) { hex.value = picked.toUpperCase(); apply(picked); }
     });
     hex.addEventListener('input', () => {
@@ -3474,11 +3478,11 @@ function wireSettingRow(def) {
       if (norm) apply(norm);
     });
     hex.addEventListener('change', () => {
-      const norm = normalizeHex(hex.value, DEFAULT_COLORS[def.key]);
+      const norm = normalizeHex(hex.value, baseColor(def.key));
       hex.value = norm; apply(norm);
     });
     reset.addEventListener('click', () => {
-      const d = DEFAULT_COLORS[def.key];
+      const d = baseColor(def.key);
       hex.value = d; apply(d);
     });
   } else if (def.type === 'icon') {
@@ -3508,7 +3512,7 @@ function readAppearanceTable() {
       out[def.key] = el ? el.classList.contains('on') : !!state.settings[def.key];
     } else if (def.type === 'color') {
       const el = document.querySelector(`[data-shex="${def.key}"]`);
-      out[def.key] = normalizeHex(el && el.value, DEFAULT_COLORS[def.key]);
+      out[def.key] = normalizeHex(el && el.value, baseColor(def.key));
     } else if (def.type === 'icon') {
       const on = document.querySelector(`[data-sicon="${def.key}"] .group-icon-opt.on`);
       out[def.key] = on ? on.dataset.shareIcon : (state.settings[def.key] || 'share');
@@ -3563,7 +3567,7 @@ function exportTheme() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${stamp}.theme`;
+  a.download = `${stamp}.theme.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -4436,10 +4440,151 @@ async function loadUsers() {
   } catch (e) { /* not admin */ }
 }
 
+// ── Admin: instance default theme + branding ──────────────
+let adminThemeDraft = {};      // {colorKey: hex} being edited (instance default)
+let adminPreviewActive = false; // whether the app view currently shows the draft
+
+// The colour rows offered in the default-theme editor (same keys as the user table).
+function adminColorDefs() {
+  return SETTING_GROUPS.flatMap(g => g.rows).filter(r => r.type === 'color');
+}
+
+// Restore the admin's own (personal) theme after a live preview.
+function restoreOwnTheme() {
+  adminPreviewActive = false;
+  applyTheme(state.settings);
+  applyFavicon(state.settings.primary_color);
+}
+
+function previewAdminTheme() {
+  adminPreviewActive = true;
+  applyTheme(adminThemeDraft);
+  applyFavicon(adminThemeDraft.primary_color);
+}
+
+function renderAdminThemeGrid() {
+  const grid = document.getElementById('admin-theme-grid');
+  if (!grid) return;
+  grid.innerHTML = adminColorDefs().map(def => {
+    const val = adminThemeDraft[def.key] || DEFAULT_COLORS[def.key];
+    return `<div class="admin-theme-row" data-arow="${def.key}">
+      <span class="admin-theme-name">${escHtml(t(def.labelKey))}</span>
+      <div class="ev-color-row">
+        <input type="text" class="ev-color-hex" data-ahex="${def.key}" maxlength="7" spellcheck="false" value="${val}" />
+        <div class="ev-color-preview" data-aprev="${def.key}" style="background:${val}" title="${escHtml(t('color_pick'))}"></div>
+        <button type="button" class="icon-btn ev-color-reset" data-areset="${def.key}" title="${escHtml(t('reset'))}">${RESET_ICON_SVG}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  adminColorDefs().forEach(def => {
+    const row = grid.querySelector(`.admin-theme-row[data-arow="${def.key}"]`);
+    if (!row) return;
+    const hex = row.querySelector('[data-ahex]');
+    const prev = row.querySelector('[data-aprev]');
+    const reset = row.querySelector('[data-areset]');
+    const apply = (color) => {
+      adminThemeDraft[def.key] = color;
+      prev.style.background = color;
+      previewAdminTheme();
+    };
+    prev.addEventListener('click', async () => {
+      const picked = await openColorPicker(prev, hex.value || DEFAULT_COLORS[def.key]);
+      if (picked) { hex.value = picked.toUpperCase(); apply(picked); }
+    });
+    hex.addEventListener('input', () => { const n = normalizeHex(hex.value, null); if (n) apply(n); });
+    hex.addEventListener('change', () => { const n = normalizeHex(hex.value, DEFAULT_COLORS[def.key]); hex.value = n; apply(n); });
+    reset.addEventListener('click', () => {
+      // Reset a default-theme colour to the built-in default.
+      const d = DEFAULT_COLORS[def.key];
+      hex.value = d; apply(d);
+    });
+  });
+}
+
+function renderAdminBranding() {
+  const logoPrev = document.getElementById('admin-logo-preview');
+  const favPrev = document.getElementById('admin-favicon-preview');
+  const ph = `<span class="admin-brand-none">${escHtml(t('admin_brand_default'))}</span>`;
+  if (logoPrev) logoPrev.innerHTML = instanceConfig.has_logo ? `<img src="${instanceConfig.logo_url}" alt="">` : ph;
+  if (favPrev) favPrev.innerHTML = instanceConfig.has_favicon ? `<img src="${instanceConfig.favicon_url}" alt="">` : ph;
+  const logoRemove = document.getElementById('admin-logo-remove');
+  const favRemove = document.getElementById('admin-favicon-remove');
+  if (logoRemove) logoRemove.classList.toggle('hidden', !instanceConfig.has_logo);
+  if (favRemove) favRemove.classList.toggle('hidden', !instanceConfig.has_favicon);
+}
+
+// Populate the admin panel (default-theme editor + branding). Admin-only.
+function loadAdminPanel() {
+  adminThemeDraft = { ...(instanceConfig.default_theme || {}) };
+  renderAdminThemeGrid();
+  renderAdminBranding();
+}
+
+async function uploadBranding(kind, input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    await api.upload(`/instance/${kind}`, form);
+    await reloadInstance();          // re-fetch + apply logo/favicon live
+    renderAdminBranding();
+    showToast(t('admin_branding_saved'));
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function removeBranding(kind) {
+  try {
+    await api.delete(`/instance/${kind}`);
+    await reloadInstance();
+    renderAdminBranding();
+    showToast(t('admin_branding_removed'));
+  } catch (e) { showToast(e.message, true); }
+}
+
+function bindAdminPanel() {
+  const save = document.getElementById('admin-theme-save');
+  if (save) save.addEventListener('click', async () => {
+    try {
+      await api.put('/instance/theme', { default_theme: adminThemeDraft });
+      setInstanceDefaults(adminThemeDraft);
+      instanceConfig.default_theme = { ...adminThemeDraft };
+      restoreOwnTheme();             // back to the admin's own view
+      showToast(t('admin_theme_saved'));
+    } catch (e) { showToast(e.message, true); }
+  });
+  const discard = document.getElementById('admin-theme-discard');
+  if (discard) discard.addEventListener('click', () => {
+    adminThemeDraft = { ...(instanceConfig.default_theme || {}) };
+    renderAdminThemeGrid();
+    restoreOwnTheme();
+  });
+
+  const bindUpload = (btnId, fileId, kind) => {
+    const btn = document.getElementById(btnId);
+    const file = document.getElementById(fileId);
+    if (btn && file) {
+      btn.addEventListener('click', () => file.click());
+      file.addEventListener('change', () => uploadBranding(kind, file));
+    }
+  };
+  bindUpload('admin-logo-upload', 'admin-logo-file', 'logo');
+  bindUpload('admin-favicon-upload', 'admin-favicon-file', 'favicon');
+  const logoRemove = document.getElementById('admin-logo-remove');
+  if (logoRemove) logoRemove.addEventListener('click', () => removeBranding('logo'));
+  const favRemove = document.getElementById('admin-favicon-remove');
+  if (favRemove) favRemove.addEventListener('click', () => removeBranding('favicon'));
+}
+
 function bindSettingsModal() {
   // Global "sync everything" master toggle (per-row toggles are wired per render).
   const syncAllBtn = document.getElementById('cfg-sync-all');
   if (syncAllBtn) syncAllBtn.addEventListener('click', toggleSyncAll);
+
+  // Admin panel (default-theme editor + branding) — buttons bound once.
+  bindAdminPanel();
 
   // Theme export / import (client-side .theme files).
   const themeExportBtn = document.getElementById('cfg-theme-export');
@@ -4902,6 +5047,8 @@ function closeModal(id) {
   document.getElementById(id).classList.add('hidden');
   if (id === 'modal-settings') {
     uiSettingsOpen = false;
+    // If the admin was live-previewing the default theme, restore their own view.
+    if (adminPreviewActive) restoreOwnTheme();
     writeUrlState();
   }
 }

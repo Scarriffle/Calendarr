@@ -1,9 +1,13 @@
 import { api } from './api.js';
 import { initCalendar, showToast, openProfileModal } from './calendar.js';
 import { t } from './i18n.js';
+import { loadInstance } from './instance.js';
 
 // ── Bootstrap ─────────────────────────────────────────────
 async function boot() {
+  // Apply instance branding (logo/favicon/default theme) ASAP so the login and
+  // setup screens are already branded. Public endpoint — no token needed.
+  loadInstance();
   // Check if setup is required
   let setupRequired = false;
   try {
