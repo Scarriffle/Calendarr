@@ -63,6 +63,9 @@ input, textarea, [contenteditable="true"], .selectable {
   -webkit-user-select: text; user-select: text;
 }
 a { color: var(--primary); text-decoration: none; }
+/* Version im Impressum verlinkt aufs Gitea-Repo — dezent, erst beim Hover als Link erkennbar */
+.impressum-version-link { color: var(--text-3); text-decoration: none; transition: color .15s ease; }
+.impressum-version-link:hover { color: var(--primary); text-decoration: underline; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }

@@ -15,7 +15,7 @@ import { APP_VERSION } from './version.js';
 document.title = 'Calendarr';
 document.addEventListener('DOMContentLoaded', () => {
   const imp = document.getElementById('impressum-version');
-  if (imp) imp.textContent = `Calendarr ${APP_VERSION}`;
+  if (imp) imp.innerHTML = `<a class="impressum-version-link" href="https://git.scarriffle.com/Scarriffle/Calendarr" target="_blank" rel="noopener noreferrer" title="Quelltext auf Gitea">Calendarr ${APP_VERSION}</a>`;
   const side = document.getElementById('sidebar-copyright');
   if (side) side.innerHTML = `©&nbsp;2026&nbsp;Scarriffleservices&nbsp;·&nbsp;${APP_VERSION}`;
 });
