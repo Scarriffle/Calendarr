@@ -7,25 +7,24 @@
 
 // Canonical default colours — the single source for the web. Reset writes these.
 export const DEFAULT_COLORS = {
-  primary_color:       '#4285F4',
-  accent_color:        '#EA4335',
-  today_color:         '#4285F4',
+  primary_color:       '#58B900',
+  accent_color:        '#45A148',
+  today_color:         '#6FB669',
   text_color:          '#FFFFFF',
   bg_color:            '#000000',
-  line_color:          '#3A3A52',
-  surface_color:       '#1A1A1A',
-  month_divider_color: '#7090C0',
-  month_label_color:   '#7090C0',
-  // Fine-grained element colours. Defaults equal the previously-derived look
-  // (see THEME.md). day_selected/today_bg are applied as a subtle tint of the
-  // chosen colour; the rest are applied solid.
+  line_color:          '#3B3B3D',
+  surface_color:       '#2B2B2B',
+  month_divider_color: '#95D25E',
+  month_label_color:   '#95D25E',
+  // Fine-grained element colours (see THEME.md). day_selected/today_bg are
+  // applied as a subtle tint of the chosen colour; the rest are applied solid.
   hover_highlight_color: '#2A2A38',
-  icon_inactive_color:   '#9090AA',
+  icon_inactive_color:   '#90AA91',
   icon_active_color:     '#E8E8F0',
-  day_hover_color:       '#2A2A38',
-  day_selected_color:    '#4285F4',
+  day_hover_color:       '#2B382A',
+  day_selected_color:    '#88EF9A',
   day_bg_color:          '#000000',
-  today_bg_color:        '#4285F4',
+  today_bg_color:        '#477650',
 };
 
 // The syncable settings the web client exposes, grouped into table sections.

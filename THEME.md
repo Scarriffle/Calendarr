@@ -38,22 +38,22 @@ untouched reproduces the previous automatic look; setting it overrides that.
 
 | Key | What it colours | Default |
 |---|---|---|
-| `primary_color` | Primary/brand colour — buttons, links, active states, and the browser favicon/tab colour | `#4285F4` |
-| `accent_color` | Accent — danger actions, the "now" line, reminders | `#EA4335` |
-| `today_color` | "Today" accent: the day-number circle and today's labels | `#4285F4` |
+| `primary_color` | Primary/brand colour — buttons, links, active states, and the browser favicon/tab colour | `#58B900` |
+| `accent_color` | Accent — danger actions, the "now" line, reminders | `#45A148` |
+| `today_color` | "Today" accent: the day-number circle and today's labels | `#6FB669` |
 | `text_color` | Base text colour (secondary/tertiary text is derived from it) | `#FFFFFF` |
 | `bg_color` | App background | `#000000` |
-| `surface_color` | Sidebar / top bar / card surfaces (derived from `bg_color` when unset) | `#1A1A1A` |
-| `line_color` | Borders and grid lines | `#3A3A52` |
-| `month_divider_color` | The line marking a month change in the scrolling month view | `#7090C0` |
-| `month_label_color` | The month abbreviation shown at a month change | `#7090C0` |
-| `hover_highlight_color` | General interactive hover — buttons, menu items, list rows | `#2A2A38` (= derived hover) |
-| `icon_inactive_color` | Sidebar action icons (notification bell *off*, hide/eye, delete/trash, "not editable") in their resting / off / not-hovered state | `#9090AA` (= secondary text) |
-| `icon_active_color` | The same sidebar action icons when hovered, pressed, or *on* (e.g. notification bell enabled) | `#E8E8F0` (= primary text) |
-| `day_hover_color` | Hover background over a calendar day (month / week / quarter / agenda / mini-calendar / date picker) | `#2A2A38` (= derived hover) |
-| `day_selected_color` | The selected day — applied as a subtle tint of this colour | `#4285F4` (= primary) |
+| `surface_color` | Sidebar / top bar / card surfaces (derived from `bg_color` when unset) | `#2B2B2B` |
+| `line_color` | Borders and grid lines | `#3B3B3D` |
+| `month_divider_color` | The line marking a month change in the scrolling month view | `#95D25E` |
+| `month_label_color` | The month abbreviation shown at a month change | `#95D25E` |
+| `hover_highlight_color` | General interactive hover — buttons, menu items, list rows | `#2A2A38` |
+| `icon_inactive_color` | Sidebar action icons (notification bell *off*, hide/eye, delete/trash, "not editable") in their resting / off / not-hovered state | `#90AA91` |
+| `icon_active_color` | The same sidebar action icons when hovered, pressed, or *on* (e.g. notification bell enabled) | `#E8E8F0` |
+| `day_hover_color` | Hover background over a calendar day (month / week / quarter / agenda / mini-calendar / date picker) | `#2B382A` |
+| `day_selected_color` | The selected day — applied as a subtle tint of this colour | `#88EF9A` |
 | `day_bg_color` | Normal (unselected, non-today) day background. Defaults to the app background so days look transparent | `#000000` |
-| `today_bg_color` | Today's day-cell background — applied as a subtle tint of this colour | `#4285F4` (= today accent) |
+| `today_bg_color` | Today's day-cell background — applied as a subtle tint of this colour | `#477650` |
 
 Notes:
 - `day_selected_color` and `today_bg_color` are applied as a low-opacity tint of
