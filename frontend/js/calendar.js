@@ -533,14 +533,16 @@ function filterEvents(events) {
       return oid == null || !hidden.has(oid);
     });
   }
-  // Normal view: honour per-device hide for calendars shared with me (their
-  // events keep coming from the server since `enabled` is the owner's flag).
+  // Normal view: honour per-device hides for calendars shared with me (their
+  // events keep coming from the server since `enabled` is the owner's flag) —
+  // both the checkbox hide and the sidebar hide remove their events.
   const hiddenLocal = state.activeGroupId ? null : loadHiddenLocalCals();
-  if (hiddenLocal && hiddenLocal.size) {
+  const sharedHidden = state.activeGroupId ? null : loadSidebarHiddenShared();
+  if ((hiddenLocal && hiddenLocal.size) || (sharedHidden && sharedHidden.size)) {
     events = events.filter(ev => {
       if (ev.source !== 'local') return true;
       const id = parseInt(String(ev.calendar_id).replace('local-', ''));
-      return !hiddenLocal.has(id);
+      return !(hiddenLocal && hiddenLocal.has(id)) && !(sharedHidden && sharedHidden.has(id));
     });
   }
   // If dimPast is enabled, events are still shown but CSS handles opacity via .past class
@@ -710,6 +712,20 @@ function setHiddenLocalCal(id, hidden) {
   try { localStorage.setItem(HIDDEN_LOCAL_KEY, JSON.stringify([...s])); } catch (e) { /* ignore */ }
 }
 
+// Calendars shared with me can't carry a server `sidebar_hidden` flag (I don't
+// own them), so "hide from sidebar" for those is a per-device set — the same
+// idea as caldav/google sidebar_hidden, just kept client-side.
+const SIDEBAR_HIDDEN_SHARED_KEY = 'sidebarHiddenShared';
+function loadSidebarHiddenShared() {
+  try { return new Set(JSON.parse(localStorage.getItem(SIDEBAR_HIDDEN_SHARED_KEY) || '[]')); }
+  catch (e) { return new Set(); }
+}
+function setSidebarHiddenShared(id, hidden) {
+  const s = loadSidebarHiddenShared();
+  if (hidden) s.add(id); else s.delete(id);
+  try { localStorage.setItem(SIDEBAR_HIDDEN_SHARED_KEY, JSON.stringify([...s])); } catch (e) { /* ignore */ }
+}
+
 // Drag & drop reordering of the flat calendar list (persisted per device).
 // The dragged row is moved live among its siblings during dragover, so the
 // list visibly "makes space" and you can see where it will land.
@@ -759,9 +775,8 @@ function bindCalDragReorder(container) {
 
 function renderCalendarList() {
   const container = document.getElementById('cal-list-items');
-  // Eye-off (hide external calendar) and trash (delete local/ical) icons.
+  // Eye-off icon — every sidebar row can now be hidden (delete lives in Settings).
   const EYE_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`;
-  const TRASH = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
   const BELL = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
   const BELL_OFF = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42v5l-2 2v1h13.73l2 2L21 19.72l-1-1.03zM12 22c1.11 0 2-.89 2-2h-4c0 1.11.89 2 2 2zm6-7.32V11c0-3.08-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.42.12-.1.03-.2.07-.3.11h-.01c-.01 0-.01 0-.02.01-.23.09-.46.2-.68.31L18 14.68z"/></svg>`;
   const SHARE_ICON = `<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>`;
@@ -771,6 +786,7 @@ function renderCalendarList() {
   // whole list can be freely reordered via drag & drop.
   const entries = [];
   const hiddenLocal = loadHiddenLocalCals();  // per-device hide for shared-with-me calendars
+  const sharedHidden = loadSidebarHiddenShared();  // per-device sidebar hide (shared cals)
   state.accounts.forEach(acc => {
     (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
       entries.push({ key: `caldav:${cal.id}`, source: 'caldav', dataId: `data-cal-id="${cal.id}"`,
@@ -785,16 +801,17 @@ function renderCalendarList() {
       name: cal.name, color: cal.color, enabled: cal.enabled,
       reminders: true, remindersEnabled: cal.reminders_enabled !== false,
       sourceLabel: t('cal_local'), groupVisible: cal.id === groupVisibleId,
-      remove: { icon: TRASH, title: t('remove_cal') } });
+      remove: { icon: EYE_OFF, title: t('hide_cal') } });
   });
-  state.localCalendars.filter(c => c.owned === false && !c.group).forEach(cal => {
+  state.localCalendars.filter(c => c.owned === false && !c.group && !sharedHidden.has(c.id)).forEach(cal => {
     const readOnly = cal.permission !== 'read_write';
     // A shared calendar is shown to the recipient under the OWNER's name
     // (e.g. Guido's "Persönlich" appears as "Guido"); the original calendar
     // name stays in the sub-label so it's still identifiable.
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.shared_by || cal.name, color: cal.color, enabled: !hiddenLocal.has(cal.id), readOnly,
-      sourceLabel: `${t('shared_with_me')} · ${cal.name}${readOnly ? ' · ' + t('perm_read') : ''}`, remove: null });
+      sourceLabel: `${t('shared_with_me')} · ${cal.name}${readOnly ? ' · ' + t('perm_read') : ''}`,
+      remove: { icon: EYE_OFF, title: t('hide_cal') } });
   });
   // Group calendars (owned by the creator or reached via membership) — shown so
   // they can be toggled/recoloured. Owned group calendars can also be muted
@@ -811,7 +828,7 @@ function renderCalendarList() {
     entries.push({ key: `ical:${sub.id}`, source: 'ical', dataId: `data-sub-id="${sub.id}"`,
       name: sub.name, color: sub.color, enabled: sub.enabled,
       reminders: true, remindersEnabled: sub.reminders_enabled !== false,
-      sourceLabel: t('cal_ical'), remove: { icon: TRASH, title: t('remove_ical_sub') } });
+      sourceLabel: t('cal_ical'), remove: { icon: EYE_OFF, title: t('hide_cal') } });
   });
   state.googleAccounts.forEach(acc => {
     (acc.calendars || []).filter(c => !c.sidebar_hidden).forEach(cal => {
@@ -1100,16 +1117,22 @@ function renderCalendarList() {
         }
         cacheCalId = calId;
       } else if (source === 'local') {
-        if (!await confirmModal(t('confirm_delete_local_cal'), { title: t('confirm_delete_cal_title'), okLabel: t('delete') })) return;
+        // Hide from the sidebar (non-destructive; delete lives in Settings).
+        // Owned calendars use the server flag; shared ones a per-device hide.
         const calId = parseInt(btn.dataset.calId);
-        await api.delete(`/local/calendars/${calId}`);
-        state.localCalendars = state.localCalendars.filter(c => c.id !== calId);
+        const cal = state.localCalendars.find(c => c.id === calId);
+        if (cal && cal.owned === false) {
+          setSidebarHiddenShared(calId, true);
+        } else {
+          await api.put(`/local/calendars/${calId}`, { enabled: false, sidebar_hidden: true });
+          if (cal) { cal.enabled = false; cal.sidebar_hidden = true; }
+        }
         cacheCalId = `local-${calId}`;
       } else if (source === 'ical') {
-        if (!await confirmModal(t('confirm_remove_ical'), { title: t('confirm_remove_ical_title'), okLabel: t('delete') })) return;
         const subId = parseInt(btn.dataset.subId);
-        await api.delete(`/ical/subscriptions/${subId}`);
-        state.icalSubscriptions = state.icalSubscriptions.filter(s => s.id !== subId);
+        await api.put(`/ical/subscriptions/${subId}`, { enabled: false, sidebar_hidden: true });
+        const sub = state.icalSubscriptions.find(s => s.id === subId);
+        if (sub) { sub.enabled = false; sub.sidebar_hidden = true; }
         cacheCalId = `ical-${subId}`;
       } else if (source === 'google') {
         const calId = parseInt(btn.dataset.calId);
@@ -4200,13 +4223,14 @@ function renderCalendarTable() {
   // management actions since I don't own them. Shown under the owner's name.
   const sharedWithMe = state.localCalendars.filter(c => c.owned === false && !c.group);
   if (sharedWithMe.length) {
+    const sharedHidden = loadSidebarHiddenShared();
     rows += `<tr class="ct-section-row"><td colspan="7">${t('shared_with_me')}</td></tr>`;
     for (const cal of sharedWithMe) {
       const readOnly = cal.permission !== 'read_write';
       rows += `<tr>
         <td>${dot(cal.color, '#34a853')}${escHtml(cal.shared_by || cal.name)}</td>
         <td class="ct-src">${escHtml(cal.name)} <span class="cal-badge">${readOnly ? t('perm_read') : t('perm_read_write')}</span></td>
-        <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+        <td>${hid('shared', cal.id, !sharedHidden.has(cal.id))}</td><td>—</td><td>—</td><td>—</td><td>—</td>
       </tr>`;
       rowCount++;
     }
@@ -4231,7 +4255,10 @@ function renderCalendarTable() {
       const src = btn.dataset.ctHid, id = parseInt(btn.dataset.ctId);
       const hidden = btn.dataset.ctVisible === '1'; // currently visible → we're hiding it
       try {
-        if (src === 'ical') {
+        if (src === 'shared') {
+          // Shared-with-me calendar: per-device sidebar hide (not owned).
+          setSidebarHiddenShared(id, hidden);
+        } else if (src === 'ical') {
           await api.put(`/ical/subscriptions/${id}`, { enabled: !hidden, sidebar_hidden: hidden });
           const s = state.icalSubscriptions.find(s => s.id === id);
           if (s) { s.sidebar_hidden = hidden; s.enabled = !hidden; }
