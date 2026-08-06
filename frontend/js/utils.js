@@ -1,4 +1,5 @@
 import { DEFAULT_COLORS, INSTANCE_DEFAULTS, baseColor } from './settings-sync.js';
+import { getLocale } from './i18n.js';
 
 export function isToday(d) {
   const now = new Date();
@@ -39,7 +40,7 @@ export function birthdayIconSvg() {
 }
 
 export function formatDate(d, opts = {}) {
-  return d.toLocaleDateString('de', opts);
+  return d.toLocaleDateString(getLocale(), opts);
 }
 
 export function dateKey(d) {

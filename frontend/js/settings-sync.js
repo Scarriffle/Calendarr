@@ -5,6 +5,8 @@
 // syncable value so that "not synced" works per browser, plus the declarative
 // table definition the settings UI renders from. See backend/SETTINGS_SYNC.md.
 
+import { LANGUAGES } from './i18n.js';
+
 // Canonical default colours — the single source for the web. Reset writes these.
 export const DEFAULT_COLORS = {
   primary_color:       '#58B900',
@@ -59,9 +61,11 @@ export const SETTING_GROUPS = [
   {
     titleKey: 'settings_language',
     rows: [
-      { key: 'language', labelKey: 'settings_language', type: 'select', opts: [
-        { v: 'de', label: 'Deutsch' }, { v: 'en', label: 'English' },
-      ] },
+      // Derived from the i18n registry: adding a language there adds it here.
+      // Each language is listed under its own endonym, so the labels are never
+      // translated — a Finn looks for "Suomi", not "Finnisch".
+      { key: 'language', labelKey: 'settings_language', type: 'select',
+        opts: LANGUAGES.map(l => ({ v: l.code, label: l.label })) },
       { key: 'share_calendar_icon', labelKey: 'settings_share_icon', type: 'icon' },
     ],
   },

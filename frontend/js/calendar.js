@@ -6,7 +6,7 @@ import { renderAgenda } from './views/agenda.js';
 import { renderQuarter } from './views/quarter.js';
 import { openColorPicker } from './color-picker.js';
 import { openDatePicker, formatDtDisplay } from './date-picker.js';
-import { t, setLang, getLang } from './i18n.js';
+import { t, setLang, getLocale } from './i18n.js';
 import { DEFAULT_COLORS, SETTING_GROUPS, SYNCABLE_KEYS, loadLocal, saveLocal, mergeEffective, baseColor, setInstanceDefaults } from './settings-sync.js';
 import { loadInstance, reloadInstance, instanceConfig } from './instance.js';
 import { APP_VERSION } from './version.js';
@@ -1912,7 +1912,7 @@ function setDtValue(id, isoStr, mode) {
   const display = document.getElementById(id + '-display');
   if (display) {
     display.querySelector('.dt-display-text').textContent =
-      formatDtDisplay(isoStr, mode, getLang());
+      formatDtDisplay(isoStr, mode);
   }
 }
 
@@ -3963,7 +3963,7 @@ function renderBirthdaySettings() {
       const rowEl = document.createElement('div');
       rowEl.className = 'form-hint';
       rowEl.style.margin = '0 0 2px';
-      const when = d.last_sync ? new Date(d.last_sync).toLocaleDateString() : '';
+      const when = d.last_sync ? new Date(d.last_sync).toLocaleDateString(getLocale()) : '';
       rowEl.textContent = `${d.device_name} — ${t('birthday_devices_count', { n: d.count })}${when ? ' · ' + when : ''}`;
       devicesWrap.appendChild(rowEl);
     });
@@ -4937,7 +4937,7 @@ function initAppPasswords() {
       appPwList.innerHTML = rows.length
         ? rows.map(r => `<div class="app-pw-item">
             <span class="app-pw-name">${escHtml(r.label)}</span>
-            <span class="app-pw-meta">${r.last_used_at ? t('app_pw_last_used') + ' ' + new Date(r.last_used_at).toLocaleDateString() : t('app_pw_never_used')}</span>
+            <span class="app-pw-meta">${r.last_used_at ? t('app_pw_last_used') + ' ' + new Date(r.last_used_at).toLocaleDateString(getLocale()) : t('app_pw_never_used')}</span>
             <button class="btn btn-ghost btn-sm app-pw-del" data-id="${r.id}">${t('app_pw_revoke')}</button>
           </div>`).join('')
         : `<p class="text-muted">${t('app_pw_none')}</p>`;
@@ -5138,10 +5138,10 @@ export function showToast(msg, isError = false) {
 
 // ── Helpers ───────────────────────────────────────────────
 function fmtTime(d) {
-  return d.toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 function fmtDatetime(d) {
-  return d.toLocaleString('de', { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+  return d.toLocaleString(getLocale(), { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

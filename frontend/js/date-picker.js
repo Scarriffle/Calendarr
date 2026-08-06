@@ -5,7 +5,7 @@
  *   value  : ISO string ("YYYY-MM-DDTHH:MM" | "YYYY-MM-DD") or ""
  *   mode   : 'datetime' | 'date'
  */
-import { t } from './i18n.js';
+import { t, getLocale } from './i18n.js';
 
 const ITEM_H  = 40;  // px per scroll item
 const VISIBLE = 3;   // visible items in time scroller
@@ -250,16 +250,16 @@ export function openDatePicker(anchor, value, mode = 'datetime') {
 /**
  * Format an ISO value for display in the UI
  * mode: 'datetime' | 'date'
- * lang: 'de' | 'en'
+ * Formatting follows the active UI language via the i18n locale registry.
  */
-export function formatDtDisplay(isoStr, mode, lang = 'de') {
+export function formatDtDisplay(isoStr, mode) {
   if (!isoStr) return '—';
   try {
     const d = mode === 'datetime'
       ? new Date(isoStr.replace(' ', 'T'))
       : new Date(isoStr + 'T00:00:00');
     if (isNaN(d)) return isoStr;
-    const locale = lang === 'en' ? 'en-GB' : 'de-CH';
+    const locale = getLocale();
     if (mode === 'datetime') {
       return d.toLocaleString(locale, {
         day: '2-digit', month: '2-digit', year: 'numeric',

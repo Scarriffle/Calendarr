@@ -1,5 +1,5 @@
 import { isToday, isPast, isSameDay, dayOfWeek, weekStart, getISOWeekNumber, eventTitle, birthdayIconSvg } from '../utils.js';
-import { t } from '../i18n.js';
+import { t, getLocale } from '../i18n.js';
 
 const LANE_H   = 20; // px per lane (event height 18px + 2px gap)
 const DAY_H    = 30; // day-number row height
@@ -251,7 +251,7 @@ function dateKey(d) {
 }
 
 function fmtTime(d) {
-  return d.toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 function escHtml(s) {

@@ -1,5 +1,5 @@
 import { isToday, isPast, dayOfWeek, weekStart, getISOWeekNumber, eventTitle, birthdayIconSvg } from '../utils.js';
-import { t } from '../i18n.js';
+import { t, getLocale } from '../i18n.js';
 
 export function renderWeek(container, currentDate, events, onSlotClick, onEventClick, isSingleDay = false, weekStartDay = 'monday', hourH = 60) {
   // Build the days array (7 days for week, 1 for day)
@@ -352,7 +352,7 @@ function isSameDay(a, b) {
 }
 
 function fmtTime(d) {
-  return d.toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 function escHtml(s) {

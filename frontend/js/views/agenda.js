@@ -1,5 +1,5 @@
 import { isPast, eventTitle, birthdayIconSvg } from '../utils.js';
-import { t, getLang } from '../i18n.js';
+import { t, getLocale } from '../i18n.js';
 
 export function renderAgenda(container, currentDate, events, onEventClick) {
   if (!events.length) {
@@ -94,7 +94,7 @@ function isTodayDate(d) {
 }
 
 function fmtTime(d) {
-  return d.toLocaleTimeString(getLang(), { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 function escHtml(s) {
