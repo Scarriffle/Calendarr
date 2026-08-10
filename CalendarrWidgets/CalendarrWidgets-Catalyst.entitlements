@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Mac Catalyst entitlements for the widget extension. Deliberately minimal:
+	  the widget only ever reads the snapshot from the App Group container. It
+	  does no networking, touches no Contacts, and needs no keychain access.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+
+	<!-- Must match CalendarrAppGroup.current on this platform, byte for byte. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>PP34X97WS3.group.com.scarriffleservices.calendarr</string>
+	</array>
+</dict>
+</plist>

@@ -4,9 +4,30 @@ import WidgetKit
 #endif
 
 /// App-Group identifier shared between the main app and the widget extension.
-/// IMPORTANT: This must match the App Group capability in BOTH targets
-/// and the App Group ID registered in the Apple Developer Portal.
-let widgetAppGroupID = "group.com.scarriffleservices.calendarr"
+///
+/// IMPORTANT: this must stay byte-identical to `com.apple.security.application-groups`
+/// in the matching .entitlements file for the platform being built, and match the
+/// App Group registered in the Apple Developer portal.
+///
+/// The identifier registered in the portal never changes — only the string the
+/// *runtime* expects does. macOS (including Mac Catalyst) requires the Team ID
+/// prefix; iOS forbids it. Get this wrong and `containerURL(forSecurityApplication‑
+/// GroupIdentifier:)` returns nil, every read and write below quietly no-ops, and
+/// the widgets show placeholder content forever with no error anywhere.
+enum CalendarrAppGroup {
+    /// As registered in the Apple Developer portal.
+    static let unprefixed = "group.com.scarriffleservices.calendarr"
+    /// Team ID — the value `$(AppIdentifierPrefix)` expands to at build time.
+    static let teamID = "PP34X97WS3"
+
+    #if os(macOS) || targetEnvironment(macCatalyst)
+    static let current = "\(teamID).\(unprefixed)"
+    #else
+    static let current = unprefixed
+    #endif
+}
+
+let widgetAppGroupID = CalendarrAppGroup.current
 
 /// Lightweight calendar descriptor stored alongside the event cache so the
 /// widget configuration intent can offer calendar options without a network call.
@@ -108,7 +129,18 @@ enum WidgetStore {
     private static let calendarsFilename = "widget-calendars.json"
 
     private static var containerURL: URL? {
-        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: widgetAppGroupID)
+        let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: widgetAppGroupID)
+        #if DEBUG
+        if url == nil {
+            // A nil container is always a build-configuration bug: the entitlement
+            // is missing, or its value does not match widgetAppGroupID. It is
+            // otherwise completely silent, so make it loud while developing.
+            assertionFailure("App Group container unavailable for \(widgetAppGroupID) — "
+                             + "check com.apple.security.application-groups in the "
+                             + "entitlements for this platform.")
+        }
+        #endif
+        return url
     }
 
     private static var cacheURL: URL? {

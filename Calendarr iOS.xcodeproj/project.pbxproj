@@ -490,10 +490,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Calendarr iOS/Calendarr iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Calendarr iOS/Calendarr iOS-Catalyst.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_CFBundleName = Calendarr;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
@@ -533,10 +535,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Calendarr iOS/Calendarr iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Calendarr iOS/Calendarr iOS-Catalyst.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_CFBundleName = Calendarr;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
@@ -575,6 +579,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = CalendarrWidgets/CalendarrWidgets.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "CalendarrWidgets/CalendarrWidgets-Catalyst.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -608,6 +613,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = CalendarrWidgets/CalendarrWidgets.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "CalendarrWidgets/CalendarrWidgets-Catalyst.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				GENERATE_INFOPLIST_FILE = NO;
