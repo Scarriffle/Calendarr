@@ -79,6 +79,12 @@ public struct SnapshotTheme: Sendable, Hashable {
     public let line: String
     public let primary: String
     public let accent: String
+
+    public init(today: String, text: String, background: String,
+                line: String, primary: String, accent: String) {
+        self.today = today; self.text = text; self.background = background
+        self.line = line; self.primary = primary; self.accent = accent
+    }
 }
 
 // MARK: - Snapshot

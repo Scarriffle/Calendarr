@@ -59,7 +59,17 @@ public struct SnapshotStore: Sendable {
         }
         let url = container.appendingPathComponent(Self.cacheFilename)
 
-        guard FileManager.default.fileExists(atPath: url.path) else { return .neverWritten }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            // No cache. Signing out deletes the events — keeping them would leak
+            // the previous user's calendar — so the session file is what tells
+            // "signed out" apart from "never ran here". Answering that in one
+            // call keeps every consumer from reimplementing the distinction.
+            if let session = SharedSessionStore(appGroupID: appGroupID).read(),
+               !session.isLoggedIn {
+                return .loggedOut(writtenAt: session.writtenAt)
+            }
+            return .neverWritten
+        }
 
         let data: Data
         do { data = try Data(contentsOf: url) }
