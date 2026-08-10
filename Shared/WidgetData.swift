@@ -152,6 +152,17 @@ enum WidgetStore {
         return (try? JSONDecoder().decode([WidgetCalendar].self, from: data)) ?? []
     }
 
+    /// Drop the cached snapshot and calendar list. Called on logout and on
+    /// server reset: without this the files survive, and widgets — plus any
+    /// other app reading the group container — keep rendering the previous
+    /// user's events indefinitely.
+    static func clear() {
+        for url in [cacheURL, calendarsURL].compactMap({ $0 }) {
+            try? FileManager.default.removeItem(at: url)
+        }
+        WidgetTimelineNotifier.reload()
+    }
+
     /// Rewrite the existing snapshot with the latest colour / language values
     /// from UserDefaults. Used when the user tweaks an appearance setting and
     /// we want the widgets to refresh immediately, without needing a new event

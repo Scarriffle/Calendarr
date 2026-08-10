@@ -1,5 +1,4 @@
 import SwiftUI
-import Security
 
 @main
 struct CalendarrApp: App {
@@ -25,15 +24,43 @@ class AppState {
 
     init() {
         serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""
-        // Migrate a token previously kept in UserDefaults into the Keychain once,
-        // so existing logins survive the change without re-authenticating.
-        if let legacy = UserDefaults.standard.string(forKey: "authToken"), !legacy.isEmpty {
-            Keychain.set(legacy, for: "authToken")
-            UserDefaults.standard.removeObject(forKey: "authToken")
-        }
-        authToken = Keychain.get("authToken") ?? ""
+        authToken = Self.loadToken()
         username = UserDefaults.standard.string(forKey: "username") ?? ""
         isAdmin = UserDefaults.standard.bool(forKey: "isAdmin")
+    }
+
+    /// Find the stored token, migrating it forward from wherever an older build
+    /// left it. Runs on every launch but does real work only once.
+    ///
+    /// Step 2 is the one that keeps existing users signed in. Before the
+    /// `keychain-access-groups` entitlement existed, items landed in the app's
+    /// own default group. Adding the entitlement makes the *first* array entry
+    /// the new default — and that entry is deliberately the app's own group, so
+    /// an unqualified query still resolves those items and we can copy them
+    /// across instead of stranding them.
+    private static func loadToken() -> String {
+        let key = "authToken"
+
+        // 1. Already in the shared group — the steady state.
+        if let token = try? KeychainStore.get(key), !token.isEmpty {
+            return token
+        }
+
+        // 2. In the app's own default group, written before the entitlement.
+        if let token = try? KeychainStore.get(key, accessGroup: nil), !token.isEmpty {
+            try? KeychainStore.set(token, for: key)
+            try? KeychainStore.set(nil, for: key, accessGroup: nil)
+            return token
+        }
+
+        // 3. In UserDefaults, written before secrets moved to the Keychain.
+        if let legacy = UserDefaults.standard.string(forKey: key), !legacy.isEmpty {
+            try? KeychainStore.set(legacy, for: key)
+            UserDefaults.standard.removeObject(forKey: key)
+            return legacy
+        }
+
+        return ""
     }
 
     func saveServer(url: String) {
@@ -46,7 +73,7 @@ class AppState {
         authToken = token
         username = user
         isAdmin = admin
-        Keychain.set(token, for: "authToken")   // secret → Keychain, not UserDefaults
+        try? KeychainStore.set(token, for: "authToken")   // secret → Keychain, not UserDefaults
         UserDefaults.standard.set(user, forKey: "username")
         UserDefaults.standard.set(admin, forKey: "isAdmin")
     }
@@ -55,49 +82,19 @@ class AppState {
         authToken = ""
         username = ""
         isAdmin = false
-        Keychain.set(nil, for: "authToken")
-        UserDefaults.standard.removeObject(forKey: "authToken")  // clear any legacy copy
+        try? KeychainStore.set(nil, for: "authToken")
+        try? KeychainStore.set(nil, for: "authToken", accessGroup: nil)  // pre-entitlement copy
+        UserDefaults.standard.removeObject(forKey: "authToken")          // pre-Keychain copy
         UserDefaults.standard.removeObject(forKey: "username")
         UserDefaults.standard.removeObject(forKey: "isAdmin")
+        // The shared container outlives the session, so it has to be cleared
+        // explicitly — otherwise widgets keep showing the signed-out user's data.
+        WidgetStore.clear()
     }
 
     func resetServer() {
         logout()
         serverURL = ""
         UserDefaults.standard.removeObject(forKey: "serverURL")
-    }
-}
-
-/// Minimal Keychain wrapper for secrets (the auth bearer token). Values are
-/// stored as generic passwords, accessible after first unlock.
-enum Keychain {
-    private static let service = "Calendarr"
-
-    static func set(_ value: String?, for key: String) {
-        let base: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-        ]
-        SecItemDelete(base as CFDictionary)
-        guard let value, let data = value.data(using: .utf8) else { return }
-        var add = base
-        add[kSecValueData as String] = data
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(add as CFDictionary, nil)
-    }
-
-    static func get(_ key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var out: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &out) == errSecSuccess,
-              let data = out as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
     }
 }
