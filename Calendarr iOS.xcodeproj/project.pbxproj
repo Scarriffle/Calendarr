@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		D0001A0CABCDEF0100AB5001 /* CalendarrWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CA1E4D0A0002000000000001 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000001 /* CalendarrCore */; };
+		CA1E4D0A0002000000000002 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000002 /* CalendarrCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -95,6 +97,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CA1E4D0A0002000000000001 /* CalendarrCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -102,6 +105,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CA1E4D0A0002000000000002 /* CalendarrCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -175,6 +179,7 @@
 			);
 			name = "Calendarr iOS";
 			packageProductDependencies = (
+				CA1E4D0A0001000000000001 /* CalendarrCore */,
 			);
 			productName = "Calendarr iOS";
 			productReference = C0000B01FC4E10100AB5001 /* Calendarr iOS.app */;
@@ -198,6 +203,7 @@
 			);
 			name = CalendarrWidgets;
 			packageProductDependencies = (
+				CA1E4D0A0001000000000002 /* CalendarrCore */,
 			);
 			productName = CalendarrWidgets;
 			productReference = D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */;
@@ -235,6 +241,9 @@
 			);
 			mainGroup = C0000201FB4E10100AB5001;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				39450EFC302A266A0090DDD7 /* XCLocalSwiftPackageReference "../CalendarrKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C0000C01FB4E10100AB5001 /* Products */;
 			projectDirPath = "";
@@ -493,9 +502,9 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Calendarr iOS/Calendarr iOS-Catalyst.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = PP34X97WS3;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_CFBundleName = Calendarr;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
@@ -538,9 +547,9 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Calendarr iOS/Calendarr iOS-Catalyst.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = PP34X97WS3;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_CFBundleName = Calendarr;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
@@ -683,6 +692,24 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CA1E4D0A0001000000000001 /* CalendarrCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CalendarrCore;
+		};
+		CA1E4D0A0001000000000002 /* CalendarrCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CalendarrCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		39450EFC302A266A0090DDD7 /* XCLocalSwiftPackageReference "../CalendarrKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../CalendarrKit;
+		};
+/* End XCLocalSwiftPackageReference section */
 	};
 	rootObject = C0000301FB4E10100AB5001 /* Project object */;
 }

@@ -1,220 +1,135 @@
 import Foundation
+@_spi(Writer) import CalendarrCore
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
 
-/// App-Group identifier shared between the main app and the widget extension.
-///
-/// IMPORTANT: this must stay byte-identical to `com.apple.security.application-groups`
-/// in the matching .entitlements file for the platform being built, and match the
-/// App Group registered in the Apple Developer portal.
-///
-/// The identifier registered in the portal never changes — only the string the
-/// *runtime* expects does. macOS (including Mac Catalyst) requires the Team ID
-/// prefix; iOS forbids it. Get this wrong and `containerURL(forSecurityApplication‑
-/// GroupIdentifier:)` returns nil, every read and write below quietly no-ops, and
-/// the widgets show placeholder content forever with no error anywhere.
-enum CalendarrAppGroup {
-    /// As registered in the Apple Developer portal.
-    static let unprefixed = "group.com.scarriffleservices.calendarr"
-    /// Team ID — the value `$(AppIdentifierPrefix)` expands to at build time.
-    static let teamID = "PP34X97WS3"
+// The snapshot types and the App Group plumbing now live in CalendarrCore, so
+// that a second app from this team reads the exact same format instead of
+// reimplementing it and drifting.
+//
+// These aliases keep the ~70 existing call sites in the app and the widget
+// compiling unchanged. They are a migration convenience, not a design: new code
+// should use the CalendarrCore names directly.
+typealias WidgetEvent = SnapshotEvent
+typealias WidgetCalendar = SnapshotCalendar
+typealias WidgetSnapshot = CalendarrSnapshot
 
-    #if os(macOS) || targetEnvironment(macCatalyst)
-    static let current = "\(teamID).\(unprefixed)"
-    #else
-    static let current = unprefixed
-    #endif
-}
-
+/// The App Group identifier for this platform. See `CalendarrAppGroup`.
 let widgetAppGroupID = CalendarrAppGroup.current
 
-/// Lightweight calendar descriptor stored alongside the event cache so the
-/// widget configuration intent can offer calendar options without a network call.
-struct WidgetCalendar: Codable, Identifiable, Hashable {
-    let id: String       // calendarKey ("source-calendarId")
-    let name: String
-    let colorHex: String
+extension CalendarrSnapshot {
+    // The six colours are stored flat on the wire for backwards compatibility
+    // but exposed as `theme` in the package. These keep the widget views, which
+    // read them individually, from having to change.
+    var todayColorHex: String      { theme.today }
+    var textColorHex: String       { theme.text }
+    var backgroundColorHex: String { theme.background }
+    var lineColorHex: String       { theme.line }
+    var primaryColorHex: String    { theme.primary }
+    var accentColorHex: String     { theme.accent }
 }
 
-/// Lightweight event representation that lives inside the widget cache.
-/// We strip everything the widget doesn't need (notes, calendar IDs, URLs).
-struct WidgetEvent: Codable, Hashable, Identifiable {
-    let id: String
-    let title: String
-    let start: Date
-    let end: Date
-    let isAllDay: Bool
-    let colorHex: String
-    let location: String
-    let calendarKey: String   // used for per-calendar filtering in widget config
-
-    init(id: String, title: String, start: Date, end: Date,
-         isAllDay: Bool, colorHex: String, location: String, calendarKey: String) {
-        self.id = id; self.title = title; self.start = start; self.end = end
-        self.isAllDay = isAllDay; self.colorHex = colorHex
-        self.location = location; self.calendarKey = calendarKey
-    }
-
-    // Backward-compatible decoder: old caches have no calendarKey field.
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id         = try c.decode(String.self, forKey: .id)
-        title      = try c.decode(String.self, forKey: .title)
-        start      = try c.decode(Date.self,   forKey: .start)
-        end        = try c.decode(Date.self,   forKey: .end)
-        isAllDay   = try c.decode(Bool.self,   forKey: .isAllDay)
-        colorHex   = try c.decode(String.self, forKey: .colorHex)
-        location   = try c.decode(String.self, forKey: .location)
-        calendarKey = try c.decodeIfPresent(String.self, forKey: .calendarKey) ?? ""
-    }
-}
-
-/// Snapshot blob the app writes to the App-Group container and the widget reads.
-struct WidgetSnapshot: Codable {
-    let writtenAt: Date
-    let events: [WidgetEvent]
-    /// Mirrors the user's chosen visual settings so the widget looks the same
-    /// as the app even when its own AppStorage in the extension is empty.
-    let todayColorHex: String
-    let textColorHex: String
-    let backgroundColorHex: String
-    let lineColorHex: String
-    let primaryColorHex: String
-    let accentColorHex: String
-    let language: String
-
-    init(writtenAt: Date,
-         events: [WidgetEvent],
-         todayColorHex: String,
-         textColorHex: String,
-         backgroundColorHex: String,
-         lineColorHex: String,
-         primaryColorHex: String,
-         accentColorHex: String,
-         language: String) {
-        self.writtenAt = writtenAt
-        self.events = events
-        self.todayColorHex = todayColorHex
-        self.textColorHex = textColorHex
-        self.backgroundColorHex = backgroundColorHex
-        self.lineColorHex = lineColorHex
-        self.primaryColorHex = primaryColorHex
-        self.accentColorHex = accentColorHex
-        self.language = language
-    }
-
-    /// Custom decoder so older caches without the new colour fields still load.
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        writtenAt          = try c.decode(Date.self,           forKey: .writtenAt)
-        events             = try c.decode([WidgetEvent].self,  forKey: .events)
-        todayColorHex      = try c.decode(String.self,         forKey: .todayColorHex)
-        textColorHex       = try c.decode(String.self,         forKey: .textColorHex)
-        backgroundColorHex = try c.decode(String.self,         forKey: .backgroundColorHex)
-        lineColorHex       = try c.decode(String.self,         forKey: .lineColorHex)
-        language           = try c.decode(String.self,         forKey: .language)
-        primaryColorHex    = try c.decodeIfPresent(String.self, forKey: .primaryColorHex) ?? "#4285f4"
-        accentColorHex     = try c.decodeIfPresent(String.self, forKey: .accentColorHex)  ?? "#ea4335"
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case writtenAt, events, todayColorHex, textColorHex, backgroundColorHex
-        case lineColorHex, primaryColorHex, accentColorHex, language
-    }
-}
-
+/// Thin facade over `CalendarrCore.SnapshotStore`, preserving the static API the
+/// app and widget already use. Errors are swallowed here exactly as before —
+/// a failed widget cache write must never interrupt the user — but the store now
+/// reports *why* a read failed, which is what `read()` discards and callers that
+/// need the distinction should use `SnapshotStore` directly for.
 enum WidgetStore {
-    private static let cacheFilename     = "widget-cache.json"
-    private static let calendarsFilename = "widget-calendars.json"
+    private static let store = SnapshotStore()
+    private static let sessions = SharedSessionStore()
 
-    private static var containerURL: URL? {
-        let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: widgetAppGroupID)
-        #if DEBUG
-        if url == nil {
-            // A nil container is always a build-configuration bug: the entitlement
-            // is missing, or its value does not match widgetAppGroupID. It is
-            // otherwise completely silent, so make it loud while developing.
-            assertionFailure("App Group container unavailable for \(widgetAppGroupID) — "
-                             + "check com.apple.security.application-groups in the "
-                             + "entitlements for this platform.")
-        }
-        #endif
-        return url
+    /// Version of the app writing the cache, for diagnostics in the consumer.
+    private static var writerVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
     }
 
-    private static var cacheURL: URL? {
-        containerURL?.appendingPathComponent(cacheFilename)
-    }
-
-    private static var calendarsURL: URL? {
-        containerURL?.appendingPathComponent(calendarsFilename)
-    }
-
-    /// Called by the app whenever the event cache changes.
     static func write(_ snapshot: WidgetSnapshot) {
-        guard let url = cacheURL else { return }
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(snapshot) {
-            try? data.write(to: url, options: .atomic)
-        }
+        try? store.write(snapshot)
     }
 
-    /// Called by the widget timeline provider to load the latest snapshot.
     static func read() -> WidgetSnapshot? {
-        guard let url = cacheURL, let data = try? Data(contentsOf: url) else { return nil }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try? decoder.decode(WidgetSnapshot.self, from: data)
+        store.read().snapshot
     }
 
-    /// Write the list of available calendars so the widget intent can offer
-    /// calendar options for filtering without a network call.
     static func writeCalendars(_ calendars: [WidgetCalendar]) {
-        guard let url = calendarsURL else { return }
-        if let data = try? JSONEncoder().encode(calendars) {
-            try? data.write(to: url, options: .atomic)
-        }
+        try? store.writeCalendars(calendars)
     }
 
-    /// Read the calendar list written by the main app.
     static func readCalendars() -> [WidgetCalendar] {
-        guard let url = calendarsURL, let data = try? Data(contentsOf: url) else { return [] }
-        return (try? JSONDecoder().decode([WidgetCalendar].self, from: data)) ?? []
+        store.readCalendars()
     }
 
-    /// Drop the cached snapshot and calendar list. Called on logout and on
-    /// server reset: without this the files survive, and widgets — plus any
-    /// other app reading the group container — keep rendering the previous
-    /// user's events indefinitely.
+    /// Record which server we are pointed at and whether anyone is signed in, so
+    /// a reading app can tell "signed out" from "never ran" without reaching into
+    /// this app's UserDefaults, which lives in another sandbox.
+    static func writeSession(baseURL: String, username: String, isLoggedIn: Bool) {
+        try? sessions.write(SharedSession(baseURL: baseURL,
+                                          username: username,
+                                          isLoggedIn: isLoggedIn,
+                                          writtenAt: Date()))
+    }
+
+    /// Forget the session entirely. Used on server reset, where the app returns
+    /// to unconfigured and there is no longer a server worth naming.
+    static func clearSession() {
+        sessions.clear()
+    }
+
+    /// Drop the cached calendar. Called on sign-out and server reset: the
+    /// container outlives the session, so without this every reader keeps
+    /// rendering the previous user's events.
     static func clear() {
-        for url in [cacheURL, calendarsURL].compactMap({ $0 }) {
-            try? FileManager.default.removeItem(at: url)
-        }
+        store.clear()
         WidgetTimelineNotifier.reload()
     }
 
-    /// Rewrite the existing snapshot with the latest colour / language values
-    /// from UserDefaults. Used when the user tweaks an appearance setting and
-    /// we want the widgets to refresh immediately, without needing a new event
-    /// sync. No-op if there's no cached snapshot yet.
+    /// Rewrite the existing snapshot with the latest colour / language values so
+    /// widgets pick up an appearance change immediately, without waiting for the
+    /// next event sync. No-op when nothing is cached yet.
     static func republishAppearanceOnly() {
         guard let existing = read() else { return }
         let defaults = UserDefaults.standard
         let updated = WidgetSnapshot(
             writtenAt: Date(),
+            coverageStart: existing.coverageStart,
+            coverageEnd: existing.coverageEnd,
+            isLoggedIn: existing.isLoggedIn,
+            writerVersion: writerVersion,
             events: existing.events,
-            todayColorHex:      defaults.string(forKey: "todayColor")       ?? existing.todayColorHex,
-            textColorHex:       defaults.string(forKey: "textColor")        ?? existing.textColorHex,
-            backgroundColorHex: defaults.string(forKey: "backgroundColor")  ?? existing.backgroundColorHex,
-            lineColorHex:       defaults.string(forKey: "lineColor")        ?? existing.lineColorHex,
-            primaryColorHex:    defaults.string(forKey: "primaryColor")     ?? existing.primaryColorHex,
-            accentColorHex:     defaults.string(forKey: "accentColor")      ?? existing.accentColorHex,
-            language:           defaults.string(forKey: "appLanguage")      ?? existing.language
-        )
+            theme: SnapshotTheme(
+                today:      defaults.string(forKey: "todayColor")      ?? existing.theme.today,
+                text:       defaults.string(forKey: "textColor")       ?? existing.theme.text,
+                background: defaults.string(forKey: "backgroundColor") ?? existing.theme.background,
+                line:       defaults.string(forKey: "lineColor")       ?? existing.theme.line,
+                primary:    defaults.string(forKey: "primaryColor")    ?? existing.theme.primary,
+                accent:     defaults.string(forKey: "accentColor")     ?? existing.theme.accent),
+            language: defaults.string(forKey: "appLanguage") ?? existing.language)
         write(updated)
         WidgetTimelineNotifier.reload()
+    }
+
+    /// Build a snapshot from the app's current state. Kept here so the coverage
+    /// window and the writer version are stamped in exactly one place.
+    static func makeSnapshot(events: [WidgetEvent],
+                             coverageStart: Date,
+                             coverageEnd: Date) -> WidgetSnapshot {
+        let defaults = UserDefaults.standard
+        return WidgetSnapshot(
+            writtenAt: Date(),
+            coverageStart: coverageStart,
+            coverageEnd: coverageEnd,
+            isLoggedIn: true,          // only ever written while signed in
+            writerVersion: writerVersion,
+            events: events,
+            theme: SnapshotTheme(
+                today:      defaults.string(forKey: "todayColor")      ?? "#4285f4",
+                text:       defaults.string(forKey: "textColor")       ?? "#FFFFFF",
+                background: defaults.string(forKey: "backgroundColor") ?? "#000000",
+                line:       defaults.string(forKey: "lineColor")       ?? "#3A3A52",
+                primary:    defaults.string(forKey: "primaryColor")    ?? "#4285f4",
+                accent:     defaults.string(forKey: "accentColor")     ?? "#ea4335"),
+            language: defaults.string(forKey: "appLanguage") ?? "system")
     }
 }
 

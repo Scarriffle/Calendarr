@@ -41,16 +41,17 @@ struct CalendarrTimelineProvider: AppIntentTimelineProvider {
         let ids = (config.selectedCalendars ?? []).map { $0.id }
         guard !ids.isEmpty else { return snapshot }   // nothing selected = show all
         let keep = Set(ids)
+        // Filtering narrows the events but not the window: the snapshot still
+        // speaks for the same range, it just has fewer calendars in it.
         return WidgetSnapshot(
-            writtenAt:          snapshot.writtenAt,
-            events:             snapshot.events.filter { keep.contains($0.calendarKey) },
-            todayColorHex:      snapshot.todayColorHex,
-            textColorHex:       snapshot.textColorHex,
-            backgroundColorHex: snapshot.backgroundColorHex,
-            lineColorHex:       snapshot.lineColorHex,
-            primaryColorHex:    snapshot.primaryColorHex,
-            accentColorHex:     snapshot.accentColorHex,
-            language:           snapshot.language
+            writtenAt:     snapshot.writtenAt,
+            coverageStart: snapshot.coverageStart,
+            coverageEnd:   snapshot.coverageEnd,
+            isLoggedIn:    snapshot.isLoggedIn,
+            writerVersion: snapshot.writerVersion,
+            events:        snapshot.events.filter { keep.contains($0.calendarKey) },
+            theme:         snapshot.theme,
+            language:      snapshot.language
         )
     }
 }

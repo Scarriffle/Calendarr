@@ -76,6 +76,17 @@ class AppState {
         try? KeychainStore.set(token, for: "authToken")   // secret → Keychain, not UserDefaults
         UserDefaults.standard.set(user, forKey: "username")
         UserDefaults.standard.set(admin, forKey: "isAdmin")
+        publishSession()
+    }
+
+    /// Mirror the non-secret session facts into the shared container. Apps in
+    /// another sandbox cannot read our UserDefaults, so this is how they learn
+    /// which server we point at and whether anyone is signed in. The token
+    /// itself stays in the shared keychain group, never in a plain file.
+    private func publishSession() {
+        WidgetStore.writeSession(baseURL: serverURL,
+                                 username: username,
+                                 isLoggedIn: isLoggedIn)
     }
 
     func logout() {
@@ -89,12 +100,18 @@ class AppState {
         UserDefaults.standard.removeObject(forKey: "isAdmin")
         // The shared container outlives the session, so it has to be cleared
         // explicitly — otherwise widgets keep showing the signed-out user's data.
+        // The session record stays behind, flagged signed-out, so a reader can
+        // say "sign in to Calendarr" rather than "open Calendarr once".
         WidgetStore.clear()
+        publishSession()
     }
 
     func resetServer() {
         logout()
         serverURL = ""
         UserDefaults.standard.removeObject(forKey: "serverURL")
+        // Back to unconfigured: there is no server left to name, so drop the
+        // session record rather than leaving a stale URL in the container.
+        WidgetStore.clearSession()
     }
 }

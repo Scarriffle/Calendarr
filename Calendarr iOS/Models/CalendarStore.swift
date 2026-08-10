@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import CalendarrCore
 
 extension Notification.Name {
     /// Posted whenever the persistent "banished calendars" set is mutated from
@@ -579,8 +580,12 @@ class CalendarStore {
         let now = Date()
         // Include the week before today so widgets that show the current week
         // (e.g. "This Week", "Up Next + Calendar") have data for Monday–today.
-        let from = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: now)) ?? now
-        let to   = cal.date(byAdding: .day, value: 42, to: cal.startOfDay(for: now)) ?? from
+        // The window is published in the snapshot as coverageStart/coverageEnd:
+        // outside it a reader has no information, which is not the same as
+        // having no events, and only the writer knows where the edge is.
+        let dayStart = cal.startOfDay(for: now)
+        let from = cal.date(byAdding: .day, value: -SnapshotCoverage.daysBehind, to: dayStart) ?? now
+        let to   = cal.date(byAdding: .day, value: SnapshotCoverage.daysAhead, to: dayStart) ?? from
 
         // Build the calendar list from all cached events (not just the window)
         // so every calendar appears in the widget configuration picker.
@@ -604,7 +609,7 @@ class CalendarStore {
                     && !banishedCalendarKeys.contains(key)
             }
             .sorted { $0.startDate < $1.startDate }
-            .prefix(500)
+            .prefix(SnapshotCoverage.maxEvents)
             .map { ev in
                 WidgetEvent(id: ev.id,
                             title: ev.title,
@@ -615,19 +620,9 @@ class CalendarStore {
                             location: ev.location,
                             calendarKey: Self.calendarKey(source: ev.source, calendarId: ev.calendarId))
             }
-        let defaults = UserDefaults.standard
-        let snap = WidgetSnapshot(
-            writtenAt: now,
-            events: Array(visible),
-            todayColorHex:      defaults.string(forKey: "todayColor")       ?? "#4285f4",
-            textColorHex:       defaults.string(forKey: "textColor")        ?? "#FFFFFF",
-            backgroundColorHex: defaults.string(forKey: "backgroundColor")  ?? "#000000",
-            lineColorHex:       defaults.string(forKey: "lineColor")        ?? "#3A3A52",
-            primaryColorHex:    defaults.string(forKey: "primaryColor")     ?? "#4285f4",
-            accentColorHex:     defaults.string(forKey: "accentColor")      ?? "#ea4335",
-            language:           defaults.string(forKey: "appLanguage")      ?? "system"
-        )
-        WidgetStore.write(snap)
+        WidgetStore.write(WidgetStore.makeSnapshot(events: Array(visible),
+                                                   coverageStart: from,
+                                                   coverageEnd: to))
         WidgetTimelineNotifier.reload()
     }
 
