@@ -32,11 +32,16 @@ struct CalendarEntityQuery: EntityQuery {
 }
 
 /// Widget configuration intent: lets the user pick which calendars to show.
-/// An empty selection means "show all calendars" (the default).
+/// No selection means "show all calendars" (the default).
+///
+/// The parameter must be optional: WidgetConfigurationIntent requires every
+/// parameter type to be optional, and the macOS/Mac Catalyst SDK enforces that
+/// where the iOS one lets a bare array through. `nil` and `[]` are treated
+/// alike downstream, so this is behaviour-preserving.
 struct CalendarSelectionIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Kalender auswählen"
     static var description = IntentDescription("Wähle welche Kalender im Widget angezeigt werden. Leer = alle Kalender.")
 
     @Parameter(title: "Kalender")
-    var selectedCalendars: [CalendarAppEntity]
+    var selectedCalendars: [CalendarAppEntity]?
 }

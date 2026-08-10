@@ -38,8 +38,8 @@ struct CalendarrTimelineProvider: AppIntentTimelineProvider {
 
     private func filtered(_ snapshot: WidgetSnapshot?, by config: CalendarSelectionIntent) -> WidgetSnapshot? {
         guard let snapshot else { return nil }
-        let ids = config.selectedCalendars.map { $0.id }
-        guard !ids.isEmpty else { return snapshot }   // empty = show all
+        let ids = (config.selectedCalendars ?? []).map { $0.id }
+        guard !ids.isEmpty else { return snapshot }   // nothing selected = show all
         let keep = Set(ids)
         return WidgetSnapshot(
             writtenAt:          snapshot.writtenAt,
