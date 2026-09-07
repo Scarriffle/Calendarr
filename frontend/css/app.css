@@ -587,11 +587,17 @@ a { color: var(--primary); text-decoration: none; }
   color: #fff; font-weight: 700;
 }
 .mini-day.selected:not(.today) { background: color-mix(in srgb, var(--day-selected-base) 15%, transparent); color: var(--primary); font-weight: 600; }
-.mini-day.has-events::after {
-  content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
-  width: 4px; height: 4px; border-radius: 50%; background: var(--primary);
+/* One dot per calendar with an event that day, in that calendar's colour. */
+.mini-dots {
+  position: absolute; bottom: 1px; left: 0; right: 0;
+  display: flex; justify-content: center; align-items: center; gap: 2px;
+  line-height: 0; pointer-events: none;
 }
-.mini-day.today.has-events::after { background: #fff; }
+.mini-dots i {
+  width: 4px; height: 4px; border-radius: 50%; flex: none;
+}
+/* Today's cell is a filled circle — ring the dots so they stay readable on it. */
+.mini-day.today .mini-dots i { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9); }
 
 /* ── Calendar List ──────────────────────────────────────── */
 .cal-list { padding: 8px 0; }
