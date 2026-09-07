@@ -559,6 +559,8 @@ function updateViewButtons() {
 }
 
 // ── Mini Calendar ─────────────────────────────────────────
+const MINI_MAX_DOTS = 4;
+
 function renderMiniCal() {
   const d = state.currentDate;
   const miniD = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -576,10 +578,14 @@ function renderMiniCal() {
   const DOW_LABELS = weekStartDay === 'sunday' ? DOW_SUNDAY : DOW_MONDAY;
   miniDowEls.forEach((el, i) => { el.textContent = DOW_LABELS[i]; });
 
-  // Build event date set — mark every day an event spans, not just its start
-  // day, so multi-day events (Urlaub/Ferien) show a dot across the whole range.
-  const eventDates = new Set();
-  state.events.forEach(ev => {
+  // Build per-day colour sets — one dot per calendar that has at least one event
+  // that day, in that calendar's colour. Every day an event spans is marked, not
+  // just its start day, so multi-day events (Urlaub/Ferien) mark the whole range.
+  const dayColors = new Map();   // 'y-m-d' → Set of colours
+  const colorRank = new Map();   // colour → first-seen index, for a stable dot order
+  filterEvents(state.events).forEach(ev => {
+    const color = ev.color || ev.calendarColor || '#4285f4';
+    if (!colorRank.has(color)) colorRank.set(color, colorRank.size);
     const s = new Date(ev.start);
     let end = new Date(ev.end || ev.start);
     // All-day events store an exclusive end → step back to the last real day.
@@ -588,7 +594,10 @@ function renderMiniCal() {
     const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
     let guard = 0;
     while (cur <= last && guard++ < 400) {
-      eventDates.add(`${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`);
+      const key = `${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`;
+      let set = dayColors.get(key);
+      if (!set) { set = new Set(); dayColors.set(key, set); }
+      set.add(color);
       cur.setDate(cur.getDate() + 1);
     }
   });
@@ -604,7 +613,8 @@ function renderMiniCal() {
     const isOther = day.getMonth() !== miniD.getMonth();
     const isToday_ = isToday(day);
     const isSelected = isSameDay(day, state.currentDate);
-    const hasEvs = eventDates.has(`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`);
+    const colors = dayColors.get(`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`);
+    const hasEvs = !!colors;
     const cls = [
       'mini-day',
       isOther   ? 'other-month' : '',
@@ -612,7 +622,14 @@ function renderMiniCal() {
       isSelected && !isToday_ ? 'selected' : '',
       hasEvs    ? 'has-events' : '',
     ].filter(Boolean).join(' ');
-    return `<div class="${cls}" data-date="${dateKey(day)}">${day.getDate()}</div>`;
+    // At most MINI_MAX_DOTS dots — more than that no longer fits under the digit.
+    const dots = hasEvs
+      ? '<span class="mini-dots">' + [...colors]
+          .sort((a, b) => colorRank.get(a) - colorRank.get(b))
+          .slice(0, MINI_MAX_DOTS)
+          .map(c => `<i style="background:${c}"></i>`).join('') + '</span>'
+      : '';
+    return `<div class="${cls}" data-date="${dateKey(day)}">${day.getDate()}${dots}</div>`;
   }).join('');
 
   document.getElementById('mini-days').innerHTML = html;
