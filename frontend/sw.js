@@ -7,7 +7,7 @@
 // the entry HTML / version files). New releases take effect on the next
 // reload, no manual SW unregister required.
 
-const CACHE_VERSION  = 'calendarr-v36';
+const CACHE_VERSION  = 'calendarr-v37';
 const OFFLINE_SHELL  = ['/', '/index.html'];
 
 self.addEventListener('install', event => {
@@ -33,6 +33,12 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+
+  // SSO: let the browser handle these itself. /start and /callback are
+  // redirects that must be followed as a top-level navigation and carry the
+  // flow cookie; wrapping them in fetch() would risk rendering the JSON
+  // offline fallback in the address bar.
+  if (url.pathname.startsWith('/api/auth/oidc/')) return;
 
   // API routes: always go to the network, no offline fallback (we'd just
   // be returning stale account/event data otherwise).

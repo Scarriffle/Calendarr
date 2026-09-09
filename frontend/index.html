@@ -80,6 +80,12 @@
       <div id="login-error" class="form-error hidden"></div>
       <button type="submit" class="btn btn-primary btn-full">Anmelden</button>
     </form>
+    <!-- Single sign-on: filled in by renderSsoButtons() when a provider is
+         configured, otherwise stays hidden and the login screen is unchanged. -->
+    <div id="sso-block" class="hidden">
+      <div class="auth-divider">oder</div>
+      <div id="sso-buttons"></div>
+    </div>
   </div>
   <button class="impressum-link" onclick="openImpressum()">©&nbsp;2026&nbsp;Scarriffleservices</button>
 </div>

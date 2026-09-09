@@ -20,7 +20,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    # bcrypt.checkpw raises ValueError when `hashed` is not a well-formed hash
+    # (empty string, a sentinel like "!", a truncated column). Uncaught, that
+    # became an HTTP 500 on /api/auth/login and on every CalDAV Basic-Auth
+    # attempt in dav_router. A malformed hash simply means "no password".
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 def get_password_hash(password: str) -> str:
@@ -46,6 +53,10 @@ def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # Other short-lived tokens are signed with the same key (e.g. the OIDC
+        # flow token); only a real access token may authenticate a request.
+        if payload.get("typ") not in (None, "access"):
+            raise exc
         username: str = payload.get("sub")
         if not username:
             raise exc

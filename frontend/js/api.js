@@ -1,6 +1,10 @@
 import { t } from './i18n.js';
 const BASE = '/api';
 
+// Paths where a 401 is a normal answer rather than an expired session, so the
+// auto-logout reload must not fire (it would loop on a failed SSO handoff).
+const NO_RELOAD_ON_401 = ['/auth/login', '/auth/oidc/complete', '/auth/oidc/exchange'];
+
 async function request(method, path, body = null, formEncoded = false) {
   const token = localStorage.getItem('token');
   const headers = {};
@@ -20,7 +24,7 @@ async function request(method, path, body = null, formEncoded = false) {
 
   const res = await fetch(`${BASE}${path}`, { method, headers, body: bodyStr });
 
-  if (res.status === 401 && !path.startsWith('/auth/login')) {
+  if (res.status === 401 && !NO_RELOAD_ON_401.some(p => path.startsWith(p))) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.reload();
@@ -108,4 +112,10 @@ export const api = {
 
   setupRequired: () => request('GET', '/auth/setup-required'),
   setup: (data)      => request('POST', '/auth/setup', data),
+
+  // Single sign-on. oidcComplete() trades the one-time HttpOnly handoff cookie
+  // set by the OIDC callback for the access token.
+  oidcProviders: () => request('GET',  '/auth/oidc/providers'),
+  oidcComplete:  () => request('POST', '/auth/oidc/complete', {}),
+  oidcIdentities: () => request('GET', '/auth/oidc/identities'),
 };

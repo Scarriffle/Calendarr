@@ -17,7 +17,7 @@ STATIC_CACHE = f"public, max-age={STATIC_MAX_AGE_SECONDS}, must-revalidate"
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import Base, engine
-from routers import admin_router, auth_router, birthdays_router, caldav_router, dav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, profile_router, settings_router, users_router
+from routers import admin_router, auth_router, birthdays_router, caldav_router, dav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, oidc_router, profile_router, settings_router, users_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -347,6 +347,41 @@ def _migrate():
         except Exception:
             pass
 
+        # ── OpenID Connect single sign-on ────────────────────────────────
+        # The oidc_identities table itself comes from create_all above; only
+        # the new users column and the indexes need retrofitting here.
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN auth_source VARCHAR(20) DEFAULT 'local'"))
+            conn.commit()
+            logging.info("Migration: added auth_source to users")
+        except Exception:
+            pass
+
+        try:
+            conn.execute(text("UPDATE users SET auth_source = 'local' "
+                              "WHERE auth_source IS NULL OR auth_source = ''"))
+            conn.commit()
+        except Exception:
+            pass
+
+        try:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_oidc_identity_provider_subject "
+                "ON oidc_identities(provider_key, subject)"
+            ))
+            conn.commit()
+        except Exception:
+            pass
+
+        try:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_oidc_identities_user_id "
+                "ON oidc_identities(user_id)"
+            ))
+            conn.commit()
+        except Exception:
+            pass
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
@@ -385,6 +420,7 @@ async def add_cache_headers(request: Request, call_next):
 
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
+app.include_router(oidc_router.router, prefix="/api/auth/oidc", tags=["oidc"])
 app.include_router(users_router.router, prefix="/api/users", tags=["users"])
 app.include_router(caldav_router.router, prefix="/api/caldav", tags=["caldav"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])

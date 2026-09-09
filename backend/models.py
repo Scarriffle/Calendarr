@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
@@ -20,6 +22,9 @@ class User(Base):
     # When true, the user is hidden from sharing/group picker directories
     # (/users/directory). Admin user management (/users/) still shows them.
     directory_hidden = Column(Boolean, default=False, nullable=False)
+    # 'local' (password login) or 'sso' (provisioned via OpenID Connect).
+    # SSO users have a random, unusable password_hash — see oidc_identity.
+    auth_source = Column(String(20), default="local")
 
     caldav_accounts = relationship(
         "CalDAVAccount", back_populates="user", cascade="all, delete-orphan"
@@ -38,6 +43,9 @@ class User(Base):
     )
     homeassistant_accounts = relationship(
         "HomeAssistantAccount", back_populates="user", cascade="all, delete-orphan"
+    )
+    oidc_identities = relationship(
+        "OIDCIdentity", back_populates="user", cascade="all, delete-orphan"
     )
 
     @property
@@ -450,3 +458,33 @@ class GroupCalendar(Base):
 
     group = relationship("Group", back_populates="group_calendar")
     calendar = relationship("LocalCalendar")
+
+
+class OIDCIdentity(Base):
+    """An external OpenID Connect identity linked to a Calendarr user.
+
+    A separate table rather than columns on ``users`` so one person can hold
+    identities at several providers (the multi-provider requirement).
+
+    Keyed on ``(provider_key, subject)`` and NOT on ``(issuer, subject)``: if
+    the web and mobile clients are registered as two Authentik *applications*
+    they have different issuer URLs, which would otherwise fork one human into
+    two accounts. ``issuer`` is kept for auditing.
+    """
+
+    __tablename__ = "oidc_identities"
+    __table_args__ = (
+        UniqueConstraint("provider_key", "subject", name="ux_oidc_identity_provider_subject"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # The configured provider key, e.g. "authentik".
+    provider_key = Column(String(50), nullable=False)
+    issuer = Column(String(500), nullable=False)
+    subject = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="oidc_identities")

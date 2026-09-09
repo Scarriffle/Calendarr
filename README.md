@@ -106,6 +106,80 @@ Configuration is done via environment variables. The `install.sh` script generat
 | `GOOGLE_CLIENT_ID` | — | Google OAuth2 Client ID *(optional)* |
 | `GOOGLE_CLIENT_SECRET` | — | Google OAuth2 Client Secret *(optional)* |
 | `GOOGLE_REDIRECT_URI` | — | e.g. `https://yourdomain.com/api/google/callback` *(optional)* |
+| `PUBLIC_BASE_URL` | *(derived)* | Public origin behind a reverse proxy — **required for SSO** |
+| `OIDC_PROVIDERS` | — | Comma-separated provider keys, e.g. `authentik` *(optional)* |
+
+Per provider `<KEY>` listed in `OIDC_PROVIDERS` (variable names are uppercased):
+
+| Variable | Default | Description |
+|---|---|---|
+| `OIDC_<KEY>_ISSUER` | — | **Required.** Issuer URL, e.g. `https://authentik.example.com/application/o/calendarr/` |
+| `OIDC_<KEY>_CLIENT_ID` | — | **Required.** Client ID of the web application |
+| `OIDC_<KEY>_CLIENT_SECRET` | — | Leave empty for a public client (PKCE only) |
+| `OIDC_<KEY>_NAME` | *(key)* | Label on the login button |
+| `OIDC_<KEY>_SCOPES` | `openid profile email` | Requested scopes — **must be quoted**, see below |
+| `OIDC_<KEY>_MOBILE_CLIENT_ID` | — | Client ID(s) of the native apps, comma-separated |
+| `OIDC_<KEY>_MOBILE_ISSUER` | *(issuer)* | Only if mobile uses a second application |
+| `OIDC_<KEY>_ALLOW_SIGNUP` | `false` | Create accounts on first SSO login |
+| `OIDC_<KEY>_ALLOWED_DOMAINS` | — | Email-domain allowlist for signup |
+| `OIDC_<KEY>_LINK_BY_EMAIL` | `false` | Auto-link to an existing account by email |
+| `OIDC_<KEY>_USERNAME_CLAIM` | `preferred_username` | Claim used to derive the username |
+| `OIDC_<KEY>_REDIRECT_URI` | *(derived)* | Overrides the derived callback URL |
+
+### Single Sign-On (OpenID Connect / Authentik)
+
+Adds an SSO button to the login screen **alongside** password login. With
+`OIDC_PROVIDERS` unset, nothing changes — the feature is invisible.
+
+**In Authentik:** create one OAuth2/OpenID provider, client type **Public**
+(the web flow uses PKCE, so a secret buys little), with two redirect URIs:
+
+- Web: `https://calendar.example.com/api/auth/oidc/authentik/callback`
+- Mobile: `calendarr://oauth/callback`
+
+Signing key RS256, scope mappings `openid`, `profile`, `email` — and
+**`offline_access` for the mobile apps**. Since Authentik 2024.2 that scope has
+to be mapped explicitly; without it no refresh token is issued and the apps
+appear to log out every week. Restrict access with an Authentik group binding —
+that, not `ALLOWED_DOMAINS`, is the real authorization control.
+
+**In `.env`:**
+
+```bash
+PUBLIC_BASE_URL=https://calendar.example.com
+OIDC_PROVIDERS=authentik
+OIDC_AUTHENTIK_NAME=Authentik
+OIDC_AUTHENTIK_ISSUER=https://authentik.example.com/application/o/calendarr/
+OIDC_AUTHENTIK_CLIENT_ID=...
+OIDC_AUTHENTIK_MOBILE_CLIENT_ID=calendarr-mobile
+OIDC_AUTHENTIK_SCOPES="openid profile email"
+OIDC_AUTHENTIK_ALLOW_SIGNUP=false
+```
+
+> **`install.sh` does not overwrite an existing `.env`.** On an existing
+> installation append these lines by hand, then `systemctl restart calendarr`.
+
+> **Quote every value containing a space.** `start.sh` does
+> `set -a; source .env; set +a`, so an unquoted
+> `OIDC_AUTHENTIK_SCOPES=openid profile email` makes the shell try to run
+> `profile` and startup fails.
+
+**Account matching.** An identity is matched on the provider's `sub` claim.
+A first-time SSO user whose email matches an existing local account is
+*refused* by default rather than linked — otherwise anyone who can set that
+email at the identity provider inherits the account. Link deliberately instead:
+sign in with the password, then link under Settings. `LINK_BY_EMAIL=true`
+enables automatic linking and additionally requires `email_verified`.
+
+With `ALLOW_SIGNUP=true`, unknown users get an account on first login. Such
+accounts have no usable password; they use **app passwords** for CalDAV, the
+same as 2FA users.
+
+**Adding a second provider** is configuration only: append its key to
+`OIDC_PROVIDERS`, add the matching `OIDC_<KEY>_*` block, restart. No code change.
+
+**Rollback:** remove `OIDC_PROVIDERS` and restart. Accounts created via SSO
+remain and must be removed (or given a password) by an admin.
 
 ### Google Calendar Setup
 

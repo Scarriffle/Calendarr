@@ -3,11 +3,98 @@ import { initCalendar, showToast, openProfileModal } from './calendar.js';
 import { t } from './i18n.js';
 import { loadInstance } from './instance.js';
 
+// ── Single Sign-On ────────────────────────────────────────
+// Error slug from a failed SSO round-trip, shown once the login screen is up.
+let ssoErrorSlug = null;
+
+/**
+ * Handle the return leg of an OIDC login.
+ *
+ * The callback redirected us to /?sso=1 with the access token in a one-time
+ * HttpOnly cookie; trade it for the token here. Returns true when the user is
+ * now logged in. Must run before the setup/token checks in boot().
+ */
+async function consumeSsoHandoff() {
+  const params = new URLSearchParams(window.location.search);
+  const ok  = params.has('sso');
+  const err = params.get('sso_error');
+  if (!ok && !err) return false;               // normal load — zero cost
+
+  // Strip the marker before awaiting anything: a reload mid-flight must not
+  // try to redeem a cookie that has already been spent.
+  window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+
+  if (err) { ssoErrorSlug = err; return false; }
+
+  try {
+    const res = await api.oidcComplete();
+    if (!res || !res.access_token) { ssoErrorSlug = 'generic'; return false; }
+    localStorage.setItem('token', res.access_token);
+    localStorage.setItem('user', JSON.stringify(res.user));
+    return true;
+  } catch (e) {
+    ssoErrorSlug = 'generic';
+    return false;
+  }
+}
+
+/** Render one button per configured provider on the login screen. */
+async function renderSsoButtons() {
+  const block = document.getElementById('sso-block');
+  const list  = document.getElementById('sso-buttons');
+  if (!block || !list) return;
+
+  if (ssoErrorSlug) {
+    const errEl = document.getElementById('login-error');
+    if (errEl) {
+      // Backend slugs come in both shapes: policy refusals are prefixed
+      // ("oidc_account_not_linked"), flow errors are not ("state_mismatch").
+      const bare = ssoErrorSlug.replace(/^oidc_/, '');
+      const msg = [`sso_err_${ssoErrorSlug}`, `sso_err_${bare}`]
+        .map(k => [k, t(k)])
+        .find(([k, v]) => v !== k);
+      errEl.textContent = msg ? msg[1] : t('sso_err_generic');
+      errEl.classList.remove('hidden');
+    }
+    ssoErrorSlug = null;
+  }
+
+  let cfg;
+  try {
+    cfg = await api.oidcProviders();
+  } catch (e) {
+    return;                                    // SSO unreachable → password only
+  }
+  if (!cfg || !cfg.enabled || !cfg.providers.length) return;
+
+  list.innerHTML = '';
+  for (const p of cfg.providers) {
+    const a = document.createElement('a');
+    a.className = 'btn btn-secondary btn-full sso-btn';
+    // A real link, not fetch(): /start answers 302 to the identity provider and
+    // needs a top-level navigation to follow it and to set the flow cookie.
+    a.href = p.start_url;
+    a.textContent = `${p.icon ? p.icon + ' ' : ''}${t('sso_login_with', { name: p.name })}`;
+    list.appendChild(a);
+  }
+  const divider = block.querySelector('.auth-divider');
+  if (divider) divider.textContent = t('sso_or');
+  block.classList.remove('hidden');
+}
+
 // ── Bootstrap ─────────────────────────────────────────────
 async function boot() {
   // Apply instance branding (logo/favicon/default theme) ASAP so the login and
   // setup screens are already branded. Public endpoint — no token needed.
   loadInstance();
+
+  // Returning from an SSO login? That has to be settled before anything else,
+  // because we arrive unauthenticated with a one-time cookie in hand.
+  if (await consumeSsoHandoff()) {
+    await launchApp();
+    return;
+  }
+
   // Check if setup is required
   let setupRequired = false;
   try {
@@ -48,6 +135,7 @@ async function boot() {
 
   showScreen('login');
   bindLoginForm();
+  renderSsoButtons();
 }
 
 function showScreen(name) {
