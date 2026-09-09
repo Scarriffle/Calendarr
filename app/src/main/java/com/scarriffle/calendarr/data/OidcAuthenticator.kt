@@ -21,6 +21,14 @@ import kotlin.coroutines.resumeWithException
 /** The app is registered as a *public* client — no secret is ever sent. */
 private const val REDIRECT_URI = "com.scarriffle.calendarr:/oauth2redirect"
 
+/** Outcome of a silent renewal against the identity provider. */
+data class RenewedTokens(
+    val idToken: String,
+    val accessToken: String?,
+    val nonce: String?,
+    val serialisedState: String,
+)
+
 /**
  * Drives the OpenID Connect Authorization Code Flow with PKCE against the
  * identity provider, using AppAuth and a Chrome Custom Tab.
@@ -104,6 +112,38 @@ class OidcAuthenticator @Inject constructor(
             }
         }
         return response to tokens
+    }
+
+    /**
+     * Ask the provider for a fresh ID token using a stored [AuthState].
+     *
+     * Returns null when there is no session to renew. The refreshed state is
+     * handed back too, because the provider may have rotated the refresh token.
+     */
+    suspend fun renewIdToken(serialisedState: String): RenewedTokens? {
+        val state = runCatching { AuthState.jsonDeserialize(serialisedState) }.getOrNull()
+            ?: return null
+
+        val tokens: Pair<String?, String?> = suspendCancellableCoroutine { cont ->
+            state.performActionWithFreshTokens(service()) { accessToken, idToken, ex ->
+                if (ex != null) {
+                    cont.resumeWithException(ex)
+                } else {
+                    cont.resume(idToken to accessToken)
+                }
+            }
+        }
+
+        val idToken = tokens.first ?: return null
+        return RenewedTokens(
+            idToken = idToken,
+            accessToken = tokens.second,
+            // The original request rides along inside the state, so the nonce
+            // survives. A refreshed token often drops the claim, which the
+            // server tolerates — but when it keeps it, it has to match.
+            nonce = state.lastAuthorizationResponse?.request?.nonce,
+            serialisedState = state.jsonSerializeString(),
+        )
     }
 
     /**
