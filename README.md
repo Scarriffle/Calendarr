@@ -135,7 +135,13 @@ Adds an SSO button to the login screen **alongside** password login. With
 (the web flow uses PKCE, so a secret buys little), with two redirect URIs:
 
 - Web: `https://calendar.example.com/api/auth/oidc/authentik/callback`
-- Mobile: `calendarr://oauth/callback`
+- iOS: `com.scarriffleservices.calendarr.ios:/oauth2redirect`
+- Android: `com.scarriffle.calendarr:/oauth2redirect`
+
+The mobile apps are separate repositories (`Calendarr-IOS`, `Calendarr-Android`)
+and authenticate as **public** clients via AppAuth — PKCE, no client secret.
+Set `OIDC_<KEY>_MOBILE_CLIENT_ID` to the client id they use; without it the apps
+show no SSO button.
 
 Signing key RS256, scope mappings `openid`, `profile`, `email` — and
 **`offline_access` for the mobile apps**. Since Authentik 2024.2 that scope has
