@@ -3,7 +3,8 @@ const BASE = '/api';
 
 // Paths where a 401 is a normal answer rather than an expired session, so the
 // auto-logout reload must not fire (it would loop on a failed SSO handoff).
-const NO_RELOAD_ON_401 = ['/auth/login', '/auth/oidc/complete', '/auth/oidc/exchange'];
+const NO_RELOAD_ON_401 = ['/auth/login', '/auth/oidc/complete', '/auth/oidc/exchange',
+                          '/auth/oidc/link-pending'];
 
 async function request(method, path, body = null, formEncoded = false) {
   const token = localStorage.getItem('token');
@@ -118,4 +119,6 @@ export const api = {
   oidcProviders: () => request('GET',  '/auth/oidc/providers'),
   oidcComplete:  () => request('POST', '/auth/oidc/complete', {}),
   oidcIdentities: () => request('GET', '/auth/oidc/identities'),
+  oidcLinkPending: () => request('POST', '/auth/oidc/link-pending', {}),
+  oidcUnlink: (id)   => request('DELETE', `/auth/oidc/identities/${id}`),
 };

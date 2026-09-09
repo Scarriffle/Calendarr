@@ -171,11 +171,18 @@ OIDC_AUTHENTIK_ALLOW_SIGNUP=false
 > `profile` and startup fails.
 
 **Account matching.** An identity is matched on the provider's `sub` claim.
-A first-time SSO user whose email matches an existing local account is
-*refused* by default rather than linked — otherwise anyone who can set that
-email at the identity provider inherits the account. Link deliberately instead:
-sign in with the password, then link under Settings. `LINK_BY_EMAIL=true`
-enables automatic linking and additionally requires `email_verified`.
+
+A first SSO login with no matching account does **not** fail. The verified
+identity is parked in a short-lived signed cookie and the login screen asks the
+user to sign in once with their Calendarr password; the identity is then
+attached to exactly that account. Both halves are proven — the ID token by us,
+the account by the password — so no trust in the provider'''s email handling is
+required.
+
+`LINK_BY_EMAIL=true` links automatically to an existing account with the same
+address instead (additionally requiring `email_verified`). It saves one step,
+but means anyone who can set an arbitrary email at the identity provider
+inherits the matching account, including an admin'''s. Prefer the default.
 
 With `ALLOW_SIGNUP=true`, unknown users get an account on first login. Such
 accounts have no usable password; they use **app passwords** for CalDAV, the

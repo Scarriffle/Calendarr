@@ -565,6 +565,16 @@ a { color: var(--primary); text-decoration: none; }
 #view-container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* ── SSO on the login screen ─────────────────────────────── */
+/* Informational, not an error: the SSO identity is fine, it just needs to be
+   tied to an account. */
+.form-hint {
+  font-size: 13px; line-height: 1.4;
+  padding: 10px 12px; margin-bottom: 12px;
+  border-radius: 8px;
+  color: var(--text-1);
+  background: var(--primary-dim);
+  border: 1px solid var(--primary);
+}
 #sso-block { margin-top: 18px; }
 .auth-divider {
   display: flex; align-items: center; gap: 10px;

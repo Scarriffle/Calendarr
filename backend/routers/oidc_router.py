@@ -47,6 +47,18 @@ FLOW_COOKIE = "clr_oidc_flow"
 FLOW_TTL = 600          # 10 minutes to complete a login
 HANDOFF_COOKIE = "clr_oidc_token"
 HANDOFF_TTL = 60        # the SPA picks the token up immediately
+LINK_COOKIE = "clr_oidc_link"
+LINK_TTL = 900          # 15 minutes to sign in with a password and link
+
+# Refusals that mean "this identity is fine, it just has no owner yet". In all
+# three the honest answer is to ask the user to prove which account is theirs,
+# rather than to dead-end them: no account exists, one exists under the same
+# address, or automatic creation is switched off.
+LINKABLE_REFUSALS = {
+    "oidc_account_not_linked",
+    "oidc_signup_disabled",
+    "oidc_email_conflict",
+}
 LINK_RETURN = "/?sso_linked=1"
 
 
@@ -70,6 +82,30 @@ def _encode_flow(payload: dict) -> str:
     data["typ"] = "oidc_flow"
     data["exp"] = datetime.utcnow() + timedelta(seconds=FLOW_TTL)
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _encode_link(claims: dict, provider_key: str) -> str:
+    """A verified-but-unlinked identity, parked until the user proves the
+    Calendarr account is theirs by signing in with their password."""
+    data = {
+        "typ": "oidc_link",
+        "p": provider_key,
+        "sub": claims.get("sub"),
+        "iss": claims.get("iss"),
+        "email": claims.get("email"),
+        "exp": datetime.utcnow() + timedelta(seconds=LINK_TTL),
+    }
+    return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _decode_link(token: str) -> Optional[dict]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("typ") != "oidc_link" or not payload.get("sub"):
+        return None
+    return payload
 
 
 def _decode_flow(token: str) -> Optional[dict]:
@@ -224,6 +260,18 @@ def oidc_callback(provider_key: str, request: Request,
     try:
         user, action = resolve_user(db, provider, claims)
     except OIDCPolicyError as e:
+        if e.slug in LINKABLE_REFUSALS:
+            # The identity is verified but belongs to nobody yet. Park it and
+            # invite the user to prove the Calendarr account is theirs. That is
+            # strictly safer than matching on the email address alone, which
+            # trusts the provider not to hand out someone else's.
+            resp = RedirectResponse(url="/?sso_link=1", status_code=302)
+            resp.delete_cookie(FLOW_COOKIE, path="/api/auth/oidc")
+            resp.set_cookie(
+                LINK_COOKIE, _encode_link(claims, provider.key),
+                **_cookie_kwargs(request, "/api/auth/oidc", LINK_TTL),
+            )
+            return resp
         return _fail(request, e.slug)
 
     logger.info("OIDC login (%s) user id=%s via %s", action, user.id, provider.key)
@@ -263,6 +311,40 @@ def oidc_complete(request: Request, response: Response, db: Session = Depends(ge
         raise HTTPException(401, "SSO-Sitzung ungültig")
 
     return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
+
+
+@router.post("/link-pending")
+def oidc_link_pending(request: Request, response: Response,
+                      current_user: models.User = Depends(get_current_user),
+                      db: Session = Depends(get_db)):
+    """Attach the parked SSO identity to the account that just signed in.
+
+    Both halves are proven: we validated the ID token ourselves before parking
+    it, and the bearer token proves this password login succeeded.
+    """
+    raw = request.cookies.get(LINK_COOKIE)
+    response.delete_cookie(LINK_COOKIE, path="/api/auth/oidc")
+    if not raw:
+        raise HTTPException(404, "Keine offene SSO-Verknüpfung")
+
+    payload = _decode_link(raw)
+    if not payload:
+        raise HTTPException(400, "oidc_link_expired")
+
+    provider = oidc_config.get_provider(payload.get("p", ""))
+    if provider is None:
+        raise HTTPException(400, "oidc_unknown_provider")
+
+    claims = {"sub": payload["sub"], "iss": payload.get("iss"),
+              "email": payload.get("email")}
+    try:
+        link_identity(db, current_user, provider, claims)
+    except OIDCPolicyError as e:
+        raise HTTPException(409, e.slug)
+
+    logger.info("OIDC: linked %s identity to user id=%s after password login",
+                provider.key, current_user.id)
+    return {"linked": True, "provider": provider.key, "name": provider.name}
 
 
 # ── native (mobile) clients ──────────────────────────────────────────────────

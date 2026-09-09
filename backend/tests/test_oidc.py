@@ -293,6 +293,89 @@ def _nonce_from(location: str) -> str:
     return parse_qs(urlparse(location).query)["nonce"][0]
 
 
+def _run_callback(client, monkeypatch, *, sub, email):
+    """Drive /start + /callback for an identity, returning the callback response."""
+    start = client.get("/api/auth/oidc/authentik/start", follow_redirects=False)
+    state = _state_from(start.headers["location"])
+    nonce = _nonce_from(start.headers["location"])
+    monkeypatch.setattr(oidc_client, "exchange_code", lambda *a, **k: {
+        "id_token": make_id_token(sub=sub, nonce=nonce, email=email),
+    })
+    return client.get(f"/api/auth/oidc/authentik/callback?code=good&state={state}",
+                      follow_redirects=False)
+
+
+def test_unlinked_identity_offers_linking_instead_of_failing(client, authentik, monkeypatch):
+    """An unknown SSO identity parks itself rather than dead-ending."""
+    admin_token = register_admin(client, "admin", "pw")
+    create_user(client, admin_token, "erin")
+
+    cb = _run_callback(client, monkeypatch, sub="ak-erin", email="erin@example.com")
+    assert cb.status_code == 302
+    assert cb.headers["location"] == "/?sso_link=1"
+    assert "clr_oidc_link=" in cb.headers["set-cookie"]
+    # Nothing is linked until an account proves itself.
+    with db_session() as db:
+        assert db.query(models.OIDCIdentity).count() == 0
+
+
+def test_password_login_redeems_the_parked_identity(client, authentik, monkeypatch):
+    admin_token = register_admin(client, "admin", "pw")
+    uid, _ = create_user(client, admin_token, "erin")
+    _run_callback(client, monkeypatch, sub="ak-erin", email="erin@example.com")
+
+    # The user signs in with their password; the client then redeems the cookie.
+    login = client.post("/api/auth/login", json={"username": "erin", "password": "pw"})
+    token = login.json()["access_token"]
+    linked = client.post("/api/auth/oidc/link-pending", headers=auth(token))
+    assert linked.status_code == 200, linked.text
+    assert linked.json()["linked"] is True
+
+    with db_session() as db:
+        identity = db.query(models.OIDCIdentity).one()
+        assert identity.user_id == uid
+        assert identity.subject == "ak-erin"
+
+    # From now on SSO alone gets them in.
+    again = _run_callback(client, monkeypatch, sub="ak-erin", email="erin@example.com")
+    assert again.headers["location"] == "/?sso=1"
+
+
+def test_parked_identity_links_to_whoever_signs_in(client, authentik, monkeypatch):
+    """The link follows the password login, not the email in the token — that
+    is the whole point of asking instead of matching."""
+    admin_token = register_admin(client, "admin", "pw")
+    other_id, _ = create_user(client, admin_token, "frank")
+    _run_callback(client, monkeypatch, sub="ak-erin", email="erin@example.com")
+
+    login = client.post("/api/auth/login", json={"username": "frank", "password": "pw"})
+    client.post("/api/auth/oidc/link-pending", headers=auth(login.json()["access_token"]))
+
+    with db_session() as db:
+        assert db.query(models.OIDCIdentity).one().user_id == other_id
+
+
+def test_link_pending_without_a_cookie_is_a_404(client, authentik):
+    admin_token = register_admin(client, "admin", "pw")
+    _, token = create_user(client, admin_token, "erin")
+    assert client.post("/api/auth/oidc/link-pending", headers=auth(token)).status_code == 404
+
+
+def test_link_cookie_is_single_use(client, authentik, monkeypatch):
+    admin_token = register_admin(client, "admin", "pw")
+    _, token = create_user(client, admin_token, "erin")
+    _run_callback(client, monkeypatch, sub="ak-erin", email="erin@example.com")
+
+    assert client.post("/api/auth/oidc/link-pending", headers=auth(token)).status_code == 200
+    assert client.post("/api/auth/oidc/link-pending", headers=auth(token)).status_code == 404
+
+
+def test_link_pending_requires_authentication(client, authentik, monkeypatch):
+    register_admin(client, "admin", "pw")
+    _run_callback(client, monkeypatch, sub="ak-erin", email="erin@example.com")
+    assert client.post("/api/auth/oidc/link-pending").status_code == 401
+
+
 # ── /exchange: token validation (the mobile entry point) ─────────────────────
 
 def _seed_identity(client, sub="ak-sub-1", username="alice"):

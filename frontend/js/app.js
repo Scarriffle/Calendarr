@@ -6,6 +6,9 @@ import { loadInstance } from './instance.js';
 // ── Single Sign-On ────────────────────────────────────────
 // Error slug from a failed SSO round-trip, shown once the login screen is up.
 let ssoErrorSlug = null;
+// True when an SSO identity is parked server-side, waiting to be linked to
+// whichever account the user signs into next.
+let ssoLinkPending = false;
 
 /**
  * Handle the return leg of an OIDC login.
@@ -16,14 +19,16 @@ let ssoErrorSlug = null;
  */
 async function consumeSsoHandoff() {
   const params = new URLSearchParams(window.location.search);
-  const ok  = params.has('sso');
-  const err = params.get('sso_error');
-  if (!ok && !err) return false;               // normal load — zero cost
+  const ok   = params.has('sso');
+  const err  = params.get('sso_error');
+  const link = params.has('sso_link');
+  if (!ok && !err && !link) return false;      // normal load — zero cost
 
   // Strip the marker before awaiting anything: a reload mid-flight must not
   // try to redeem a cookie that has already been spent.
   window.history.replaceState({}, '', window.location.pathname + window.location.hash);
 
+  if (link) { ssoLinkPending = true; return false; }
   if (err) { ssoErrorSlug = err; return false; }
 
   try {
@@ -44,6 +49,14 @@ async function renderSsoButtons() {
   const list  = document.getElementById('sso-buttons');
   if (!block || !list) return;
 
+  if (ssoLinkPending) {
+    const hintEl = document.getElementById('login-hint');
+    if (hintEl) {
+      hintEl.textContent = t('sso_link_prompt');
+      hintEl.classList.remove('hidden');
+    }
+  }
+
   if (ssoErrorSlug) {
     const errEl = document.getElementById('login-error');
     if (errEl) {
@@ -53,7 +66,10 @@ async function renderSsoButtons() {
       const msg = [`sso_err_${ssoErrorSlug}`, `sso_err_${bare}`]
         .map(k => [k, t(k)])
         .find(([k, v]) => v !== k);
-      errEl.textContent = msg ? msg[1] : t('sso_err_generic');
+      // An unmapped slug still has to be diagnosable — showing only the
+      // generic text hides the one piece of information that identifies the
+      // fault.
+      errEl.textContent = msg ? msg[1] : `${t('sso_err_generic')} (${ssoErrorSlug})`;
       errEl.classList.remove('hidden');
     }
     ssoErrorSlug = null;
@@ -150,6 +166,13 @@ function showScreen(name) {
 
 async function launchApp() {
   showScreen('app');
+
+  // Confirm a linking that happened during this login.
+  const linkedName = sessionStorage.getItem('ssoLinkedName');
+  if (linkedName !== null) {
+    sessionStorage.removeItem('ssoLinkedName');
+    showToast(t('sso_linked_toast', { name: linkedName }));
+  }
 
   // Set user avatar initials
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -250,6 +273,17 @@ function bindLoginForm() {
       const res = await api.login(username, password, totpCode, remember);
       localStorage.setItem('token', res.access_token);
       localStorage.setItem('user', JSON.stringify(res.user));
+      // A parked SSO identity is attached to exactly the account that just
+      // proved itself with a password — no email guesswork involved.
+      if (ssoLinkPending) {
+        ssoLinkPending = false;
+        try {
+          const linked = await api.oidcLinkPending();
+          if (linked && linked.linked) {
+            sessionStorage.setItem('ssoLinkedName', linked.name || '');
+          }
+        } catch (e) { /* linking is optional; the login itself succeeded */ }
+      }
       await launchApp();
     } catch (err) {
       if (err.message === '2fa_required') {
