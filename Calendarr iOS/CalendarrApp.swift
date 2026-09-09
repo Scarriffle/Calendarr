@@ -95,6 +95,9 @@ class AppState {
         isAdmin = false
         try? KeychainStore.set(nil, for: "authToken")
         try? KeychainStore.set(nil, for: "authToken", accessGroup: nil)  // pre-entitlement copy
+        // Drop the SSO session too, otherwise a stale provider refresh token
+        // outlives the account it belonged to.
+        OIDCAuthenticator.clearStoredSession()
         UserDefaults.standard.removeObject(forKey: "authToken")          // pre-Keychain copy
         UserDefaults.standard.removeObject(forKey: "username")
         UserDefaults.standard.removeObject(forKey: "isAdmin")

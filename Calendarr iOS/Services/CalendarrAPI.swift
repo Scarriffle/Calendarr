@@ -78,6 +78,79 @@ class CalendarrAPI {
         return (token, uname, admin)
     }
 
+    // MARK: - Single sign-on (OpenID Connect)
+
+    /// Providers configured on the server. Empty when SSO is off or the server
+    /// predates it — the password form is unaffected either way.
+    static func oidcProviders(baseURL: String) async throws -> [OIDCProvider] {
+        guard let url = URL(string: baseURL + "/api/auth/oidc/providers") else {
+            throw APIError.invalidURL
+        }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["enabled"] as? Bool == true,
+              let list = json["providers"] as? [[String: Any]] else { return [] }
+
+        return list.compactMap { entry in
+            // Without a mobile client id the app cannot start a flow.
+            guard let key = entry["key"] as? String,
+                  let clientID = entry["mobile_client_id"] as? String, !clientID.isEmpty,
+                  let issuer = entry["issuer"] as? String else { return nil }
+            return OIDCProvider(
+                key: key,
+                name: (entry["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? key,
+                issuer: issuer,
+                // mobile_scopes is what the server wants the apps to request
+                // (it knows whether the provider grants offline_access).
+                scopes: (entry["mobile_scopes"] as? String)
+                    ?? (entry["scopes"] as? String)
+                    ?? "openid profile email",
+                mobileClientID: clientID
+            )
+        }
+    }
+
+    /// Trade a provider ID token for a Calendarr token.
+    ///
+    /// The app is a public client: this request carries no secret, only the ID
+    /// token and the nonce AppAuth bound into the flow.
+    static func exchangeOIDC(baseURL: String,
+                             provider: String,
+                             clientID: String,
+                             idToken: String,
+                             accessToken: String?,
+                             nonce: String?) async throws -> (token: String, username: String, isAdmin: Bool) {
+        guard let url = URL(string: baseURL + "/api/auth/oidc/exchange") else { throw APIError.invalidURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["provider": provider, "client_id": clientID, "id_token": idToken]
+        if let accessToken { body["access_token"] = accessToken }
+        if let nonce { body["nonce"] = nonce }
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status >= 400 {
+            // The server answers with a stable slug the login screen translates.
+            let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String
+            throw OIDCError(slug: detail?.isEmpty == false ? detail! : "oidc_failed")
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let token = json["access_token"] as? String,
+              let user = json["user"] as? [String: Any],
+              let uname = user["username"] as? String else {
+            throw APIError.decodingError
+        }
+        let admin = user["is_admin"] as? Bool ?? false
+        // Same side effect as login(): creator/owner comparisons elsewhere read
+        // these back, so an SSO user must not be left with a zero userId.
+        UserDefaults.standard.set(user["id"] as? Int ?? 0, forKey: "userId")
+        UserDefaults.standard.set(user["display_name"] as? String ?? uname, forKey: "displayName")
+        return (token, uname, admin)
+    }
+
     static func checkSetupRequired(baseURL: String) async throws -> Bool {
         guard let url = URL(string: baseURL + "/api/auth/setup-required") else { throw APIError.invalidURL }
         let (data, _) = try await URLSession.shared.data(from: url)

@@ -10,6 +10,7 @@
 		D0001A0CABCDEF0100AB5001 /* CalendarrWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CA1E4D0A0002000000000001 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000001 /* CalendarrCore */; };
 		CA1E4D0A0002000000000002 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000002 /* CalendarrCore */; };
+		AA9701000001000000000001 /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = AA9701000002000000000001 /* AppAuth */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -98,6 +99,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CA1E4D0A0002000000000001 /* CalendarrCore in Frameworks */,
+				AA9701000001000000000001 /* AppAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -180,6 +182,7 @@
 			name = "Calendarr iOS";
 			packageProductDependencies = (
 				CA1E4D0A0001000000000001 /* CalendarrCore */,
+				AA9701000002000000000001 /* AppAuth */,
 			);
 			productName = "Calendarr iOS";
 			productReference = C0000B01FC4E10100AB5001 /* Calendarr iOS.app */;
@@ -243,6 +246,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				39450EFC302A266A0090DDD7 /* XCLocalSwiftPackageReference "../CalendarrKit" */,
+				AA9701000003000000000001 /* XCRemoteSwiftPackageReference "AppAuth-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C0000C01FB4E10100AB5001 /* Products */;
@@ -521,6 +525,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios;
 				PRODUCT_NAME = "Calendarr iOS";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -565,6 +573,10 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios;
 				PRODUCT_NAME = "Calendarr iOS";
@@ -702,6 +714,11 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = CalendarrCore;
 		};
+		AA9701000002000000000001 /* AppAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA9701000003000000000001 /* XCRemoteSwiftPackageReference "AppAuth-iOS" */;
+			productName = AppAuth;
+		};
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -710,6 +727,17 @@
 			relativePath = ../CalendarrKit;
 		};
 /* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AA9701000003000000000001 /* XCRemoteSwiftPackageReference "AppAuth-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/openid/AppAuth-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.7.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = C0000301FB4E10100AB5001 /* Project object */;
 }
