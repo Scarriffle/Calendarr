@@ -32,3 +32,11 @@ fun Response<*>.ensureSuccess() {
         throw ApiException(errorDetail(errorBody(), code()))
     }
 }
+
+
+/**
+ * An SSO exchange the server refused. [slug] is the stable machine-readable
+ * reason (e.g. `oidc_account_not_linked`), which the UI maps to a translated
+ * message; unknown slugs fall back to a generic one.
+ */
+class OidcException(val slug: String) : Exception(slug)

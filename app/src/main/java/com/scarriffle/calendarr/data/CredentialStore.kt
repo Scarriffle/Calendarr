@@ -54,6 +54,24 @@ class CredentialStore @Inject constructor(
         get() = prefs.getString(KEY_DISPLAY_NAME, null)
         set(value) = prefs.edit().putString(KEY_DISPLAY_NAME, value).apply()
 
+    /**
+     * Serialised AppAuth [net.openid.appauth.AuthState] for the SSO session —
+     * holds the provider's refresh token, so it must stay in the encrypted
+     * store and never in plain preferences.
+     */
+    var oidcState: String?
+        get() = prefs.getString(KEY_OIDC_STATE, null)
+        set(value) = prefs.edit().putString(KEY_OIDC_STATE, value).apply()
+
+    /** Provider key and client id the current SSO session was obtained with. */
+    var oidcProvider: String?
+        get() = prefs.getString(KEY_OIDC_PROVIDER, null)
+        set(value) = prefs.edit().putString(KEY_OIDC_PROVIDER, value).apply()
+
+    var oidcClientId: String?
+        get() = prefs.getString(KEY_OIDC_CLIENT_ID, null)
+        set(value) = prefs.edit().putString(KEY_OIDC_CLIENT_ID, value).apply()
+
     /** True once a server URL has been entered (setup step complete). */
     val isConfigured: Boolean get() = !serverUrl.isNullOrBlank()
 
@@ -70,12 +88,24 @@ class CredentialStore @Inject constructor(
             .apply()
     }
 
+    /** Persist the SSO session alongside the Calendarr token. */
+    fun saveOidcSession(state: String, provider: String, clientId: String) {
+        prefs.edit()
+            .putString(KEY_OIDC_STATE, state)
+            .putString(KEY_OIDC_PROVIDER, provider)
+            .putString(KEY_OIDC_CLIENT_ID, clientId)
+            .apply()
+    }
+
     /** Clear the token (logout) but keep the server URL. */
     fun clearToken() {
         prefs.edit()
             .remove(KEY_TOKEN)
             .remove(KEY_USERNAME)
             .remove(KEY_IS_ADMIN)
+            .remove(KEY_OIDC_STATE)
+            .remove(KEY_OIDC_PROVIDER)
+            .remove(KEY_OIDC_CLIENT_ID)
             .apply()
     }
 
@@ -91,5 +121,8 @@ class CredentialStore @Inject constructor(
         const val KEY_IS_ADMIN = "is_admin"
         const val KEY_USER_ID = "user_id"
         const val KEY_DISPLAY_NAME = "display_name"
+        const val KEY_OIDC_STATE = "oidc_state"
+        const val KEY_OIDC_PROVIDER = "oidc_provider"
+        const val KEY_OIDC_CLIENT_ID = "oidc_client_id"
     }
 }

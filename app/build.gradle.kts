@@ -29,6 +29,13 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        // AppAuth merges its RedirectUriReceiverActivity into the manifest and
+        // needs the custom scheme for the OIDC redirect. Reverse-DNS on the
+        // application id, per RFC 8252; the same value must be registered as a
+        // redirect URI in the identity provider:
+        //   com.scarriffle.calendarr:/oauth2redirect
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.scarriffle.calendarr"
     }
 
     signingConfigs {
@@ -108,6 +115,9 @@ dependencies {
 
     // Secure credential storage
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // OIDC / SSO — Authorization Code Flow with PKCE in a Custom Tab
+    implementation("net.openid:appauth:0.11.1")
 
     // Async
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

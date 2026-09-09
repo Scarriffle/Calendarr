@@ -37,6 +37,15 @@ interface CalendarrApi {
     @GET("api/auth/setup-required")
     suspend fun setupRequired(): Response<ResponseBody>
 
+    /** Configured OIDC providers. Public — used before login. */
+    @GET("api/auth/oidc/providers")
+    suspend fun oidcProviders(): Response<ResponseBody>
+
+    /** Trade a provider ID token for a Calendarr token. Same response shape as
+     *  [login]. Public client: never send a client secret. */
+    @POST("api/auth/oidc/exchange")
+    suspend fun oidcExchange(@Body body: RequestBody): Response<ResponseBody>
+
     @POST("api/auth/login")
     suspend fun login(@Body body: RequestBody): Response<ResponseBody>
 

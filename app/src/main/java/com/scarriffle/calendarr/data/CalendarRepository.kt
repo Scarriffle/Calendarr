@@ -1,6 +1,7 @@
 package com.scarriffle.calendarr.data
 
 import com.scarriffle.calendarr.data.remote.ApiException
+import com.scarriffle.calendarr.data.remote.OidcException
 import com.scarriffle.calendarr.data.remote.ApiProvider
 import com.scarriffle.calendarr.data.remote.TwoFactorRequiredException
 import com.scarriffle.calendarr.data.remote.UnauthorizedException
@@ -18,6 +19,7 @@ import com.scarriffle.calendarr.domain.model.GoogleAccount
 import com.scarriffle.calendarr.domain.model.HomeAssistantAccount
 import com.scarriffle.calendarr.domain.model.ICalSubscription
 import com.scarriffle.calendarr.domain.model.LocalCalendar
+import com.scarriffle.calendarr.domain.model.OidcProvider
 import com.scarriffle.calendarr.domain.model.UserProfile
 import com.scarriffle.calendarr.domain.model.WritableCalendar
 import com.scarriffle.calendarr.util.Dates
@@ -100,10 +102,89 @@ class CalendarRepository @Inject constructor(
         if (!resp.isSuccessful) throw ApiException(errorDetail(resp.errorBody(), resp.code()))
 
         val json = JSONObject(resp.body()?.string() ?: throw ApiException("Leere Antwort"))
+        persistLogin(baseUrl, json, fallbackUsername = username)
+    }
+
+    // ---- Single sign-on (OpenID Connect) ----
+
+    /** Providers configured on the server. Empty list when SSO is off. */
+    suspend fun oidcProviders(baseUrl: String): List<OidcProvider> = withContext(Dispatchers.IO) {
+        val resp = apiProvider.apiFor(baseUrl).oidcProviders()
+        if (!resp.isSuccessful) return@withContext emptyList()
+        val raw = resp.body()?.string() ?: return@withContext emptyList()
+        runCatching {
+            val json = JSONObject(raw)
+            if (!json.optBoolean("enabled", false)) return@runCatching emptyList<OidcProvider>()
+            val arr = json.optJSONArray("providers") ?: return@runCatching emptyList<OidcProvider>()
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                // Without a mobile client id the app cannot start a flow.
+                val clientId = o.optString("mobile_client_id").takeIf { it.isNotBlank() }
+                    ?: return@mapNotNull null
+                // Without an issuer the flow can only fail later with a
+                // misleading "unreachable" — drop the provider here instead.
+                val issuer = o.optString("issuer").takeIf { it.isNotBlank() }
+                    ?: return@mapNotNull null
+                OidcProvider(
+                    key = o.optString("key"),
+                    name = o.optString("name").takeIf { it.isNotBlank() } ?: o.optString("key"),
+                    issuer = issuer,
+                    // The server decides the scopes (it knows whether the
+                    // provider grants offline_access); the app never adds any.
+                    scopes = o.optString("mobile_scopes").takeIf { it.isNotBlank() }
+                        ?: o.optString("scopes").takeIf { it.isNotBlank() }
+                        ?: "openid profile email",
+                    mobileClientId = clientId,
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * Trade a verified provider ID token for a Calendarr token.
+     *
+     * The app is a public client: the request carries no secret, only the id
+     * token the provider issued for [clientId] plus the [nonce] AppAuth bound
+     * into the flow.
+     */
+    suspend fun exchangeOidc(
+        baseUrl: String,
+        provider: String,
+        clientId: String,
+        idToken: String,
+        accessToken: String?,
+        nonce: String?,
+    ): LoginResult = withContext(Dispatchers.IO) {
+        val body = jsonBody(
+            "provider" to provider,
+            "client_id" to clientId,
+            "id_token" to idToken,
+            "access_token" to accessToken,
+            "nonce" to nonce,
+        )
+        val resp = apiProvider.apiFor(baseUrl).oidcExchange(body)
+        if (!resp.isSuccessful) {
+            // The server answers with a stable slug in `detail`; map the ones a
+            // user can act on, and fall back to the raw detail otherwise.
+            val detail = runCatching {
+                JSONObject(resp.errorBody()?.string() ?: "").optString("detail")
+            }.getOrNull().orEmpty()
+            throw OidcException(detail.takeIf { it.isNotBlank() } ?: "oidc_failed")
+        }
+        val json = JSONObject(resp.body()?.string() ?: throw ApiException("Leere Antwort"))
+        persistLogin(baseUrl, json, fallbackUsername = null)
+    }
+
+    /** Shared tail of [login] and [exchangeOidc]: read the user, persist, reset. */
+    private fun persistLogin(baseUrl: String, json: JSONObject, fallbackUsername: String?): LoginResult {
         val token = json.optString("access_token").takeIf { it.isNotBlank() }
             ?: throw ApiException("Antwort konnte nicht verarbeitet werden")
         val user = json.optJSONObject("user")
-        val uname = user?.optString("username") ?: username
+        // A blank username would be persisted as a blank display name too, so
+        // refuse rather than store a nameless identity.
+        val uname = user?.optString("username")?.takeIf { it.isNotBlank() }
+            ?: fallbackUsername
+            ?: throw ApiException("Antwort konnte nicht verarbeitet werden")
         val isAdmin = user?.optBoolean("is_admin", false) ?: false
         val uid = user?.optInt("id", 0) ?: 0
         val displayName = user?.optString("display_name")?.takeIf { it.isNotBlank() } ?: uname
@@ -111,7 +192,7 @@ class CalendarRepository @Inject constructor(
         credentialStore.serverUrl = ApiProvider.normalize(baseUrl)
         credentialStore.saveLogin(token, uname, isAdmin, uid, displayName)
         apiProvider.invalidate()
-        LoginResult(token, uname, isAdmin)
+        return LoginResult(token, uname, isAdmin)
     }
 
     // ---- Settings / profile ----

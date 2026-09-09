@@ -21,8 +21,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.Divider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
@@ -40,6 +45,14 @@ fun LoginScreen(
     onBack: () -> Unit,
     vm: AuthViewModel = hiltViewModel(),
 ) {
+    // Browser round-trip for SSO. AppAuth returns the authorization response
+    // as an Activity result, so nothing has to be wired into MainActivity.
+    val ssoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result -> vm.finishSso(result.data, onLoggedIn) }
+
+    LaunchedEffect(Unit) { vm.loadSsoProviders() }
+
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
             IconButton(onClick = onBack) {
@@ -96,6 +109,14 @@ fun LoginScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
+            vm.ssoErrorSlug?.let { slug ->
+                // Unknown slugs fall through to the generic message rather than
+                // showing the raw key.
+                val key = "sso.err.$slug"
+                val msg = tr(key).takeIf { it != key } ?: tr("sso.err.generic")
+                Spacer(Modifier.height(8.dp))
+                Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
             Spacer(Modifier.height(20.dp))
             Button(
                 onClick = { vm.login(onLoggedIn) },
@@ -106,6 +127,33 @@ fun LoginScreen(
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
                     Text(tr("auth.login"))
+                }
+            }
+            if (vm.ssoProviders.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Divider(modifier = Modifier.weight(1f))
+                    Text(
+                        tr("sso.or"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    Divider(modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(12.dp))
+                vm.ssoProviders.forEach { provider ->
+                    OutlinedButton(
+                        onClick = { vm.startSso(provider) { intent -> ssoLauncher.launch(intent) } },
+                        enabled = vm.ssoBusyKey == null && !vm.loggingIn,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    ) {
+                        if (vm.ssoBusyKey == provider.key) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(tr("sso.login_with", provider.name))
+                        }
+                    }
                 }
             }
             TextButton(onClick = onBack) { Text(tr("server.switch")) }
