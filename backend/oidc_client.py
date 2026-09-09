@@ -208,8 +208,16 @@ def _verify_at_hash(claims, access_token: str) -> None:
 def validate_id_token(provider: OIDCProvider, id_token: str, *,
                       expected_audience: str,
                       nonce: Optional[str] = None,
+                      require_nonce: bool = False,
                       access_token: Optional[str] = None) -> dict:
     """Verify an ID token's signature and claims. Returns the claim dict.
+
+    ``nonce`` is the value the client bound into the flow. When
+    ``require_nonce`` is set the token must carry a matching one — that is the
+    browser flow, where we generated the nonce ourselves and the provider is
+    obliged to echo it. Native clients also pass a nonce, but a token they
+    renewed with a refresh token legitimately no longer carries the claim, so
+    there the check applies only if the claim is present.
 
     Raises :class:`OIDCError` with a stable slug on any failure.
     """
@@ -225,7 +233,10 @@ def validate_id_token(provider: OIDCProvider, id_token: str, *,
                 "exp": {"essential": True},
                 "sub": {"essential": True},
             },
-            claims_params={"nonce": nonce, "client_id": expected_audience,
+            # Nonce deliberately omitted: Authlib treats "caller supplied a
+            # nonce but the token has none" as a mismatch, which breaks
+            # refreshed tokens. The policy is enforced explicitly below.
+            claims_params={"client_id": expected_audience,
                            "access_token": access_token},
         )
 
@@ -268,7 +279,10 @@ def validate_id_token(provider: OIDCProvider, id_token: str, *,
     if not claims.get("sub"):
         raise OIDCError("oidc_no_subject")
 
-    if nonce is not None and claims.get("nonce") != nonce:
+    token_nonce = claims.get("nonce")
+    if require_nonce and not token_nonce:
+        raise OIDCError("oidc_nonce_missing")
+    if nonce is not None and token_nonce is not None and token_nonce != nonce:
         raise OIDCError("oidc_nonce_mismatch")
 
     if access_token:

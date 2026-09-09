@@ -208,6 +208,8 @@ def oidc_callback(provider_key: str, request: Request,
             provider, tokens["id_token"],
             expected_audience=provider.client_id,
             nonce=payload.get("n"),
+            # We generated this nonce; the provider must echo it back.
+            require_nonce=True,
             access_token=tokens.get("access_token"),
         )
         if not claims.get("email"):

@@ -374,6 +374,29 @@ def test_exchange_rejects_nonce_mismatch(client, authentik):
     assert r.status_code == 401
 
 
+def test_refreshed_token_without_nonce_is_accepted(client, authentik):
+    """A token renewed via the refresh token drops the nonce claim; the app
+    still sends the nonce it remembers, and that must not be a mismatch."""
+    _seed_identity(client)
+    r = exchange(client, nonce="original-nonce",
+                 id_token=make_id_token(aud=MOBILE_CLIENT, nonce=None))
+    assert r.status_code == 200, r.text
+
+
+def test_browser_flow_requires_a_nonce_in_the_token(client, authentik):
+    """We generate the nonce for the browser flow, so the provider must echo
+    it — a token without one is refused there even though /exchange allows it."""
+    import oidc_config
+    from oidc_client import OIDCError
+
+    provider = oidc_config.get_provider("authentik")
+    with pytest.raises(OIDCError) as e:
+        oidc_client.validate_id_token(
+            provider, make_id_token(nonce=None),
+            expected_audience=WEB_CLIENT, nonce="expected", require_nonce=True)
+    assert e.value.slug == "oidc_nonce_missing"
+
+
 def test_exchange_requires_nonce_when_token_carries_one(client, authentik):
     _seed_identity(client)
     r = exchange(client, id_token=make_id_token(aud=MOBILE_CLIENT, nonce="from-appauth"))
