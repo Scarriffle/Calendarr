@@ -43,6 +43,7 @@ class OIDCProvider:
     scopes: str = DEFAULT_SCOPES
     redirect_uri: str = ""                    # empty => derived from public_base()
     mobile_client_ids: tuple = ()             # public native clients (AppAuth)
+    mobile_scopes: str = ""                   # scopes the apps request (see below)
     mobile_issuer: str = ""                   # only if mobile uses a 2nd application
     allow_signup: bool = False                # just-in-time provisioning
     allowed_domains: tuple = ()               # email domain allowlist for signup
@@ -90,13 +91,26 @@ def _build_provider(key: str) -> Optional[OIDCProvider]:
         p.strip() for p in _env(key, "MOBILE_CLIENT_ID").split(",") if p.strip()
     )
 
+    scopes = _env(key, "SCOPES") or DEFAULT_SCOPES
+    # The native apps need a refresh token, which requires `offline_access`.
+    # Since Authentik 2024.2 that scope must be mapped explicitly, and some
+    # other providers reject an unknown scope outright — so it is the server,
+    # not the app, that decides. Overridable per provider without a code change.
+    mobile_scopes = _env(key, "MOBILE_SCOPES")
+    if not mobile_scopes:
+        wanted = scopes.split()
+        if "offline_access" not in wanted:
+            wanted.append("offline_access")
+        mobile_scopes = " ".join(wanted)
+
     return OIDCProvider(
         key=key,
         name=_env(key, "NAME") or key.capitalize(),
         issuer=issuer,
         client_id=client_id,
         client_secret=_env(key, "CLIENT_SECRET"),
-        scopes=_env(key, "SCOPES") or DEFAULT_SCOPES,
+        scopes=scopes,
+        mobile_scopes=mobile_scopes,
         redirect_uri=_env(key, "REDIRECT_URI"),
         mobile_client_ids=mobile_ids,
         mobile_issuer=_env(key, "MOBILE_ISSUER"),

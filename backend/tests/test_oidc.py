@@ -140,6 +140,22 @@ def test_providers_lists_endpoints(client, authentik):
     assert p["authorization_endpoint"] == _discovery()["authorization_endpoint"]
 
 
+def test_mobile_scopes_include_offline_access_by_default(client, authentik):
+    """The apps need a refresh token, so the server asks for offline_access."""
+    p = client.get("/api/auth/oidc/providers").json()["providers"][0]
+    assert "offline_access" in p["mobile_scopes"].split()
+    # The browser flow does not need it and must not be changed by this.
+    assert "offline_access" not in p["scopes"].split()
+
+
+def test_mobile_scopes_are_overridable(client, authentik, monkeypatch):
+    """A provider that cannot grant offline_access must be configurable."""
+    monkeypatch.setenv("OIDC_AUTHENTIK_MOBILE_SCOPES", "openid email")
+    oidc_config.reset_cache()
+    p = client.get("/api/auth/oidc/providers").json()["providers"][0]
+    assert p["mobile_scopes"] == "openid email"
+
+
 def test_providers_never_leaks_client_secret(client, authentik, monkeypatch):
     secret = "super-secret-value-42"
     monkeypatch.setenv("OIDC_AUTHENTIK_CLIENT_SECRET", secret)

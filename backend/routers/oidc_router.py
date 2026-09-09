@@ -123,6 +123,9 @@ def list_providers():
         }
         if provider.mobile_client_ids:
             entry["mobile_client_id"] = provider.mobile_client_ids[0]
+            # The apps request exactly these — they must not invent scopes of
+            # their own, or a provider that lacks one rejects the whole flow.
+            entry["mobile_scopes"] = provider.mobile_scopes
         try:
             doc = oidc_client.discover(provider)
             entry["authorization_endpoint"] = doc.get("authorization_endpoint")
