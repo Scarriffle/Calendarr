@@ -43,6 +43,18 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_user_token(user: "models.User", expires_delta: Optional[timedelta] = None) -> str:
+    """Session token for a user.
+
+    ``uid`` is the authoritative subject: the immutable row id. ``sub`` keeps
+    the username for readability and for tokens issued before ``uid`` existed,
+    but it is not what identifies the account — otherwise renaming a user would
+    silently invalidate every session on their other devices, and an identity
+    provider that changes a name would break the mapping.
+    """
+    return create_access_token({"sub": user.username, "uid": user.id}, expires_delta)
+
+
 def get_current_user(
     token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> models.User:
@@ -57,12 +69,19 @@ def get_current_user(
         # flow token); only a real access token may authenticate a request.
         if payload.get("typ") not in (None, "access"):
             raise exc
+        uid = payload.get("uid")
         username: str = payload.get("sub")
-        if not username:
+        if uid is None and not username:
             raise exc
     except JWTError:
         raise exc
-    user = db.query(models.User).filter(models.User.username == username).first()
+
+    if uid is not None:
+        user = db.query(models.User).filter(models.User.id == uid).first()
+    else:
+        # Legacy token issued before uid existed. "Remember me" runs for 180
+        # days, so these stay in circulation for a while.
+        user = db.query(models.User).filter(models.User.username == username).first()
     if not user:
         raise exc
     return user

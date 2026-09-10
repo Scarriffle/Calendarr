@@ -623,6 +623,79 @@ def test_second_login_reuses_the_same_account(client, authentik, monkeypatch):
         assert db.query(models.OIDCIdentity).count() == 1
 
 
+# ── identity is the id, never the name ───────────────────────────────────────
+
+def test_rename_at_the_provider_keeps_the_same_account(client, authentik, monkeypatch):
+    """Authentik renames a user: same sub, new preferred_username and email.
+    That must land on the same Calendarr account, unchanged."""
+    monkeypatch.setenv("OIDC_AUTHENTIK_ALLOW_SIGNUP", "true")
+    oidc_config.reset_cache()
+    register_admin(client, "admin", "pw")
+
+    first = exchange(client, id_token=make_id_token(
+        aud=MOBILE_CLIENT, sub="stable-sub", email="old@example.com",
+        preferred_username="oldname", name="Old Name"))
+    assert first.status_code == 200
+    uid = first.json()["user"]["id"]
+    original_username = first.json()["user"]["username"]
+
+    second = exchange(client, id_token=make_id_token(
+        aud=MOBILE_CLIENT, sub="stable-sub", email="brand-new@example.com",
+        preferred_username="totally-different", name="New Name"))
+    assert second.status_code == 200
+    assert second.json()["user"]["id"] == uid
+    # The local login name is ours, not the provider's — it does not churn.
+    assert second.json()["user"]["username"] == original_username
+
+    with db_session() as db:
+        assert db.query(models.OIDCIdentity).count() == 1
+        assert db.query(models.User).count() == 2      # admin + this one
+
+
+def test_local_rename_keeps_existing_sessions_alive(client, authentik):
+    """A username change must not silently sign the user out everywhere: the
+    token identifies the account by id."""
+    admin_token = register_admin(client, "admin", "pw")
+    _, token = create_user(client, admin_token, "gina")
+
+    renamed = client.put("/api/profile/", headers=auth(token),
+                         json={"username": "gina-married"})
+    assert renamed.status_code == 200, renamed.text
+
+    # The *old* token — as still held by another device — keeps working.
+    me = client.get("/api/auth/me", headers=auth(token))
+    assert me.status_code == 200
+    assert me.json()["username"] == "gina-married"
+
+
+def test_local_rename_keeps_the_sso_link(client, authentik, monkeypatch):
+    """Renaming locally must not detach a linked SSO identity either."""
+    admin_token = register_admin(client, "admin", "pw")
+    uid, token = create_user(client, admin_token, "gina")
+    with db_session() as db:
+        db.add(models.OIDCIdentity(user_id=uid, provider_key="authentik",
+                                   issuer=ISSUER, subject="ak-gina"))
+        db.commit()
+
+    client.put("/api/profile/", headers=auth(token), json={"username": "gina-married"})
+
+    r = exchange(client, id_token=make_id_token(sub="ak-gina", aud=MOBILE_CLIENT))
+    assert r.status_code == 200
+    assert r.json()["user"]["id"] == uid
+
+
+def test_legacy_token_without_uid_still_works(client, authentik):
+    """Tokens minted before the uid claim stay valid — "remember me" runs for
+    180 days, so they are in circulation for a long time."""
+    from auth import create_access_token
+
+    register_admin(client, "admin", "pw")
+    legacy = create_access_token({"sub": "admin"})
+    me = client.get("/api/auth/me", headers=auth(legacy))
+    assert me.status_code == 200
+    assert me.json()["username"] == "admin"
+
+
 # ── the password_hash trap ───────────────────────────────────────────────────
 
 def test_sso_user_password_login_fails_without_500(client, authentik, monkeypatch):

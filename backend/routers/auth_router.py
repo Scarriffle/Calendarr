@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import models
-from auth import create_access_token, get_current_user, get_password_hash, verify_password
+from auth import create_user_token, get_current_user, get_password_hash, verify_password
 from database import get_db
 
 # When "Angemeldet bleiben" is ticked the token lives for half a year.
@@ -61,7 +61,7 @@ def setup(req: SetupRequest, db: Session = Depends(get_db)):
     db.add(models.UserSettings(user_id=user.id))
     db.commit()
     db.refresh(user)
-    token = create_access_token({"sub": user.username})
+    token = create_user_token(user)
     return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
 
 
@@ -83,7 +83,7 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="2fa_required",
         )
-    token = create_access_token({"sub": user.username})
+    token = create_user_token(user)
     return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
 
 
@@ -110,7 +110,7 @@ def login_json(req: LoginRequest, db: Session = Depends(get_db)):
                 detail="Ungültiger 2FA-Code",
             )
     expires = REMEMBER_ME_EXPIRY if req.remember_me else None
-    token = create_access_token({"sub": user.username}, expires_delta=expires)
+    token = create_user_token(user, expires_delta=expires)
     return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
 
 

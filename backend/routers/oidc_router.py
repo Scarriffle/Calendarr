@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 import models
 import oidc_client
 import oidc_config
-from auth import ALGORITHM, SECRET_KEY, create_access_token, get_current_user
+from auth import ALGORITHM, SECRET_KEY, create_user_token, get_current_user
 from database import get_db
 from dav_util import public_base
 from oidc_client import OIDCError
@@ -275,7 +275,7 @@ def oidc_callback(provider_key: str, request: Request,
         return _fail(request, e.slug)
 
     logger.info("OIDC login (%s) user id=%s via %s", action, user.id, provider.key)
-    token = create_access_token({"sub": user.username})
+    token = create_user_token(user)
 
     resp = RedirectResponse(url="/?sso=1", status_code=302)
     resp.delete_cookie(FLOW_COOKIE, path="/api/auth/oidc")
@@ -300,13 +300,13 @@ def oidc_complete(request: Request, response: Response, db: Session = Depends(ge
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
+        uid = payload.get("uid")
     except JWTError:
         raise HTTPException(401, "SSO-Sitzung ungültig")
-    if not username:
+    if uid is None:
         raise HTTPException(401, "SSO-Sitzung ungültig")
 
-    user = db.query(models.User).filter(models.User.username == username).first()
+    user = db.query(models.User).filter(models.User.id == uid).first()
     if not user:
         raise HTTPException(401, "SSO-Sitzung ungültig")
 
@@ -404,7 +404,7 @@ def oidc_exchange(req: ExchangeRequest, db: Session = Depends(get_db)):
 
     logger.info("OIDC exchange (%s) user id=%s via %s", action, user.id, provider.key)
     return {
-        "access_token": create_access_token({"sub": user.username}),
+        "access_token": create_user_token(user),
         "token_type": "bearer",
         "user": _user_dict(user),
     }

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import models
-from auth import create_access_token, get_current_user, get_password_hash, verify_password
+from auth import create_user_token, get_current_user, get_password_hash, verify_password
 from database import DATA_DIR, get_db
 
 router = APIRouter()
@@ -116,7 +116,9 @@ def update_profile(
             db.commit()
             # The JWT 'sub' is the login name — renaming it invalidates the old
             # token, so hand back a fresh one for the client to store.
-            result["access_token"] = create_access_token({"sub": new_login})
+            # The session survives a rename on its own (uid), but the token
+            # still carries the old name for display — hand out a fresh one.
+            result["access_token"] = create_user_token(current_user)
             return result
     if data.directory_hidden is not None:
         current_user.directory_hidden = data.directory_hidden
