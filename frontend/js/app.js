@@ -288,7 +288,16 @@ function bindLoginForm() {
     } catch (err) {
       if (err.message === '2fa_required') {
         totpRow.classList.remove('hidden');
-        document.getElementById('login-totp').focus();
+        // Focus only after the revealed row has been laid out. Password
+        // managers position their inline icon from the field's bounding box at
+        // the moment focus fires, and focusing in the same tick as the unhide
+        // can hand them a stale rect. setTimeout rather than
+        // requestAnimationFrame on purpose: rAF does not run in a backgrounded
+        // tab, which would swallow the focus entirely.
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'));  // nudge overlay repositioning
+          document.getElementById('login-totp').focus();
+        }, 0);
       } else {
         errEl.textContent = err.message;
         errEl.classList.remove('hidden');
