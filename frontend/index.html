@@ -806,6 +806,14 @@
           </div>
           <div id="app-pw-list"></div>
 
+          <!-- Single sign-on: hidden unless the server has a provider or the
+               account already holds a linked identity. -->
+          <div id="sso-section" class="hidden">
+            <h4 class="panel-title" style="margin-top:24px" data-i18n="sso_link_title">Single Sign-On</h4>
+            <p class="panel-desc" data-i18n="sso_link_desc">Verknüpfte Konten, mit denen du dich ohne Passwort anmelden kannst.</p>
+            <div id="sso-identity-list"></div>
+          </div>
+
           <h4 class="panel-title" style="margin-top:24px" data-i18n="settings_privacy">Privatsphäre</h4>
           <p class="panel-desc" data-i18n="settings_private_visibility_desc">Wie private Termine für andere Gruppenmitglieder erscheinen</p>
           <div class="form-group">

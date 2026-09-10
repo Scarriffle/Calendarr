@@ -3398,6 +3398,7 @@ function populateSettings() {
     if (dh) dh.checked = !!p.directory_hidden;
   }).catch(() => {});
   initAppPasswords();
+  initSSOIdentities();
 
   // Show users nav button only for admins
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -4938,6 +4939,64 @@ function bindProfileModal() {
       document.getElementById('2fa-disable-pw').value = '';
     } catch (e) { showToast(e.message, true); }
   };
+}
+
+// ── Linked SSO accounts — lives in Settings → Profile ──
+async function initSSOIdentities() {
+  const section = document.getElementById('sso-section');
+  const list = document.getElementById('sso-identity-list');
+  if (!section || !list) return;
+
+  let data;
+  try {
+    data = await api.oidcIdentities();
+  } catch (e) {
+    section.classList.add('hidden');
+    return;
+  }
+  if (!data) return;
+
+  const identities = data.identities || [];
+  // An SSO-provisioned account cannot fall back to a password, so its last
+  // link must stay — otherwise the user locks themselves out for good.
+  const isSSOOnly = data.auth_source === 'sso';
+
+  if (!identities.length) {
+    // Nothing linked: only worth showing if SSO is available at all.
+    let enabled = false;
+    try {
+      const cfg = await api.oidcProviders();
+      enabled = !!(cfg && cfg.enabled);
+    } catch (e) { /* treat as unavailable */ }
+    if (!enabled) { section.classList.add('hidden'); return; }
+    list.innerHTML = `<p class="text-muted">${t('sso_none_linked')}</p>`;
+    section.classList.remove('hidden');
+    return;
+  }
+
+  list.innerHTML = identities.map(i => `<div class="app-pw-item">
+      <span class="app-pw-name">${escHtml(i.name || i.provider)}</span>
+      <span class="app-pw-meta">${i.email ? escHtml(i.email) + ' · ' : ''}${
+        i.last_login_at
+          ? t('sso_last_login') + ' ' + new Date(i.last_login_at).toLocaleDateString(getLocale())
+          : t('sso_never_used')}</span>
+      <button class="btn btn-ghost btn-sm sso-unlink" data-id="${i.id}"
+        ${isSSOOnly && identities.length === 1 ? 'disabled title="' + escHtml(t('sso_last_identity_hint')) + '"' : ''}
+        >${t('sso_unlink')}</button>
+    </div>`).join('');
+  section.classList.remove('hidden');
+
+  list.querySelectorAll('.sso-unlink').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        await api.oidcUnlink(btn.dataset.id);
+        showToast(t('sso_unlinked'));
+        initSSOIdentities();
+      } catch (e) {
+        showToast(e.message === 'oidc_last_identity' ? t('sso_last_identity_hint') : e.message, true);
+      }
+    };
+  });
 }
 
 // ── App passwords (CalDAV) — lives in Settings → Profile ──

@@ -39,6 +39,12 @@ const translations = {
     sso_err_discovery_failed: 'Anmeldedienst antwortet nicht korrekt',
     sso_err_setup_required: 'Bitte zuerst das Administrator-Konto einrichten',
     sso_link_title: 'Single Sign-On',
+    sso_link_desc: 'Verknüpfte Konten, mit denen du dich ohne Passwort anmelden kannst.',
+    sso_none_linked: 'Noch kein Konto verknüpft. Melde dich einmal über den SSO-Knopf auf der Anmeldeseite an.',
+    sso_last_login: 'Zuletzt',
+    sso_never_used: 'Noch nicht benutzt',
+    sso_unlinked: 'Verknüpfung aufgehoben',
+    sso_last_identity_hint: 'Letzte Verknüpfung — dieses Konto hat kein Passwort und wäre danach nicht mehr erreichbar.',
     sso_unlink: 'Verknüpfung aufheben',
 
     // Topbar
@@ -846,6 +852,12 @@ const translations = {
     sso_err_discovery_failed: 'Sign-in service returned an invalid response',
     sso_err_setup_required: 'Please set up the administrator account first',
     sso_link_title: 'Single sign-on',
+    sso_link_desc: 'Linked accounts you can sign in with, without a password.',
+    sso_none_linked: 'No account linked yet. Sign in once via the SSO button on the login screen.',
+    sso_last_login: 'Last used',
+    sso_never_used: 'Not used yet',
+    sso_unlinked: 'Link removed',
+    sso_last_identity_hint: 'Last link — this account has no password and would become unreachable.',
     sso_unlink: 'Unlink',
 
     // Topbar
