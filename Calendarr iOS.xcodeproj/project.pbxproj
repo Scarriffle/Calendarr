@@ -7,10 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D0001A0CABCDEF0100AB5001 /* CalendarrWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3934CF4630544C2E003958B8 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3934CF4530544C2E003958B8 /* WidgetKit.framework */; };
+		3934CF4830544C2E003958B8 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3934CF4730544C2E003958B8 /* SwiftUI.framework */; };
+		3934CF5530544C2E003958B8 /* CalendarrWatchComplications.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3934CF4330544C2E003958B8 /* CalendarrWatchComplications.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA9701000001000000000001 /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = AA9701000002000000000001 /* AppAuth */; };
 		CA1E4D0A0002000000000001 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000001 /* CalendarrCore */; };
 		CA1E4D0A0002000000000002 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000002 /* CalendarrCore */; };
-		AA9701000001000000000001 /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = AA9701000002000000000001 /* AppAuth */; };
+		CA1E4D0A0002000000000003 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000003 /* CalendarrCore */; };
+		CA1E4D0A0002000000000004 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000004 /* CalendarrCore */; };
+		D0001A0CABCDEF0100AB5001 /* CalendarrWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		39E1B0010001000000000001 /* CalendarrWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 3934CF1A30544C01003958B8 /* CalendarrWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,6 +27,27 @@
 			remoteGlobalIDString = C0000A01FB4E10100AB5001;
 			remoteInfo = "Calendarr iOS";
 		};
+		3934CF2730544C02003958B8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C0000301FB4E10100AB5001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3934CF1930544C01003958B8;
+			remoteInfo = CalendarrWatch;
+		};
+		3934CF3130544C02003958B8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C0000301FB4E10100AB5001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3934CF1930544C01003958B8;
+			remoteInfo = CalendarrWatch;
+		};
+		3934CF5330544C2E003958B8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C0000301FB4E10100AB5001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3934CF4230544C2E003958B8;
+			remoteInfo = CalendarrWatchComplications;
+		};
 		D0001A0DABCDEF0100AB5001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C0000301FB4E10100AB5001 /* Project object */;
@@ -28,9 +55,27 @@
 			remoteGlobalIDString = D0001A01ABCDEF0100AB5001;
 			remoteInfo = CalendarrWidgets;
 		};
+		39E1B0010003000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C0000301FB4E10100AB5001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3934CF1930544C01003958B8;
+			remoteInfo = CalendarrWatch;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		3934CF5A30544C2E003958B8 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3934CF5530544C2E003958B8 /* CalendarrWatchComplications.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D0001A0BABCDEF0100AB5001 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -42,15 +87,39 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		39E1B0010002000000000001 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				39E1B0010001000000000001 /* CalendarrWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		3927C7BC2FB99D0E00EAD8ED /* Calendarr iOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Calendarr iOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3934CF1A30544C01003958B8 /* CalendarrWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CalendarrWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3934CF2630544C02003958B8 /* CalendarrWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CalendarrWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3934CF3030544C02003958B8 /* CalendarrWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CalendarrWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3934CF4330544C2E003958B8 /* CalendarrWatchComplications.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CalendarrWatchComplications.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		3934CF4530544C2E003958B8 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		3934CF4730544C2E003958B8 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		C0000B01FC4E10100AB5001 /* Calendarr iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Calendarr iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CalendarrWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3934CF5630544C2E003958B8 /* Exceptions for "CalendarrWatchComplications" folder in "CalendarrWatchComplications" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3934CF4230544C2E003958B8 /* CalendarrWatchComplications */;
+		};
 		D0001A0FABCDEF0100AB5001 /* Exceptions for "CalendarrWidgets" folder in "CalendarrWidgets" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -64,6 +133,29 @@
 		3927C7BD2FB99D0F00EAD8ED /* Calendarr iOSTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Calendarr iOSTests";
+			sourceTree = "<group>";
+		};
+		3934CF1B30544C01003958B8 /* CalendarrWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CalendarrWatch;
+			sourceTree = "<group>";
+		};
+		3934CF2930544C02003958B8 /* CalendarrWatchTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CalendarrWatchTests;
+			sourceTree = "<group>";
+		};
+		3934CF3330544C02003958B8 /* CalendarrWatchUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CalendarrWatchUITests;
+			sourceTree = "<group>";
+		};
+		3934CF4930544C2E003958B8 /* CalendarrWatchComplications */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3934CF5630544C2E003958B8 /* Exceptions for "CalendarrWatchComplications" folder in "CalendarrWatchComplications" target */,
+			);
+			path = CalendarrWatchComplications;
 			sourceTree = "<group>";
 		};
 		C0000D01FC4E10100AB5001 /* Calendarr iOS */ = {
@@ -94,6 +186,38 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		3934CF1730544C01003958B8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CA1E4D0A0002000000000003 /* CalendarrCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF2330544C02003958B8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF2D30544C02003958B8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF4030544C2E003958B8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3934CF4830544C2E003958B8 /* SwiftUI.framework in Frameworks */,
+				3934CF4630544C2E003958B8 /* WidgetKit.framework in Frameworks */,
+				CA1E4D0A0002000000000004 /* CalendarrCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C0000801FB4E10100AB5001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -114,6 +238,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3934CF4430544C2E003958B8 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				3934CF4530544C2E003958B8 /* WidgetKit.framework */,
+				3934CF4730544C2E003958B8 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		C0000201FB4E10100AB5001 = {
 			isa = PBXGroup;
 			children = (
@@ -121,6 +254,11 @@
 				D0001A03ABCDEF0100AB5001 /* CalendarrWidgets */,
 				D0001A04ABCDEF0100AB5001 /* Shared */,
 				3927C7BD2FB99D0F00EAD8ED /* Calendarr iOSTests */,
+				3934CF1B30544C01003958B8 /* CalendarrWatch */,
+				3934CF2930544C02003958B8 /* CalendarrWatchTests */,
+				3934CF3330544C02003958B8 /* CalendarrWatchUITests */,
+				3934CF4930544C2E003958B8 /* CalendarrWatchComplications */,
+				3934CF4430544C2E003958B8 /* Frameworks */,
 				C0000C01FB4E10100AB5001 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -131,6 +269,10 @@
 				C0000B01FC4E10100AB5001 /* Calendarr iOS.app */,
 				3927C7BC2FB99D0E00EAD8ED /* Calendarr iOSTests.xctest */,
 				D0001A02ABCDEF0100AB5001 /* CalendarrWidgets.appex */,
+				3934CF1A30544C01003958B8 /* CalendarrWatch.app */,
+				3934CF2630544C02003958B8 /* CalendarrWatchTests.xctest */,
+				3934CF3030544C02003958B8 /* CalendarrWatchUITests.xctest */,
+				3934CF4330544C2E003958B8 /* CalendarrWatchComplications.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -161,6 +303,100 @@
 			productReference = 3927C7BC2FB99D0E00EAD8ED /* Calendarr iOSTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		3934CF1930544C01003958B8 /* CalendarrWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3934CF3C30544C02003958B8 /* Build configuration list for PBXNativeTarget "CalendarrWatch" */;
+			buildPhases = (
+				3934CF1630544C01003958B8 /* Sources */,
+				3934CF1730544C01003958B8 /* Frameworks */,
+				3934CF1830544C01003958B8 /* Resources */,
+				3934CF5A30544C2E003958B8 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3934CF5430544C2E003958B8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3934CF1B30544C01003958B8 /* CalendarrWatch */,
+			);
+			name = CalendarrWatch;
+			packageProductDependencies = (
+				CA1E4D0A0001000000000003 /* CalendarrCore */,
+			);
+			productName = CalendarrWatch;
+			productReference = 3934CF1A30544C01003958B8 /* CalendarrWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		3934CF2530544C02003958B8 /* CalendarrWatchTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3934CF3D30544C02003958B8 /* Build configuration list for PBXNativeTarget "CalendarrWatchTests" */;
+			buildPhases = (
+				3934CF2230544C02003958B8 /* Sources */,
+				3934CF2330544C02003958B8 /* Frameworks */,
+				3934CF2430544C02003958B8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3934CF2830544C02003958B8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3934CF2930544C02003958B8 /* CalendarrWatchTests */,
+			);
+			name = CalendarrWatchTests;
+			packageProductDependencies = (
+			);
+			productName = CalendarrWatchTests;
+			productReference = 3934CF2630544C02003958B8 /* CalendarrWatchTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		3934CF2F30544C02003958B8 /* CalendarrWatchUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3934CF3E30544C02003958B8 /* Build configuration list for PBXNativeTarget "CalendarrWatchUITests" */;
+			buildPhases = (
+				3934CF2C30544C02003958B8 /* Sources */,
+				3934CF2D30544C02003958B8 /* Frameworks */,
+				3934CF2E30544C02003958B8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3934CF3230544C02003958B8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3934CF3330544C02003958B8 /* CalendarrWatchUITests */,
+			);
+			name = CalendarrWatchUITests;
+			packageProductDependencies = (
+			);
+			productName = CalendarrWatchUITests;
+			productReference = 3934CF3030544C02003958B8 /* CalendarrWatchUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		3934CF4230544C2E003958B8 /* CalendarrWatchComplications */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3934CF5730544C2E003958B8 /* Build configuration list for PBXNativeTarget "CalendarrWatchComplications" */;
+			buildPhases = (
+				3934CF3F30544C2E003958B8 /* Sources */,
+				3934CF4030544C2E003958B8 /* Frameworks */,
+				3934CF4130544C2E003958B8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3934CF4930544C2E003958B8 /* CalendarrWatchComplications */,
+			);
+			name = CalendarrWatchComplications;
+			packageProductDependencies = (
+				CA1E4D0A0001000000000004 /* CalendarrCore */,
+			);
+			productName = CalendarrWatchComplications;
+			productReference = 3934CF4330544C2E003958B8 /* CalendarrWatchComplications.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		C0000A01FB4E10100AB5001 /* Calendarr iOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C0001601FB4E10100AB5001 /* Build configuration list for PBXNativeTarget "Calendarr iOS" */;
@@ -169,11 +405,13 @@
 				C0000801FB4E10100AB5001 /* Frameworks */,
 				C0000901FB4E10100AB5001 /* Resources */,
 				D0001A0BABCDEF0100AB5001 /* Embed Foundation Extensions */,
+				39E1B0010002000000000001 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				D0001A0EABCDEF0100AB5001 /* PBXTargetDependency */,
+				39E1B0010004000000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C0000D01FC4E10100AB5001 /* Calendarr iOS */,
@@ -219,12 +457,26 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2650;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					3927C7BB2FB99D0E00EAD8ED = {
 						CreatedOnToolsVersion = 26.5;
 						TestTargetID = C0000A01FB4E10100AB5001;
+					};
+					3934CF1930544C01003958B8 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					3934CF2530544C02003958B8 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 3934CF1930544C01003958B8;
+					};
+					3934CF2F30544C02003958B8 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 3934CF1930544C01003958B8;
+					};
+					3934CF4230544C2E003958B8 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 					C0000A01FB4E10100AB5001 = {
 						CreatedOnToolsVersion = 26.4.1;
@@ -256,12 +508,44 @@
 				C0000A01FB4E10100AB5001 /* Calendarr iOS */,
 				D0001A01ABCDEF0100AB5001 /* CalendarrWidgets */,
 				3927C7BB2FB99D0E00EAD8ED /* Calendarr iOSTests */,
+				3934CF1930544C01003958B8 /* CalendarrWatch */,
+				3934CF2530544C02003958B8 /* CalendarrWatchTests */,
+				3934CF2F30544C02003958B8 /* CalendarrWatchUITests */,
+				3934CF4230544C2E003958B8 /* CalendarrWatchComplications */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		3927C7BA2FB99D0E00EAD8ED /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF1830544C01003958B8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF2430544C02003958B8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF2E30544C02003958B8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF4130544C2E003958B8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -292,6 +576,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		3934CF1630544C01003958B8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF2230544C02003958B8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF2C30544C02003958B8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3934CF3F30544C2E003958B8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C0000701FB4E10100AB5001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -314,10 +626,30 @@
 			target = C0000A01FB4E10100AB5001 /* Calendarr iOS */;
 			targetProxy = 3927C7C02FB99D0F00EAD8ED /* PBXContainerItemProxy */;
 		};
+		3934CF2830544C02003958B8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3934CF1930544C01003958B8 /* CalendarrWatch */;
+			targetProxy = 3934CF2730544C02003958B8 /* PBXContainerItemProxy */;
+		};
+		3934CF3230544C02003958B8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3934CF1930544C01003958B8 /* CalendarrWatch */;
+			targetProxy = 3934CF3130544C02003958B8 /* PBXContainerItemProxy */;
+		};
+		3934CF5430544C2E003958B8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3934CF4230544C2E003958B8 /* CalendarrWatchComplications */;
+			targetProxy = 3934CF5330544C2E003958B8 /* PBXContainerItemProxy */;
+		};
 		D0001A0EABCDEF0100AB5001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = D0001A01ABCDEF0100AB5001 /* CalendarrWidgets */;
 			targetProxy = D0001A0DABCDEF0100AB5001 /* PBXContainerItemProxy */;
+		};
+		39E1B0010004000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3934CF1930544C01003958B8 /* CalendarrWatch */;
+			targetProxy = 39E1B0010003000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -369,6 +701,232 @@
 				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Calendarr iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Calendarr iOS";
 				XROS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
+		3934CF3630544C02003958B8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CalendarrWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.scarriffleservices.calendarr.ios;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				CODE_SIGN_ENTITLEMENTS = CalendarrWatch/CalendarrWatch.entitlements;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		3934CF3730544C02003958B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CalendarrWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.scarriffleservices.calendarr.ios;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				CODE_SIGN_ENTITLEMENTS = CalendarrWatch/CalendarrWatch.entitlements;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		3934CF3830544C02003958B8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scarriffleservices.calendarr.ios.watchkitapp.CalendarrWatch-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CalendarrWatch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CalendarrWatch";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		3934CF3930544C02003958B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scarriffleservices.calendarr.ios.watchkitapp.CalendarrWatch-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CalendarrWatch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CalendarrWatch";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		3934CF3A30544C02003958B8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scarriffleservices.calendarr.ios.watchkitapp.CalendarrWatch-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = CalendarrWatch;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		3934CF3B30544C02003958B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scarriffleservices.calendarr.ios.watchkitapp.CalendarrWatch-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = CalendarrWatch;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		3934CF5830544C2E003958B8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CalendarrWatchComplications/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CalendarrWatch;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				CODE_SIGN_ENTITLEMENTS = CalendarrWatchComplications/CalendarrWatchComplications.entitlements;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios.watchkitapp.complications;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		3934CF5930544C2E003958B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PP34X97WS3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CalendarrWatchComplications/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CalendarrWatch;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				CODE_SIGN_ENTITLEMENTS = CalendarrWatchComplications/CalendarrWatchComplications.entitlements;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scarriffleservices.calendarr.ios.watchkitapp.complications;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;
 		};
@@ -678,6 +1236,42 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		3934CF3C30544C02003958B8 /* Build configuration list for PBXNativeTarget "CalendarrWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3934CF3630544C02003958B8 /* Debug */,
+				3934CF3730544C02003958B8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3934CF3D30544C02003958B8 /* Build configuration list for PBXNativeTarget "CalendarrWatchTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3934CF3830544C02003958B8 /* Debug */,
+				3934CF3930544C02003958B8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3934CF3E30544C02003958B8 /* Build configuration list for PBXNativeTarget "CalendarrWatchUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3934CF3A30544C02003958B8 /* Debug */,
+				3934CF3B30544C02003958B8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3934CF5730544C2E003958B8 /* Build configuration list for PBXNativeTarget "CalendarrWatchComplications" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3934CF5830544C2E003958B8 /* Debug */,
+				3934CF5930544C2E003958B8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		C0000601FB4E10100AB5001 /* Build configuration list for PBXProject "Calendarr iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -707,22 +1301,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCSwiftPackageProductDependency section */
-		CA1E4D0A0001000000000001 /* CalendarrCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = CalendarrCore;
-		};
-		CA1E4D0A0001000000000002 /* CalendarrCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = CalendarrCore;
-		};
-		AA9701000002000000000001 /* AppAuth */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AA9701000003000000000001 /* XCRemoteSwiftPackageReference "AppAuth-iOS" */;
-			productName = AppAuth;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin XCLocalSwiftPackageReference section */
 		39450EFC302A266A0090DDD7 /* XCLocalSwiftPackageReference "../CalendarrKit" */ = {
 			isa = XCLocalSwiftPackageReference;
@@ -740,6 +1318,30 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA9701000002000000000001 /* AppAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA9701000003000000000001 /* XCRemoteSwiftPackageReference "AppAuth-iOS" */;
+			productName = AppAuth;
+		};
+		CA1E4D0A0001000000000001 /* CalendarrCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CalendarrCore;
+		};
+		CA1E4D0A0001000000000003 /* CalendarrCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CalendarrCore;
+		};
+		CA1E4D0A0001000000000004 /* CalendarrCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CalendarrCore;
+		};
+		CA1E4D0A0001000000000002 /* CalendarrCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CalendarrCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C0000301FB4E10100AB5001 /* Project object */;
 }
