@@ -6,6 +6,7 @@ struct CalendarrWatchComplicationBundle: WidgetBundle {
     var body: some Widget {
         WatchNextEventWidget()
         WatchCornerCountdownWidget()
+        WatchCornerTitleWidget()
         WatchCornerTimeWidget()
         WatchCountdownWidget()
         WatchDateWidget()
@@ -50,6 +51,21 @@ struct WatchCornerCountdownWidget: Widget {
         }
         .configurationDisplayName("Restzeit (Ecke)")
         .description("Restzeit bis zum nächsten Termin, Name am Rand.")
+        .supportedFamilies([.accessoryCorner])
+    }
+}
+
+struct WatchCornerTitleWidget: Widget {
+    let kind = "WatchCornerTitle"
+
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(kind: kind,
+                               intent: WatchCalendarSelectionIntent.self,
+                               provider: WatchComplicationProvider()) { entry in
+            CornerTitleComplicationView(entry: entry).complicationChrome(entry.language)
+        }
+        .configurationDisplayName("Terminname (Ecke)")
+        .description("Name des nächsten Termins, Uhrzeit klein am Rand.")
         .supportedFamilies([.accessoryCorner])
     }
 }
