@@ -5,6 +5,10 @@ let package = Package(
     name: "CalendarrKit",
     platforms: [
         .iOS(.v17),
+        // String form, not `.v26`: that enum case needs PackageDescription 6.2,
+        // and raising swift-tools-version for one constant would change
+        // defaults across the whole manifest.
+        .watchOS("26.0"),
         .macOS(.v14),
         .macCatalyst(.v17),
     ],
