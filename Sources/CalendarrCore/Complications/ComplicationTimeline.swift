@@ -10,14 +10,22 @@ public enum ComplicationTimeline {
     /// Dates at which a complication should re-render.
     ///
     /// Always begins with `now` so the first entry renders immediately. Event
-    /// starts and ends within `horizon` become entries; hourly marks fill the
-    /// rest so a quiet calendar still advances its date and countdown. The
-    /// result is sorted, deduplicated to the second, and capped at
+    /// starts and ends within `horizon` become entries.
+    ///
+    /// The first `fineGrainedWindow` then gets a mark every minute, and the rest
+    /// of the horizon one every hour. The fine-grained part is what lets a
+    /// complication show a *compact* countdown — "23m" rather than "1:23:45" —
+    /// which is the only kind that fits an accessoryCorner or a circular gauge.
+    /// A live `Text(style: .timer)` needs no entries at all but is eight
+    /// characters wide, and overlaps the curved label it sits next to.
+    ///
+    /// The result is sorted, deduplicated to the second, and capped at
     /// `maxEntries`, keeping the earliest.
     public static func entryDates(from now: Date,
                                   in snapshot: CalendarrSnapshot,
                                   horizon: TimeInterval = 24 * 3600,
-                                  maxEntries: Int = 100) -> [Date] {
+                                  fineGrainedWindow: TimeInterval = 3600,
+                                  maxEntries: Int = 150) -> [Date] {
         let end = now.addingTimeInterval(horizon)
         var seen: Set<Int> = []
         var dates: [Date] = []
@@ -35,6 +43,12 @@ public enum ComplicationTimeline {
         for event in snapshot.events {
             add(event.start)
             add(event.end)
+        }
+        let fineEnd = min(end, now.addingTimeInterval(fineGrainedWindow))
+        var minute = now.addingTimeInterval(60)
+        while minute <= fineEnd {
+            add(minute)
+            minute = minute.addingTimeInterval(60)
         }
         var hourly = now.addingTimeInterval(3600)
         while hourly <= end {

@@ -73,6 +73,27 @@ struct ComplicationTimelineTests {
         #expect(dates.count >= 24)
     }
 
+    @Test("The first hour gets minute-granular entries, so a compact countdown stays honest")
+    func minuteGranularFirstHour() {
+        let dates = ComplicationTimeline.entryDates(from: Self.now, in: Self.snapshot([]))
+        let firstHour = dates.filter { $0 <= Self.now.addingTimeInterval(3600) }
+
+        // 60 minute marks plus `now` itself.
+        #expect(firstHour.count >= 60)
+        #expect(firstHour.contains(Self.now.addingTimeInterval(60)))
+        #expect(firstHour.contains(Self.now.addingTimeInterval(1800)))
+    }
+
+    @Test("Past the first hour the entries thin out to hourly")
+    func hourlyAfterFirstHour() {
+        let dates = ComplicationTimeline.entryDates(from: Self.now, in: Self.snapshot([]))
+        let later = dates.filter { $0 > Self.now.addingTimeInterval(3600) }
+
+        // 23 further hours, not 23 * 60 minutes.
+        #expect(later.count < 40)
+        #expect(later.contains(Self.now.addingTimeInterval(2 * 3600)))
+    }
+
     @Test("The entry count is capped, keeping the earliest entries")
     func capsEntries() {
         var events: [SnapshotEvent] = []
