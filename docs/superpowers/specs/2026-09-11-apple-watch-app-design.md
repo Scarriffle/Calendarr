@@ -1,7 +1,7 @@
 # Apple Watch app and watch-face complications
 
 Date: 2026-09-11
-Status: approved — ready for implementation planning
+Status: implemented — pending on-device verification
 
 ## Goal
 

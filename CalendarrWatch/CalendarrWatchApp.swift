@@ -1,17 +1,19 @@
-//
-//  CalendarrWatchApp.swift
-//  CalendarrWatch Watch App
-//
-//  Created by Guido Schmit on 11.09.2026.
-//
-
 import SwiftUI
 
 @main
-struct CalendarrWatch_Watch_AppApp: App {
+struct CalendarrWatchApp: App {
+    @State private var model = WatchSnapshotModel()
+
+    init() {
+        // The session has to be live before the first payload arrives, and a
+        // complication push can wake this app with no UI on screen at all.
+        WatchSnapshotReceiver.shared.activate()
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            WatchAgendaView()
+                .environment(model)
         }
     }
 }
