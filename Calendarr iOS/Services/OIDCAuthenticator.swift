@@ -66,7 +66,7 @@ final class OIDCAuthenticator {
     /// the app target generates its Info.plist, which has no way to declare
     /// `CFBundleURLTypes`. Rather than hang forever waiting for a callback that
     /// cannot arrive, refuse up front.
-    var guidedAccessBlocksLogin: Bool { UIAccessibilityIsGuidedAccessEnabled() }
+    var guidedAccessBlocksLogin: Bool { UIAccessibility.isGuidedAccessEnabled }
 
     func discover(issuer: String) async throws -> OIDServiceConfiguration {
         guard let url = URL(string: issuer) else { throw OIDCError(slug: "oidc_bad_issuer") }
@@ -174,7 +174,7 @@ final class OIDCAuthenticator {
         // The original request travels inside the stored state, so the nonce
         // is still available. A refreshed token often drops the claim, which
         // the server tolerates — but when it keeps it, it has to match.
-        let nonce = state.lastAuthorizationResponse?.request.nonce
+        let nonce = state.lastAuthorizationResponse.request.nonce
         return (idToken, tokens.1, nonce)
     }
 
