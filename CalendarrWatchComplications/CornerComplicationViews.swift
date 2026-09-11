@@ -26,7 +26,7 @@ struct CornerCountdownComplicationView: View {
             }
         }
         .widgetLabel {
-            Text(WatchComplicationSupport.cornerLabel(next, at: entry.date, language: entry.language))
+            Text(WatchComplicationSupport.eventLabel(next, at: entry.date, language: entry.language))
         }
     }
 }

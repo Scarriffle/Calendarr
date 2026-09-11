@@ -2,6 +2,18 @@ import SwiftUI
 import WidgetKit
 import CalendarrCore
 
+/// Attaches the curved bezel label that a face with a bezel slot — Infograph —
+/// renders across the top, where the tick marks otherwise are. Faces without
+/// that slot ignore it, so it costs nothing to always provide.
+private extension View {
+    func eventBezelLabel(_ entry: WatchComplicationEntry) -> some View {
+        let next = WatchComplicationSupport.nextEvent(in: entry.snapshot, at: entry.date)
+        return widgetLabel {
+            Text(WatchComplicationSupport.eventLabel(next, at: entry.date, language: entry.language))
+        }
+    }
+}
+
 /// A draining ring plus the remaining time.
 struct CountdownComplicationView: View {
     let entry: WatchComplicationEntry
@@ -32,6 +44,7 @@ struct CountdownComplicationView: View {
             }
             .gaugeStyle(.accessoryCircularCapacity)
             .widgetAccentable()
+            .eventBezelLabel(entry)
         } else {
             ZStack {
                 AccessoryWidgetBackground()
@@ -82,6 +95,7 @@ struct DateComplicationView: View {
             }
             .gaugeStyle(.accessoryCircularCapacity)
             .widgetAccentable()
+            .eventBezelLabel(entry)
         }
     }
 }
@@ -112,6 +126,7 @@ struct TodayCountComplicationView: View {
             }
             .gaugeStyle(.accessoryCircularCapacity)
             .widgetAccentable()
+            .eventBezelLabel(entry)
         }
     }
 }

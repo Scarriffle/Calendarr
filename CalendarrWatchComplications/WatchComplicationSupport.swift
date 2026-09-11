@@ -89,9 +89,15 @@ enum WatchComplicationSupport {
         return formatter.string(from: date).uppercased()
     }
 
-    /// The curved bezel label for a corner complication: time plus title, or a
-    /// plain "no events".
-    static func cornerLabel(_ event: SnapshotEvent?, at now: Date, language: String) -> String {
+    /// The curved label that accompanies a circular or corner complication:
+    /// time plus title, or a plain "no events".
+    ///
+    /// On a corner this follows the screen edge. On a face with a bezel slot —
+    /// Infograph — the same label arcs across the top, where the tick marks
+    /// otherwise are. That is the position ClockKit called `graphicBezel`, and
+    /// in WidgetKit it is reached by attaching `.widgetLabel` to an
+    /// `accessoryCircular` widget.
+    static func eventLabel(_ event: SnapshotEvent?, at now: Date, language: String) -> String {
         guard let event else { return WatchL10n.t("watch.no_events", language) }
         if event.isAllDay { return event.title }
         return "\(time(event.start, language: language)) \(event.title)"
