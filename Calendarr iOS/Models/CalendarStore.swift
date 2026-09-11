@@ -599,7 +599,8 @@ class CalendarStore {
                                                   colorHex: ev.calendarColor)
             }
         }
-        WidgetStore.writeCalendars(Array(calendarMap.values).sorted { $0.name < $1.name })
+        let calendars = Array(calendarMap.values).sorted { $0.name < $1.name }
+        WidgetStore.writeCalendars(calendars)
 
         let visible = allCachedEvents
             .filter { ev in
@@ -620,10 +621,14 @@ class CalendarStore {
                             location: ev.location,
                             calendarKey: Self.calendarKey(source: ev.source, calendarId: ev.calendarId))
             }
-        WidgetStore.write(WidgetStore.makeSnapshot(events: Array(visible),
-                                                   coverageStart: from,
-                                                   coverageEnd: to))
+        let snapshot = WidgetStore.makeSnapshot(events: Array(visible),
+                                               coverageStart: from,
+                                               coverageEnd: to)
+        WidgetStore.write(snapshot)
         WidgetTimelineNotifier.reload()
+        // The watch has its own container and cannot read the file we just
+        // wrote, so it is handed the data explicitly.
+        WatchSyncService.shared.push(snapshot: snapshot, calendars: calendars)
     }
 
     // MARK: – Writable calendars
