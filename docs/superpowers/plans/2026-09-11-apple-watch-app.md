@@ -12,6 +12,14 @@
 
 ---
 
+## Note on the source files
+
+`Calendarr iOS/`, `CalendarrWidgets/` and `Shared/` are
+`PBXFileSystemSynchronizedRootGroup`s, so **new `.swift` files are picked up
+automatically** — no `project.pbxproj` surgery to add them. This does not extend
+to new *targets* (Task 9), and it is why a partial Info.plist has to live
+outside those folders (Task 7).
+
 ## Prerequisite (blocks device verification only)
 
 Xcode 26.6 ships the watchOS 26.5 SDK. The target device runs watchOS 27 beta, so builds cannot be installed on it until an Xcode with watchOS 27 support is present. Every task below can be written and build-verified without it. Do not block on this; note it when handing back.
@@ -44,6 +52,7 @@ Xcode 26.6 ships the watchOS 26.5 SDK. The target device runs watchOS 27 beta, s
 
 | File | Responsibility |
 |---|---|
+| `Calendarr-Info.plist` | Partial Info.plist for the two background-task array keys, merged into the generated one. At the project root, not in the target folder. |
 | `Calendarr iOS/Services/BackgroundRefresh.swift` | `BGAppRefreshTask` registration and handling. |
 | `Calendarr iOS/Services/WatchSyncService.swift` | WCSession sender on the phone. |
 | `CalendarrWatch/CalendarrWatchApp.swift` | watchOS app entry point. |
@@ -1114,7 +1123,8 @@ Independently valuable: the home-screen widgets are currently only as fresh as t
 **Files:**
 - Create: `Calendarr iOS/Services/BackgroundRefresh.swift`
 - Modify: `Calendarr iOS/CalendarrApp.swift:5-13`
-- Modify: `Calendarr iOS.xcodeproj/project.pbxproj` (two Info.plist build settings, both configurations)
+- Create: `Calendarr-Info.plist` (project root)
+- Modify: `Calendarr iOS.xcodeproj/project.pbxproj` (`INFOPLIST_FILE`, both configurations)
 
 - [ ] **Step 1: Write the refresh service**
 
@@ -1230,36 +1240,50 @@ struct CalendarrApp: App {
 }
 ```
 
-- [ ] **Step 3: Add the Info.plist keys**
+- [x] **Step 3: Add the Info.plist keys**
 
-In Xcode, select the **Calendarr iOS** target → Build Settings, and add to **both** Debug and Release:
+Both keys are arrays, and Xcode does **not** expose either as an
+`INFOPLIST_KEY_` build setting — verified by setting them, building, and finding
+them absent from the result while `INFOPLIST_KEY_UIApplicationSupportsIndirect\
+InputEvents` did land. Use a partial Info.plist instead; generation stays on and
+merges into it.
 
-- `INFOPLIST_KEY_UIBackgroundModes` = `fetch`
-- `INFOPLIST_KEY_BGTaskSchedulerPermittedIdentifiers` = `com.scarriffleservices.calendarr.ios.refresh`
-
-- [ ] **Step 4: Build and verify the keys reached the built Info.plist**
-
-```bash
-xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/calendarr-dd CODE_SIGNING_ALLOWED=NO build
-plutil -p "/tmp/calendarr-dd/Build/Products/Debug-iphonesimulator/Calendarr iOS.app/Info.plist" | grep -A3 -i "BGTaskScheduler\|UIBackgroundModes"
-```
-
-Expected: `** BUILD SUCCEEDED **`, and the output shows both `UIBackgroundModes` containing `fetch` and `BGTaskSchedulerPermittedIdentifiers` containing the identifier.
-
-If `INFOPLIST_KEY_BGTaskSchedulerPermittedIdentifiers` does not appear, the build setting is not supported by this Xcode. In that case create `Calendarr iOS/Info.plist` containing only the two keys, set `INFOPLIST_FILE = Calendarr iOS/Info.plist` and `GENERATE_INFOPLIST_FILE = NO` on the target, and re-run this step:
+Create `Calendarr-Info.plist` at the **project root**:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
-	<array><string>fetch</string></array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array><string>com.scarriffleservices.calendarr.ios.refresh</string></array>
+	<array>
+		<string>com.scarriffleservices.calendarr.ios.refresh</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 </dict>
 </plist>
 ```
+
+Then set `INFOPLIST_FILE = "Calendarr-Info.plist"` on the **Calendarr iOS**
+target in both configurations, leaving `GENERATE_INFOPLIST_FILE = YES`.
+
+The root location is load-bearing: `Calendarr iOS/` is a
+`PBXFileSystemSynchronizedRootGroup`, so a plist inside it is also copied as a
+resource and the build fails with "Multiple commands produce .../Info.plist".
+
+- [x] **Step 4: Build and verify the merge lost nothing**
+
+```bash
+xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/calendarr-dd CODE_SIGNING_ALLOWED=NO build
+plutil -p "/tmp/calendarr-dd/Build/Products/Release-iphonesimulator/Calendarr iOS.app/Info.plist" | grep -A3 -i "BGTaskScheduler\|UIBackgroundModes"
+```
+
+Note the scheme builds **Release**, not Debug. Expected: `** BUILD SUCCEEDED **`
+and both keys present. Diff the whole plist against a build without the change
+to confirm no generated key was displaced.
 
 - [ ] **Step 5: Commit**
 
