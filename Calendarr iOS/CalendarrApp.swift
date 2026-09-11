@@ -4,10 +4,17 @@ import SwiftUI
 struct CalendarrApp: App {
     @State private var appState = AppState()
 
+    init() {
+        // Registration has to happen before the app finishes launching, which
+        // is why it is here and not in a .task modifier.
+        BackgroundRefresh.register()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(appState)
+                .task { BackgroundRefresh.schedule() }
         }
     }
 }

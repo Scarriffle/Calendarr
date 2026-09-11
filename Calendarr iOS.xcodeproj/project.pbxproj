@@ -509,6 +509,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Calendarr-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_CFBundleName = Calendarr;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
@@ -558,6 +559,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Calendarr-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_CFBundleName = Calendarr;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
