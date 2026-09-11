@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** All 17 tasks implemented and build-verified as of 2026-09-11. On-device behaviour is still unverified — see the handoff list in Task 17.
+
 **Goal:** Ship a read-only Apple Watch app plus eight watch-face complications that show the next Calendarr appointment, fed from the iPhone over WatchConnectivity.
 
 **Architecture:** The watch is a read-only consumer of the phone's snapshot. Every piece of logic that can be tested lives in `CalendarrCore` (testable with `swift test` on the dev machine); the watch targets hold only thin SwiftUI and WCSession glue, which can only be build-verified here. The phone trims its 42-day snapshot to a 14-day watch payload and sends it; the watch writes it into its *own* App Group container through the same `SnapshotStore`, so there is one wire format and one reader.
