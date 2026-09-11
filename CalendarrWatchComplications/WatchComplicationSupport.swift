@@ -28,6 +28,22 @@ enum WatchComplicationSupport {
         event.start > now ? event.start : event.end
     }
 
+    /// A countdown narrow enough for a corner or a circular gauge: at most
+    /// three characters. `Text(style: .timer)` would be live and free of
+    /// timeline entries, but renders `1:23:45` and overlaps whatever sits
+    /// beside it — so the timeline carries minute-granular entries instead and
+    /// this is recomputed per entry.
+    static func compactCountdown(to target: Date, at now: Date, language: String) -> String {
+        let seconds = target.timeIntervalSince(now)
+        guard seconds > 0 else { return WatchL10n.t("watch.now", language) }
+        let minutes = Int(seconds / 60)
+        if minutes < 1  { return WatchL10n.t("watch.now", language) }
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        if hours < 24   { return "\(hours)h" }
+        return "\(hours / 24)d"
+    }
+
     /// How full a draining ring should be, over a two-hour lead window.
     static func gaugeFraction(to target: Date, at now: Date) -> Double {
         let window: TimeInterval = 2 * 3600

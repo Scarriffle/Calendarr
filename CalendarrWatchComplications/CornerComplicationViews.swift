@@ -14,7 +14,12 @@ struct CornerCountdownComplicationView: View {
         let next = WatchComplicationSupport.nextEvent(in: entry.snapshot, at: entry.date)
         Group {
             if let next {
-                Text(WatchComplicationSupport.countdownTarget(next, at: entry.date), style: .timer)
+                Text(WatchComplicationSupport.compactCountdown(
+                        to: WatchComplicationSupport.countdownTarget(next, at: entry.date),
+                        at: entry.date,
+                        language: entry.language))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .widgetAccentable()
             } else {
                 Image(systemName: "calendar")
@@ -37,6 +42,8 @@ struct CornerTimeComplicationView: View {
                 Text(next.isAllDay
                      ? WatchL10n.t("watch.allday", entry.language)
                      : WatchComplicationSupport.time(next.start, language: entry.language))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .widgetAccentable()
             } else {
                 Image(systemName: "calendar")

@@ -24,8 +24,11 @@ struct CountdownComplicationView: View {
             Gauge(value: WatchComplicationSupport.gaugeFraction(to: target, at: entry.date)) {
                 Image(systemName: "calendar")
             } currentValueLabel: {
-                Text(target, style: .timer)
-                    .font(.system(size: 12))
+                Text(WatchComplicationSupport.compactCountdown(to: target, at: entry.date,
+                                                               language: entry.language))
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
             .gaugeStyle(.accessoryCircularCapacity)
             .widgetAccentable()
