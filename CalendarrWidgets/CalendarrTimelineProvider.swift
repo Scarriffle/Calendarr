@@ -1,5 +1,6 @@
 import WidgetKit
 import AppIntents
+import CalendarrCore
 
 struct CalendarrEntry: TimelineEntry {
     let date: Date
@@ -37,22 +38,9 @@ struct CalendarrTimelineProvider: AppIntentTimelineProvider {
     // MARK: – Filtering
 
     private func filtered(_ snapshot: WidgetSnapshot?, by config: CalendarSelectionIntent) -> WidgetSnapshot? {
-        guard let snapshot else { return nil }
-        let ids = (config.selectedCalendars ?? []).map { $0.id }
-        guard !ids.isEmpty else { return snapshot }   // nothing selected = show all
-        let keep = Set(ids)
-        // Filtering narrows the events but not the window: the snapshot still
-        // speaks for the same range, it just has fewer calendars in it.
-        return WidgetSnapshot(
-            writtenAt:     snapshot.writtenAt,
-            coverageStart: snapshot.coverageStart,
-            coverageEnd:   snapshot.coverageEnd,
-            isLoggedIn:    snapshot.isLoggedIn,
-            writerVersion: snapshot.writerVersion,
-            events:        snapshot.events.filter { keep.contains($0.calendarKey) },
-            theme:         snapshot.theme,
-            language:      snapshot.language
-        )
+        // The rule lives in CalendarrCore so the watch provider cannot drift
+        // from this one. Nothing selected means "show all calendars".
+        snapshot?.filtered(toCalendarKeys: Set((config.selectedCalendars ?? []).map(\.id)))
     }
 }
 
