@@ -723,7 +723,7 @@
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = CalendarrWatch;
+				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.scarriffleservices.calendarr.ios;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -757,7 +757,7 @@
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = CalendarrWatch;
+				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.scarriffleservices.calendarr.ios;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -881,7 +881,7 @@
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CalendarrWatchComplications/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CalendarrWatch;
+				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -915,7 +915,7 @@
 				DEVELOPMENT_TEAM = PP34X97WS3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CalendarrWatchComplications/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CalendarrWatch;
+				INFOPLIST_KEY_CFBundleDisplayName = Calendarr;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
