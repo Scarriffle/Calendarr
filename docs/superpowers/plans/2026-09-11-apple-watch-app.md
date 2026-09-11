@@ -26,6 +26,12 @@ Xcode 26.6 ships the watchOS 26.5 SDK. The target device runs watchOS 27 beta, s
 
 ## Working rules for this repo
 
+- **Never pass `-sdk` to xcodebuild.** It overrides SDKROOT for every target in
+  the dependency graph, so the watch app gets built against the iOS SDK: the
+  build still succeeds, but `WKApplication` is missing from the result and
+  `DTSDKName` reads `iphonesimulator`. Select the platform with `-destination`
+  alone and let each target keep its own SDK.
+
 - Never run or start the server, and never run the apps. Apps are **build-verified only**; behaviour, layout and complication refresh are verified by the user on the device.
 - Commit messages in English. Commit after every task.
 - `CalendarrKit` is a **separate git repo** at `../CalendarrKit` with **no remote** — commit there, do not push. The iOS repo (`.`) pushes to `origin main`.
@@ -509,7 +515,7 @@ import CalendarrCore
 - [ ] **Step 6: Build the iOS app to verify the adoption compiles**
 
 ```bash
-xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Expected: `** BUILD SUCCEEDED **`.
@@ -1529,7 +1535,7 @@ In `Calendarr iOS/CalendarrApp.swift`, in `AppState.logout()`, after the existin
 - [ ] **Step 5: Build the iOS app**
 
 ```bash
-xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Expected: `** BUILD SUCCEEDED **`.
@@ -1615,7 +1621,7 @@ For both new bundle IDs, enable the **App Groups** capability and select `group.
 - [ ] **Step 6: Verify both targets build**
 
 ```bash
-xcodebuild -project "Calendarr iOS.xcodeproj" -scheme CalendarrWatch -sdk watchsimulator -destination 'generic/platform=watchOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Expected: `** BUILD SUCCEEDED **` (an empty app at this point).
@@ -2349,7 +2355,7 @@ struct WatchCalendarFilterView: View {
 - [ ] **Step 2: Build the watch app**
 
 ```bash
-xcodebuild -project "Calendarr iOS.xcodeproj" -scheme CalendarrWatch -sdk watchsimulator -destination 'generic/platform=watchOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Expected: `** BUILD SUCCEEDED **`.
@@ -3012,7 +3018,7 @@ struct WatchDatePlusEventWidget: Widget {
 - [ ] **Step 5: Build the complications target**
 
 ```bash
-xcodebuild -project "Calendarr iOS.xcodeproj" -scheme CalendarrWatch -sdk watchsimulator -destination 'generic/platform=watchOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Expected: `** BUILD SUCCEEDED **` — the scheme builds the embedded extension too.
@@ -3046,8 +3052,8 @@ Expected: build succeeds against the native macOS SDK, every test passes.
 
 ```bash
 cd "../Calendarr iOS"
-xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
-xcodebuild -project "Calendarr iOS.xcodeproj" -scheme CalendarrWatch -sdk watchsimulator -destination 'generic/platform=watchOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project "Calendarr iOS.xcodeproj" -scheme "Calendarr iOS" -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Expected: `** BUILD SUCCEEDED **` twice.
