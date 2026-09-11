@@ -69,17 +69,19 @@ struct DateComplicationView: View {
             Label("\(WatchComplicationSupport.monthAbbreviation(entry.date, language: entry.language)) \(day)",
                   systemImage: "calendar")
         default:
-            ZStack {
-                AccessoryWidgetBackground()
-                VStack(spacing: 0) {
-                    Text("\(day)")
-                        .font(.system(size: 22, weight: .bold))
-                        .minimumScaleFactor(0.7)
-                        .widgetAccentable()
-                    Text(WatchComplicationSupport.monthAbbreviation(entry.date, language: entry.language))
-                        .font(.system(size: 8, weight: .semibold))
-                }
+            // A closed gauge, filling the slot edge to edge — the WidgetKit
+            // equivalent of ClockKit's ClosedGaugeText, which no longer exists.
+            // The ring is not decoration: it drains as the day does.
+            Gauge(value: WatchComplicationSupport.dayRemainingFraction(at: entry.date)) {
+                Text(WatchComplicationSupport.monthAbbreviation(entry.date, language: entry.language))
+            } currentValueLabel: {
+                Text("\(day)")
+                    .font(.system(size: 20, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .widgetAccentable()
         }
     }
 }
@@ -99,18 +101,17 @@ struct TodayCountComplicationView: View {
             Label("\(count) \(WatchL10n.t("watch.events_today", entry.language))",
                   systemImage: "calendar")
         default:
-            ZStack {
-                AccessoryWidgetBackground()
-                VStack(spacing: 0) {
-                    Text("\(count)")
-                        .font(.system(size: 22, weight: .bold))
-                        .widgetAccentable()
-                    Text(WatchL10n.t("watch.events_today", entry.language).uppercased())
-                        .font(.system(size: 7, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
+            Gauge(value: WatchComplicationSupport.todayRemainingFraction(in: entry.snapshot,
+                                                                         at: entry.date)) {
+                Image(systemName: "calendar")
+            } currentValueLabel: {
+                Text("\(count)")
+                    .font(.system(size: 20, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .widgetAccentable()
         }
     }
 }

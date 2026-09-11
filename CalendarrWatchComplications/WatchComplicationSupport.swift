@@ -50,6 +50,31 @@ enum WatchComplicationSupport {
         return min(1, max(0, target.timeIntervalSince(now) / window))
     }
 
+    /// How much of today is still ahead. Drains through the day, matching the
+    /// countdown ring rather than inventing a second direction.
+    static func dayRemainingFraction(at now: Date,
+                                     calendar: Calendar = Calendar(identifier: .gregorian)) -> Double {
+        let dayStart = calendar.startOfDay(for: now)
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return 0 }
+        let total = dayEnd.timeIntervalSince(dayStart)
+        guard total > 0 else { return 0 }
+        return min(1, max(0, dayEnd.timeIntervalSince(now) / total))
+    }
+
+    /// The share of today's appointments still ahead. Zero when there are none,
+    /// which leaves the ring empty rather than full — an empty day should not
+    /// look like an untouched one.
+    static func todayRemainingFraction(in snapshot: CalendarrSnapshot?, at now: Date,
+                                       calendar: Calendar = Calendar(identifier: .gregorian)) -> Double {
+        guard let snapshot else { return 0 }
+        let dayStart = calendar.startOfDay(for: now)
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return 0 }
+        let today = snapshot.events.filter { $0.start < dayEnd && $0.end > dayStart }
+        guard !today.isEmpty else { return 0 }
+        let ahead = today.filter { $0.end > now }.count
+        return min(1, max(0, Double(ahead) / Double(today.count)))
+    }
+
     static func time(_ date: Date, language: String) -> String {
         let formatter = DateFormatter()
         formatter.locale = WatchL10n.locale(language)
