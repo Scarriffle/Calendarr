@@ -108,9 +108,13 @@ struct CalEvent: Identifiable, Hashable {
         // holiday sent without the flag renders as "00:00 – 00:00" — a time
         // range that is technically true and tells the reader nothing.
         let cal = Calendar.current
+        // Requiring the end to land exactly on midnight too was too strict: a
+        // holiday stored as 16th 00:00 to 21st 01:00 slipped through and showed
+        // up as a one-hour slot. Starting on a day boundary and running into a
+        // later day is enough.
         let spansWholeDays = e > s
             && cal.startOfDay(for: s) == s
-            && cal.startOfDay(for: e) == e
+            && cal.startOfDay(for: e) > cal.startOfDay(for: s)
         let isAllDay = declaredAllDay || spansWholeDays
 
         return CalEvent(

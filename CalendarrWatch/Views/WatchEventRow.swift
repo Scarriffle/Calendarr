@@ -41,14 +41,27 @@ extension Color {
 }
 
 enum WatchEventFormat {
-    static func timeRange(_ event: SnapshotEvent, language: String) -> String {
+    static func timeRange(_ event: SnapshotEvent, language: String,
+                          calendar: Calendar = Calendar(identifier: .gregorian)) -> String {
         if event.isAllDay { return WatchL10n.t("watch.allday", language) }
-        let formatter = DateFormatter()
-        formatter.locale = WatchL10n.locale(language)
-        formatter.dateFormat = "HH:mm"
-        let start = formatter.string(from: event.start)
+
+        let time = DateFormatter()
+        time.locale = WatchL10n.locale(language)
+        time.dateFormat = "HH:mm"
+
+        let start = time.string(from: event.start)
         guard event.end > event.start else { return start }
-        return "\(start) – \(formatter.string(from: event.end))"
+
+        // Without the weekday, an event running from Wednesday to Monday reads
+        // as a one-hour slot: "00:00 – 01:00" is true and useless.
+        if calendar.startOfDay(for: event.end) > calendar.startOfDay(for: event.start) {
+            let day = DateFormatter()
+            day.locale = WatchL10n.locale(language)
+            day.setLocalizedDateFormatFromTemplate("EEE")
+            return "\(day.string(from: event.start)) \(start) – "
+                 + "\(day.string(from: event.end)) \(time.string(from: event.end))"
+        }
+        return "\(start) – \(time.string(from: event.end))"
     }
 
     static func time(_ date: Date, language: String) -> String {
