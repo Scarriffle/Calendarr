@@ -10,7 +10,7 @@
 		3934CF4630544C2E003958B8 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3934CF4530544C2E003958B8 /* WidgetKit.framework */; };
 		3934CF4830544C2E003958B8 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3934CF4730544C2E003958B8 /* SwiftUI.framework */; };
 		3934CF5530544C2E003958B8 /* CalendarrWatchComplications.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3934CF4330544C2E003958B8 /* CalendarrWatchComplications.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		39E1B0010001000000000001 /* CalendarrWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 3934CF1A30544C01003958B8 /* CalendarrWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		39E1B0010001000000000001 /* CalendarrWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 3934CF1A30544C01003958B8 /* CalendarrWatch.app */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA9701000001000000000001 /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = AA9701000002000000000001 /* AppAuth */; };
 		CA1E4D0A0002000000000001 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000001 /* CalendarrCore */; };
 		CA1E4D0A0002000000000002 /* CalendarrCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA1E4D0A0001000000000002 /* CalendarrCore */; };
@@ -651,6 +651,9 @@
 		};
 		39E1B0010004000000000001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+			);
 			target = 3934CF1930544C01003958B8 /* CalendarrWatch */;
 			targetProxy = 39E1B0010003000000000001 /* PBXContainerItemProxy */;
 		};
@@ -1087,6 +1090,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDarkContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1109,7 +1113,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 2;
 			};
 			name = Debug;
@@ -1138,6 +1142,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDarkContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1160,7 +1165,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 2;
 			};
 			name = Release;
@@ -1195,7 +1200,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 2;
 			};
 			name = Debug;
@@ -1229,7 +1234,7 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 2;
 			};
 			name = Release;
