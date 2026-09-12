@@ -98,10 +98,20 @@ struct CalEvent: Identifiable, Hashable {
             let clean = startStr.trimmingCharacters(in: .whitespaces)
             return clean.count == 10 && !clean.contains("T")
         }()
-        let isAllDay = (json["allDay"] as? Bool ?? false) || startIsDateOnly
-        let startDate = parseDate(startStr, allDay: isAllDay)
-        let endDate = parseDate(endStr, allDay: isAllDay)
+        let declaredAllDay = (json["allDay"] as? Bool ?? false) || startIsDateOnly
+        let startDate = parseDate(startStr, allDay: declaredAllDay)
+        let endDate = parseDate(endStr, allDay: declaredAllDay)
         guard let s = startDate, let e = endDate else { return nil }
+
+        // An event running midnight to midnight across one or more whole days
+        // is all-day whatever the payload claims. Without this, a six-day
+        // holiday sent without the flag renders as "00:00 – 00:00" — a time
+        // range that is technically true and tells the reader nothing.
+        let cal = Calendar.current
+        let spansWholeDays = e > s
+            && cal.startOfDay(for: s) == s
+            && cal.startOfDay(for: e) == e
+        let isAllDay = declaredAllDay || spansWholeDays
 
         return CalEvent(
             id: id,
