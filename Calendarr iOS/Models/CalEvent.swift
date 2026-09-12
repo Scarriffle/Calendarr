@@ -91,7 +91,14 @@ struct CalEvent: Identifiable, Hashable {
         else if let n = json["id"] as? Int { id = String(n) }
         else { return nil }
 
-        let isAllDay = json["allDay"] as? Bool ?? false
+        // A date-only string is an all-day event whether or not the flag says
+        // so — `parseDate` already treats it that way. Trusting the flag alone
+        // is what put "00:00" in front of birthdays everywhere they are shown.
+        let startIsDateOnly: Bool = {
+            let clean = startStr.trimmingCharacters(in: .whitespaces)
+            return clean.count == 10 && !clean.contains("T")
+        }()
+        let isAllDay = (json["allDay"] as? Bool ?? false) || startIsDateOnly
         let startDate = parseDate(startStr, allDay: isAllDay)
         let endDate = parseDate(endStr, allDay: isAllDay)
         guard let s = startDate, let e = endDate else { return nil }

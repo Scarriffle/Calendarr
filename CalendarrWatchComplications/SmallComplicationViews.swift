@@ -67,7 +67,10 @@ struct CountdownComplicationView: View {
     }
 }
 
-/// Day number and month. No appointment information — a date replacement.
+/// Weekday and day number, the way a date is actually read. The ring appears
+/// only while an appointment is running, and then shows how far through it we
+/// are — an empty track around an idle day is noise, so there is no Gauge at
+/// all in that case.
 struct DateComplicationView: View {
     let entry: WatchComplicationEntry
     @Environment(\.widgetFamily) private var family
@@ -76,26 +79,47 @@ struct DateComplicationView: View {
         Calendar(identifier: .gregorian).component(.day, from: entry.date)
     }
 
+    private var weekday: String {
+        WatchComplicationSupport.weekdayAbbreviation(entry.date, language: entry.language)
+    }
+
     var body: some View {
         switch family {
         case .accessoryInline:
-            Label("\(WatchComplicationSupport.monthAbbreviation(entry.date, language: entry.language)) \(day)",
-                  systemImage: "calendar")
+            Label("\(weekday) \(day)", systemImage: "calendar")
         default:
-            // A closed gauge, filling the slot edge to edge — the WidgetKit
-            // equivalent of ClockKit's ClosedGaugeText, which no longer exists.
-            // The ring is not decoration: it drains as the day does.
-            Gauge(value: WatchComplicationSupport.dayRemainingFraction(at: entry.date)) {
-                Text(WatchComplicationSupport.monthAbbreviation(entry.date, language: entry.language))
+            circular
+        }
+    }
+
+    @ViewBuilder
+    private var circular: some View {
+        if let running = WatchComplicationSupport.runningEvent(in: entry.snapshot, at: entry.date) {
+            Gauge(value: WatchComplicationSupport.progress(of: running, at: entry.date)) {
+                Text(weekday)
             } currentValueLabel: {
-                Text("\(day)")
-                    .font(.system(size: 20, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                dateStack
             }
             .gaugeStyle(.accessoryCircularCapacity)
-            .widgetAccentable()
             .eventBezelLabel(entry)
+        } else {
+            ZStack {
+                AccessoryWidgetBackground()
+                dateStack
+            }
+            .eventBezelLabel(entry)
+        }
+    }
+
+    private var dateStack: some View {
+        VStack(spacing: -2) {
+            Text(weekday)
+                .font(.system(size: 11, weight: .semibold))
+                .widgetAccentable()
+            Text("\(day)")
+                .font(.system(size: 23, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
     }
 }

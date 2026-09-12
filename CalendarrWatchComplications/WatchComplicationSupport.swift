@@ -22,6 +22,32 @@ enum WatchComplicationSupport {
         return snapshot.events.filter { $0.start < dayEnd && $0.end > dayStart }.count
     }
 
+    /// The appointment happening right now, if there is one. All-day events are
+    /// excluded on purpose: one of those is "running" for twenty-four hours and
+    /// would hold the ring at some arbitrary fraction all day, which says
+    /// nothing.
+    static func runningEvent(in snapshot: CalendarrSnapshot?, at now: Date) -> SnapshotEvent? {
+        snapshot?.events
+            .filter { !$0.isAllDay && $0.start <= now && $0.end > now }
+            .min { $0.end < $1.end }
+    }
+
+    /// How far through an appointment we are, 0 at its start and 1 at its end.
+    static func progress(of event: SnapshotEvent, at now: Date) -> Double {
+        let total = event.end.timeIntervalSince(event.start)
+        guard total > 0 else { return 0 }
+        return min(1, max(0, now.timeIntervalSince(event.start) / total))
+    }
+
+    static func weekdayAbbreviation(_ date: Date, language: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = WatchL10n.locale(language)
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date)
+            .replacingOccurrences(of: ".", with: "")
+            .uppercased()
+    }
+
     /// What a countdown counts to: the start if it has not begun, otherwise the
     /// end. Counting up from a start time that has passed reads as broken.
     static func countdownTarget(_ event: SnapshotEvent, at now: Date) -> Date {
