@@ -16,6 +16,7 @@ STATIC_CACHE = f"public, max-age={STATIC_MAX_AGE_SECONDS}, must-revalidate"
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import scheduler
 from database import Base, engine
 from routers import admin_router, attachments_router, auth_router, birthdays_router, caldav_router, dav_router, google_router, groups_router, homeassistant_router, ical_router, local_router, oidc_router, profile_router, settings_router, users_router
 
@@ -384,7 +385,8 @@ def _migrate():
 
 _migrate()
 
-app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None)
+app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None,
+              lifespan=scheduler.lifespan)
 
 
 @app.middleware("http")
