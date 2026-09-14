@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
+import attachments_store
 import caldav_client
 import models
 import permissions
@@ -400,6 +401,9 @@ def get_events(
             )
             .all()
         )
+        # One grouped query for the whole calendar: a per-event lookup here
+        # would be N+1 across a month view.
+        att_counts = attachments_store.counts_for_events(db, [e.id for e in local_events])
         for ev in local_events:
             creator = resolve_creator(ev, name_cache=name_cache)
             # A private event belonging to someone else (shared calendar or group
@@ -413,9 +417,15 @@ def get_events(
             if foreign_private and visibility == "hidden":
                 continue
             if ev.rrule:
-                built = expand_recurring_local(ev, local_cal, start_dt, end_dt, creator=creator)
+                built = expand_recurring_local(
+                    ev, local_cal, start_dt, end_dt, creator=creator,
+                    attachment_count=att_counts.get(ev.id, 0),
+                )
             else:
-                built = [build_local_event_dict(ev, local_cal, rrule=None, creator=creator)]
+                built = [build_local_event_dict(
+                    ev, local_cal, rrule=None, creator=creator,
+                    attachment_count=att_counts.get(ev.id, 0),
+                )]
             for b in built:
                 if shared_owner_name:
                     b["calendar_name"] = shared_owner_name

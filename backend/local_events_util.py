@@ -71,6 +71,9 @@ def mask_busy_event(event: dict) -> dict:
     masked["rrule"] = None
     masked["exdate"] = None
     masked["private"] = True
+    # "This busy block has 3 files" is a small but real leak, and _BUSY_KEEP
+    # would drop the key entirely — set it so clients get a defined value.
+    masked["attachment_count"] = 0
     return masked
 
 
@@ -103,6 +106,7 @@ def build_local_event_dict(
     owner: Optional[dict] = None,
     is_group_event: bool = False,
     read_only: bool = False,
+    attachment_count: int = 0,
 ) -> dict:
     """Build the unified dict for a single local event (or occurrence).
 
@@ -131,6 +135,11 @@ def build_local_event_dict(
         "creator": creator,
         "private": bool(ev.is_private),
         "reminders": [int(x) for x in (ev.reminders or "").split(",") if x.strip().lstrip("-").isdigit()],
+        # Only a COUNT, never the list: the merged read loops over every event,
+        # so a lazy relationship here would be one query per event across a
+        # whole month, and a recurring event would repeat the same array on
+        # every occurrence. Clients fetch the list when a detail view opens.
+        "attachment_count": attachment_count,
     }
     # Birthday calendars: the server owns the presentation. It flags the event so
     # clients can show a cake icon, appends the age computed for THIS occurrence
@@ -170,6 +179,7 @@ def expand_recurring_local(
     owner: Optional[dict] = None,
     is_group_event: bool = False,
     read_only: bool = False,
+    attachment_count: int = 0,
 ) -> list:
     """Expand a recurring LocalEvent into individual occurrences in the range."""
     results = []
@@ -201,7 +211,7 @@ def expand_recurring_local(
                     ev, local_cal,
                     start=occ_start.isoformat(), end=occ_end.isoformat(), all_day=True,
                     creator=creator, owner=owner, is_group_event=is_group_event,
-                    read_only=read_only,
+                    read_only=read_only, attachment_count=attachment_count,
                 ))
         else:
             ev_start = dt_datetime.fromisoformat(ev_start_str)
@@ -228,13 +238,13 @@ def expand_recurring_local(
                     ev, local_cal,
                     start=occ.isoformat(), end=occ_end.isoformat(), all_day=False,
                     creator=creator, owner=owner, is_group_event=is_group_event,
-                    read_only=read_only,
+                    read_only=read_only, attachment_count=attachment_count,
                 ))
     except Exception as exc:
         logger.warning("Error expanding recurring event %s: %s", ev.uid, exc)
         # Fall back to a single event.
         results.append(build_local_event_dict(
             ev, local_cal, creator=creator, owner=owner, is_group_event=is_group_event,
-            read_only=read_only,
+            read_only=read_only, attachment_count=attachment_count,
         ))
     return results

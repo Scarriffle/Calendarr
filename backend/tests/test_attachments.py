@@ -461,3 +461,58 @@ def test_capability_url_serves_without_authentication(client):
     assert client.get("/api/attach/voellig-erfunden").status_code == 404
     client.delete(f"/api/local/attachments/{att_id}", headers=auth(token))
     assert client.get(f"/api/attach/{cap}").status_code == 404
+
+
+# ── attachment_count in the merged event read ─────────────
+
+def test_attachment_count_appears_on_the_merged_read(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+
+    def count_for(uid):
+        events = client.get("/api/caldav/events", headers=auth(token),
+                            params=RANGE).json()["events"]
+        return next(e["attachment_count"] for e in events if e["id"] == uid)
+
+    assert count_for(ev["id"]) == 0
+    _upload(client, token, ev["id"], name="a.pdf")
+    _upload(client, token, ev["id"], name="b.pdf")
+    assert count_for(ev["id"]) == 2
+
+
+def test_recurring_event_carries_the_count_on_every_occurrence(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    r = client.post("/api/local/events", headers=auth(token), json={
+        "calendar_id": cal_id, "title": "Taeglich", "rrule": "FREQ=DAILY;COUNT=5",
+        "start": "2026-06-10T10:00:00+00:00", "end": "2026-06-10T11:00:00+00:00",
+    })
+    ev = r.json()
+    _upload(client, token, ev["id"], name="a.pdf")
+
+    events = client.get("/api/caldav/events", headers=auth(token),
+                        params=RANGE).json()["events"]
+    occurrences = [e for e in events if e["id"] == ev["id"]]
+    assert len(occurrences) == 5
+    assert all(e["attachment_count"] == 1 for e in occurrences)
+
+
+def test_busy_masked_event_reports_no_attachments(client):
+    """A count is metadata too: "this busy block has 3 files" would leak."""
+    admin = register_admin(client)
+    bob_id, bob = create_user(client, admin, "bob")
+    cal_id = _make_calendar(client, admin)
+    r = client.post("/api/local/events", headers=auth(admin), json={
+        "calendar_id": cal_id, "title": "Vertraulich", "private": True,
+        "start": "2026-06-10T10:00:00+00:00", "end": "2026-06-10T11:00:00+00:00",
+    })
+    ev = r.json()
+    _upload(client, admin, ev["id"], name="geheim.pdf")
+    _share(client, admin, cal_id, bob_id, "read")
+
+    events = client.get("/api/caldav/events", headers=auth(bob),
+                        params=RANGE).json()["events"]
+    masked = next(e for e in events if e["id"] == ev["id"])
+    assert masked["title"] == "Beschäftigt"
+    assert masked["attachment_count"] == 0

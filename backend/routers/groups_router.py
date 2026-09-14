@@ -398,6 +398,7 @@ def combined_events(
             )
             .all()
         )
+        att_counts = attachments_store.counts_for_events(db, [e.id for e in events])
         for ev in events:
             creator_owner_id = ev.creator_id or owner_id
             # Private filtering for events that belong to someone else.
@@ -412,9 +413,9 @@ def combined_events(
                 creator = {"id": None, "display_name": f"{ev.creator_name_external} (importiert)"}
 
             if ev.rrule:
-                built = expand_recurring_local(ev, cal, start_dt, end_dt, creator=creator, owner=owner, is_group_event=is_group, read_only=read_only)
+                built = expand_recurring_local(ev, cal, start_dt, end_dt, creator=creator, owner=owner, is_group_event=is_group, read_only=read_only, attachment_count=att_counts.get(ev.id, 0))
             else:
-                built = [build_local_event_dict(ev, cal, rrule=None, creator=creator, owner=owner, is_group_event=is_group, read_only=read_only)]
+                built = [build_local_event_dict(ev, cal, rrule=None, creator=creator, owner=owner, is_group_event=is_group, read_only=read_only, attachment_count=att_counts.get(ev.id, 0))]
 
             for b in built:
                 if ev.is_private and creator_owner_id != current_user.id and visibility_for(creator_owner_id) == "busy":

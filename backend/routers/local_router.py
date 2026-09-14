@@ -110,7 +110,11 @@ def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
 
 
 def _event_dict(ev: models.LocalEvent, cal: models.LocalCalendar, db: Session) -> dict:
-    return build_local_event_dict(ev, cal, creator=resolve_creator(ev))
+    counts = attachments_store.counts_for_events(db, [ev.id])
+    return build_local_event_dict(
+        ev, cal, creator=resolve_creator(ev),
+        attachment_count=counts.get(ev.id, 0),
+    )
 
 
 # ── Calendar CRUD ─────────────────────────────────────────
