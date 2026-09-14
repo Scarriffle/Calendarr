@@ -2355,12 +2355,8 @@ function renderAttachmentRows() {
   const existing = (state.eventAttachments || []).filter(a => !removed.includes(a.id));
   const pending = state.pendingAttachments || [];
 
-  if (!existing.length && !pending.length) {
-    const empty = document.createElement('div');
-    empty.className = 'form-hint';
-    empty.textContent = t('attachment_none');
-    list.appendChild(empty);
-  }
+  // Nothing when empty — the reminders list does the same, and the caption
+  // under the button already says what can go here.
   existing.forEach(a => list.appendChild(attachmentRow({
     name: a.filename, size: a.size_bytes, contentType: a.content_type,
     thumbId: a.has_thumb ? a.id : null,

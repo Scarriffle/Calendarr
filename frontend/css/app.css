@@ -399,7 +399,26 @@ a { color: var(--primary); text-decoration: none; }
 .ev-reminder-before { color: var(--text-3); font-size: 12px; }
 
 /* ── Attachments ─────────────────────────────────────── */
-.ev-attach-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.ev-attach-list:not(:empty) { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+/* Looks like the text inputs above it rather than a button: same ground,
+   border, radius and padding, just left-aligned and in the muted text colour.
+   NOT .form-hint for the caption below — a later rule turns that class into a
+   bordered callout box, which is right for a warning and far too loud here. */
+.ev-attach-add {
+  display: block; width: 100%; text-align: left;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 14px;
+  color: var(--text-2);
+  font-size: 14px; font-family: inherit;
+  cursor: pointer; outline: none;
+  transition: border-color var(--transition), color var(--transition);
+}
+.ev-attach-add:hover:not(:disabled) { border-color: var(--text-3); color: var(--text-1); }
+.ev-attach-add:focus-visible { border-color: var(--primary); }
+.ev-attach-add:disabled { opacity: .5; cursor: default; }
+.ev-attach-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; }
 .ev-attach-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px;
                  border: 1px solid var(--border); border-radius: 8px; }
 .ev-attach-row:hover { background: var(--hover-highlight); }
