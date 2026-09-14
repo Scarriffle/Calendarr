@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import logging
 import uuid
+from urllib.parse import quote
 from datetime import date, datetime, timedelta, timezone
 
-from icalendar import Calendar, Event, vCalAddress, vRecur, vText
+from icalendar import Calendar, Event, vCalAddress, vRecur, vText, vUri
+from icalendar.parser import Parameters
 
 logger = logging.getLogger(__name__)
 
@@ -150,8 +152,17 @@ def _parse_iso(s: str) -> datetime:
     return dt
 
 
-def build_ics(calendar, events, *, name_cache: dict | None = None) -> str:
-    """Build a VCALENDAR string for a local calendar and its events."""
+def build_ics(calendar, events, *, name_cache: dict | None = None,
+              attachments_by_event: dict | None = None,
+              base_url: str | None = None) -> str:
+    """Build a VCALENDAR string for a local calendar and its events.
+
+    ``attachments_by_event`` maps LocalEvent.id -> list of EventAttachment. With
+    a ``base_url`` each one becomes an ATTACH property pointing at its
+    capability URL, so external clients (Apple Calendar, Thunderbird) can fetch
+    it — they cannot send a bearer token. Both arguments are optional so every
+    existing caller keeps working and emits no ATTACH at all.
+    """
     cal = Calendar()
     cal.add("prodid", "-//Calendarr//EN")
     cal.add("version", "2.0")
@@ -199,6 +210,20 @@ def build_ics(calendar, events, *, name_cache: dict | None = None) -> str:
             organizer = vCalAddress("mailto:noreply@calendarr.local")
             organizer.params["CN"] = vText(organizer_name.replace('"', ""))
             item.add("organizer", organizer)
+
+        # ATTACH: one line per attachment, as a URI rather than inline base64 —
+        # the files are up to 10 MB each and would otherwise be copied into
+        # every ICS body on every sync.
+        for att in (attachments_by_event or {}).get(getattr(ev, "id", None), ()):
+            if not base_url:
+                continue  # a relative ATTACH URL is useless to an external client
+            uri = vUri(f"{base_url}/api/attach/{att.token}/{quote(att.filename)}")
+            uri.params = Parameters({
+                "FMTTYPE": att.content_type,
+                "SIZE": str(att.size_bytes),
+                "FILENAME": att.filename,
+            })
+            item.add("attach", uri, encode=0)
 
         cal.add_component(item)
 

@@ -10,7 +10,6 @@ Two routers live here:
                   send a bearer token. See the README for the tradeoff.
 """
 
-import os
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -28,12 +27,6 @@ from database import get_db
 
 router = APIRouter()
 public_router = APIRouter()
-
-# Deployments that would rather lose attachments in external calendar clients
-# than hand out unauthenticated URLs can set this to 0: the capability endpoint
-# then 404s and no ATTACH line is emitted into any ICS.
-PUBLIC_LINKS_ENABLED = os.environ.get("ATTACHMENT_PUBLIC_LINKS", "1") != "0"
-
 
 def _to_dict(att: models.EventAttachment) -> dict:
     uploader = None
@@ -261,7 +254,7 @@ def public_attachment(token: str, name: str = "", db: Session = Depends(get_db))
 
     Never distinguish "wrong token" from "deleted": both are 404.
     """
-    if not PUBLIC_LINKS_ENABLED:
+    if not attachments_store.PUBLIC_LINKS_ENABLED:
         raise HTTPException(404, "Not found")
     att = (
         db.query(models.EventAttachment)

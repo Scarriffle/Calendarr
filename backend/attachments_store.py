@@ -21,6 +21,7 @@ and forgets the helper.
 
 import io
 import logging
+import os
 import secrets
 import time
 import uuid
@@ -74,6 +75,11 @@ _TEXT_TYPES = {
 # this the sweep races an upload in progress: the bytes are written before the
 # row is committed, and a sweep landing in between would delete a good file.
 SWEEP_GRACE_SECONDS = 3600
+
+# Deployments that would rather lose attachments in external calendar clients
+# than hand out unauthenticated URLs set this to 0: no ATTACH line is emitted
+# and the capability endpoint 404s.
+PUBLIC_LINKS_ENABLED = os.environ.get("ATTACHMENT_PUBLIC_LINKS", "1") != "0"
 
 
 def sniff(raw: bytes, filename: str) -> tuple[str, str]:
@@ -241,6 +247,23 @@ def counts_for_events(db: Session, event_ids: Iterable[int]) -> dict[int, int]:
         .all()
     )
     return {event_id: n for event_id, n in rows}
+
+
+def by_event(db: Session, event_ids: Iterable[int]) -> dict[int, list]:
+    """Attachments grouped by event id, in ONE query — for ICS generation."""
+    ids = [i for i in event_ids if i is not None]
+    if not ids:
+        return {}
+    out: dict[int, list] = {}
+    rows = (
+        db.query(models.EventAttachment)
+        .filter(models.EventAttachment.event_id.in_(ids))
+        .order_by(models.EventAttachment.id)
+        .all()
+    )
+    for row in rows:
+        out.setdefault(row.event_id, []).append(row)
+    return out
 
 
 def sweep(db: Session) -> tuple[int, int]:

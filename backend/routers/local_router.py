@@ -772,6 +772,7 @@ async def import_generic(
 @router.get("/calendars/{calendar_id}/export")
 def export_calendar(
     calendar_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -783,7 +784,12 @@ def export_calendar(
     )
     # Resolve creator display names for ORGANIZER.
     name_cache = {u.id: (u.display_name or u.username) for u in db.query(models.User).all()}
-    ics = ical_io.build_ics(cal, events, name_cache=name_cache)
+    base_url = dav_util.public_base(request)
+    atts = None
+    if base_url and attachments_store.PUBLIC_LINKS_ENABLED:
+        atts = attachments_store.by_event(db, [e.id for e in events])
+    ics = ical_io.build_ics(cal, events, name_cache=name_cache,
+                            attachments_by_event=atts, base_url=base_url)
     safe_name = "".join(c for c in cal.name if c.isalnum() or c in (" ", "-", "_")).strip() or "calendar"
     return Response(
         content=ics,

@@ -516,3 +516,132 @@ def test_busy_masked_event_reports_no_attachments(client):
     masked = next(e for e in events if e["id"] == ev["id"])
     assert masked["title"] == "Beschäftigt"
     assert masked["attachment_count"] == 0
+
+
+# ── ATTACH in the generated ICS ───────────────────────────
+
+def _publish(client, token, cal_id):
+    """Publish the calendar over CalDAV and return its secret token URL path."""
+    r = client.put(f"/api/local/calendars/{cal_id}", headers=auth(token),
+                   json={"caldav_published": True})
+    assert r.status_code == 200, r.text
+    cals = client.get("/api/local/calendars", headers=auth(token)).json()
+    url = next(c["caldav_url"] for c in cals if c["id"] == cal_id)
+    return "/dav/" + url.rstrip("/").rsplit("/", 1)[-1] + "/"
+
+
+def _attach_props(ics_text):
+    """Re-parse instead of grepping: icalendar folds lines at 75 octets, so a
+    naive substring check would miss a long URL."""
+    from icalendar import Calendar
+
+    cal = Calendar.from_ical(ics_text)
+    out = []
+    for comp in cal.walk("VEVENT"):
+        prop = comp.get("attach")
+        if prop is None:
+            continue
+        for p in (prop if isinstance(prop, list) else [prop]):
+            out.append((str(p), dict(p.params)))
+    return out
+
+
+def test_ics_carries_an_attach_line_per_attachment(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    _upload(client, token, ev["id"], name="Mietvertrag.pdf")
+    _upload(client, token, ev["id"], png_bytes(), "foto.png", "image/png")
+    dav_path = _publish(client, token, cal_id)
+
+    props = _attach_props(client.get(dav_path).text)
+    assert len(props) == 2
+    by_name = {params["FILENAME"]: (uri, params) for uri, params in props}
+    assert set(by_name) == {"Mietvertrag.pdf", "foto.png"}
+
+    uri, params = by_name["Mietvertrag.pdf"]
+    assert params["FMTTYPE"] == "application/pdf"
+    assert int(params["SIZE"]) == len(PDF_BYTES)
+    assert "/api/attach/" in uri and uri.startswith("http")
+
+
+def test_attach_url_from_the_ics_actually_serves_the_file(client):
+    """The whole point: an external client follows the URL with no credentials."""
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    _upload(client, token, ev["id"])
+    dav_path = _publish(client, token, cal_id)
+
+    uri, _ = _attach_props(client.get(dav_path).text)[0]
+    path = uri.split("testserver", 1)[1]
+    r = client.get(path)  # no Authorization header
+    assert r.status_code == 200
+    assert r.content == PDF_BYTES
+
+
+def test_attach_url_honours_public_base_url(client, monkeypatch):
+    """Behind a reverse proxy the app only sees its internal origin."""
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://cal.example.com")
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    _upload(client, token, ev["id"])
+    dav_path = _publish(client, token, cal_id)
+
+    uri, _ = _attach_props(client.get(dav_path).text)[0]
+    assert uri.startswith("https://cal.example.com/api/attach/")
+
+
+def test_no_attach_when_public_links_are_switched_off(client, monkeypatch):
+    monkeypatch.setattr(attachments_store, "PUBLIC_LINKS_ENABLED", False)
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    _upload(client, token, ev["id"])
+    dav_path = _publish(client, token, cal_id)
+
+    assert _attach_props(client.get(dav_path).text) == []
+
+
+def test_events_without_attachments_get_no_attach(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    _make_event(client, token, cal_id)
+    dav_path = _publish(client, token, cal_id)
+    assert _attach_props(client.get(dav_path).text) == []
+
+
+def test_upload_changes_the_event_etag(client):
+    """The ICS body changes, so CalDAV clients must be told to re-fetch."""
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    db = SessionLocal()
+    before = db.query(models.LocalEvent).filter(
+        models.LocalEvent.uid == ev["id"]).first().etag
+    db.close()
+
+    _upload(client, token, ev["id"])
+
+    db = SessionLocal()
+    after = db.query(models.LocalEvent).filter(
+        models.LocalEvent.uid == ev["id"]).first().etag
+    db.close()
+    assert after != before
+
+
+def test_caldav_put_leaves_attachments_alone(client):
+    """An external client rewriting the event must not drop its attachments."""
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    _upload(client, token, ev["id"])
+    dav_path = _publish(client, token, cal_id)
+
+    ics = client.get(dav_path).text
+    r = client.put(f"{dav_path}{ev['id']}.ics", content=ics.encode("utf-8"),
+                   headers={"Content-Type": "text/calendar"})
+    assert r.status_code in (201, 204), r.text
+    assert _row_count() == 1
+    assert len(_attach_props(client.get(dav_path).text)) == 1

@@ -160,8 +160,15 @@ def _name_cache(cal: models.LocalCalendar, db: Session) -> dict:
     return {}
 
 
-def _build_ics(cal: models.LocalCalendar, evs: list[models.LocalEvent], db: Session) -> str:
-    return ical_io.build_ics(cal, evs, name_cache=_name_cache(cal, db))
+def _build_ics(cal: models.LocalCalendar, evs: list[models.LocalEvent], db: Session,
+               base_url: str | None = None) -> str:
+    # Without a base URL (or with public links switched off) no ATTACH is
+    # emitted: a relative attachment URL is useless to an external client.
+    atts = None
+    if base_url and attachments_store.PUBLIC_LINKS_ENABLED:
+        atts = attachments_store.by_event(db, [e.id for e in evs])
+    return ical_io.build_ics(cal, evs, name_cache=_name_cache(cal, db),
+                             attachments_by_event=atts, base_url=base_url)
 
 
 # ── XML builders ──────────────────────────────────────────
@@ -277,7 +284,8 @@ def _handle_propfind(cal: models.LocalCalendar, base: str, resource: str, depth:
     return _multistatus("\n".join(parts))
 
 
-def _handle_report(cal: models.LocalCalendar, base: str, body: bytes, db: Session) -> Response:
+def _handle_report(cal: models.LocalCalendar, base: str, body: bytes, db: Session,
+                   base_url: str | None = None) -> Response:
     report_type = None
     hrefs: list[str] = []
     if body:
@@ -297,17 +305,17 @@ def _handle_report(cal: models.LocalCalendar, base: str, body: bytes, db: Sessio
 
     parts = []
     for ev in evs:
-        ics = _build_ics(cal, [ev], db)
+        ics = _build_ics(cal, [ev], db, base_url)
         parts.append(_event_propstat(base, ev, with_data=True, ics=ics))
     return _multistatus("\n".join(parts) if parts else "")
 
 
 def _handle_get(cal: models.LocalCalendar, resource: str, db: Session,
-                *, head: bool = False) -> Response:
+                *, head: bool = False, base_url: str | None = None) -> Response:
     ev = _find_event(cal, resource, db)
     if not ev:
         return Response(status_code=404)
-    ics = _build_ics(cal, [ev], db)
+    ics = _build_ics(cal, [ev], db, base_url)
     headers = {"ETag": f'"{_etag(ev)}"'}
     return Response(
         content=b"" if head else ics,
@@ -390,13 +398,15 @@ async def _dispatch_collection(request: Request, cal: models.LocalCalendar, base
         depth = request.headers.get("Depth", "0")
         return _handle_propfind(cal, base, resource, depth, db,
                                 principal_href=principal_href, home_href=home_href)
+    # The public origin as clients actually reach us, for ATTACH URLs.
+    base_url = dav_util.public_base(request)
     if method == "REPORT":
-        return _handle_report(cal, base, await request.body(), db)
+        return _handle_report(cal, base, await request.body(), db, base_url)
     if method in ("GET", "HEAD"):
         if not resource:
-            ics = _build_ics(cal, _events(cal, db), db)
+            ics = _build_ics(cal, _events(cal, db), db, base_url)
             return Response(content=ics, media_type="text/calendar; charset=utf-8")
-        return _handle_get(cal, resource, db, head=(method == "HEAD"))
+        return _handle_get(cal, resource, db, head=(method == "HEAD"), base_url=base_url)
     if method == "PUT":
         return _handle_put(cal, resource, await request.body(), db)
     if method == "DELETE":
