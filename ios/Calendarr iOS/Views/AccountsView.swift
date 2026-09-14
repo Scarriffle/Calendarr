@@ -1,0 +1,922 @@
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct AccountsView: View {
+    let api: CalendarrAPI
+    @State private var caldavAccounts: [CalDAVAccount] = []
+    @State private var localCalendars: [LocalCalendar] = []
+    @State private var icalSubs: [ICalSubscription] = []
+    @State private var googleAccounts: [GoogleAccount] = []
+    @State private var haAccounts: [HomeAssistantAccount] = []
+    @State private var isLoading = true
+
+    @State private var showAddCalDAV = false
+    @State private var showAddLocal = false
+    @State private var showAddICal = false
+    @State private var showAddHA = false
+    @State private var errorAlert: String?
+    @State private var banishedKeys: Set<String> = CalendarStore.loadBanishedKeys()
+
+    // Sharing / import / export
+    @State private var shareCalId: Int?
+    @State private var showImporter = false
+    @State private var importTargetCalId: Int?
+    @State private var exportDoc: ExportedICS?
+    @State private var infoMessage: String?
+
+    // Contacts → birthday-calendar sync (opt-in, bound to one birthday calendar).
+    @AppStorage("birthdaysSyncEnabled") private var birthdaysSyncEnabled = false
+    @State private var isSyncingBirthdays = false
+    @State private var birthdayNotify = -1
+
+    @AppStorage("appLanguage") private var appLang = "system"
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView(L10n.t("accounts.loading", appLang))
+                } else {
+                    List {
+                        if !banishedKeys.isEmpty { banishedSection }
+                        caldavSection
+                        localSection
+                        birthdayContactsSection
+                        icalSection
+                        googleSection
+                        haSection
+                    }
+                    .onChange(of: birthdaysSyncEnabled) { _, on in
+                        // Enabling only asks for Contacts access — it must NOT create
+                        // the birthday calendar. That's an explicit action.
+                        if on { Task { _ = await BirthdaysImporter.requestAccess() } }
+                    }
+                }
+            }
+            .navigationTitle(L10n.t("accounts.title", appLang))
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button(L10n.t("accounts.add.caldav", appLang)) { showAddCalDAV = true }
+                        Button(L10n.t("accounts.add.local",  appLang)) { showAddLocal  = true }
+                        // Only one birthday calendar per account.
+                        if birthdayCalendar == nil {
+                            Button(L10n.t("accounts.add.birthday", appLang)) {
+                                Task { await createBirthdayCalendar() }
+                            }
+                        }
+                        Button(L10n.t("accounts.add.ical",   appLang)) { showAddICal   = true }
+                        Button(L10n.t("accounts.add.ha",     appLang)) { showAddHA     = true }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showAddCalDAV) {
+                AddCalDAVSheet(api: api) { await load() }
+            }
+            .sheet(isPresented: $showAddLocal) {
+                AddLocalCalSheet(api: api) { await load() }
+            }
+            .sheet(isPresented: $showAddICal) {
+                AddICalSheet(api: api) { await load() }
+            }
+            .sheet(isPresented: $showAddHA) {
+                AddHASheet(api: api) { await load() }
+            }
+            .alert(L10n.t("common.error", appLang), isPresented: .constant(errorAlert != nil), actions: {
+                Button(L10n.t("common.ok", appLang)) { errorAlert = nil }
+            }, message: {
+                Text(errorAlert ?? "")
+            })
+            .sheet(item: Binding(get: { shareCalId.map { IdentifiableInt(id: $0) } },
+                                 set: { shareCalId = $0?.id })) { wrap in
+                SharingView(api: api, calendarId: wrap.id)
+            }
+            .sheet(item: $exportDoc) { doc in
+                ActivityView(items: [doc.url])
+            }
+            .fileImporter(isPresented: $showImporter,
+                          allowedContentTypes: [UTType(filenameExtension: "ics") ?? .data, .data],
+                          allowsMultipleSelection: false) { result in
+                Task { await handleImport(result) }
+            }
+            .alert(L10n.t("common.info", appLang), isPresented: .constant(infoMessage != nil), actions: {
+                Button(L10n.t("common.ok", appLang)) { infoMessage = nil }
+            }, message: { Text(infoMessage ?? "") })
+        }
+        .task { await load() }
+    }
+
+    private func exportCalendar(_ cal: LocalCalendar) async {
+        do {
+            let data = try await api.exportICS(calendarId: cal.id)
+            let safe = cal.name.components(separatedBy: CharacterSet.alphanumerics.inverted).joined(separator: "_")
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(safe.isEmpty ? "calendar" : safe).ics")
+            try data.write(to: url)
+            exportDoc = ExportedICS(url: url)
+        } catch {
+            errorAlert = error.localizedDescription
+        }
+    }
+
+    private func handleImport(_ result: Result<[URL], Error>) async {
+        guard let calId = importTargetCalId else { return }
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let r = try await api.importICS(calendarId: calId, fileURL: url)
+                infoMessage = String(format: L10n.t("ics.import_result", appLang), r.imported, r.skipped)
+            } catch {
+                errorAlert = error.localizedDescription
+            }
+        case .failure(let err):
+            errorAlert = err.localizedDescription
+        }
+    }
+
+    // MARK: – Sections
+
+    var caldavSection: some View {
+        Section {
+            if caldavAccounts.isEmpty {
+                Text(L10n.t("accounts.caldav.empty", appLang))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(caldavAccounts) { acc in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Circle().fill(Color(hex: acc.color)).frame(width: 12, height: 12)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(acc.name).font(.body)
+                                Text(acc.url).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                        ForEach(acc.calendars ?? []) { cal in
+                            HStack {
+                                CalendarColorDot(hex: cal.color ?? acc.color) { hex in
+                                    try? await api.setCalendarColor(source: "caldav", calendarId: cal.id, color: hex)
+                                }
+                                Text(cal.name).font(.callout)
+                            }
+                            .padding(.leading, 8)
+                        }
+                    }
+                }
+                .onDelete { offsets in
+                    Task { await deleteCalDAV(offsets: offsets) }
+                }
+            }
+            Button(L10n.t("accounts.caldav.add", appLang)) { showAddCalDAV = true }
+                .foregroundStyle(Color.accentColor)
+        } header: {
+            Text(L10n.t("accounts.caldav.header", appLang))
+        }
+    }
+
+    var localSection: some View {
+        Section {
+            if localCalendars.isEmpty {
+                Text(L10n.t("accounts.local.empty", appLang))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(localCalendars) { cal in
+                    HStack {
+                        // Recipients of a shared calendar may recolour it (their
+                        // own per-user colour); renaming stays owner-only.
+                        CalendarColorDot(hex: cal.color, editable: true) { hex in
+                            try? await api.updateLocalCalendarColor(id: cal.id, color: hex)
+                        }
+                        Text(cal.name)
+                        if cal.group {
+                            Image(systemName: "person.2.fill").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if !cal.owned, let by = cal.sharedBy {
+                            Text(String(format: L10n.t("accounts.shared_by", appLang), by))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Menu {
+                            if cal.owned && !cal.group {
+                                Button { shareCalId = cal.id } label: {
+                                    Label(L10n.t("share.title", appLang), systemImage: "person.crop.circle.badge.plus")
+                                }
+                            }
+                            if cal.owned || cal.permission == "read_write" {
+                                Button { importTargetCalId = cal.id; showImporter = true } label: {
+                                    Label(L10n.t("ics.import", appLang), systemImage: "square.and.arrow.down")
+                                }
+                            }
+                            Button { Task { await exportCalendar(cal) } } label: {
+                                Label(L10n.t("ics.export", appLang), systemImage: "square.and.arrow.up")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onDelete { offsets in
+                    Task { await deleteLocal(offsets: offsets) }
+                }
+            }
+            Button(L10n.t("accounts.local.add", appLang)) { showAddLocal = true }
+                .foregroundStyle(Color.accentColor)
+        } header: {
+            Text(L10n.t("accounts.local.header", appLang))
+        }
+    }
+
+    /// The user's single birthday calendar (created on first sync/activation).
+    private var birthdayCalendar: LocalCalendar? {
+        localCalendars.first { $0.isBirthday && $0.owned }
+    }
+
+    @ViewBuilder var birthdayContactsSection: some View {
+        Section {
+            if let cal = birthdayCalendar {
+                Toggle(L10n.t("birthday.contacts.sync", appLang), isOn: $birthdaysSyncEnabled)
+                if birthdaysSyncEnabled {
+                    BirthdayNotifyPicker(days: $birthdayNotify, appLang: appLang)
+                        .onChange(of: birthdayNotify) { _, v in
+                            Task { try? await api.updateLocalCalendarBirthday(id: cal.id, notifyDaysBefore: v) }
+                        }
+                    Button {
+                        Task { await syncBirthdays() }
+                    } label: {
+                        HStack {
+                            Text(L10n.t("birthday.contacts.sync_now", appLang))
+                            if isSyncingBirthdays { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(isSyncingBirthdays)
+                }
+            } else {
+                // No birthday calendar yet — sync has nothing to fill. Create one
+                // first via the + menu (never auto-created by sync).
+                Text(L10n.t("birthday.contacts.need_calendar", appLang))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text(L10n.t("birthday.contacts.header", appLang))
+        } footer: {
+            Text(L10n.t("birthday.contacts.hint", appLang))
+        }
+    }
+
+    /// Explicitly create the single birthday calendar (from the + menu).
+    private func createBirthdayCalendar() async {
+        _ = await BirthdaysImporter.ensureBirthdayCalendar(api: api)
+        await load()
+    }
+
+    private func syncBirthdays() async {
+        isSyncingBirthdays = true
+        defer { isSyncingBirthdays = false }
+        guard await BirthdaysImporter.requestAccess() else {
+            errorAlert = L10n.t("birthday.contacts.denied", appLang)
+            return
+        }
+        await BirthdaysImporter.sync(api: api)
+        await load()   // pick up the (possibly newly created) birthday calendar
+        infoMessage = L10n.t("birthday.contacts.synced", appLang)
+        // Let the calendar refresh so imported birthdays show up right away.
+        NotificationCenter.default.post(name: .manualSyncRequested, object: nil)
+    }
+
+    var icalSection: some View {
+        Section {
+            if icalSubs.isEmpty {
+                Text(L10n.t("accounts.ical.empty", appLang))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(icalSubs) { sub in
+                    HStack {
+                        CalendarColorDot(hex: sub.color) { hex in
+                            try? await api.updateICalColor(id: sub.id, color: hex)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(sub.name).font(.body)
+                            Text(String(format: L10n.t("accounts.ical.every", appLang), sub.refreshMinutes))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onDelete { offsets in
+                    Task { await deleteICal(offsets: offsets) }
+                }
+            }
+            Button(L10n.t("accounts.ical.add", appLang)) { showAddICal = true }
+                .foregroundStyle(Color.accentColor)
+        } header: {
+            Text(L10n.t("accounts.ical.header", appLang))
+        }
+    }
+
+    var googleSection: some View {
+        Section {
+            if googleAccounts.isEmpty {
+                Text(L10n.t("accounts.google.empty", appLang))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(googleAccounts) { acc in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "g.circle.fill").foregroundStyle(.red)
+                            Text(acc.email)
+                        }
+                        ForEach(acc.calendars ?? []) { cal in
+                            HStack {
+                                CalendarColorDot(hex: cal.color ?? "#4285f4") { hex in
+                                    try? await api.setCalendarColor(source: "google", calendarId: cal.id, color: hex)
+                                }
+                                Text(cal.name).font(.callout)
+                            }
+                            .padding(.leading, 8)
+                        }
+                    }
+                }
+                .onDelete { offsets in
+                    Task { await deleteGoogle(offsets: offsets) }
+                }
+            }
+            Text(L10n.t("accounts.google.hint", appLang))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text(L10n.t("accounts.google.header", appLang))
+        }
+    }
+
+    var banishedSection: some View {
+        Section {
+            ForEach(Array(banishedKeys).sorted(), id: \.self) { key in
+                let info = resolveBanished(key)
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Color(hex: info.colorHex))
+                        .frame(width: 12, height: 12)
+                        .opacity(0.5)
+                    Text(info.name)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(L10n.t("accounts.banished_unhide", appLang)) {
+                        unbanish(key)
+                    }
+                    .font(.callout)
+                    .foregroundStyle(Color.accentColor)
+                }
+            }
+        } header: {
+            Text(L10n.t("accounts.banished_header", appLang))
+        }
+    }
+
+    /// Re-show a banished calendar. For server-backed sources this clears the
+    /// server's sidebar_hidden (re-enabling the calendar); for local/ical it's
+    /// just the local set.
+    private func unbanish(_ key: String) {
+        banishedKeys.remove(key)
+        CalendarStore.saveBanishedKeys(banishedKeys)
+        NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+        if let parsed = CalendarStore.parseCalendarKey(key),
+           CalendarStore.serverManagedSources.contains(parsed.source) {
+            // The server excluded this calendar's events while hidden, so they
+            // aren't in the cache. Re-enable on the server, then force a refetch
+            // so the events actually reappear without a manual sync.
+            Task {
+                try? await api.setCalendarSidebarHidden(source: parsed.source, calendarId: parsed.id, hidden: false)
+                NotificationCenter.default.post(name: .manualSyncRequested, object: nil)
+            }
+        }
+    }
+
+    private func resolveBanished(_ key: String) -> (name: String, colorHex: String) {
+        let parts = key.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2, let id = Int(parts[1]) else {
+            return (L10n.t("accounts.banished_unknown", appLang), "#888888")
+        }
+        switch parts[0] {
+        case "local":
+            if let c = localCalendars.first(where: { $0.id == id }) {
+                return (c.name, c.color)
+            }
+        case "caldav":
+            for acc in caldavAccounts {
+                if let c = acc.calendars?.first(where: { $0.id == id }) {
+                    return ("\(acc.name) – \(c.name)", c.color ?? acc.color)
+                }
+            }
+        case "ical":
+            if let s = icalSubs.first(where: { $0.id == id }) {
+                return (s.name, s.color)
+            }
+        case "google":
+            for acc in googleAccounts {
+                if let c = acc.calendars?.first(where: { $0.id == id }) {
+                    return ("\(acc.email) – \(c.name)", c.color ?? "#4285f4")
+                }
+            }
+        case "homeassistant":
+            for acc in haAccounts {
+                if let c = acc.calendars?.first(where: { $0.id == id }) {
+                    return ("\(acc.name) – \(c.name)", c.color ?? "#46bdc6")
+                }
+            }
+        default: break
+        }
+        return (L10n.t("accounts.banished_unknown", appLang), "#888888")
+    }
+
+    var haSection: some View {
+        Section {
+            if haAccounts.isEmpty {
+                Text(L10n.t("accounts.ha.empty", appLang))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(haAccounts) { acc in
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(acc.name).font(.body)
+                            Text(acc.url).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        ForEach(acc.calendars ?? []) { cal in
+                            HStack {
+                                CalendarColorDot(hex: cal.color ?? "#03a9f4") { hex in
+                                    try? await api.setCalendarColor(source: "homeassistant", calendarId: cal.id, color: hex)
+                                }
+                                Text(cal.name).font(.callout)
+                            }
+                            .padding(.leading, 8)
+                        }
+                    }
+                }
+                .onDelete { offsets in
+                    Task { await deleteHA(offsets: offsets) }
+                }
+            }
+            Button(L10n.t("accounts.ha.add", appLang)) { showAddHA = true }
+                .foregroundStyle(Color.accentColor)
+        } header: {
+            Text(L10n.t("accounts.ha.header", appLang))
+        }
+    }
+
+    // MARK: – Actions
+
+    private func load() async {
+        isLoading = true
+        banishedKeys = CalendarStore.loadBanishedKeys()
+        async let c = (try? await api.getCalDAVAccounts()) ?? []
+        async let l = (try? await api.getLocalCalendars()) ?? []
+        async let i = (try? await api.getICalSubscriptions()) ?? []
+        async let g = (try? await api.getGoogleAccounts()) ?? []
+        async let h = (try? await api.getHomeAssistantAccounts()) ?? []
+        (caldavAccounts, localCalendars, icalSubs, googleAccounts, haAccounts) = await (c, l, i, g, h)
+
+        // Reconcile banished list with the server's sidebar_hidden (server wins
+        // for CalDAV/Google/HA; local/ical keep their local state).
+        var b = banishedKeys
+        func applyServerHidden(_ source: String, _ id: Int, _ hidden: Bool) {
+            let key = CalendarStore.calendarKey(source: source, calendarId: "\(id)")
+            if hidden { b.insert(key) } else { b.remove(key) }
+        }
+        for acc in caldavAccounts { for cal in acc.calendars ?? [] { applyServerHidden("caldav", cal.id, cal.sidebarHidden) } }
+        for acc in googleAccounts { for cal in acc.calendars ?? [] { applyServerHidden("google", cal.id, cal.sidebarHidden) } }
+        for acc in haAccounts     { for cal in acc.calendars ?? [] { applyServerHidden("homeassistant", cal.id, cal.sidebarHidden) } }
+        if b != banishedKeys {
+            banishedKeys = b
+            CalendarStore.saveBanishedKeys(b)
+            NotificationCenter.default.post(name: .banishedCalendarsChanged, object: nil)
+        }
+        // Reflect the birthday calendar's current reminder setting in the picker.
+        birthdayNotify = birthdayCalendar?.birthdayNotifyDaysBefore ?? -1
+        isLoading = false
+    }
+
+    private func deleteCalDAV(offsets: IndexSet) async {
+        for i in offsets {
+            try? await api.deleteCalDAVAccount(id: caldavAccounts[i].id)
+        }
+        await load()
+    }
+
+    private func deleteLocal(offsets: IndexSet) async {
+        for i in offsets {
+            try? await api.deleteLocalCalendar(id: localCalendars[i].id)
+        }
+        await load()
+    }
+
+    private func deleteICal(offsets: IndexSet) async {
+        for i in offsets {
+            try? await api.deleteICalSubscription(id: icalSubs[i].id)
+        }
+        await load()
+    }
+
+    private func deleteGoogle(offsets: IndexSet) async {
+        for i in offsets {
+            try? await api.deleteGoogleAccount(id: googleAccounts[i].id)
+        }
+        await load()
+    }
+
+    private func deleteHA(offsets: IndexSet) async {
+        for i in offsets {
+            try? await api.deleteHomeAssistantAccount(id: haAccounts[i].id)
+        }
+        await load()
+    }
+}
+
+// MARK: – Add Sheets
+
+struct AddCalDAVSheet: View {
+    let api: CalendarrAPI
+    let onDone: () async -> Void
+    @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
+
+    @State private var name = ""
+    @State private var url = ""
+    @State private var username = ""
+    @State private var password = ""
+    @State private var color = Color(hex: "#4285f4")
+    @State private var isLoading = false
+    @State private var error = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(L10n.t("caldav.section", appLang)) {
+                    TextField(L10n.t("caldav.display_name", appLang), text: $name)
+                    TextField(L10n.t("caldav.url", appLang), text: $url)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                    TextField(L10n.t("caldav.username", appLang), text: $username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    SecureField(L10n.t("caldav.password", appLang), text: $password)
+                }
+                Section(L10n.t("caldav.color_section", appLang)) {
+                    ColorPicker(L10n.t("caldav.color_label", appLang), selection: $color, supportsOpacity: false)
+                }
+                if !error.isEmpty {
+                    Section {
+                        Text(error).foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle(L10n.t("caldav.title", appLang))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.t("common.cancel", appLang)) { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(L10n.t("caldav.connect", appLang)) {
+                        Task { await save() }
+                    }
+                    .bold()
+                    .disabled(name.isEmpty || url.isEmpty || username.isEmpty || password.isEmpty || isLoading)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        isLoading = true
+        error = ""
+        do {
+            _ = try await api.addCalDAVAccount(name: name, url: url, username: username, password: password, color: color.toHex())
+            await onDone()
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
+struct AddLocalCalSheet: View {
+    let api: CalendarrAPI
+    let onDone: () async -> Void
+    @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
+
+    @State private var name = ""
+    @State private var color = Color(hex: "#34a853")
+    @State private var isLoading = false
+    @State private var error = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(L10n.t("local.name", appLang), text: $name)
+                    ColorPicker(L10n.t("local.color", appLang), selection: $color, supportsOpacity: false)
+                }
+                if !error.isEmpty {
+                    Section { Text(error).foregroundStyle(.red) }
+                }
+            }
+            .navigationTitle(L10n.t("local.title", appLang))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.t("common.cancel", appLang)) { dismiss() } }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(L10n.t("local.create", appLang)) {
+                        Task { await save() }
+                    }
+                    .bold()
+                    .disabled(name.isEmpty || isLoading)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        isLoading = true
+        do {
+            _ = try await api.addLocalCalendar(name: name, color: color.toHex())
+            await onDone()
+            dismiss()
+        } catch { self.error = error.localizedDescription }
+        isLoading = false
+    }
+}
+
+/// Reusable "notify N days before" picker for birthday calendars.
+/// -1 = off, 0 = on the day, N = N days before.
+struct BirthdayNotifyPicker: View {
+    @Binding var days: Int
+    let appLang: String
+
+    var body: some View {
+        Picker(L10n.t("birthday.notify", appLang), selection: $days) {
+            Text(L10n.t("birthday.notify.off", appLang)).tag(-1)
+            Text(L10n.t("birthday.notify.same_day", appLang)).tag(0)
+            Text(L10n.t("birthday.notify.one_day", appLang)).tag(1)
+            ForEach([2, 3, 7], id: \.self) { d in
+                Text(String(format: L10n.t("birthday.notify.days", appLang), d)).tag(d)
+            }
+        }
+    }
+}
+
+struct AddICalSheet: View {
+    let api: CalendarrAPI
+    let onDone: () async -> Void
+    @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
+
+    @State private var name = ""
+    @State private var url = ""
+    @State private var color = Color(hex: "#46bdc6")
+    @State private var refreshMinutes = 60
+    @State private var isLoading = false
+    @State private var error = ""
+
+    private var refreshOptions: [(Int, String)] {
+        [(15,   L10n.t("ical.refresh.15m", appLang)),
+         (30,   L10n.t("ical.refresh.30m", appLang)),
+         (60,   L10n.t("ical.refresh.1h",  appLang)),
+         (360,  L10n.t("ical.refresh.6h",  appLang)),
+         (1440, L10n.t("ical.refresh.1d",  appLang))]
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(L10n.t("ical.subscription", appLang)) {
+                    TextField(L10n.t("ical.name", appLang), text: $name)
+                    TextField(L10n.t("ical.url",  appLang), text: $url)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                    ColorPicker(L10n.t("ical.color", appLang), selection: $color, supportsOpacity: false)
+                }
+                Section(L10n.t("ical.refresh_section", appLang)) {
+                    Picker(L10n.t("ical.interval", appLang), selection: $refreshMinutes) {
+                        ForEach(refreshOptions, id: \.0) { opt in
+                            Text(opt.1).tag(opt.0)
+                        }
+                    }
+                }
+                if !error.isEmpty {
+                    Section { Text(error).foregroundStyle(.red) }
+                }
+            }
+            .navigationTitle(L10n.t("ical.title", appLang))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.t("common.cancel", appLang)) { dismiss() } }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(L10n.t("ical.subscribe", appLang)) {
+                        Task { await save() }
+                    }
+                    .bold()
+                    .disabled(name.isEmpty || url.isEmpty || isLoading)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        isLoading = true
+        do {
+            _ = try await api.addICalSubscription(name: name, url: url, color: color.toHex(), refreshMinutes: refreshMinutes)
+            await onDone()
+            dismiss()
+        } catch { self.error = error.localizedDescription }
+        isLoading = false
+    }
+}
+
+struct AddHASheet: View {
+    let api: CalendarrAPI
+    let onDone: () async -> Void
+    @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
+
+    @State private var name = ""
+    @State private var url = ""
+    @State private var token = ""
+    @State private var isLoading = false
+    @State private var error = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(L10n.t("ha.section", appLang)) {
+                    TextField(L10n.t("ha.display_name",   appLang), text: $name)
+                    TextField(L10n.t("ha.url_placeholder", appLang), text: $url)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                }
+                Section(L10n.t("ha.auth_section", appLang)) {
+                    SecureField(L10n.t("ha.token", appLang), text: $token)
+                    Text(L10n.t("ha.token_hint", appLang))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !error.isEmpty {
+                    Section { Text(error).foregroundStyle(.red) }
+                }
+            }
+            .navigationTitle(L10n.t("accounts.add.ha", appLang))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.t("common.cancel", appLang)) { dismiss() } }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(L10n.t("ha.connect", appLang)) {
+                        Task { await save() }
+                    }
+                    .bold()
+                    .disabled(name.isEmpty || url.isEmpty || token.isEmpty || isLoading)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        isLoading = true
+        do {
+            _ = try await api.addHomeAssistantAccount(name: name, url: url, token: token)
+            await onDone()
+            dismiss()
+        } catch { self.error = error.localizedDescription }
+        isLoading = false
+    }
+}
+
+// MARK: – Sharing / Import-Export helpers
+
+struct IdentifiableInt: Identifiable { let id: Int }
+struct ExportedICS: Identifiable { let id = UUID(); let url: URL }
+
+/// A tappable colour swatch (ColorPicker) for a calendar. Persists via `onPick`
+/// when the chosen colour changes. Read-only fallback when `editable` is false.
+struct CalendarColorDot: View {
+    let hex: String
+    var editable: Bool = true
+    let onPick: (String) async -> Void
+    @State private var color: Color
+
+    init(hex: String, editable: Bool = true, onPick: @escaping (String) async -> Void) {
+        self.hex = hex; self.editable = editable; self.onPick = onPick
+        _color = State(initialValue: Color(hex: hex))
+    }
+
+    var body: some View {
+        if editable {
+            ColorPicker("", selection: $color, supportsOpacity: false)
+                .labelsHidden()
+                .frame(width: 26, height: 26)
+                .onChange(of: color) { _, c in Task { await onPick(c.toHex()) } }
+        } else {
+            Circle().fill(Color(hex: hex)).frame(width: 14, height: 14)
+        }
+    }
+}
+
+/// Wraps UIActivityViewController so an exported .ics can be shared/saved.
+struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
+}
+
+/// Manage who a local calendar is shared with (owner only).
+struct SharingView: View {
+    let api: CalendarrAPI
+    let calendarId: Int
+    @Environment(\.dismiss) var dismiss
+    @AppStorage("appLanguage") private var appLang = "system"
+
+    @State private var shares: [CalendarShare] = []
+    @State private var directory: [DirectoryUser] = []
+    @State private var search = ""
+    @State private var permission = "read"
+    @State private var error = ""
+
+    private var candidates: [DirectoryUser] {
+        let sharedIds = Set(shares.map { $0.userId })
+        return directory.filter { !sharedIds.contains($0.id) &&
+            (search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search)) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(L10n.t("share.current", appLang)) {
+                    if shares.isEmpty {
+                        Text(L10n.t("share.none", appLang)).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(shares) { s in
+                            HStack {
+                                Text(s.displayName ?? "—")
+                                Spacer()
+                                Text(s.permission == "read_write"
+                                     ? L10n.t("perm.read_write", appLang)
+                                     : L10n.t("perm.read", appLang))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .onDelete { offsets in
+                            Task { await removeShares(offsets) }
+                        }
+                    }
+                }
+                Section(L10n.t("share.add", appLang)) {
+                    Picker(L10n.t("share.permission", appLang), selection: $permission) {
+                        Text(L10n.t("perm.read", appLang)).tag("read")
+                        Text(L10n.t("perm.read_write", appLang)).tag("read_write")
+                    }
+                    TextField(L10n.t("share.search", appLang), text: $search)
+                        .autocapitalization(.none)
+                    ForEach(candidates) { u in
+                        Button { Task { await addShare(u.id) } } label: {
+                            HStack {
+                                Text(u.displayName)
+                                Spacer()
+                                Image(systemName: "plus.circle").foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                }
+                if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
+            }
+            .navigationTitle(L10n.t("share.title", appLang))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.t("common.done", appLang)) { dismiss() }
+                }
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        shares = (try? await api.getShares(calendarId: calendarId)) ?? []
+        directory = (try? await api.getUserDirectory()) ?? []
+    }
+    private func addShare(_ userId: Int) async {
+        do { try await api.addShare(calendarId: calendarId, userId: userId, permission: permission); await load() }
+        catch { self.error = error.localizedDescription }
+    }
+    private func removeShares(_ offsets: IndexSet) async {
+        for i in offsets { try? await api.removeShare(calendarId: calendarId, userId: shares[i].userId) }
+        await load()
+    }
+}

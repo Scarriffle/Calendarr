@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Mac Catalyst entitlements. A separate file is required because the App
+	  Group value differs per platform: macOS demands the Team ID prefix, iOS
+	  forbids it, and listing both in one file breaks iOS provisioning.
+	  Selected via CODE_SIGN_ENTITLEMENTS[sdk=macosx*].
+
+	  This one file serves both distribution paths. app-sandbox is required by
+	  the Mac App Store and desirable for Developer ID; ENABLE_HARDENED_RUNTIME
+	  is required for notarization and ignored by the App Store. Only the
+	  signing identity differs, and that is chosen at export time.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+
+	<!-- Talks to the user's own Calendarr server. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+
+	<!-- BirthdaysImporter reads Contacts to sync birthdays. -->
+	<key>com.apple.security.personal-information.addressbook</key>
+	<true/>
+
+	<!-- .ics import (fileImporter) and calendar export (fileExporter). -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+
+	<!-- Must match CalendarrAppGroup.current on this platform, byte for byte. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>PP34X97WS3.group.com.scarriffleservices.calendarr</string>
+	</array>
+
+	<!-- Own group first: it stays the default access group, so tokens written
+	     before this entitlement existed keep resolving. The .shared group is
+	     what a second app from this team reads the auth token from. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.scarriffleservices.calendarr.ios</string>
+		<string>$(AppIdentifierPrefix)com.scarriffleservices.calendarr.shared</string>
+	</array>
+</dict>
+</plist>

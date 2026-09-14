@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.scarriffleservices.calendarr</string>
+	</array>
+	<!-- Order matters. Without this entitlement the default access group is
+	     <AppIdentifierPrefix><bundle id>, which is where every existing token
+	     lives. Adding the entitlement makes the FIRST entry the new default, so
+	     listing our own group first keeps those tokens resolving and nobody
+	     gets signed out. The .shared group is the one the Mac app also reads. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.scarriffleservices.calendarr.ios</string>
+		<string>$(AppIdentifierPrefix)com.scarriffleservices.calendarr.shared</string>
+	</array>
+</dict>
+</plist>
