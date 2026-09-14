@@ -268,3 +268,196 @@ def test_sweep_leaves_live_attachments_alone(client):
     db.close()
     assert (rows, files) == (0, 0)
     assert _row_count() == 1 and _exists(stored)
+
+
+# ── Upload / download through the API ─────────────────────
+
+def _upload(client, token, uid, raw=PDF_BYTES, name="Rechnung.pdf", mime="application/pdf"):
+    return client.post(
+        f"/api/local/events/{uid}/attachments",
+        headers=auth(token),
+        files={"file": (name, raw, mime)},
+    )
+
+
+def test_upload_list_and_download_roundtrip(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+
+    r = _upload(client, token, ev["id"])
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["filename"] == "Rechnung.pdf"
+    assert body["content_type"] == "application/pdf"
+    assert body["has_thumb"] is False
+    assert body["uploaded_by"]["display_name"] == "admin"
+
+    listing = client.get(f"/api/local/events/{ev['id']}/attachments", headers=auth(token))
+    assert listing.status_code == 200
+    assert [a["id"] for a in listing.json()] == [body["id"]]
+
+    dl = client.get(f"/api/local/attachments/{body['id']}", headers=auth(token))
+    assert dl.status_code == 200
+    assert dl.content == PDF_BYTES
+    assert dl.headers["content-disposition"].startswith("attachment;")
+    assert dl.headers["x-content-type-options"] == "nosniff"
+
+
+def test_image_upload_gets_a_thumbnail(client):
+    token = register_admin(client)
+    ev = _make_event(client, token, _make_calendar(client, token))
+    r = _upload(client, token, ev["id"], png_bytes((640, 480)), "foto.png", "image/png")
+    assert r.status_code == 201, r.text
+    assert r.json()["has_thumb"] is True
+
+    thumb = client.get(f"/api/local/attachments/{r.json()['id']}/thumb", headers=auth(token))
+    assert thumb.status_code == 200
+    assert thumb.headers["content-type"] == "image/jpeg"
+
+
+def test_declared_mime_is_ignored_in_favour_of_the_bytes(client):
+    """A PNG announced as application/pdf is stored as a PNG."""
+    token = register_admin(client)
+    ev = _make_event(client, token, _make_calendar(client, token))
+    r = _upload(client, token, ev["id"], png_bytes(), "getarnt.pdf", "application/pdf")
+    assert r.status_code == 201, r.text
+    assert r.json()["content_type"] == "image/png"
+
+
+def test_rejects_disallowed_type_and_writes_nothing(client):
+    token = register_admin(client)
+    ev = _make_event(client, token, _make_calendar(client, token))
+    r = _upload(client, token, ev["id"], b"<svg/>", "x.svg", "image/svg+xml")
+    assert r.status_code == 400
+    assert _row_count() == 0
+    assert not any(p.is_file() for p in attachments_store.ATTACH_DIR.rglob("*"))
+
+
+def test_rejects_oversized_file(client):
+    token = register_admin(client)
+    ev = _make_event(client, token, _make_calendar(client, token))
+    big = b"%PDF-1.4\n" + b"x" * attachments_store.MAX_ATTACHMENT_BYTES
+    r = _upload(client, token, ev["id"], big, "gross.pdf")
+    assert r.status_code == 413
+    assert _row_count() == 0
+
+
+def test_enforces_the_per_event_limit(client):
+    token = register_admin(client)
+    ev = _make_event(client, token, _make_calendar(client, token))
+    for i in range(attachments_store.MAX_ATTACHMENTS_PER_EVENT):
+        assert _upload(client, token, ev["id"], name=f"a{i}.pdf").status_code == 201
+    r = _upload(client, token, ev["id"], name="zuviel.pdf")
+    assert r.status_code == 409
+    assert _row_count() == attachments_store.MAX_ATTACHMENTS_PER_EVENT
+
+
+def test_deleting_an_attachment_removes_its_file(client):
+    token = register_admin(client)
+    ev = _make_event(client, token, _make_calendar(client, token))
+    att_id = _upload(client, token, ev["id"]).json()["id"]
+    db = SessionLocal()
+    stored = db.query(models.EventAttachment).filter(
+        models.EventAttachment.id == att_id).first().stored_name
+    db.close()
+
+    r = client.delete(f"/api/local/attachments/{att_id}", headers=auth(token))
+    assert r.status_code == 200, r.text
+    assert _row_count() == 0
+    assert not _exists(stored)
+
+
+# ── Permission matrix ─────────────────────────────────────
+
+def _share(client, owner_token, cal_id, user_id, permission):
+    r = client.post(f"/api/local/calendars/{cal_id}/shares", headers=auth(owner_token),
+                    json={"user_id": user_id, "permission": permission})
+    assert r.status_code == 200, r.text
+
+
+def test_read_share_may_view_but_not_upload_or_delete(client):
+    admin = register_admin(client)
+    bob_id, bob = create_user(client, admin, "bob")
+    cal_id = _make_calendar(client, admin)
+    ev = _make_event(client, admin, cal_id)
+    att_id = _upload(client, admin, ev["id"]).json()["id"]
+    _share(client, admin, cal_id, bob_id, "read")
+
+    assert client.get(f"/api/local/events/{ev['id']}/attachments",
+                      headers=auth(bob)).status_code == 200
+    assert client.get(f"/api/local/attachments/{att_id}", headers=auth(bob)).status_code == 200
+    assert _upload(client, bob, ev["id"], name="nope.pdf").status_code == 403
+    assert client.delete(f"/api/local/attachments/{att_id}",
+                         headers=auth(bob)).status_code == 403
+
+
+def test_read_write_share_may_upload_and_delete(client):
+    admin = register_admin(client)
+    bob_id, bob = create_user(client, admin, "bob")
+    cal_id = _make_calendar(client, admin)
+    ev = _make_event(client, admin, cal_id)
+    att_id = _upload(client, admin, ev["id"]).json()["id"]
+    _share(client, admin, cal_id, bob_id, "read_write")
+
+    assert _upload(client, bob, ev["id"], name="bob.pdf").status_code == 201
+    # The stated rule: whoever may edit the event may remove anyone's attachment.
+    assert client.delete(f"/api/local/attachments/{att_id}",
+                         headers=auth(bob)).status_code == 200
+
+
+def test_unrelated_user_gets_404_not_403(client):
+    """404 everywhere, so a stranger cannot even learn the event exists."""
+    admin = register_admin(client)
+    _, dave = create_user(client, admin, "dave")
+    ev = _make_event(client, admin, _make_calendar(client, admin))
+    att_id = _upload(client, admin, ev["id"]).json()["id"]
+
+    assert client.get(f"/api/local/events/{ev['id']}/attachments",
+                      headers=auth(dave)).status_code == 404
+    assert client.get(f"/api/local/attachments/{att_id}", headers=auth(dave)).status_code == 404
+    assert client.delete(f"/api/local/attachments/{att_id}",
+                         headers=auth(dave)).status_code == 404
+
+
+def test_private_event_hides_its_attachments_from_a_share_recipient(client):
+    """The leak this feature could most easily introduce: the merge read masks
+    a foreign private event, so its attachments must be unreachable too."""
+    admin = register_admin(client)
+    bob_id, bob = create_user(client, admin, "bob")
+    cal_id = _make_calendar(client, admin)
+    r = client.post("/api/local/events", headers=auth(admin), json={
+        "calendar_id": cal_id, "title": "Vertraulich", "private": True,
+        "start": "2026-06-10T10:00:00+00:00", "end": "2026-06-10T11:00:00+00:00",
+    })
+    ev = r.json()
+    att_id = _upload(client, admin, ev["id"]).json()["id"]
+    _share(client, admin, cal_id, bob_id, "read_write")
+
+    assert client.get(f"/api/local/events/{ev['id']}/attachments",
+                      headers=auth(bob)).status_code == 404
+    assert client.get(f"/api/local/attachments/{att_id}", headers=auth(bob)).status_code == 404
+    # The owner still reaches their own private event's attachments.
+    assert client.get(f"/api/local/attachments/{att_id}", headers=auth(admin)).status_code == 200
+
+
+# ── Capability URL ────────────────────────────────────────
+
+def test_capability_url_serves_without_authentication(client):
+    token = register_admin(client)
+    ev = _make_event(client, token, _make_calendar(client, token))
+    att_id = _upload(client, token, ev["id"]).json()["id"]
+    db = SessionLocal()
+    cap = db.query(models.EventAttachment).filter(
+        models.EventAttachment.id == att_id).first().token
+    db.close()
+
+    r = client.get(f"/api/attach/{cap}/Rechnung.pdf")  # no Authorization header
+    assert r.status_code == 200
+    assert r.content == PDF_BYTES
+    assert r.headers["content-disposition"].startswith("attachment;")
+    assert r.headers["x-content-type-options"] == "nosniff"
+
+    assert client.get("/api/attach/voellig-erfunden").status_code == 404
+    client.delete(f"/api/local/attachments/{att_id}", headers=auth(token))
+    assert client.get(f"/api/attach/{cap}").status_code == 404

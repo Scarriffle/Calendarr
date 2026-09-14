@@ -82,6 +82,28 @@ def accessible_local_calendar(
     return cal
 
 
+def readable_local_event(db: Session, user: models.User, uid: str) -> models.LocalEvent:
+    """Return the event if the user may READ it, else raise 404.
+
+    The read-side mirror of local_router._writable_event. Beyond the calendar
+    check it enforces the private-event rule: the merge read hides or busy-masks
+    another user's private events, so anything hanging off such an event must
+    not be reachable by uid either — otherwise a share recipient could read the
+    attachments of events whose very title is deliberately withheld from them.
+
+    Always 404, never 403: a user who may not see the event may not learn that
+    it exists.
+    """
+    ev = db.query(models.LocalEvent).filter(models.LocalEvent.uid == uid).first()
+    if not ev:
+        raise HTTPException(404, "Event not found")
+    cal = accessible_local_calendar(db, user, ev.calendar_id)
+    owner_id = ev.creator_id or cal.user_id
+    if ev.is_private and owner_id != user.id:
+        raise HTTPException(404, "Event not found")
+    return ev
+
+
 def is_calendar_owner(db: Session, user: models.User, calendar_id: int) -> models.LocalCalendar:
     """Return the calendar only if the user owns it, else raise 404."""
     cal = (
