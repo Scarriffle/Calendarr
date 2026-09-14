@@ -24,6 +24,7 @@ A clean, self-hosted calendar application with support for CalDAV, Google Calend
 - Create, edit, and delete events with title, description, location, and time
 - All-day events
 - Per-event color overrides
+- **Attachments** — PDFs, images and text files on local events (10 MB each, 10 per event)
 - iCal event overrides (hide or edit individual events from subscriptions)
 - Dim past events option
 
@@ -102,11 +103,15 @@ Configuration is done via environment variables. The `install.sh` script generat
 | `SECRET_KEY` | *(auto-generated)* | JWT signing key — use a strong random value in production |
 | `PORT` | `8080` | Server port |
 | `HOST` | `0.0.0.0` | Bind address |
-| `DATA_DIR` | `./data` | Directory for SQLite database and avatars |
+| `DATA_DIR` | `./data` | Directory for the SQLite database, avatars, branding and attachments |
 | `GOOGLE_CLIENT_ID` | — | Google OAuth2 Client ID *(optional)* |
 | `GOOGLE_CLIENT_SECRET` | — | Google OAuth2 Client Secret *(optional)* |
 | `GOOGLE_REDIRECT_URI` | — | e.g. `https://yourdomain.com/api/google/callback` *(optional)* |
-| `PUBLIC_BASE_URL` | *(derived)* | Public origin behind a reverse proxy — **required for SSO** |
+| `PUBLIC_BASE_URL` | *(derived)* | Public origin behind a reverse proxy — **required for SSO** and for attachment links in CalDAV |
+| `ATTACHMENT_PUBLIC_LINKS` | `1` | `0` disables the unauthenticated attachment URLs (see below) |
+| `SCHEDULER_ENABLED` | `1` | `0` disables all background jobs |
+| `ATTACHMENT_SWEEP_HOURS` | `24` | How often orphaned attachments are cleaned up |
+| `ICAL_REFRESH_MINUTES` | `15` | How often iCal subscriptions are checked in the background |
 | `OIDC_PROVIDERS` | — | Comma-separated provider keys, e.g. `authentik` *(optional)* |
 
 Per provider `<KEY>` listed in `OIDC_PROVIDERS` (variable names are uppercased):
@@ -138,8 +143,8 @@ Adds an SSO button to the login screen **alongside** password login. With
 - iOS: `com.scarriffleservices.calendarr.ios:/oauth2redirect`
 - Android: `com.scarriffle.calendarr:/oauth2redirect`
 
-The mobile apps are separate repositories (`Calendarr-IOS`, `Calendarr-Android`)
-and authenticate as **public** clients via AppAuth — PKCE, no client secret.
+The mobile apps live in this repository under `ios/` and `android/`, and
+authenticate as **public** clients via AppAuth — PKCE, no client secret.
 Set `OIDC_<KEY>_MOBILE_CLIENT_ID` to the client id they use; without it the apps
 show no SSO button.
 
@@ -193,6 +198,59 @@ same as 2FA users.
 
 **Rollback:** remove `OIDC_PROVIDERS` and restart. Accounts created via SSO
 remain and must be removed (or given a password) by an admin.
+
+### Attachments
+
+Events in **local** calendars can carry files: PDFs, images (PNG/JPEG/WebP/GIF)
+and text files (TXT/Markdown/CSV), up to **10 MB per file and 10 per event**.
+Events from CalDAV, Google, Home Assistant or iCal subscriptions cannot — they
+are fetched live from their own server and have no record here to attach to.
+
+Files are stored under `DATA_DIR/attachments`; **back that up together with the
+database**, or a restored database will point at files that no longer exist.
+
+Who may attach or remove a file is the same rule as who may edit the event:
+the calendar's owner, group members, and anyone with a read-write share. A
+read-only share can view and download. Private events of other users expose
+neither their attachments nor their number.
+
+**Attachments in external calendar clients.** The generated ICS carries an
+`ATTACH` line per file, so Apple Calendar, Thunderbird and DAVx5 show the
+attachment and can download it. Those clients cannot send a login, so the URL
+has to work without one: each attachment gets its own unguessable 256-bit
+token, and anyone who has that URL can fetch the file.
+
+Weigh that honestly. The link only ever reaches clients that were already
+allowed to read the calendar, and it dies when the attachment is deleted — but
+it is long-lived, it ends up in plain text in the client's local calendar
+store, and it would appear in a reverse-proxy access log. If that is not
+acceptable for your deployment, set `ATTACHMENT_PUBLIC_LINKS=0`: no `ATTACH`
+line is written and the public URL stops answering. Attachments then work in
+the web UI and the mobile apps only.
+
+`PUBLIC_BASE_URL` must be set for the links to be correct behind a reverse
+proxy; without a usable base URL the `ATTACH` line is omitted entirely.
+
+### Background jobs
+
+The server runs two periodic jobs in-process:
+
+| Job | Interval | What it does |
+|---|---|---|
+| `attachments.sweep` | 24 h | Removes attachment records whose event is gone, and files with no record |
+| `ical.refresh` | 15 min | Re-fetches iCal subscriptions that are due |
+
+Attachments are normally cleaned up the moment an event, calendar or user is
+deleted; the sweep is the safety net for what gets past that — an external
+CalDAV client deleting an event, or a request that died mid-upload. It leaves
+files younger than an hour alone, so it cannot race an upload in progress.
+
+The iCal job only drives the same refresh the app already did on demand, so
+subscription intervals are unchanged. What is new is that subscriptions stay
+current while nobody has the app open.
+
+Both jobs assume a single server process, which is how `main.py` starts
+uvicorn. Running multiple workers would run every job once per worker.
 
 ### Google Calendar Setup
 
