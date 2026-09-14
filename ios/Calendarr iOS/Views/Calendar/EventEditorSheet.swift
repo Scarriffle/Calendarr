@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct EventEditorSheet: View {
     let api: CalendarrAPI
@@ -23,6 +24,12 @@ struct EventEditorSheet: View {
     @State private var isPrivate = false
     @State private var reminders: [Int] = []
     @State private var isSaving = false
+    // Files picked before the event exists are staged and uploaded after it is
+    // created; existing ones are removed only on save, so Cancel really cancels.
+    @State private var stagedFiles: [URL] = []
+    @State private var existingAttachments: [EventAttachment] = []
+    @State private var removedAttachmentIds: Set<Int> = []
+    @State private var showFileImporter = false
     @State private var error = ""
 
     private var isEditing: Bool { editingEvent != nil }
@@ -114,6 +121,44 @@ struct EventEditorSheet: View {
                         }
                     }
                     .disabled(remindersDisabled)
+
+                    Section(L10n.t("event.attachments", appLang)) {
+                        ForEach(existingAttachments.filter { !removedAttachmentIds.contains($0.id) }) { att in
+                            HStack {
+                                Image(systemName: att.symbolName).foregroundStyle(.secondary)
+                                Text(att.filename).lineLimit(1).truncationMode(.middle)
+                                Spacer()
+                                Text(att.displaySize).font(.caption).foregroundStyle(.secondary)
+                                Button(role: .destructive) {
+                                    removedAttachmentIds.insert(att.id)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                        ForEach(stagedFiles, id: \.self) { url in
+                            HStack {
+                                Image(systemName: "doc.badge.plus").foregroundStyle(Color.accentColor)
+                                Text(url.lastPathComponent).lineLimit(1).truncationMode(.middle)
+                                Spacer()
+                                Button(role: .destructive) {
+                                    stagedFiles.removeAll { $0 == url }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                        Button {
+                            showFileImporter = true
+                        } label: {
+                            Label(L10n.t("event.attachment_add", appLang), systemImage: "paperclip")
+                        }
+                        .disabled(attachmentSlotsUsed >= 10)
+                    } footer: {
+                        Text(L10n.t("event.attachment_hint", appLang))
+                    }
                 }
 
                 Section(L10n.t("event.color_section", appLang)) {
@@ -161,12 +206,57 @@ struct EventEditorSheet: View {
             }
         }
         .onAppear { setup() }
+        .task { await loadExistingAttachments() }
+        .fileImporter(isPresented: $showFileImporter,
+                      allowedContentTypes: Self.allowedAttachmentTypes,
+                      allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            for url in urls where attachmentSlotsUsed < 10 {
+                stagedFiles.append(url)
+            }
+        }
         .onChange(of: startDate) { oldStart, newStart in
             guard newStart >= endDate else { return }
             let duration = endDate.timeIntervalSince(oldStart)
             let minDuration: TimeInterval = isAllDay ? 86400 : 3600
             endDate = newStart.addingTimeInterval(max(duration, minDuration))
         }
+    }
+
+    /// Mirrors the server allowlist. `.webP` needs iOS 14, which is well below
+    /// the deployment target; markdown has no system-provided type.
+    private static var allowedAttachmentTypes: [UTType] {
+        var types: [UTType] = [.pdf, .png, .jpeg, .gif, .plainText, .commaSeparatedText]
+        if let webp = UTType("org.webmproject.webp") { types.append(webp) }
+        if let md = UTType("net.daringfireball.markdown") { types.append(md) }
+        return types
+    }
+
+    private var attachmentSlotsUsed: Int {
+        existingAttachments.filter { !removedAttachmentIds.contains($0.id) }.count + stagedFiles.count
+    }
+
+    private func loadExistingAttachments() async {
+        guard let ev = editingEvent, ev.source == "local", ev.attachmentCount > 0 else { return }
+        existingAttachments = (try? await api.listAttachments(eventUid: ev.id)) ?? []
+    }
+
+    /// Applied after the event itself was saved. A failure here leaves the
+    /// event in place — report it rather than claiming everything worked.
+    private func applyAttachmentChanges(uid: String) async {
+        var failed = 0
+        for id in removedAttachmentIds {
+            do { try await api.deleteAttachment(id: id) } catch { failed += 1 }
+        }
+        for url in stagedFiles {
+            do { _ = try await api.uploadAttachment(eventUid: uid, fileURL: url) }
+            catch { failed += 1 }
+        }
+        if failed > 0 {
+            error = L10n.t("event.attachment_failed", appLang)
+        }
+        stagedFiles = []
+        removedAttachmentIds = []
     }
 
     private func setup() {
@@ -232,6 +322,7 @@ struct EventEditorSheet: View {
                     try await api.updateLocalEvent(uid: ev.id, title: title, start: start, end: end,
                                                    isAllDay: isAllDay, location: location, description: notes, color: colorVal,
                                                    isPrivate: isPrivate, reminders: reminders)
+                    await applyAttachmentChanges(uid: ev.id)
                 case "homeassistant":
                     // No update API exists – delete the old event and recreate with new data.
                     let rawId = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
@@ -249,10 +340,12 @@ struct EventEditorSheet: View {
             } else {
                 switch cal.source {
                 case "local":
-                    _ = try await api.createLocalEvent(calendarId: cal.numericId, title: title,
+                    let created = try await api.createLocalEvent(calendarId: cal.numericId, title: title,
                                                        start: start, end: end, isAllDay: isAllDay,
                                                        location: location, description: notes, color: colorVal,
                                                        isPrivate: isPrivate, reminders: reminders)
+                    // Only now does a uid exist to attach the staged files to.
+                    await applyAttachmentChanges(uid: created.id)
                 case "google":
                     try await api.createGoogleEvent(calendarDbId: cal.numericId, title: title,
                                                     start: start, end: end, isAllDay: isAllDay,

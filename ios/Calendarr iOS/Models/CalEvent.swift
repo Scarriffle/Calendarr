@@ -18,6 +18,48 @@ struct EventPerson: Hashable {
     }
 }
 
+/// A file attached to an event.
+///
+/// Deliberately declared here rather than in a file of its own: a new .swift
+/// file added outside Xcode is not a member of any target and simply would not
+/// compile in, which is invisible until someone opens the project on a Mac.
+struct EventAttachment: Identifiable, Hashable {
+    let id: Int
+    let filename: String
+    let contentType: String
+    let sizeBytes: Int
+    let hasThumbnail: Bool
+    let uploadedBy: EventPerson?
+
+    var isImage: Bool { contentType.hasPrefix("image/") }
+
+    /// SF Symbol for the file kind — no network, unlike the thumbnail.
+    var symbolName: String {
+        if contentType == "application/pdf" { return "doc.richtext" }
+        if isImage { return "photo" }
+        return "doc.text"
+    }
+
+    var displaySize: String {
+        ByteCountFormatter.string(fromByteCount: Int64(sizeBytes), countStyle: .file)
+    }
+
+    static func from(json: [String: Any]) -> EventAttachment? {
+        guard
+            let id = json["id"] as? Int,
+            let filename = json["filename"] as? String
+        else { return nil }
+        return EventAttachment(
+            id: id,
+            filename: filename,
+            contentType: json["content_type"] as? String ?? "application/octet-stream",
+            sizeBytes: json["size_bytes"] as? Int ?? 0,
+            hasThumbnail: json["has_thumb"] as? Bool ?? false,
+            uploadedBy: EventPerson.from(json["uploaded_by"])
+        )
+    }
+}
+
 /// A partial-sync failure reported alongside an otherwise-successful
 /// `/api/caldav/events` response: one specific calendar didn't sync (e.g.
 /// expired credentials) even though it's still enabled. Distinct from a
@@ -70,6 +112,10 @@ struct CalEvent: Identifiable, Hashable {
     // True for events from a birthday calendar — clients show a cake icon and the
     // server bakes the age into `displayTitle`.
     var isBirthday: Bool = false
+    // How many files hang off this event. The list payload carries only the
+    // count; the files themselves are fetched when the detail sheet opens.
+    // Absent on non-local sources and on busy-masked private events, so 0.
+    var attachmentCount: Int = 0
 
     // Group view supplies a server-resolved colour; otherwise per-event then calendar colour.
     var effectiveColor: String { displayColor ?? color ?? calendarColor }
@@ -139,7 +185,8 @@ struct CalEvent: Identifiable, Hashable {
             displayTitle: (json["display_title"] as? String).flatMap { $0.isEmpty ? nil : $0 },
             reminders: (json["reminders"] as? [Int]) ?? (json["reminders"] as? [Any])?.compactMap { ($0 as? Int) ?? Int("\($0)") } ?? [],
             readOnly: json["read_only"] as? Bool ?? false,
-            isBirthday: json["is_birthday"] as? Bool ?? false
+            isBirthday: json["is_birthday"] as? Bool ?? false,
+            attachmentCount: json["attachment_count"] as? Int ?? 0
         )
     }
 }

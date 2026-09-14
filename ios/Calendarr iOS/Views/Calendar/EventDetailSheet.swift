@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// `.sheet(item:)` needs Identifiable and URL is not. A retroactive conformance
+/// on a stdlib type would be visible module-wide, so wrap it instead.
+private struct SharedFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 struct EventDetailSheet: View {
     let event: CalEvent
     let api: CalendarrAPI
@@ -15,6 +22,10 @@ struct EventDetailSheet: View {
     @State private var showDeleteConfirm = false
     @State private var isDeleting = false
     @State private var showCopySheet = false
+    @State private var attachments: [EventAttachment] = []
+    @State private var thumbnails: [Int: UIImage] = [:]
+    @State private var loadingAttachments = false
+    @State private var sharedFile: SharedFile?
 
     private let timeFmt: DateFormatter = {
         let f = DateFormatter()
@@ -111,6 +122,43 @@ struct EventDetailSheet: View {
                     }
                 }
 
+                // Attachments exist on local events only; the payload carries
+                // just the count, so the list is fetched when the sheet opens.
+                if event.source == "local" && event.attachmentCount > 0 {
+                    Section(L10n.t("event.attachments", appLang)) {
+                        if loadingAttachments && attachments.isEmpty {
+                            ProgressView()
+                        }
+                        ForEach(attachments) { att in
+                            Button {
+                                Task { await shareAttachment(att) }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    if let image = thumbnails[att.id] {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 32, height: 32)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    } else {
+                                        Image(systemName: att.symbolName)
+                                            .frame(width: 32)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text(att.filename)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                    Spacer()
+                                    Text(att.displaySize)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
                 if !store.writableCalendars.isEmpty {
                     Section {
                         Button {
@@ -170,7 +218,40 @@ struct EventDetailSheet: View {
                     await onDone(nil, true)
                 }
             }
+            .task(id: event.id) { await loadAttachments() }
+            .sheet(item: $sharedFile) { shared in
+                ActivityView(items: [shared.url])
+            }
         }
+    }
+
+    private func loadAttachments() async {
+        guard event.source == "local", event.attachmentCount > 0 else {
+            attachments = []
+            return
+        }
+        loadingAttachments = true
+        defer { loadingAttachments = false }
+        guard let loaded = try? await api.listAttachments(eventUid: event.id) else { return }
+        attachments = loaded
+        // Thumbnails are small server-rendered JPEGs, so decoding them here is
+        // cheap and needs no image-loading dependency.
+        for att in loaded where att.hasThumbnail {
+            if let data = await api.attachmentThumbnail(id: att.id),
+               let image = UIImage(data: data) {
+                thumbnails[att.id] = image
+            }
+        }
+    }
+
+    /// Download to a temporary file and hand it to the share sheet, so the user
+    /// can save it to Files or open it in another app.
+    private func shareAttachment(_ att: EventAttachment) async {
+        guard let data = try? await api.downloadAttachment(id: att.id) else { return }
+        let name = att.filename.isEmpty ? "anhang" : att.filename
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        guard (try? data.write(to: url)) != nil else { return }
+        sharedFile = SharedFile(url: url)
     }
 
     private func deleteEvent() async {

@@ -673,6 +673,82 @@ class CalendarrAPI {
     // MARK: – iCal import / export
 
     /// Import a .ics file into a local calendar. Returns (imported, skipped, errors).
+
+    // MARK: - Attachments
+
+    /// Files on an event. Only local events can have any; the server answers
+    /// 404 for anything else, which surfaces as `serverError`.
+    func listAttachments(eventUid: String) async throws -> [EventAttachment] {
+        let path = "/api/local/events/\(eventUid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? eventUid)/attachments"
+        let data = try await request(path)
+        let arr = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] ?? []
+        return arr.compactMap { EventAttachment.from(json: $0) }
+    }
+
+    /// Upload one file. The body is built by hand, exactly like `importICS`.
+    func uploadAttachment(eventUid: String, fileURL: URL) async throws -> EventAttachment {
+        // A URL from `.fileImporter` is security-scoped: without this the read
+        // fails outside the app's own container.
+        let scoped = fileURL.startAccessingSecurityScopedResource()
+        defer { if scoped { fileURL.stopAccessingSecurityScopedResource() } }
+        let fileData = try Data(contentsOf: fileURL)
+        return try await uploadAttachment(eventUid: eventUid,
+                                          data: fileData,
+                                          filename: fileURL.lastPathComponent)
+    }
+
+    func uploadAttachment(eventUid: String, data fileData: Data, filename: String) async throws -> EventAttachment {
+        let encodedUid = eventUid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? eventUid
+        guard let url = URL(string: baseURL + "/api/local/events/\(encodedUid)/attachments") else {
+            throw APIError.invalidURL
+        }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var bodyData = Data()
+        let name = filename.isEmpty ? "anhang" : filename
+        bodyData.append("--\(boundary)\r\n".data(using: .utf8)!)
+        bodyData.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(name)\"\r\n".data(using: .utf8)!)
+        // The server sniffs the bytes and ignores this header, but something
+        // has to be sent for the part to be well formed.
+        bodyData.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        bodyData.append(fileData)
+        bodyData.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = bodyData
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 401 { throw APIError.unauthorized }
+        if status >= 400 {
+            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String
+                ?? "Fehler \(status)"
+            throw APIError.serverError(msg)
+        }
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let att = EventAttachment.from(json: json) else {
+            throw APIError.serverError("Unerwartete Antwort")
+        }
+        return att
+    }
+
+    func deleteAttachment(id: Int) async throws {
+        _ = try await request("/api/local/attachments/\(id)", method: "DELETE")
+    }
+
+    /// Raw bytes, for saving or sharing.
+    func downloadAttachment(id: Int) async throws -> Data {
+        try await request("/api/local/attachments/\(id)")
+    }
+
+    /// Small JPEG preview, or nil when there is none. Never throws: a missing
+    /// thumbnail just means the row shows its type icon.
+    func attachmentThumbnail(id: Int) async -> Data? {
+        try? await request("/api/local/attachments/\(id)/thumb")
+    }
+
     func importICS(calendarId: Int, fileURL: URL) async throws -> (imported: Int, skipped: Int, errors: [String]) {
         guard let url = URL(string: baseURL + "/api/local/calendars/\(calendarId)/import") else { throw APIError.invalidURL }
         let fileData = try Data(contentsOf: fileURL)
