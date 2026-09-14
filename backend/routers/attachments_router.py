@@ -87,8 +87,11 @@ def _download_response(att: models.EventAttachment) -> FileResponse:
         # Row without bytes: the sweep will reconcile it on its next run.
         raise HTTPException(404, "Attachment not found")
     # RFC 6266: an ASCII fallback plus the real UTF-8 name, so umlauts survive.
+    # str.isalnum() is true for "ä" and friends, so the ASCII test is explicit —
+    # otherwise the "ASCII" fallback would carry the very bytes it exists to
+    # avoid, and older clients would garble the name.
     ascii_name = "".join(
-        c for c in att.filename if c.isalnum() or c in " -_."
+        c for c in att.filename if c.isascii() and (c.isalnum() or c in " -_.")
     ).strip() or "anhang"
     disposition = (
         f'attachment; filename="{ascii_name}"; '

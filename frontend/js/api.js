@@ -34,7 +34,11 @@ async function request(method, path, body = null, formEncoded = false) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: t('unknown_error') }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    const e = new Error(err.detail || `HTTP ${res.status}`);
+    // Keep the status so callers can map it to a translated message instead of
+    // showing the backend's German detail to someone running the app in Finnish.
+    e.status = res.status;
+    throw e;
   }
 
   if (res.status === 204) return null;
@@ -61,7 +65,9 @@ async function uploadRequest(path, formData) {
     const detail = (err && err.detail)
       ? err.detail
       : (res.status === 413 ? t('upload_too_large') : `HTTP ${res.status} ${res.statusText || ''}`.trim());
-    throw new Error(detail);
+    const e = new Error(detail);
+    e.status = res.status;
+    throw e;
   }
   if (res.status === 204) return null;
   return res.json();
@@ -81,7 +87,11 @@ async function downloadRequest(path, fallbackName) {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: t('unknown_error') }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    const e = new Error(err.detail || `HTTP ${res.status}`);
+    // Keep the status so callers can map it to a translated message instead of
+    // showing the backend's German detail to someone running the app in Finnish.
+    e.status = res.status;
+    throw e;
   }
   // Derive filename from Content-Disposition if present.
   let filename = fallbackName || 'calendar.ics';

@@ -645,3 +645,17 @@ def test_caldav_put_leaves_attachments_alone(client):
     assert r.status_code in (201, 204), r.text
     assert _row_count() == 1
     assert len(_attach_props(client.get(dav_path).text)) == 1
+
+
+def test_download_filename_fallback_is_really_ascii(client):
+    """str.isalnum() is true for umlauts, so the ASCII fallback needs an
+    explicit ascii test — otherwise it carries the bytes it exists to avoid."""
+    token = register_admin(client)
+    ev = _make_event(client, token, _make_calendar(client, token))
+    att_id = _upload(client, token, ev["id"], name="Rechnung Zahnärztin.pdf").json()["id"]
+
+    dl = client.get(f"/api/local/attachments/{att_id}", headers=auth(token))
+    disposition = dl.headers["content-disposition"]
+    fallback = disposition.split('filename="', 1)[1].split('"', 1)[0]
+    assert fallback.isascii(), fallback
+    assert "filename*=UTF-8''Rechnung%20Zahn%C3%A4rztin.pdf" in disposition

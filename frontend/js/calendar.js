@@ -1625,9 +1625,12 @@ function showEventPopup(ev, anchor) {
     document.getElementById('popup-row-creator').style.display = 'none';
   }
 
-  // Position near anchor
+  renderPopupAttachments(ev);
+
+  // Position near anchor. The height was hard-coded at 200, which an attachment
+  // list easily exceeds — measure instead, and fall back to the old guess.
   const rect = anchor.getBoundingClientRect();
-  const pw = 320, ph = 200;
+  const pw = 320, ph = popup.offsetHeight || 200;
   let left = rect.right + 8;
   let top  = rect.top;
   if (left + pw > window.innerWidth) left = rect.left - pw - 8;
@@ -1958,6 +1961,8 @@ function openNewEventModal(date) {
   const defMin = state.settings && state.settings.default_reminder_minutes;
   setEventReminders(defMin != null ? [defMin] : []);
   updateRemindersRow();
+  resetAttachmentState();
+  updateAttachmentsRow();
   resetColorPicker('');
   resetRecurrenceUI();
   document.getElementById('ev-delete').classList.add('hidden');
@@ -1996,6 +2001,8 @@ function openCopyEditModal(ev, targetCal) {
   updatePrivateRow(ev.private);
   setEventReminders(ev.reminders || []);
   updateRemindersRow();
+  resetAttachmentState();
+  updateAttachmentsRow();
 
   resetColorPicker(ev.color || '');
   resetRecurrenceUI();
@@ -2031,6 +2038,8 @@ function openEditEventModal(ev) {
   updatePrivateRow(ev.private);
   setEventReminders(ev.reminders || []);
   updateRemindersRow();
+  loadEventAttachments(ev);
+  updateAttachmentsRow();
   resetColorPicker(ev.color || '');
 
   // Recurrence
@@ -2219,6 +2228,298 @@ function updateRemindersRow() {
   group.querySelectorAll('select, input, button').forEach(el => { el.disabled = disabled; });
 }
 
+// ── Attachments ───────────────────────────────────────────
+// Attachments exist on local events only — the other sources are fetched live
+// from a remote server and have no row here to hang a file on. The editor
+// stages changes and applies them on Save, matching the modal's "nothing
+// happens until you save" contract; the popup fetches the list lazily, because
+// the event payload carries only attachment_count.
+
+const ATTACH_ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp,image/gif,.txt,.md,.csv';
+const ATTACH_MAX_BYTES = 10 * 1024 * 1024;
+const ATTACH_MAX_COUNT = 10;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+const ICON_PATH_DOC = 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm0 2l4 4h-4V4zM8 13h8v2H8v-2zm0 4h8v2H8v-2z';
+const ICON_PATH_PDF = 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm0 2l4 4h-4V4zM8 12h1.5a1.5 1.5 0 010 3H9v2H8v-5zm3.5 0H13a2 2 0 012 2v1a2 2 0 01-2 2h-1.5v-5z';
+
+function formatFileSize(bytes) {
+  const n = Number(bytes);
+  if (!isFinite(n)) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Map the HTTP status to a translated message. Without this the backend's
+// German detail would be shown to someone running the app in another language.
+function attachErrorMessage(e) {
+  if (e && e.status === 409) return t('attachment_limit_reached');
+  if (e && e.status === 413) return t('attachment_too_large');
+  if (e && e.status === 400) return t('attachment_type_not_allowed');
+  return t('attachment_upload_failed', { error: (e && e.message) || '' });
+}
+
+function attachIconEl(contentType) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'ev-attach-icon');
+  svg.setAttribute('fill', 'currentColor');
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', contentType === 'application/pdf' ? ICON_PATH_PDF : ICON_PATH_DOC);
+  svg.appendChild(path);
+  return svg;
+}
+
+// <img src="/api/…"> cannot carry the bearer token, so fetch the thumbnail and
+// hand the element a blob URL. Revoke it as soon as the image has decoded —
+// the browser keeps its own copy, and the row is rebuilt on every render.
+// (fetchAvatarBlob and loadAvatarImage never revoke; don't copy that.)
+async function setAttachmentThumb(imgEl, attId) {
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`/api/local/attachments/${attId}/thumb`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;  // the type icon stays in place
+    const url = URL.createObjectURL(await res.blob());
+    imgEl.onload = () => URL.revokeObjectURL(url);
+    imgEl.onerror = () => URL.revokeObjectURL(url);
+    imgEl.src = url;
+    imgEl.style.display = '';
+  } catch (e) {
+    /* offline or blocked — the icon is a fine fallback */
+  }
+}
+
+// Filenames come from other users via calendar sharing, so they only ever go
+// into textContent, never into innerHTML.
+function attachmentRow({ name, size, contentType, thumbId, pending, onRemove }) {
+  const row = document.createElement('div');
+  row.className = 'ev-attach-row' + (pending ? ' is-pending' : '');
+
+  if (thumbId) {
+    const img = document.createElement('img');
+    img.className = 'ev-attach-thumb';
+    img.alt = '';
+    img.style.display = 'none';
+    row.appendChild(attachIconEl(contentType));
+    row.appendChild(img);
+    setAttachmentThumb(img, thumbId).then(() => {
+      if (img.getAttribute('src')) row.firstChild.remove();
+    });
+  } else {
+    row.appendChild(attachIconEl(contentType));
+  }
+
+  const label = document.createElement('span');
+  label.className = 'ev-attach-name';
+  label.textContent = name;
+  label.title = name;
+  row.appendChild(label);
+
+  const sizeEl = document.createElement('span');
+  sizeEl.className = 'ev-attach-size';
+  sizeEl.textContent = formatFileSize(size);
+  row.appendChild(sizeEl);
+
+  if (onRemove) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'icon-btn ev-attach-remove';
+    btn.textContent = '×';
+    btn.title = t('delete');
+    btn.addEventListener('click', onRemove);
+    row.appendChild(btn);
+  }
+  return row;
+}
+
+function attachmentStagedCount() {
+  const removed = state.removedAttachments || [];
+  const existing = (state.eventAttachments || []).filter(a => !removed.includes(a.id));
+  return existing.length + (state.pendingAttachments || []).length;
+}
+
+function resetAttachmentState() {
+  state.eventAttachments = [];
+  state.pendingAttachments = [];
+  state.removedAttachments = [];
+}
+
+function renderAttachmentRows() {
+  const list = document.getElementById('ev-attachments-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const removed = state.removedAttachments || [];
+  const existing = (state.eventAttachments || []).filter(a => !removed.includes(a.id));
+  const pending = state.pendingAttachments || [];
+
+  if (!existing.length && !pending.length) {
+    const empty = document.createElement('div');
+    empty.className = 'form-hint';
+    empty.textContent = t('attachment_none');
+    list.appendChild(empty);
+  }
+  existing.forEach(a => list.appendChild(attachmentRow({
+    name: a.filename, size: a.size_bytes, contentType: a.content_type,
+    thumbId: a.has_thumb ? a.id : null,
+    onRemove: () => { state.removedAttachments.push(a.id); renderAttachmentRows(); },
+  })));
+  pending.forEach((f, i) => list.appendChild(attachmentRow({
+    name: f.name, size: f.size, contentType: f.type, pending: true,
+    onRemove: () => { state.pendingAttachments.splice(i, 1); renderAttachmentRows(); },
+  })));
+
+  const addBtn = document.getElementById('ev-attachment-add');
+  if (addBtn) addBtn.disabled = attachmentStagedCount() >= ATTACH_MAX_COUNT;
+}
+
+// Attachments apply to local calendars only — same gate as the private toggle.
+function updateAttachmentsRow() {
+  const calVal = document.getElementById('ev-calendar').value || '';
+  const isLocal = calVal.startsWith('local-');
+  const group = document.getElementById('ev-attachments-group');
+  if (!group) return;
+  group.style.display = isLocal ? '' : 'none';
+  if (!isLocal && (state.pendingAttachments || []).length) {
+    // Switching to a remote calendar drops staged files: there would be
+    // nowhere to put them. Say so rather than losing them silently.
+    state.pendingAttachments = [];
+    showToast(t('attachment_save_first'), true);
+  }
+  if (isLocal) renderAttachmentRows();
+}
+
+function triggerAttachmentPicker() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.accept = ATTACH_ACCEPT;
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.addEventListener('change', () => {
+    const files = Array.from(input.files || []);
+    input.remove();
+    for (const f of files) {
+      if (attachmentStagedCount() >= ATTACH_MAX_COUNT) {
+        showToast(t('attachment_limit_reached'), true);
+        break;
+      }
+      // The server checks both again; this is only to fail fast.
+      if (f.size > ATTACH_MAX_BYTES) {
+        showToast(t('attachment_too_large'), true);
+        continue;
+      }
+      state.pendingAttachments.push(f);
+    }
+    renderAttachmentRows();
+  });
+  input.click();
+}
+
+async function loadEventAttachments(ev) {
+  resetAttachmentState();
+  if (ev && ev.source === 'local' && (ev.attachment_count || 0) > 0) {
+    try {
+      state.eventAttachments = await api.get(
+        `/local/events/${encodeURIComponent(ev.id)}/attachments`) || [];
+    } catch (e) {
+      /* the editor still opens; the list just stays empty */
+    }
+  }
+  renderAttachmentRows();
+}
+
+// Applied after the event itself was saved, because a new event has no uid to
+// attach to until then. If this fails the event still exists — say so plainly
+// instead of reporting success.
+async function flushAttachmentChanges(uid) {
+  const removed = state.removedAttachments || [];
+  const pending = state.pendingAttachments || [];
+  let failed = 0;
+  let lastError = null;
+
+  for (const id of removed) {
+    try {
+      await api.delete(`/local/attachments/${id}`);
+    } catch (e) { failed++; lastError = e; }
+  }
+  for (const f of pending) {
+    const form = new FormData();
+    form.append('file', f, f.name);
+    try {
+      await api.upload(`/local/events/${encodeURIComponent(uid)}/attachments`, form);
+    } catch (e) { failed++; lastError = e; }
+  }
+
+  const total = removed.length + pending.length;
+  resetAttachmentState();
+  if (failed === 1) {
+    showToast(attachErrorMessage(lastError), true);
+  } else if (failed > 1) {
+    showToast(t('attachment_upload_partial', { failed, total }), true);
+  }
+}
+
+// ── Attachments in the detail popup ───────────────────────
+
+async function renderPopupAttachments(ev) {
+  const row = document.getElementById('popup-row-attachments');
+  const list = document.getElementById('popup-attachments');
+  if (!row || !list) return;
+  list.innerHTML = '';
+  if (ev.source !== 'local' || !((ev.attachment_count || 0) > 0)) {
+    row.style.display = 'none';
+    return;
+  }
+  row.style.display = '';
+  const placeholder = document.createElement('span');
+  placeholder.className = 'ev-attach-size';
+  placeholder.textContent = '…';
+  list.appendChild(placeholder);
+
+  let items = [];
+  try {
+    items = await api.get(`/local/events/${encodeURIComponent(ev.id)}/attachments`) || [];
+  } catch (e) {
+    list.innerHTML = '';
+    const err = document.createElement('span');
+    err.className = 'ev-attach-size';
+    err.textContent = (e && e.message) || '';
+    list.appendChild(err);
+    return;
+  }
+  // The popup may have been closed or re-rendered while we waited.
+  if (document.getElementById('popup-attachments') !== list) return;
+
+  list.innerHTML = '';
+  if (!items.length) { row.style.display = 'none'; return; }
+  for (const a of items) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'popup-attach-item';
+    item.appendChild(attachIconEl(a.content_type));
+    const label = document.createElement('span');
+    label.className = 'ev-attach-name';
+    label.textContent = a.filename;
+    label.title = a.filename;
+    item.appendChild(label);
+    const size = document.createElement('span');
+    size.className = 'ev-attach-size';
+    size.textContent = formatFileSize(a.size_bytes);
+    item.appendChild(size);
+    item.addEventListener('click', async () => {
+      try {
+        await api.download(`/local/attachments/${a.id}`, a.filename);
+      } catch (err) {
+        showToast((err && err.message) || '', true);
+      }
+    });
+    list.appendChild(item);
+  }
+}
+
 function buildRruleFromUI() {
   const sel = document.getElementById('ev-recurrence').value;
   if (!sel) return null;
@@ -2305,9 +2606,11 @@ function bindEventModal() {
   document.getElementById('ev-calendar').addEventListener('change', () => {
     updatePrivateRow();
     updateRemindersRow();
+    updateAttachmentsRow();
   });
 
   document.getElementById('ev-reminder-add').addEventListener('click', addReminderRow);
+  document.getElementById('ev-attachment-add').addEventListener('click', triggerAttachmentPicker);
 
   // Custom calendar dropdown toggle
   document.getElementById('ev-cal-trigger').addEventListener('click', e => {
@@ -2476,6 +2779,9 @@ function bindEventModal() {
           await api.put(`/local/events/${encodeURIComponent(ev.id)}`,
             { title, start, end, allDay, location: loc, description: desc, color: color || null, rrule: rrule || '', private: isPrivate, reminders: state.eventReminders }
           );
+          // Staged adds/removals are applied only now, so cancelling the modal
+          // really does change nothing.
+          await flushAttachmentChanges(ev.id);
         } else if (ev.source === 'ical') {
           showToast(t('event_readonly'), true);
           return;
@@ -2509,12 +2815,15 @@ function bindEventModal() {
         showToast(t('event_created'));
       } else if (isLocal) {
         const calId = parseInt(calVal.replace('local-', ''));
-        await api.post('/local/events', {
+        // A new event has no uid until the server answers, so files picked
+        // beforehand were only staged — upload them now against the real uid.
+        const created = await api.post('/local/events', {
           calendar_id: calId, title, start, end, allDay,
           location: loc, description: desc, color: color || null,
           rrule: rrule || null, private: isPrivate, reminders: state.eventReminders,
         });
         showToast(t('event_created'));
+        if (created && created.id) await flushAttachmentChanges(created.id);
       } else if (isHA) {
         const haCalId = parseInt(calVal.replace('homeassistant-', ''));
         await api.post('/homeassistant/events', {

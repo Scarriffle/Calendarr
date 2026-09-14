@@ -397,6 +397,12 @@
         <div id="ev-reminders-list" class="ev-reminders-list"></div>
         <button type="button" class="btn btn-ghost btn-sm" id="ev-reminder-add" data-i18n="reminder_add">Benachrichtigung hinzufügen</button>
       </div>
+      <div class="form-group" id="ev-attachments-group" style="display:none">
+        <label data-i18n="attachments">Anhänge</label>
+        <div id="ev-attachments-list" class="ev-attach-list"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="ev-attachment-add" data-i18n="attachment_add">Datei hinzufügen</button>
+        <div class="form-hint" data-i18n="attachment_hint">Max. 10 MB pro Datei, 10 Dateien. PDF, Bilder, Text.</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger hidden" id="ev-delete">Löschen</button>
@@ -553,6 +559,10 @@
     <div class="popup-row" id="popup-row-creator" style="display:none">
       <svg class="popup-row-icon" viewBox="0 0 24 24"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-5.33 0-8 2.67-8 6v2h16v-2c0-3.33-2.67-6-8-6z"/></svg>
       <span id="popup-creator"></span>
+    </div>
+    <div class="popup-row popup-row-attach" id="popup-row-attachments" style="display:none">
+      <svg class="popup-row-icon" viewBox="0 0 24 24"><path d="M16.5 6v11.5a4 4 0 11-8 0V5a2.5 2.5 0 115 0v10.5a1 1 0 11-2 0V6H10v9.5a2.5 2.5 0 105 0V5a4 4 0 10-8 0v12.5a5.5 5.5 0 1011 0V6h-1.5z"/></svg>
+      <div id="popup-attachments" class="popup-attach-list"></div>
     </div>
   </div>
   <div id="popup-copy-menu" class="popup-copy-menu hidden"></div>
