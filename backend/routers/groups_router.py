@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+import attachments_store
 import models
 from auth import get_current_user
 from database import get_db
@@ -311,12 +312,15 @@ def delete_group(
     _require_owner(db, group, current_user)
     # Remove the group calendar (and its events) too.
     gc = db.query(models.GroupCalendar).filter(models.GroupCalendar.group_id == group_id).first()
+    stale = []
     if gc:
         cal = db.query(models.LocalCalendar).filter(models.LocalCalendar.id == gc.calendar_id).first()
         if cal:
+            stale = attachments_store.purge_for_calendars(db, [cal.id])
             db.delete(cal)  # cascades to events
     db.delete(group)  # cascades to members + group_calendar link
     db.commit()
+    attachments_store.unlink_all(stale)
     return {"ok": True}
 
 

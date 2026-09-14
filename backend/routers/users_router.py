@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import attachments_store
 import models
 from auth import get_current_admin, get_current_user, get_password_hash
 from database import get_db
@@ -101,8 +102,18 @@ def delete_user(
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(404, "User not found")
+    # user -> calendars -> events -> attachments: the longest cascade chain, and
+    # the one where orphaned files would pile up unnoticed.
+    cal_ids = [
+        r[0]
+        for r in db.query(models.LocalCalendar.id)
+        .filter(models.LocalCalendar.user_id == user_id)
+        .all()
+    ]
+    stale = attachments_store.purge_for_calendars(db, cal_ids)
     db.delete(user)
     db.commit()
+    attachments_store.unlink_all(stale)
     return {"ok": True}
 
 

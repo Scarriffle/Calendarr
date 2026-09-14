@@ -1,0 +1,270 @@
+"""Event attachments: content validation, storage and cleanup."""
+
+import io
+import os
+import shutil
+import time
+
+import pytest
+from fastapi import HTTPException
+from PIL import Image
+
+import attachments_store
+import models
+from conftest import auth, create_user, register_admin
+from database import SessionLocal
+
+RANGE = {"start": "2026-06-01T00:00:00Z", "end": "2026-06-30T00:00:00Z"}
+
+
+@pytest.fixture(autouse=True)
+def clean_attachment_dir():
+    """conftest wipes the tables but not the files — without this the orphan
+    sweep test would trip over leftovers from earlier tests."""
+    for child in attachments_store.ATTACH_DIR.iterdir():
+        shutil.rmtree(child, ignore_errors=True) if child.is_dir() else child.unlink()
+    yield
+
+
+# ── Fixtures for file bytes ───────────────────────────────
+
+def png_bytes(size=(8, 8)) -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", size, "red").save(buf, "PNG")
+    return buf.getvalue()
+
+
+PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
+TXT_BYTES = "Zugangsdaten: siehe Umschlag\n".encode("utf-8")
+
+
+# ── Helpers ───────────────────────────────────────────────
+
+def _make_calendar(client, token, name="Privat"):
+    r = client.post("/api/local/calendars", headers=auth(token),
+                    json={"name": name, "color": "#4285f4"})
+    assert r.status_code == 200, r.text
+    return r.json()["id"]
+
+
+def _make_event(client, token, cal_id, title="Termin"):
+    r = client.post("/api/local/events", headers=auth(token), json={
+        "calendar_id": cal_id, "title": title,
+        "start": "2026-06-10T10:00:00+00:00", "end": "2026-06-10T11:00:00+00:00",
+    })
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _attach_row(event_uid, event_id, raw=PDF_BYTES, content_type="application/pdf",
+                ext=".pdf", filename="Rechnung.pdf"):
+    """Insert an attachment row and write its bytes, bypassing the API.
+
+    Used by the cleanup tests, which must work before the upload endpoint
+    exists and must be able to build states the API would refuse to create.
+    """
+    stored = attachments_store.new_stored_name(ext)
+    attachments_store.write_file(stored, raw)
+    has_thumb = attachments_store.make_thumb(raw, content_type, stored)
+    db = SessionLocal()
+    try:
+        row = models.EventAttachment(
+            source="local", event_uid=event_uid, event_id=event_id,
+            filename=filename, stored_name=stored, content_type=content_type,
+            size_bytes=len(raw), has_thumb=has_thumb,
+            token=attachments_store.new_token(),
+        )
+        db.add(row)
+        db.commit()
+        return stored
+    finally:
+        db.close()
+
+
+def _row_count() -> int:
+    db = SessionLocal()
+    try:
+        return db.query(models.EventAttachment).count()
+    finally:
+        db.close()
+
+
+def _exists(stored_name) -> bool:
+    return attachments_store.path_for(stored_name).exists()
+
+
+# ── Content sniffing ──────────────────────────────────────
+
+@pytest.mark.parametrize("raw,name,expected", [
+    (PDF_BYTES, "x.pdf", "application/pdf"),
+    (png_bytes(), "x.png", "image/png"),
+    (TXT_BYTES, "notiz.txt", "text/plain"),
+    (b"a,b\n1,2", "liste.csv", "text/csv"),
+    (b"# Titel", "doku.md", "text/markdown"),
+])
+def test_sniff_accepts_allowed_types(raw, name, expected):
+    content_type, _ = attachments_store.sniff(raw, name)
+    assert content_type == expected
+
+
+@pytest.mark.parametrize("raw,name", [
+    (b'<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>', "x.svg"),
+    (b"<!doctype html><html><script>alert(1)</script></html>", "x.html"),
+    (b"print('hi')", "x.py"),
+    (bytes(range(256)), "x.bin"),
+    (b"plain text but no known extension", "readme"),
+])
+def test_sniff_rejects_everything_else(raw, name):
+    """SVG and HTML matter most here: both execute script in the app's origin,
+    where the session token lives in localStorage."""
+    with pytest.raises(HTTPException) as e:
+        attachments_store.sniff(raw, name)
+    assert e.value.status_code == 400
+
+
+def test_sniff_ignores_the_uploaded_name_for_binary_types():
+    """A PNG named .pdf is a PNG. The extension never overrides the bytes."""
+    content_type, ext = attachments_store.sniff(png_bytes(), "getarnt.pdf")
+    assert (content_type, ext) == ("image/png", ".png")
+
+
+def test_stored_name_never_contains_path_separators():
+    """The uploaded name is attacker-controlled, and on the CalDAV path so is
+    the event UID — neither may reach the filesystem."""
+    _, ext = attachments_store.sniff(PDF_BYTES, "../../../etc/passwd.pdf")
+    stored = attachments_store.new_stored_name(ext)
+    assert "/" not in stored and "\\" not in stored and ".." not in stored
+    path = attachments_store.path_for(stored)
+    assert attachments_store.ATTACH_DIR in path.parents
+
+
+def test_safe_filename_strips_directories_and_quotes():
+    assert attachments_store.safe_filename("../../etc/passwd", ".txt") == "passwd"
+    assert '"' not in attachments_store.safe_filename('a"b.pdf', ".pdf")
+    assert attachments_store.safe_filename("", ".pdf") == "anhang.pdf"
+
+
+def test_thumbnail_only_for_images():
+    stored = attachments_store.new_stored_name(".png")
+    attachments_store.write_file(stored, png_bytes((600, 400)))
+    assert attachments_store.make_thumb(png_bytes((600, 400)), "image/png", stored) is True
+    assert attachments_store.thumb_path_for(stored).exists()
+
+    stored_pdf = attachments_store.new_stored_name(".pdf")
+    assert attachments_store.make_thumb(PDF_BYTES, "application/pdf", stored_pdf) is False
+
+
+# ── Cleanup on every delete path ──────────────────────────
+
+def test_deleting_an_event_removes_rows_and_files(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    db = SessionLocal()
+    ev_id = db.query(models.LocalEvent).filter(models.LocalEvent.uid == ev["id"]).first().id
+    db.close()
+
+    stored = _attach_row(ev["id"], ev_id)
+    assert _row_count() == 1 and _exists(stored)
+
+    r = client.delete(f"/api/local/events/{ev['id']}", headers=auth(token))
+    assert r.status_code == 200, r.text
+    assert _row_count() == 0
+    assert not _exists(stored)
+
+
+def test_deleting_a_calendar_removes_rows_and_files(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    db = SessionLocal()
+    ev_id = db.query(models.LocalEvent).filter(models.LocalEvent.uid == ev["id"]).first().id
+    db.close()
+    stored = _attach_row(ev["id"], ev_id)
+
+    r = client.delete(f"/api/local/calendars/{cal_id}", headers=auth(token))
+    assert r.status_code == 200, r.text
+    assert _row_count() == 0
+    assert not _exists(stored)
+
+
+def test_deleting_a_user_removes_rows_and_files(client):
+    """The longest cascade: user -> calendars -> events -> attachments."""
+    admin = register_admin(client)
+    bob_id, bob = create_user(client, admin, "bob")
+    cal_id = _make_calendar(client, bob, "Bobs Kalender")
+    ev = _make_event(client, bob, cal_id)
+    db = SessionLocal()
+    ev_id = db.query(models.LocalEvent).filter(models.LocalEvent.uid == ev["id"]).first().id
+    db.close()
+    stored = _attach_row(ev["id"], ev_id)
+
+    r = client.delete(f"/api/users/{bob_id}", headers=auth(admin))
+    assert r.status_code == 200, r.text
+    assert _row_count() == 0
+    assert not _exists(stored)
+
+
+# ── The background sweep ──────────────────────────────────
+
+def test_sweep_removes_rows_whose_event_is_gone(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    db = SessionLocal()
+    ev_id = db.query(models.LocalEvent).filter(models.LocalEvent.uid == ev["id"]).first().id
+    db.close()
+    stored = _attach_row(ev["id"], ev_id)
+
+    # Delete the event behind the API's back, as a cascade that skipped the
+    # purge helper would.
+    db = SessionLocal()
+    db.query(models.LocalEvent).filter(models.LocalEvent.id == ev_id).delete()
+    db.commit()
+    db.close()
+
+    db = SessionLocal()
+    rows, files = attachments_store.sweep(db)
+    db.close()
+    assert rows == 1
+    assert not _exists(stored)
+
+
+def test_sweep_removes_files_with_no_row_but_respects_the_grace_period():
+    stored = attachments_store.new_stored_name(".pdf")
+    path = attachments_store.write_file(stored, PDF_BYTES)
+
+    # Fresh file, no row: must survive — an upload in flight writes the bytes
+    # before it commits the row.
+    db = SessionLocal()
+    rows, files = attachments_store.sweep(db)
+    db.close()
+    assert files == 0 and path.exists()
+
+    # Same file, aged past the grace window: now it is an orphan.
+    old = time.time() - attachments_store.SWEEP_GRACE_SECONDS - 60
+    os.utime(path, (old, old))
+    db = SessionLocal()
+    rows, files = attachments_store.sweep(db)
+    db.close()
+    assert files == 1 and not path.exists()
+
+
+def test_sweep_leaves_live_attachments_alone(client):
+    token = register_admin(client)
+    cal_id = _make_calendar(client, token)
+    ev = _make_event(client, token, cal_id)
+    db = SessionLocal()
+    ev_id = db.query(models.LocalEvent).filter(models.LocalEvent.uid == ev["id"]).first().id
+    db.close()
+    stored = _attach_row(ev["id"], ev_id)
+
+    old = time.time() - attachments_store.SWEEP_GRACE_SECONDS - 60
+    for p in (attachments_store.path_for(stored),):
+        os.utime(p, (old, old))
+
+    db = SessionLocal()
+    rows, files = attachments_store.sweep(db)
+    db.close()
+    assert (rows, files) == (0, 0)
+    assert _row_count() == 1 and _exists(stored)

@@ -30,6 +30,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import attachments_store
 import dav_util
 import ical_io
 import models
@@ -357,6 +358,10 @@ def _handle_put(cal: models.LocalCalendar, resource: str, body: bytes, db: Sessi
     ev.description = item.get("description")
     ev.rrule = item.get("rrule")
     ev.exdate = item.get("exdate")
+    # Only LocalEvent columns are written here, so attachments in the side table
+    # survive an external client rewriting the event. Do NOT start parsing the
+    # ICS ATTACH property: an inline ENCODING=BASE64 attachment would be
+    # unbounded in size and its content never sniffed.
     dav_util.bump_dav(cal, ev)
     db.commit()
     db.refresh(ev)
@@ -368,8 +373,10 @@ def _handle_delete(cal: models.LocalCalendar, resource: str, db: Session) -> Res
     if not ev:
         return Response(status_code=404)
     dav_util.bump_dav(cal)
+    stale = attachments_store.purge_for_events(db, [ev.id])
     db.delete(ev)
     db.commit()
+    attachments_store.unlink_all(stale)
     return Response(status_code=204)
 
 

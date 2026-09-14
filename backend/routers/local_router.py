@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+import attachments_store
 import dav_util
 import ical_io
 import models
@@ -391,8 +392,10 @@ def delete_calendar(
     )
     if not cal:
         raise HTTPException(404, "Calendar not found")
+    stale = attachments_store.purge_for_calendars(db, [cal.id])
     db.delete(cal)
     db.commit()
+    attachments_store.unlink_all(stale)
     return {"ok": True}
 
 
@@ -525,8 +528,12 @@ def delete_event(
 ):
     ev = _writable_event(db, current_user, uid)
     dav_util.bump_dav(ev.calendar)
+    # Drop the attachment rows here so their files can be named, then unlink
+    # only after the commit — a rollback must not leave rows without bytes.
+    stale = attachments_store.purge_for_events(db, [ev.id])
     db.delete(ev)
     db.commit()
+    attachments_store.unlink_all(stale)
     return {"ok": True}
 
 

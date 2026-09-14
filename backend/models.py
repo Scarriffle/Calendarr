@@ -243,6 +243,47 @@ class LocalEvent(Base):
 
     calendar = relationship("LocalCalendar", back_populates="events")
     creator = relationship("User")
+    # Deleting the event drops its attachment rows; the FILES are removed by
+    # attachments_store.purge_for_events() — the ORM cascade never touches disk.
+    attachments = relationship(
+        "EventAttachment", cascade="all, delete-orphan", passive_deletes=False
+    )
+
+
+class EventAttachment(Base):
+    """A file attached to an event (PDF, image or text).
+
+    The event is addressed by ``(source, event_uid)`` so non-local sources
+    (CalDAV, Google, Home Assistant) can be enabled later without a migration.
+    Today only ``source="local"`` is ever written, and for those rows
+    ``event_id`` carries the FK that makes joins and the ORM cascade work.
+    """
+
+    __tablename__ = "event_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source = Column(String(20), nullable=False, default="local")
+    event_uid = Column(String(255), nullable=False, index=True)
+    event_id = Column(Integer, ForeignKey("local_events.id"), nullable=True, index=True)
+
+    # The name the user uploaded — only ever used to label the download. It is
+    # NEVER part of an on-disk path: for CalDAV-created events even the event
+    # UID comes from an external client, so paths are built from stored_name.
+    filename = Column(String(255), nullable=False)
+    # Server-generated uuid4 hex plus extension, e.g. "a1b2...ef.pdf".
+    stored_name = Column(String(80), nullable=False, unique=True)
+    # The result of sniffing the bytes, never the client's Content-Type header.
+    content_type = Column(String(100), nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    has_thumb = Column(Boolean, default=False)
+    # Capability token for the ICS ATTACH URL, which external CalDAV clients
+    # fetch without any credentials. Unguessable, and revoked only by deleting
+    # the attachment.
+    token = Column(String(64), nullable=False, unique=True, index=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    uploader = relationship("User")
 
 
 class ICalSubscription(Base):
