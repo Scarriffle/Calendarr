@@ -1,0 +1,590 @@
+package com.scarriffle.calendarr.ui.calendar
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Divider
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.scarriffle.calendarr.domain.model.AppSettings
+import com.scarriffle.calendarr.domain.model.CalEvent
+import com.scarriffle.calendarr.domain.model.CalViewType
+import com.scarriffle.calendarr.ui.LocalLang
+import com.scarriffle.calendarr.ui.accounts.AccountsScreen
+import com.scarriffle.calendarr.domain.model.Group
+import com.scarriffle.calendarr.ui.event.EventDetailScreen
+import com.scarriffle.calendarr.ui.event.EventEditorSheet
+import com.scarriffle.calendarr.ui.groups.GroupIcon
+import com.scarriffle.calendarr.ui.groups.GroupsScreen
+import com.scarriffle.calendarr.ui.menu.MenuScreen
+import com.scarriffle.calendarr.ui.profile.ProfileScreen
+import com.scarriffle.calendarr.ui.settings.SettingsScreen
+import com.scarriffle.calendarr.ui.tr
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+
+private enum class Overlay { NONE, MENU, PROFILE, SETTINGS, ACCOUNTS, GROUPS }
+
+data class EditorRequest(val existing: CalEvent?, val date: LocalDate, val prefill: CalEvent? = null)
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun CalendarScreen(
+    onLogout: () -> Unit,
+    onSwitchServer: () -> Unit,
+    onSettingsChanged: (AppSettings) -> Unit,
+    onSettingsSynced: () -> Unit,
+    username: String = "",
+    serverUrl: String = "",
+    vm: CalendarViewModel = hiltViewModel(),
+) {
+    val state by vm.state.collectAsState()
+    val lang = LocalLang.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Ask once for notification permission (Android 13+), then keep the OS
+    // reminder alarms in sync with the visible events / muted-calendar set.
+    val notifPermLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) {}
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(state.events, state.reminderDisabledKeys) {
+        com.scarriffle.calendarr.notifications.NotificationScheduler.reschedule(
+            context, state.events, state.reminderDisabledKeys, vm.defaultReminderMinutes
+        )
+    }
+    // Re-check server-side calendar visibility whenever the app returns to the
+    // foreground (e.g. after hiding/showing a calendar on the web or another
+    // device); reloads only if something changed.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) vm.onAppResumed()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Contacts birthday import (mirrors iOS): request permission on demand; sync
+    // this device's contact birthdays into the birthday calendar.
+    val deviceName = android.os.Build.MODEL ?: "Android"
+    fun runBirthdayImport() {
+        vm.birthdaysSyncEnabled = true
+        vm.syncContactBirthdays(com.scarriffle.calendarr.data.ContactsReader.readBirthdays(context), deviceName)
+    }
+    val contactsPermLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) runBirthdayImport() }
+    fun startBirthdayImport() {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.READ_CONTACTS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) runBirthdayImport() else contactsPermLauncher.launch(android.Manifest.permission.READ_CONTACTS)
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (vm.birthdaysSyncEnabled &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.READ_CONTACTS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) runBirthdayImport()
+    }
+
+    var viewMenuOpen by remember { mutableStateOf(false) }
+    var detailEvent by remember { mutableStateOf<CalEvent?>(null) }
+    var editor by remember { mutableStateOf<EditorRequest?>(null) }
+    var overlay by remember { mutableStateOf(Overlay.NONE) }
+    var dayPreview by remember { mutableStateOf<LocalDate?>(null) }
+    var fabMenuOpen by remember { mutableStateOf(false) }
+    var showBirthday by remember { mutableStateOf(false) }
+    var birthdayCal by remember { mutableStateOf<com.scarriffle.calendarr.domain.model.LocalCalendar?>(null) }
+    val birthdayScope = rememberCoroutineScope()
+    val birthdayCalName = tr("birthday.calendar_name")
+
+    // Side navigation drawer (calendars + groups + view + menu).
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerScope = rememberCoroutineScope()
+    val drawerCalendars = remember(state.events, state.banishedKeys, state.allCalendars) { allKnownCalendars(vm) }
+    androidx.compose.runtime.LaunchedEffect(drawerState.currentValue) {
+        if (drawerState.isOpen) vm.loadAllCalendars()
+    }
+
+    // Continuous month scrolling
+    val monthListState = rememberLazyListState()
+    var todaySignal by remember { mutableIntStateOf(0) }
+    var monthJumpSignal by remember { mutableIntStateOf(0) }
+    var monthJumpTarget by remember { mutableStateOf<LocalDate?>(null) }
+    var visibleMonth by remember { mutableStateOf(state.currentDate) }
+    val isMonth = state.viewType == CalViewType.MONTH
+    val barTitle = if (isMonth) titleForView(CalViewType.MONTH, visibleMonth, lang)
+        else titleForView(state.viewType, state.currentDate, lang)
+
+    fun goPrev() {
+        if (isMonth) { monthJumpTarget = visibleMonth.minusMonths(1); monthJumpSignal++ } else vm.navigatePrev()
+    }
+    fun goNext() {
+        if (isMonth) { monthJumpTarget = visibleMonth.plusMonths(1); monthJumpSignal++ } else vm.navigateNext()
+    }
+    fun goToday() {
+        if (isMonth) todaySignal++ else vm.moveToToday()
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            CalendarDrawerContent(
+                state = state, vm = vm, username = username, serverUrl = serverUrl,
+                calendars = drawerCalendars,
+                onOpenMenu = { drawerScope.launch { drawerState.close() }; overlay = Overlay.MENU },
+                onSync = { drawerScope.launch { drawerState.close() }; vm.syncWithServer() },
+                onClose = { drawerScope.launch { drawerState.close() } },
+            )
+        },
+    ) {
+    Scaffold(
+        topBar = {
+            CompactTopBar(
+                title = barTitle,
+                viewType = state.viewType,
+                loading = state.isLoading || state.isBackgroundCaching,
+                viewMenuOpen = viewMenuOpen,
+                showMenuButton = !state.hideMenuButton,
+                onMenu = { drawerScope.launch { drawerState.open() } },
+                onPrev = { goPrev() },
+                onToday = { goToday() },
+                onNext = { goNext() },
+                onViewMenuToggle = { viewMenuOpen = it },
+                onSelectView = { vm.setViewType(it) },
+            )
+        },
+        floatingActionButton = {
+            // Tap = new event; long-press opens a small menu (new event / new
+            // birthday). A transparent overlay carries the combined click so the
+            // long-press is reliable on the Material FAB.
+            Box(Modifier.navigationBarsPadding()) {
+                FloatingActionButton(
+                    onClick = {},
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = tr("cal.new_event"))
+                }
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .clip(CircleShape)
+                        .combinedClickable(
+                            onClick = { editor = EditorRequest(null, if (isMonth) visibleMonth else state.currentDate) },
+                            onLongClick = { fabMenuOpen = true },
+                        ),
+                )
+                DropdownMenu(expanded = fabMenuOpen, onDismissRequest = { fabMenuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(tr("cal.new_event")) },
+                        onClick = { fabMenuOpen = false; editor = EditorRequest(null, if (isMonth) visibleMonth else state.currentDate) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(tr("birthday.new")) },
+                        onClick = { fabMenuOpen = false; showBirthday = true },
+                    )
+                }
+            }
+        },
+        // Edge-to-edge: we place the system-bar insets ourselves (top bar gets
+        // statusBarsPadding, the content column gets navigationBarsPadding) so
+        // nothing hides behind the status/nav bars.
+        contentWindowInsets = WindowInsets(0),
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).navigationBarsPadding()) {
+            state.error?.let { err ->
+                ErrorBanner(err, onRetry = { vm.loadVisible(force = true) }, onDismiss = vm::clearError)
+            }
+            if (state.syncErrors.isNotEmpty()) {
+                SyncErrorBanner(state.syncErrors, onDismiss = vm::clearSyncErrors)
+            }
+            state.activeGroup?.let { g ->
+                GroupBanner(group = g, onExit = { vm.switchGroup(null) })
+            }
+            Box(Modifier.fillMaxSize()) {
+                // remember: stable callbacks keep the lazily composed week rows
+                // skippable during scroll (fresh lambdas would recompose them all).
+                CalendarBody(
+                    state = state,
+                    vm = vm,
+                    monthListState = monthListState,
+                    scrollToTodaySignal = todaySignal,
+                    monthJumpSignal = monthJumpSignal,
+                    monthJumpTarget = monthJumpTarget,
+                    onVisibleMonthChange = remember { { visibleMonth = it } },
+                    onEventClick = remember { { detailEvent = it } },
+                    onDayClick = remember(vm) { { date -> vm.goToDate(date, CalViewType.DAY) } },
+                    onDayLongPress = remember { { date -> dayPreview = date } },
+                )
+            }
+        }
+    }
+    }
+
+    // ---- Sheets ----
+
+    dayPreview?.let { date ->
+        DayPreviewDialog(
+            date = date,
+            events = remember(state.events, date) { vm.eventsOn(date, state.events) },
+            onDismiss = { dayPreview = null },
+            onEventClick = { ev -> dayPreview = null; detailEvent = ev },
+            onCreateEvent = { dayPreview = null; editor = EditorRequest(null, date) },
+            onOpenDay = { dayPreview = null; vm.goToDate(date, CalViewType.DAY) },
+            onOpenWeek = { dayPreview = null; vm.goToDate(date, CalViewType.WEEK) },
+        )
+    }
+
+    if (showBirthday) {
+        androidx.compose.runtime.LaunchedEffect(Unit) { birthdayCal = vm.birthdayCalendar() }
+        BirthdayDialog(
+            calendar = birthdayCal,
+            onDismiss = { showBirthday = false },
+            onActivate = { birthdayScope.launch { birthdayCal = vm.ensureBirthdayCalendar(birthdayCalName) } },
+            onImportContacts = { showBirthday = false; startBirthdayImport() },
+            onSave = { name, date, yearKnown ->
+                birthdayCal?.let { vm.createBirthday(it.id, name, date, yearKnown) {} }
+                showBirthday = false
+            },
+        )
+    }
+
+    // Keep the last event during the close animation.
+    var lastDetail by remember { mutableStateOf<CalEvent?>(null) }
+    detailEvent?.let { lastDetail = it }
+    AnimatedVisibility(
+        visible = detailEvent != null,
+        enter = slideInVertically(initialOffsetY = { it / 6 }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it / 6 }) + fadeOut(),
+    ) {
+        val ev = lastDetail
+        if (ev != null) {
+            EventDetailScreen(
+                event = ev,
+                currentUserId = vm.currentUserId,
+                onClose = { detailEvent = null },
+                onEdit = {
+                    detailEvent = null
+                    editor = EditorRequest(ev, localDate(ev.startDate))
+                },
+                onCopy = {
+                    detailEvent = null
+                    editor = EditorRequest(existing = null, date = localDate(ev.startDate), prefill = ev)
+                },
+                onDelete = {
+                    vm.deleteEvent(ev) {}
+                    detailEvent = null
+                },
+            )
+        }
+    }
+
+    editor?.let { req ->
+        EventEditorSheet(
+            request = req,
+            writableCalendars = state.writableCalendars,
+            onDismiss = { editor = null },
+            defaultDurationMinutes = vm.defaultEventDurationMinutes,
+            reminderDisabledKeys = state.reminderDisabledKeys,
+            onSave = { cal, title, start, end, allDay, location, desc, color, isPrivate, reminders ->
+                vm.saveEvent(cal, req.existing, title, start, end, allDay, location, desc, color, isPrivate, reminders) { error ->
+                    if (error == null) editor = null
+                }
+            },
+        )
+    }
+
+    when (overlay) {
+        Overlay.MENU -> MenuScreen(
+            username = username,
+            serverUrl = serverUrl,
+            onClose = { overlay = Overlay.NONE },
+            onProfile = { overlay = Overlay.PROFILE },
+            onAppearance = { overlay = Overlay.SETTINGS },
+            onAccounts = { overlay = Overlay.ACCOUNTS },
+            onGroups = { overlay = Overlay.GROUPS },
+            onSync = { overlay = Overlay.NONE; vm.syncWithServer() },
+            onSwitchServer = onSwitchServer,
+            onLogout = onLogout,
+        )
+        Overlay.PROFILE -> ProfileScreen(onClose = { overlay = Overlay.MENU })
+        Overlay.SETTINGS -> SettingsScreen(
+            onClose = { overlay = Overlay.MENU; vm.refreshMonthViewMode() },
+            onSettingsChanged = onSettingsChanged,
+            onSettingsSynced = onSettingsSynced,
+        )
+        Overlay.ACCOUNTS -> AccountsScreen(
+            onClose = { overlay = Overlay.MENU },
+            onChanged = { vm.loadWritableCalendars(); vm.syncWithServer() },
+        )
+        Overlay.GROUPS -> GroupsScreen(
+            onClose = { overlay = Overlay.MENU },
+            onChanged = { vm.loadGroups(); vm.loadWritableCalendars() },
+            onOpenGroupView = { g -> overlay = Overlay.NONE; vm.switchGroup(g) },
+        )
+        Overlay.NONE -> Unit
+    }
+}
+
+@Composable
+private fun CalendarBody(
+    state: CalendarUiState,
+    vm: CalendarViewModel,
+    monthListState: androidx.compose.foundation.lazy.LazyListState,
+    scrollToTodaySignal: Int,
+    monthJumpSignal: Int,
+    monthJumpTarget: LocalDate?,
+    onVisibleMonthChange: (LocalDate) -> Unit,
+    onEventClick: (CalEvent) -> Unit,
+    onDayClick: (LocalDate) -> Unit,
+    onDayLongPress: (LocalDate) -> Unit,
+) {
+    when (state.viewType) {
+        CalViewType.MONTH -> MonthView(
+            state = state,
+            vm = vm,
+            listState = monthListState,
+            scrollToTodaySignal = scrollToTodaySignal,
+            monthJumpSignal = monthJumpSignal,
+            monthJumpTarget = monthJumpTarget,
+            onVisibleMonthChange = onVisibleMonthChange,
+            onDayClick = onDayClick,
+            onDayLongPress = onDayLongPress,
+            onEventClick = onEventClick,
+        )
+        CalViewType.WEEK -> WeekView(state, vm, onEventClick)
+        CalViewType.DAY -> DayView(state, vm, onEventClick)
+        CalViewType.QUARTER -> QuarterView(state, onDayClick)
+        CalViewType.AGENDA -> AgendaView(state, vm, onEventClick)
+    }
+}
+
+@Composable
+private fun ErrorBanner(message: String, onRetry: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(message, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
+            androidx.compose.foundation.layout.Row {
+                TextButton(onClick = onRetry) { Text(tr("common.retry")) }
+                TextButton(onClick = onDismiss) { Text(tr("common.close")) }
+            }
+        }
+    }
+}
+
+/**
+ * Additive to [ErrorBanner]: the fetch as a whole succeeded, but one or more
+ * enabled calendars failed to sync (e.g. expired credentials) and are showing
+ * zero events with no other indication. Same visual language, no retry button
+ * (retrying the whole range wouldn't target just the broken calendar).
+ */
+@Composable
+private fun SyncErrorBanner(errors: List<com.scarriffle.calendarr.data.SyncError>, onDismiss: () -> Unit) {
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            errors.forEach { err ->
+                Text(
+                    "${err.name}: ${err.message}",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            androidx.compose.foundation.layout.Row {
+                TextButton(onClick = onDismiss) { Text(tr("common.close")) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun loadingPlaceholder() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun CompactTopBar(
+    title: String,
+    viewType: CalViewType,
+    loading: Boolean,
+    viewMenuOpen: Boolean,
+    showMenuButton: Boolean,
+    onMenu: () -> Unit,
+    onPrev: () -> Unit,
+    onToday: () -> Unit,
+    onNext: () -> Unit,
+    onViewMenuToggle: (Boolean) -> Unit,
+    onSelectView: (CalViewType) -> Unit,
+) {
+    val twoLine = viewType == CalViewType.WEEK || viewType == CalViewType.DAY
+    // Surface fills behind the status bar; the content column is inset below it.
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.statusBarsPadding()) {
+        Row(
+            Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Menu (hamburger) on the left — the drawer opens from the left.
+            if (showMenuButton) CompactIcon(Icons.Filled.Menu, onMenu, tr("nav.menu"))
+            CompactIcon(Icons.Filled.ChevronLeft, onPrev)
+            TextButton(onClick = onToday, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                Text(tr("nav.today"), fontSize = 13.sp)
+            }
+            CompactIcon(Icons.Filled.ChevronRight, onNext)
+            Text(
+                title,
+                modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = if (twoLine) 13.sp else 16.sp,
+                lineHeight = if (twoLine) 15.sp else 18.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp).padding(end = 2.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
+            Box {
+                CompactIcon(viewType.icon, { onViewMenuToggle(true) }, tr("view.change"))
+                DropdownMenu(expanded = viewMenuOpen, onDismissRequest = { onViewMenuToggle(false) }) {
+                    CalViewType.entries.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(tr("view.${type.key}")) },
+                            leadingIcon = { Icon(type.icon, contentDescription = null) },
+                            onClick = { onViewMenuToggle(false); onSelectView(type) },
+                        )
+                    }
+                }
+            }
+        }
+        Divider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+        )
+        }
+    }
+}
+
+@Composable
+private fun CompactIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    contentDescription: String? = null,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun GroupBanner(group: Group, onExit: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GroupIcon(group.icon, modifier = Modifier.padding(end = 6.dp))
+            Text(
+                "${tr("groups.view")}: ${group.name}",
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            TextButton(onClick = onExit) { Text(tr("group.switch.personal")) }
+        }
+    }
+}
+
+/** Distinct calendars in the cache for the filter sheet — from the UNFILTERED
+ *  cache (minus banished) so a locally quick-hidden calendar still shows up and
+ *  can be toggled back on. */
+private fun allKnownCalendars(vm: CalendarViewModel): List<CalendarFilterEntry> {
+    val fromEvents = vm.knownCalendars()
+        .map { CalendarFilterEntry(calendarKey(it.source, it.calendarId), it.calendarName.ifBlank { it.source }, it.effectiveColor, it.source, it.readOnly) }
+    // Event-derived entries first (current server colour / owner name), then the
+    // full source list so calendars WITHOUT events in range still appear;
+    // distinctBy keeps the event-derived entry when a calendar has both.
+    return (fromEvents + vm.state.value.allCalendars)
+        .distinctBy { it.key }
+        .sortedBy { it.name.lowercase() }
+}

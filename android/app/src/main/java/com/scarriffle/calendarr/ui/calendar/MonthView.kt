@@ -1,0 +1,512 @@
+package com.scarriffle.calendarr.ui.calendar
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.scarriffle.calendarr.domain.model.CalEvent
+import com.scarriffle.calendarr.ui.LocalAppSettings
+import com.scarriffle.calendarr.ui.LocalLang
+import com.scarriffle.calendarr.ui.tr
+import com.scarriffle.calendarr.util.colorFromHex
+import com.scarriffle.calendarr.util.contrastingTextColor
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
+import java.time.temporal.IsoFields
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+
+private const val MONTHS_BACK = 120L   // 10 years back
+private const val MONTHS_AHEAD = 600L  // 50 years ahead
+private const val MAX_LANES = 4
+private val DAY_NUM_H = 22.dp
+private val LANE_H = 15.dp
+private val LANE_SPACE = 2.dp
+// Bottom strip must fit the 8sp "+N"/"KW" labels without event bars overlapping them.
+private val ROW_HEIGHT = DAY_NUM_H + (LANE_H + LANE_SPACE) * MAX_LANES + 16.dp
+
+private enum class DividerEdge { NONE, TOP, BOTTOM }
+
+/** A placed event bar within a week (with colours resolved once, not per frame). */
+private data class PlacedBar(
+    val event: CalEvent,
+    val lane: Int,
+    val startCol: Int,
+    val span: Int,
+    val color: Color,
+    val textColor: Color,
+)
+
+private class WeekLayout(val bars: List<PlacedBar>, val overflowPerCol: IntArray)
+
+/** Month calendar with multi-day event bars (iOS-style). Two modes: a
+ *  continuous vertical scroll feed, or a horizontally-paged one-month-per-screen
+ *  grid (swipe left/right), toggled by [CalendarUiState.monthViewPaged]. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun MonthView(
+    state: CalendarUiState,
+    vm: CalendarViewModel,
+    listState: LazyListState,
+    scrollToTodaySignal: Int,
+    monthJumpSignal: Int,
+    monthJumpTarget: LocalDate?,
+    onVisibleMonthChange: (LocalDate) -> Unit,
+    onDayClick: (LocalDate) -> Unit,
+    onDayLongPress: (LocalDate) -> Unit,
+    onEventClick: (CalEvent) -> Unit,
+) {
+    val lang = LocalLang.current
+    val settings = LocalAppSettings.current
+    val mondayFirst = state.weekStartsOnMonday
+    val today = LocalDate.now()
+
+    val fallbackLabel = MaterialTheme.colorScheme.onSurfaceVariant
+    val outline = MaterialTheme.colorScheme.outline
+    val onBackground = MaterialTheme.colorScheme.onBackground
+    val dividerColor = remember(settings.monthDividerColor) { colorFromHex(settings.monthDividerColor, Color(0xFF7090C0)) }
+    val labelColor = remember(settings.monthLabelColor, fallbackLabel) { colorFromHex(settings.monthLabelColor, fallbackLabel) }
+    val gridColor = remember(outline, settings.lineContrast) { outline.copy(alpha = gridLineOpacity(settings.lineContrast)) }
+    val secondaryText = remember(onBackground, settings.textContrast) { onBackground.copy(alpha = secondaryTextOpacity(settings.textContrast)) }
+    val todayColor = remember(settings.todayColor) { colorFromHex(settings.todayColor) }
+
+    // Column width measured once → no per-row BoxWithConstraints (smooth scrolling).
+    val density = LocalDensity.current
+    val fallbackCellW = LocalConfiguration.current.screenWidthDp.dp / 7
+    var gridWidthPx by remember { mutableIntStateOf(0) }
+    val cellW: Dp = if (gridWidthPx > 0) with(density) { (gridWidthPx / 7f).toDp() } else fallbackCellW
+
+    val firstVisible = remember(mondayFirst) {
+        startOfWeek(today.withDayOfMonth(1).minusMonths(MONTHS_BACK), mondayFirst)
+    }
+    val end = remember(mondayFirst) {
+        startOfWeek(today.withDayOfMonth(1).plusMonths(MONTHS_AHEAD), mondayFirst)
+    }
+    val weekCount = remember(firstVisible, end) {
+        (ChronoUnit.WEEKS.between(firstVisible, end).toInt() + 1).coerceAtLeast(1)
+    }
+    fun weekIndexOf(date: LocalDate): Int =
+        ChronoUnit.WEEKS.between(firstVisible, startOfWeek(date, mondayFirst)).toInt().coerceIn(0, weekCount - 1)
+
+    val todayIndex = remember(firstVisible) { weekIndexOf(today) }
+
+    // Month-paged mode bookkeeping (one page per calendar month).
+    val firstMonth = remember { today.withDayOfMonth(1).minusMonths(MONTHS_BACK) }
+    val monthCount = remember { (MONTHS_BACK + MONTHS_AHEAD + 1).toInt() }
+    fun monthIndexOf(date: LocalDate): Int =
+        ChronoUnit.MONTHS.between(firstMonth, date.withDayOfMonth(1)).toInt().coerceIn(0, monthCount - 1)
+    val todayMonthIndex = remember(firstMonth) { monthIndexOf(today) }
+    val pagerState = rememberPagerState(initialPage = todayMonthIndex) { monthCount }
+
+    val eventsByWeek = remember(state.events, mondayFirst) { buildEventsByWeek(state.events, mondayFirst) }
+    val dimPast = settings.dimPastEvents
+    val cwLabel = tr("cal.cw")
+    // remember: a fresh Instant per recomposition would invalidate every visible
+    // WeekRow (the main source of scroll jank); minute precision is plenty here.
+    val now = remember { java.time.Instant.now() }
+
+    // Route the title / prev-next / today signals to the active surface (pager or list).
+    if (state.monthViewPaged) {
+        LaunchedEffect(scrollToTodaySignal) {
+            if (scrollToTodaySignal > 0) pagerState.animateScrollToPage(todayMonthIndex)
+        }
+        LaunchedEffect(monthJumpSignal) {
+            if (monthJumpSignal > 0 && monthJumpTarget != null) pagerState.animateScrollToPage(monthIndexOf(monthJumpTarget))
+        }
+        LaunchedEffect(pagerState) {
+            snapshotFlow { pagerState.currentPage }
+                .map { firstMonth.plusMonths(it.toLong()) }
+                .distinctUntilChanged()
+                .collect { month ->
+                    onVisibleMonthChange(month)
+                    vm.ensureMonthLoaded(month)
+                }
+        }
+    } else {
+        LaunchedEffect(Unit) { listState.scrollToItem((todayIndex - 1).coerceAtLeast(0)) }
+        LaunchedEffect(scrollToTodaySignal) {
+            if (scrollToTodaySignal > 0) listState.animateScrollToItem((todayIndex - 1).coerceAtLeast(0))
+        }
+        LaunchedEffect(monthJumpSignal) {
+            if (monthJumpSignal > 0 && monthJumpTarget != null) {
+                listState.animateScrollToItem(weekIndexOf(monthJumpTarget.withDayOfMonth(1)))
+            }
+        }
+        LaunchedEffect(listState, weekCount) {
+            snapshotFlow { listState.firstVisibleItemIndex }
+                .map { firstVisible.plusWeeks(it.toLong()).plusDays(3).withDayOfMonth(1) }
+                .distinctUntilChanged()
+                .collect { month ->
+                    onVisibleMonthChange(month)
+                    vm.ensureMonthLoaded(month)
+                }
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+            weekdayLabels(mondayFirst, lang).forEach { label ->
+                Text(
+                    label,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        if (state.monthViewPaged) {
+            // One month per page, six height-filling week rows, swipe to change month.
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize().onSizeChanged { gridWidthPx = it.width },
+            ) { page ->
+                val month = firstMonth.plusMonths(page.toLong())
+                val firstWeek = startOfWeek(month.withDayOfMonth(1), mondayFirst)
+                Column(Modifier.fillMaxSize()) {
+                    repeat(6) { w ->
+                        val weekStart = firstWeek.plusWeeks(w.toLong())
+                        WeekRow(
+                            rowModifier = Modifier.fillMaxWidth().weight(1f),
+                            weekStart = weekStart,
+                            today = today,
+                            weekEvents = eventsByWeek[weekStart] ?: emptyList(),
+                            cellW = cellW,
+                            dimPast = dimPast,
+                            now = now,
+                            lang = lang,
+                            cwLabel = cwLabel,
+                            dividerColor = dividerColor,
+                            gridColor = gridColor,
+                            labelColor = labelColor,
+                            secondaryText = secondaryText,
+                            todayColor = todayColor,
+                            onDayClick = onDayClick,
+                            onDayLongPress = onDayLongPress,
+                            onEventClick = onEventClick,
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().onSizeChanged { gridWidthPx = it.width },
+            ) {
+                items(weekCount, key = { it }, contentType = { "week" }) { index ->
+                    val weekStart = firstVisible.plusWeeks(index.toLong())
+                    WeekRow(
+                        rowModifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
+                        weekStart = weekStart,
+                        today = today,
+                        weekEvents = eventsByWeek[weekStart] ?: emptyList(),
+                        cellW = cellW,
+                        dimPast = dimPast,
+                        now = now,
+                        lang = lang,
+                        cwLabel = cwLabel,
+                        dividerColor = dividerColor,
+                        gridColor = gridColor,
+                        labelColor = labelColor,
+                        secondaryText = secondaryText,
+                        todayColor = todayColor,
+                        onDayClick = onDayClick,
+                        onDayLongPress = onDayLongPress,
+                        onEventClick = onEventClick,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekRow(
+    rowModifier: Modifier,
+    weekStart: LocalDate,
+    today: LocalDate,
+    weekEvents: List<CalEvent>,
+    cellW: Dp,
+    dimPast: Boolean,
+    now: java.time.Instant,
+    lang: String,
+    cwLabel: String,
+    dividerColor: Color,
+    gridColor: Color,
+    labelColor: Color,
+    secondaryText: Color,
+    todayColor: Color,
+    onDayClick: (LocalDate) -> Unit,
+    onDayLongPress: (LocalDate) -> Unit,
+    onEventClick: (CalEvent) -> Unit,
+) {
+    val days = remember(weekStart) { (0 until 7).map { weekStart.plusDays(it.toLong()) } }
+    val boundaryCol = (1 until 7).firstOrNull { days[it].dayOfMonth == 1 }
+    val rowStartsNewMonth = days[0].dayOfMonth == 1
+
+    val packed = remember(weekStart, weekEvents) { packEvents(weekStart, weekEvents) }
+
+    // Scroll mode passes a fixed ROW_HEIGHT; paged mode passes weight(1f) so six
+    // rows fill the screen. Event bars anchor to the top; the day cells fill height.
+    Box(rowModifier) {
+        Row(Modifier.fillMaxSize()) {
+            days.forEachIndexed { idx, day ->
+                val edge = when {
+                    boundaryCol != null -> if (idx < boundaryCol) DividerEdge.BOTTOM else DividerEdge.TOP
+                    rowStartsNewMonth -> DividerEdge.TOP
+                    else -> DividerEdge.NONE
+                }
+                DayCellBackground(
+                    day = day,
+                    isToday = day == today,
+                    isMonday = day.dayOfWeek == DayOfWeek.MONDAY,
+                    weekNumber = day.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR),
+                    cwLabel = cwLabel,
+                    overflow = packed.overflowPerCol[idx],
+                    lang = lang,
+                    edge = edge,
+                    dividerColor = dividerColor,
+                    gridColor = gridColor,
+                    labelColor = labelColor,
+                    secondaryText = secondaryText,
+                    todayColor = todayColor,
+                    onClick = { onDayClick(day) },
+                    onLongClick = { onDayLongPress(day) },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
+        }
+
+        packed.bars.forEach { bar ->
+            val past = dimPast && bar.event.endDate.isBefore(now)
+            EventBar(bar = bar, cellW = cellW, dimmed = past, onClick = { onEventClick(bar.event) })
+        }
+
+        if (boundaryCol != null) {
+            Box(
+                Modifier
+                    .offset(x = cellW * boundaryCol)
+                    .width(1.5.dp)
+                    .fillMaxHeight()
+                    .background(dividerColor),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EventBar(bar: PlacedBar, cellW: Dp, dimmed: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .offset(
+                x = cellW * bar.startCol + 1.dp,
+                y = DAY_NUM_H + (LANE_H + LANE_SPACE) * bar.lane,
+            )
+            .width(cellW * bar.span - 2.dp)
+            .height(LANE_H)
+            .alpha(if (dimmed) 0.45f else 1f)
+            .clip(RoundedCornerShape(3.dp))
+            .background(bar.color)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        EventLabel(
+            event = bar.event,
+            color = bar.textColor,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DayCellBackground(
+    day: LocalDate,
+    isToday: Boolean,
+    isMonday: Boolean,
+    weekNumber: Int,
+    cwLabel: String,
+    overflow: Int,
+    lang: String,
+    edge: DividerEdge,
+    dividerColor: Color,
+    gridColor: Color,
+    labelColor: Color,
+    secondaryText: Color,
+    todayColor: Color,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isFirst = day.dayOfMonth == 1
+    val onBg = MaterialTheme.colorScheme.onBackground
+
+    Box(
+        modifier = modifier
+            .drawBehind {
+                val gridW = 0.5.dp.toPx()
+                val divW = 1.5.dp.toPx()
+                if (edge == DividerEdge.TOP) {
+                    drawLine(dividerColor, Offset(0f, 0f), Offset(size.width, 0f), divW)
+                } else {
+                    drawLine(gridColor, Offset(0f, 0f), Offset(size.width, 0f), gridW)
+                }
+                if (edge == DividerEdge.BOTTOM) {
+                    drawLine(dividerColor, Offset(0f, size.height), Offset(size.width, size.height), divW)
+                }
+                drawLine(gridColor, Offset(size.width, 0f), Offset(size.width, size.height), gridW)
+            }
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 1.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(DAY_NUM_H).padding(top = 3.dp),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isFirst) {
+                Text(
+                    day.month.getDisplayName(TextStyle.SHORT, com.scarriffle.calendarr.ui.L10n.locale(lang)).uppercase(),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = labelColor,
+                    modifier = Modifier.padding(end = 2.dp),
+                )
+            }
+            Box(contentAlignment = Alignment.Center) {
+                if (isToday) {
+                    Box(Modifier.height(18.dp).width(18.dp).clip(RoundedCornerShape(9.dp)).background(todayColor))
+                }
+                Text(
+                    "${day.dayOfMonth}",
+                    fontSize = 11.sp,
+                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isToday) todayColor.contrastingTextColor() else onBg,
+                )
+            }
+        }
+        if (overflow > 0) {
+            Text(
+                "+$overflow",
+                fontSize = 8.sp,
+                color = secondaryText,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 3.dp, bottom = 1.dp),
+            )
+        }
+        if (isMonday) {
+            Text(
+                "$cwLabel $weekNumber",
+                fontSize = 8.sp,
+                color = secondaryText,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 3.dp, bottom = 1.dp),
+            )
+        }
+    }
+}
+
+private fun startOfWeek(date: LocalDate, mondayFirst: Boolean): LocalDate {
+    val dow = date.dayOfWeek.value
+    val offset = if (mondayFirst) dow - 1 else dow % 7
+    return date.minusDays(offset.toLong())
+}
+
+/** Columns [startCol, startCol+span-1] this event occupies within the given week. */
+private fun columnRange(weekStart: LocalDate, ev: CalEvent): Pair<Int, Int> {
+    val weekEnd = weekStart.plusDays(7)
+    val evStartDay = maxOf(localDate(ev.startDate), weekStart)
+    val lastDay = localDate(ev.endDate.minusSeconds(1))
+    val evEndDay = minOf(lastDay, weekEnd.minusDays(1))
+    val sc = ChronoUnit.DAYS.between(weekStart, evStartDay).toInt().coerceIn(0, 6)
+    val ec = ChronoUnit.DAYS.between(weekStart, evEndDay).toInt().coerceIn(0, 6)
+    return sc to (ec - sc + 1).coerceAtLeast(1)
+}
+
+/** Greedy first-fit lane packing (mirrors iOS packEvents); colours resolved here. */
+private fun packEvents(weekStart: LocalDate, weekEvents: List<CalEvent>): WeekLayout {
+    val sorted = weekEvents.sortedWith(compareBy<CalEvent> { it.startDate }.thenByDescending { it.endDate })
+    val laneLastEnd = ArrayList<Int>()
+    val bars = ArrayList<PlacedBar>()
+    val overflow = IntArray(7)
+    for (ev in sorted) {
+        val (sc, span) = columnRange(weekStart, ev)
+        val lastCol = (sc + span - 1).coerceAtMost(6)
+        var assigned = -1
+        for (i in laneLastEnd.indices) {
+            if (laneLastEnd[i] < sc) { laneLastEnd[i] = lastCol; assigned = i; break }
+        }
+        if (assigned == -1 && laneLastEnd.size < MAX_LANES) {
+            laneLastEnd.add(lastCol); assigned = laneLastEnd.size - 1
+        }
+        if (assigned >= 0) {
+            val color = colorFromHex(ev.effectiveColor)
+            bars.add(PlacedBar(ev, assigned, sc, span, color, color.contrastingTextColor()))
+        } else {
+            for (c in sc..lastCol) overflow[c]++
+        }
+    }
+    return WeekLayout(bars, overflow)
+}
+
+/** Bucket events into every week (week-start key) they overlap. */
+private fun buildEventsByWeek(events: List<CalEvent>, mondayFirst: Boolean): Map<LocalDate, List<CalEvent>> {
+    val map = HashMap<LocalDate, MutableList<CalEvent>>()
+    for (ev in events) {
+        val startD = localDate(ev.startDate)
+        val firstWeek = startOfWeek(startD, mondayFirst)
+        val lastDay = localDate(ev.endDate.minusSeconds(1)).let { if (it.isBefore(startD)) startD else it }
+        val lastWeek = startOfWeek(lastDay, mondayFirst)
+        var w = firstWeek
+        var guard = 0
+        while (!w.isAfter(lastWeek) && guard < 120) {
+            map.getOrPut(w) { mutableListOf() }.add(ev)
+            w = w.plusWeeks(1)
+            guard++
+        }
+    }
+    return map
+}

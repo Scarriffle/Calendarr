@@ -1,0 +1,20 @@
+<resources>
+    <color name="splash_bg">#000000</color>
+    <color name="ic_launcher_background">#16703D</color>
+
+    <style name="Theme.Calendarr" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Black window/system bars (matches the app background). -->
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- System splash (core-splashscreen): plain black with an invisible icon,
+         so the only branded screen the user sees is the in-app splash. -->
+    <style name="Theme.Calendarr.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@android:color/black</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_transparent</item>
+        <item name="postSplashScreenTheme">@style/Theme.Calendarr</item>
+    </style>
+</resources>

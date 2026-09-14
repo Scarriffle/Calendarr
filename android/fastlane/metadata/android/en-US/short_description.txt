@@ -1,0 +1,1 @@
+Calendar client for your self-hosted Calendarr server

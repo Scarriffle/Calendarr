@@ -1,0 +1,5 @@
+* Pro-Einstellung-Synchronisierung mit einheitlicher Einstellungstabelle
+* Neue linke Seitenleiste: Kalender ein-/ausblenden & sortieren, Gruppenwechsel, Schnellmenü
+* Geburtstage aus den Kontakten importieren
+* Voll dynamische Theme-Farben (8 einstellbare Farben mit Reset)
+* Fix: mehrtägige Ganztags-Termine werden in Wochen-/Tagesansicht durchgehend dargestellt
