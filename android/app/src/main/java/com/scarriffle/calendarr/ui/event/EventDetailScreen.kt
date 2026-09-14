@@ -1,6 +1,8 @@
 package com.scarriffle.calendarr.ui.event
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,8 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -51,6 +58,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.scarriffle.calendarr.domain.model.CalEvent
+import com.scarriffle.calendarr.domain.model.EventAttachment
 import com.scarriffle.calendarr.ui.LocalLang
 import com.scarriffle.calendarr.ui.calendar.eventDateRange
 import com.scarriffle.calendarr.ui.tr
@@ -66,6 +74,9 @@ fun EventDetailScreen(
     onEdit: () -> Unit,
     onCopy: () -> Unit,
     onDelete: () -> Unit,
+    attachments: List<EventAttachment> = emptyList(),
+    attachmentThumbs: Map<Int, ImageBitmap> = emptyMap(),
+    onOpenAttachment: (EventAttachment) -> Unit = {},
 ) {
     val lang = LocalLang.current
     var confirmDelete by remember { mutableStateOf(false) }
@@ -118,6 +129,59 @@ fun EventDetailScreen(
                 }
                 if (event.isPrivate) DetailRow(Icons.Filled.Lock, tr("event.private"))
 
+                // Attachments exist on local events only; the payload carries
+                // just the count, so the list arrives once the screen is open.
+                if (event.source == "local" && event.attachmentCount > 0) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        tr("event.attachments"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    attachments.forEach { att ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenAttachment(att) }
+                                .padding(vertical = 8.dp),
+                        ) {
+                            val thumb = attachmentThumbs[att.id]
+                            if (thumb != null) {
+                                Image(
+                                    bitmap = thumb,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Filled.AttachFile,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(32.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                att.filename,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                formatAttachmentSize(att.sizeBytes),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(28.dp))
                 OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.ContentCopy, contentDescription = null)
@@ -165,4 +229,11 @@ private fun DetailRow(icon: ImageVector, text: String) {
         Spacer(Modifier.width(14.dp))
         Text(text, style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+/** Human-readable size, matching what the web and iOS show. */
+private fun formatAttachmentSize(bytes: Int): String = when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+    else -> String.format(java.util.Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
 }

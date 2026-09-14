@@ -18,6 +18,7 @@ import retrofit2.http.HTTP
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Streaming
 import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
@@ -85,6 +86,28 @@ interface CalendarrApi {
 
     @GET("api/local/calendars/{id}/export")
     suspend fun exportCalendar(@Path("id") id: Int): Response<ResponseBody>
+
+    // ---- Attachments ----
+    // Like the event endpoints, these return the raw body and are parsed by
+    // hand, mirroring the iOS client.
+
+    @GET("api/local/events/{uid}/attachments")
+    suspend fun listAttachments(@Path("uid") uid: String): Response<ResponseBody>
+
+    @Multipart
+    @POST("api/local/events/{uid}/attachments")
+    suspend fun uploadAttachment(@Path("uid") uid: String,
+                                 @Part part: MultipartBody.Part): Response<ResponseBody>
+
+    @Streaming
+    @GET("api/local/attachments/{id}")
+    suspend fun downloadAttachment(@Path("id") id: Int): Response<ResponseBody>
+
+    @GET("api/local/attachments/{id}/thumb")
+    suspend fun attachmentThumbnail(@Path("id") id: Int): Response<ResponseBody>
+
+    @DELETE("api/local/attachments/{id}")
+    suspend fun deleteAttachment(@Path("id") id: Int): Response<ResponseBody>
 
     // ---- Groups ----
 

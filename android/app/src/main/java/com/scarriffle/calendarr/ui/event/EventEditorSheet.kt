@@ -22,7 +22,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.IconButton
@@ -44,6 +47,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -52,7 +56,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.scarriffle.calendarr.domain.model.CalEvent
+import com.scarriffle.calendarr.domain.model.EventAttachment
 import com.scarriffle.calendarr.domain.model.ReminderOptions
+import com.scarriffle.calendarr.domain.model.StagedAttachment
 import com.scarriffle.calendarr.domain.model.WritableCalendar
 import com.scarriffle.calendarr.ui.L10n
 import com.scarriffle.calendarr.ui.LocalLang
@@ -79,7 +85,8 @@ fun EventEditorSheet(
     onDismiss: () -> Unit,
     defaultDurationMinutes: Int = 60,
     reminderDisabledKeys: Set<String> = emptySet(),
-    onSave: (WritableCalendar, String, Instant, Instant, Boolean, String, String, String?, Boolean, List<Int>) -> Unit,
+    existingAttachments: List<EventAttachment> = emptyList(),
+    onSave: (WritableCalendar, String, Instant, Instant, Boolean, String, String, String?, Boolean, List<Int>, List<StagedAttachment>, Set<Int>) -> Unit,
 ) {
     val zone = ZoneId.systemDefault()
     val context = LocalContext.current
@@ -126,6 +133,28 @@ fun EventEditorSheet(
     }
     var calendar by remember { mutableStateOf(preselected ?: writableCalendars.firstOrNull()) }
     var calMenuOpen by remember { mutableStateOf(false) }
+    // Files picked before the event exists are staged and uploaded after it is
+    // created; removals of existing ones are applied on save, so Cancel really
+    // does cancel.
+    var stagedAttachments by remember { mutableStateOf(emptyList<StagedAttachment>()) }
+    var removedAttachmentIds by remember { mutableStateOf(emptySet<Int>()) }
+    val attachmentSlotsUsed =
+        existingAttachments.count { it.id !in removedAttachmentIds } + stagedAttachments.size
+    val pickAttachment = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null && attachmentSlotsUsed < 10) {
+            // Read the bytes now: the content URI may not outlive this screen.
+            val bytes = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            }.getOrNull()
+            val name = queryDisplayName(context, uri) ?: "anhang"
+            val mime = context.contentResolver.getType(uri)
+            if (bytes != null && bytes.size <= 10 * 1024 * 1024) {
+                stagedAttachments = stagedAttachments + StagedAttachment(bytes, name, mime)
+            }
+        }
+    }
     var error by remember { mutableStateOf<String?>(null) }
 
     val dateFmt = DateTimeFormatter.ofPattern("EEE, d. MMM yyyy")
@@ -282,6 +311,42 @@ fun EventEditorSheet(
                     },
                 ) { Text(tr("event.reminder_add")) }
                 Spacer(Modifier.size(12.dp))
+
+                Text(tr("event.attachments"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                existingAttachments.filter { it.id !in removedAttachmentIds }.forEach { att ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.size(8.dp))
+                        Text(att.filename, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        androidx.compose.material3.IconButton(onClick = {
+                            removedAttachmentIds = removedAttachmentIds + att.id
+                        }) {
+                            Icon(Icons.Filled.Close, contentDescription = tr("common.delete"))
+                        }
+                    }
+                }
+                stagedAttachments.forEach { file ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.size(8.dp))
+                        Text(file.filename, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        androidx.compose.material3.IconButton(onClick = {
+                            stagedAttachments = stagedAttachments - file
+                        }) {
+                            Icon(Icons.Filled.Close, contentDescription = tr("common.delete"))
+                        }
+                    }
+                }
+                androidx.compose.material3.TextButton(
+                    enabled = attachmentSlotsUsed < 10,
+                    onClick = { pickAttachment.launch(ATTACHMENT_MIME_TYPES) },
+                ) { Text(tr("event.attachment_add")) }
+                Text(
+                    tr("event.attachment_hint"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.size(12.dp))
             }
 
             // Color
@@ -325,7 +390,9 @@ fun EventEditorSheet(
                         end = endDate.atTime(endTime).atZone(zone).toInstant()
                     }
                     val rem = if (cal.source == "local") reminders else emptyList()
-                    onSave(cal, title.trim(), start, end, allDay, location.trim(), description.trim(), color, isPrivate && cal.source == "local", rem)
+                    val staged = if (cal.source == "local") stagedAttachments else emptyList()
+                    val removed = if (cal.source == "local") removedAttachmentIds else emptySet()
+                    onSave(cal, title.trim(), start, end, allDay, location.trim(), description.trim(), color, isPrivate && cal.source == "local", rem, staged, removed)
                 },
                 enabled = writableCalendars.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
@@ -405,3 +472,21 @@ private fun ReminderRow(
         }
     }
 }
+
+/** Mirrors the server allowlist. "*/*" is deliberately absent — the picker
+ *  should not offer files the upload would reject. */
+private val ATTACHMENT_MIME_TYPES = arrayOf(
+    "application/pdf",
+    "image/png", "image/jpeg", "image/webp", "image/gif",
+    "text/plain", "text/markdown", "text/csv", "text/comma-separated-values",
+)
+
+/** The user-visible name behind a content URI; the last path segment is an
+ *  opaque id and would end up as the attachment's filename. */
+private fun queryDisplayName(context: android.content.Context, uri: android.net.Uri): String? =
+    runCatching {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
+        }
+    }.getOrNull()

@@ -1,5 +1,8 @@
 package com.scarriffle.calendarr.ui.calendar
 
+import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scarriffle.calendarr.data.CalendarRepository
@@ -7,9 +10,11 @@ import com.scarriffle.calendarr.data.SettingsStore
 import com.scarriffle.calendarr.data.SyncError
 import com.scarriffle.calendarr.domain.model.CalEvent
 import com.scarriffle.calendarr.domain.model.CalViewType
+import com.scarriffle.calendarr.domain.model.EventAttachment
 import com.scarriffle.calendarr.domain.model.Group
 import com.scarriffle.calendarr.domain.model.GroupMember
 import com.scarriffle.calendarr.domain.model.LocalCalendar
+import com.scarriffle.calendarr.domain.model.StagedAttachment
 import com.scarriffle.calendarr.domain.model.WritableCalendar
 import com.scarriffle.calendarr.util.Dates
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,9 +22,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -731,20 +738,25 @@ class CalendarViewModel @Inject constructor(
         color: String?,
         isPrivate: Boolean,
         reminders: List<Int> = emptyList(),
+        stagedAttachments: List<StagedAttachment> = emptyList(),
+        removedAttachmentIds: Set<Int> = emptySet(),
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             val result = runCatching {
                 if (existing != null && existing.source == calendar.source) {
                     when (existing.source) {
-                        "local" -> repository.updateLocalEvent(existing.id, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
+                        "local" -> {
+                            repository.updateLocalEvent(existing.id, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
+                            applyAttachmentChanges(existing.id, stagedAttachments, removedAttachmentIds)
+                        }
                         "caldav" -> repository.updateCalDAVEvent(existing.id, existing.url, calendar.numericId, title, start, end, isAllDay, location, description, color)
                         "homeassistant" -> repository.updateHAEvent(calendar.numericId, existing.id, title, start, end, isAllDay, location, description)
                         "google" -> repository.updateGoogleEvent(calendar.numericId, existing.id, title, start, end, isAllDay, location, description)
-                        else -> createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
+                        else -> createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate, reminders, stagedAttachments)
                     }
                 } else {
-                    createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
+                    createForSource(calendar, title, start, end, isAllDay, location, description, color, isPrivate, reminders, stagedAttachments)
                 }
             }
             result.onSuccess { afterMutation(); onResult(null) }
@@ -756,12 +768,70 @@ class CalendarViewModel @Inject constructor(
         calendar: WritableCalendar, title: String, start: Instant, end: Instant,
         isAllDay: Boolean, location: String, description: String, color: String?, isPrivate: Boolean,
         reminders: List<Int> = emptyList(),
+        stagedAttachments: List<StagedAttachment> = emptyList(),
     ) {
         when (calendar.source) {
-            "local" -> repository.createLocalEvent(calendar.numericId, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
+            "local" -> {
+                // Only now does a uid exist to attach the staged files to.
+                val uid = repository.createLocalEvent(calendar.numericId, title, start, end, isAllDay, location, description, color, isPrivate, reminders)
+                if (uid != null) applyAttachmentChanges(uid, stagedAttachments, emptySet())
+            }
             "caldav" -> repository.createCalDAVEvent(calendar.numericId, title, start, end, isAllDay, location, description, color)
             "google" -> repository.createGoogleEvent(calendar.numericId, title, start, end, isAllDay, location, description)
             "homeassistant" -> repository.createHAEvent(calendar.numericId, title, start, end, isAllDay, location, description)
+        }
+    }
+
+    // ---- Attachments ----
+    // The event payload carries only a count, so the list is fetched when the
+    // detail screen opens. Thumbnails are small server-rendered JPEGs, decoded
+    // here rather than pulling in an image-loading dependency for them.
+
+    private val _attachments = MutableStateFlow<List<EventAttachment>>(emptyList())
+    val attachments: StateFlow<List<EventAttachment>> = _attachments.asStateFlow()
+
+    private val _attachmentThumbs = MutableStateFlow<Map<Int, ImageBitmap>>(emptyMap())
+    val attachmentThumbs: StateFlow<Map<Int, ImageBitmap>> = _attachmentThumbs.asStateFlow()
+
+    fun loadAttachments(event: CalEvent) {
+        clearAttachments()
+        if (event.source != "local" || event.attachmentCount <= 0) return
+        viewModelScope.launch {
+            val loaded = runCatching { repository.listAttachments(event.id) }.getOrDefault(emptyList())
+            _attachments.value = loaded
+            val thumbs = mutableMapOf<Int, ImageBitmap>()
+            for (att in loaded.filter { it.hasThumbnail }) {
+                val bytes = repository.attachmentThumbnail(att.id) ?: continue
+                val bitmap = withContext(Dispatchers.IO) {
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                } ?: continue
+                thumbs[att.id] = bitmap.asImageBitmap()
+            }
+            _attachmentThumbs.value = thumbs
+        }
+    }
+
+    /** Applied after the event itself was saved; a failure leaves the event. */
+    private suspend fun applyAttachmentChanges(
+        uid: String,
+        staged: List<StagedAttachment>,
+        removedIds: Set<Int>,
+    ) {
+        for (id in removedIds) runCatching { repository.deleteAttachment(id) }
+        for (file in staged) {
+            runCatching { repository.uploadAttachment(uid, file.bytes, file.filename, file.mimeType) }
+        }
+    }
+
+    fun clearAttachments() {
+        _attachments.value = emptyList()
+        _attachmentThumbs.value = emptyMap()
+    }
+
+    /** Download the bytes and hand them to the caller (which writes them via SAF). */
+    fun downloadAttachment(att: EventAttachment, onReady: (ByteArray) -> Unit) {
+        viewModelScope.launch {
+            runCatching { repository.downloadAttachment(att.id) }.onSuccess(onReady)
         }
     }
 

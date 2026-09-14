@@ -11,6 +11,7 @@ import com.scarriffle.calendarr.data.remote.jsonBody
 import com.scarriffle.calendarr.domain.model.AppSettings
 import com.scarriffle.calendarr.domain.model.CalDAVAccount
 import com.scarriffle.calendarr.domain.model.CalEvent
+import com.scarriffle.calendarr.domain.model.EventAttachment
 import com.scarriffle.calendarr.domain.model.CalendarShareEntry
 import com.scarriffle.calendarr.domain.model.DirectoryUser
 import com.scarriffle.calendarr.domain.model.Group
@@ -27,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import retrofit2.HttpException
 import java.time.Instant
@@ -437,9 +439,13 @@ class CalendarRepository @Inject constructor(
         isAllDay: Boolean, location: String, description: String, color: String?,
         isPrivate: Boolean = false, reminders: List<Int>? = null,
         rrule: String? = null, birthYear: Int? = null, externalUid: String? = null,
-    ) = guarded {
-        api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate, reminders, rrule, birthYear, externalUid))
-            .ensureSuccess()
+    ): String? = guarded {
+        val resp = api.createLocalEvent(eventBody(calendarId, title, start, end, isAllDay, location, description, color, isPrivate, reminders, rrule, birthYear, externalUid))
+        resp.ensureSuccess()
+        // The response is the full event dict; its "id" is the uid attachments
+        // are addressed by. Callers that don't need it simply ignore it.
+        runCatching { JSONObject(resp.body()?.string() ?: "{}").optString("id").ifBlank { null } }
+            .getOrNull()
     }
 
     suspend fun updateLocalEvent(
@@ -502,6 +508,50 @@ class CalendarRepository @Inject constructor(
         val body = bytes.toRequestBody("text/calendar".toMediaTypeOrNull())
         val part = okhttp3.MultipartBody.Part.createFormData("file", filename, body)
         return importIcs(calendarId, part)
+    }
+
+    // ---- Attachments ----
+
+    suspend fun listAttachments(uid: String): List<EventAttachment> = guarded {
+        val resp = api.listAttachments(uid)
+        resp.ensureSuccess()
+        val arr = JSONArray(resp.body()?.string() ?: "[]")
+        buildList {
+            for (i in 0 until arr.length()) {
+                arr.optJSONObject(i)?.let { EventAttachment.fromJson(it)?.let(::add) }
+            }
+        }
+    }
+
+    /** Upload one file. The server sniffs the bytes, so the media type here is
+     *  only about forming a valid multipart part. */
+    suspend fun uploadAttachment(uid: String, bytes: ByteArray, filename: String,
+                                 mimeType: String?): EventAttachment = guarded {
+        val body = bytes.toRequestBody((mimeType ?: "application/octet-stream").toMediaTypeOrNull())
+        val part = okhttp3.MultipartBody.Part.createFormData("file", filename, body)
+        val resp = api.uploadAttachment(uid, part)
+        resp.ensureSuccess()
+        EventAttachment.fromJson(JSONObject(resp.body()?.string() ?: "{}"))
+            ?: error("Unerwartete Antwort")
+    }
+
+    suspend fun downloadAttachment(id: Int): ByteArray = guarded {
+        val resp = api.downloadAttachment(id)
+        resp.ensureSuccess()
+        resp.body()?.bytes() ?: ByteArray(0)
+    }
+
+    /** Thumbnail bytes, or null when there is none — a missing preview just
+     *  means the row shows its type icon. */
+    suspend fun attachmentThumbnail(id: Int): ByteArray? = try {
+        val resp = api.attachmentThumbnail(id)
+        if (resp.isSuccessful) resp.body()?.bytes() else null
+    } catch (e: Exception) {
+        null
+    }
+
+    suspend fun deleteAttachment(id: Int): Unit = guarded {
+        api.deleteAttachment(id).ensureSuccess()
     }
 
     suspend fun exportIcs(calendarId: Int): ByteArray = guarded {

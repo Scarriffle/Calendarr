@@ -52,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -156,6 +157,19 @@ fun CalendarScreen(
 
     var viewMenuOpen by remember { mutableStateOf(false) }
     var detailEvent by remember { mutableStateOf<CalEvent?>(null) }
+    // Downloading an attachment is two steps, like the .ics export: fetch the
+    // bytes, then let the user choose where to put them. Going through SAF
+    // means no FileProvider entry and no storage permission.
+    var pendingAttachment by remember { mutableStateOf<ByteArray?>(null) }
+    val saveAttachment = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("*/*")
+    ) { uri ->
+        val bytes = pendingAttachment
+        pendingAttachment = null
+        if (uri != null && bytes != null) {
+            runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } }
+        }
+    }
     var editor by remember { mutableStateOf<EditorRequest?>(null) }
     var overlay by remember { mutableStateOf(Overlay.NONE) }
     var dayPreview by remember { mutableStateOf<LocalDate?>(null) }
@@ -328,9 +342,23 @@ fun CalendarScreen(
     ) {
         val ev = lastDetail
         if (ev != null) {
+            val attachments by vm.attachments.collectAsState()
+            val attachmentThumbs by vm.attachmentThumbs.collectAsState()
+            LaunchedEffect(ev.id) { vm.loadAttachments(ev) }
             EventDetailScreen(
                 event = ev,
                 currentUserId = vm.currentUserId,
+                attachments = attachments,
+                attachmentThumbs = attachmentThumbs,
+                onOpenAttachment = { att ->
+                    // Fetch the bytes, then let the user pick where to save
+                    // them — the same two-step the .ics export already uses,
+                    // which needs no FileProvider entry in the manifest.
+                    vm.downloadAttachment(att) { bytes ->
+                        pendingAttachment = bytes
+                        saveAttachment.launch(att.filename)
+                    }
+                },
                 onClose = { detailEvent = null },
                 onEdit = {
                     detailEvent = null
@@ -349,14 +377,19 @@ fun CalendarScreen(
     }
 
     editor?.let { req ->
+        // The editor needs the event's current attachments to offer removing
+        // them; loading is the same call the detail screen makes.
+        LaunchedEffect(req.existing?.id) { req.existing?.let { vm.loadAttachments(it) } }
+        val editorAttachments by vm.attachments.collectAsState()
         EventEditorSheet(
             request = req,
             writableCalendars = state.writableCalendars,
+            existingAttachments = if (req.existing?.source == "local") editorAttachments else emptyList(),
             onDismiss = { editor = null },
             defaultDurationMinutes = vm.defaultEventDurationMinutes,
             reminderDisabledKeys = state.reminderDisabledKeys,
-            onSave = { cal, title, start, end, allDay, location, desc, color, isPrivate, reminders ->
-                vm.saveEvent(cal, req.existing, title, start, end, allDay, location, desc, color, isPrivate, reminders) { error ->
+            onSave = { cal, title, start, end, allDay, location, desc, color, isPrivate, reminders, staged, removed ->
+                vm.saveEvent(cal, req.existing, title, start, end, allDay, location, desc, color, isPrivate, reminders, staged, removed) { error ->
                     if (error == null) editor = null
                 }
             },
