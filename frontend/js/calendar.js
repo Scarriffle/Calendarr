@@ -153,9 +153,11 @@ export async function initCalendar() {
   // initial fetchAndRender) so a reload reopens settings instead of stripping it.
   uiSettingsOpen = urlState.settings === true;
 
-  setLang(settings.language || 'de');
-  applyTheme(settings);
-  applyFavicon(settings.primary_color);
+  // state.settings, not the raw server response: for any key whose sync flag
+  // is off the effective value is this browser's local one, and using the raw
+  // value here silently ignored it (and clobbered the setLang above).
+  applyTheme(state.settings);
+  applyFavicon(state.settings.primary_color);
   updateViewButtons();
   renderCalendarList();
   renderMiniCal();
