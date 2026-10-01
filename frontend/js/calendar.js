@@ -3761,8 +3761,13 @@ function settingRowHtml(def) {
     valueHtml = `<button type="button" class="sync-toggle ${val ? 'on' : ''}" data-vtoggle="${def.key}" role="switch" aria-checked="${!!val}"></button>`;
   } else if (def.type === 'color') {
     const hex = normalizeHex(val, baseColor(def.key));
+    // No own value means the row inherits the admin instance default. The
+    // field still shows that colour, but saving must send null — writing the
+    // hex back would freeze today's admin default into the user's row and
+    // later admin changes would stop reaching them.
+    const inherits = val == null ? ' data-inherit="1"' : '';
     valueHtml = `<div class="settings-color-ctl">
-      <input type="text" class="ev-color-hex" data-shex="${def.key}" maxlength="7" spellcheck="false" value="${hex}" />
+      <input type="text" class="ev-color-hex" data-shex="${def.key}" maxlength="7" spellcheck="false" value="${hex}"${inherits} />
       <div class="ev-color-preview" data-sprev="${def.key}" style="background:${hex}" title="${escHtml(t('color_pick'))}"></div>
       <button type="button" class="icon-btn ev-color-reset" data-sreset="${def.key}" title="${escHtml(t('reset'))}">${RESET_ICON_SVG}</button>
     </div>`;
@@ -3817,20 +3822,23 @@ function wireSettingRow(def) {
       state.settings[def.key] = color;
       applyTheme(state.settings);
     };
+    const own = () => { delete hex.dataset.inherit; };
     prev.addEventListener('click', async () => {
       const picked = await openColorPicker(prev, hex.value || baseColor(def.key));
-      if (picked) { hex.value = picked.toUpperCase(); apply(picked); }
+      if (picked) { hex.value = picked.toUpperCase(); own(); apply(picked); }
     });
     hex.addEventListener('input', () => {
       const norm = normalizeHex(hex.value, null);
-      if (norm) apply(norm);
+      if (norm) { own(); apply(norm); }
     });
     hex.addEventListener('change', () => {
       const norm = normalizeHex(hex.value, baseColor(def.key));
-      hex.value = norm; apply(norm);
+      hex.value = norm; own(); apply(norm);
     });
     reset.addEventListener('click', () => {
+      // Back to inheriting, not "copy the current admin default in".
       const d = baseColor(def.key);
+      hex.dataset.inherit = '1';
       hex.value = d; apply(d);
     });
   } else if (def.type === 'icon') {
@@ -3860,7 +3868,9 @@ function readAppearanceTable() {
       out[def.key] = el ? el.classList.contains('on') : !!state.settings[def.key];
     } else if (def.type === 'color') {
       const el = document.querySelector(`[data-shex="${def.key}"]`);
-      out[def.key] = normalizeHex(el && el.value, baseColor(def.key));
+      out[def.key] = (el && el.dataset.inherit === '1')
+        ? null                                   // inherit the admin default
+        : normalizeHex(el && el.value, baseColor(def.key));
     } else if (def.type === 'icon') {
       const on = document.querySelector(`[data-sicon="${def.key}"] .group-icon-opt.on`);
       out[def.key] = on ? on.dataset.shareIcon : (state.settings[def.key] || 'share');

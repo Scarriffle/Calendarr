@@ -108,8 +108,10 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "line_contrast": s.line_contrast or 3,
         "hour_height": s.hour_height or 60,
         "language": s.language or "de",
-        "month_divider_color": s.month_divider_color or "#7090c0",
-        "month_label_color": s.month_label_color or "#7090c0",
+        # NULL stays NULL: the client resolves it against the admin instance
+        # default. Substituting a colour here would hide the inheritance.
+        "month_divider_color": s.month_divider_color,
+        "month_label_color": s.month_label_color,
         "text_color": s.text_color,
         "line_color": s.line_color,
         "bg_color":   s.bg_color,
@@ -186,7 +188,7 @@ def update_settings(
     # For these three override colours, an explicit null is meaningful
     # ("reset to default") and must be persisted as NULL. All other fields
     # keep the previous behaviour where a null/missing value is ignored.
-    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "surface_color", "hover_highlight_color", "icon_inactive_color", "icon_active_color", "day_hover_color", "day_selected_color", "day_bg_color", "today_bg_color", "group_visible_calendar_id", "default_reminder_minutes", "default_event_duration_minutes", "share_calendar_icon"}
+    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "surface_color", "hover_highlight_color", "icon_inactive_color", "icon_active_color", "day_hover_color", "day_selected_color", "day_bg_color", "today_bg_color", "group_visible_calendar_id", "default_reminder_minutes", "default_event_duration_minutes", "share_calendar_icon", "primary_color", "accent_color", "today_color", "month_divider_color", "month_label_color"}
     update_data = data.model_dump(exclude_unset=True)
 
     # Merge sync-flag overrides into the stored account-wide JSON map. Only known

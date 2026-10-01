@@ -95,16 +95,19 @@ class UserSettings(Base):
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     default_view = Column(String(20), default="month")
     week_start_day = Column(String(10), default="monday")
-    primary_color = Column(String(7), default="#4285f4")
-    accent_color = Column(String(7), default="#ea4335")
-    today_color = Column(String(7), default="#4285f4")
+    # NULL = inherit the admin instance default (see admin_router). A baked-in
+    # column default would mean every user always *has* an own colour, so the
+    # instance default could never apply — which is exactly what happened.
+    primary_color = Column(String(7), nullable=True)
+    accent_color = Column(String(7), nullable=True)
+    today_color = Column(String(7), nullable=True)
     dim_past_events = Column(Boolean, default=False)
     text_contrast = Column(Integer, default=3)
     line_contrast = Column(Integer, default=3)
     hour_height = Column(Integer, default=60)
     language = Column(String(5), default="de")
-    month_divider_color = Column(String(7), default="#7090c0")
-    month_label_color = Column(String(7), default="#7090c0")
+    month_divider_color = Column(String(7), nullable=True)  # NULL = inherit
+    month_label_color = Column(String(7), nullable=True)    # NULL = inherit
     text_color = Column(String(7), nullable=True)   # Override für --text-1 (NULL = nutze text_contrast)
     line_color = Column(String(7), nullable=True)   # Override für --border  (NULL = nutze line_contrast)
     bg_color   = Column(String(7), nullable=True)   # Override für --bg-app  (NULL = Default)

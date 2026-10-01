@@ -383,6 +383,28 @@ def _migrate():
         except Exception:
             pass
 
+        # ── Theme inheritance ────────────────────────────────────────────
+        # These five colours used to carry a hardcoded column default, so every
+        # user row held a concrete value and the admin instance default could
+        # never apply. Clear the ones that still hold exactly that old default
+        # so they inherit again. A user who deliberately picked the same colour
+        # also inherits now — which is the same colour, until an admin changes
+        # the instance default.
+        for col, old_default in (("primary_color", "#4285f4"),
+                                 ("accent_color", "#ea4335"),
+                                 ("today_color", "#4285f4"),
+                                 ("month_divider_color", "#7090c0"),
+                                 ("month_label_color", "#7090c0")):
+            try:
+                conn.execute(text(
+                    f"UPDATE user_settings SET {col} = NULL "
+                    f"WHERE lower({col}) = lower(:old)"
+                ), {"old": old_default})
+                conn.commit()
+            except Exception:
+                pass
+
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None,
