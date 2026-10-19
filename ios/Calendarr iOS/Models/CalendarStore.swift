@@ -68,6 +68,10 @@ class CalendarStore {
     var syncErrors: [SyncError] = []
     var weekStartsOnMonday = true
     var writableCalendars: [WritableCalendar] = []
+    /// Why a source contributed nothing, keyed by source name. Empty when every
+    /// source answered. Surfaced in the event editor, because an empty picker
+    /// with no explanation is indistinguishable from "you own no calendars".
+    var writableCalendarErrors: [String: String] = [:]
     // When set, the calendar shows the group's combined overlay instead of the
     // user's own events. nil = personal view.
     var activeGroup: CalGroup? = nil
@@ -634,29 +638,53 @@ class CalendarStore {
     // MARK: – Writable calendars
 
     func loadWritableCalendars(api: CalendarrAPI) async {
-        async let localCals  = (try? await api.getLocalCalendars()) ?? []
-        async let caldavAccs = (try? await api.getCalDAVAccounts()) ?? []
-        async let googleCals = (try? await api.getGoogleCalendars()) ?? []
-        async let haCals     = (try? await api.getHACalendars()) ?? []
+        // Each source is fetched independently and reports its own failure.
+        // `try?` used to discard all four, so a source that errored looked
+        // exactly like a source with nothing in it — which is how a missing
+        // Home Assistant calendar can go unexplained for a long time.
+        var errors: [String: String] = [:]
+
+        async let localResult  = Self.attempt("local")        { try await api.getLocalCalendars() }
+        async let caldavResult = Self.attempt("caldav")       { try await api.getCalDAVAccounts() }
+        async let googleResult = Self.attempt("google")       { try await api.getGoogleCalendars() }
+        async let haResult     = Self.attempt("homeassistant"){ try await api.getHACalendars() }
+
+        let (localCals, localErr)   = await localResult
+        let (caldavAccs, caldavErr) = await caldavResult
+        let (googleCals, googleErr) = await googleResult
+        let (haCals, haErr)         = await haResult
+        for (source, message) in [("local", localErr), ("caldav", caldavErr),
+                                  ("google", googleErr), ("homeassistant", haErr)] {
+            if let message { errors[source] = message }
+        }
 
         var result: [WritableCalendar] = []
         // Skip read-only shared calendars — offering them in the event editor
         // only leads to a 403 on save. Own + read_write (incl. group) stay.
-        for cal in await localCals where cal.owned || cal.permission == "read_write" {
+        for cal in localCals where cal.owned || cal.permission == "read_write" {
             result.append(WritableCalendar(id: "local-\(cal.id)", name: cal.name, color: cal.color, source: "local", numericId: cal.id))
         }
-        for acc in await caldavAccs where acc.enabled {
+        for acc in caldavAccs where acc.enabled {
             for cal in acc.calendars ?? [] where cal.enabled {
                 result.append(WritableCalendar(id: "caldav-\(cal.id)", name: "\(acc.name) – \(cal.name)", color: cal.color ?? acc.color, source: "caldav", numericId: cal.id))
             }
         }
-        for (email, id, name, color) in await googleCals {
+        for (email, id, name, color) in googleCals {
             result.append(WritableCalendar(id: "google-\(id)", name: "\(email) – \(name)", color: color, source: "google", numericId: id))
         }
-        for (accName, id, name, color) in await haCals {
+        for (accName, id, name, color) in haCals {
             result.append(WritableCalendar(id: "ha-\(id)", name: "\(accName) – \(name)", color: color, source: "homeassistant", numericId: id))
         }
         writableCalendars = result
+        writableCalendarErrors = errors
+    }
+
+    /// Run one source fetch, returning its result or the reason it produced
+    /// nothing. Never throws: one broken source must not empty the picker.
+    private static func attempt<T>(_ source: String,
+                                   _ work: () async throws -> [T]) async -> ([T], String?) {
+        do { return (try await work(), nil) }
+        catch { return ([], error.localizedDescription) }
     }
 
     // MARK: – Query helpers

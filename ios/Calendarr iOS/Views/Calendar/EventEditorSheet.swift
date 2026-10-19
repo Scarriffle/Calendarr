@@ -35,6 +35,18 @@ struct EventEditorSheet: View {
     private var isEditing: Bool { editingEvent != nil }
     private var isCopying: Bool { copyFrom != nil && editingEvent == nil }
 
+    /// Sources that failed to answer, named instead of silently leaving their
+    /// calendars out of the picker.
+    @ViewBuilder
+    private var sourceErrorRows: some View {
+        let failures = store.writableCalendarErrors.sorted { $0.key < $1.key }
+        ForEach(failures, id: \.key) { failure in
+            Label("\(failure.key): \(failure.value)", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .font(.caption)
+        }
+    }
+
     private var selectedCal: WritableCalendar? {
         store.writableCalendars.first { $0.id == selectedCalendarId }
     }
@@ -80,7 +92,9 @@ struct EventEditorSheet: View {
                         Text(L10n.t("event.no_writable", appLang))
                             .foregroundStyle(.secondary)
                             .font(.callout)
-                    } else {
+                    }
+                    sourceErrorRows
+                    if !store.writableCalendars.isEmpty {
                         Picker(L10n.t("event.calendar_picker", appLang), selection: $selectedCalendarId) {
                             ForEach(store.writableCalendars) { cal in
                                 HStack {
@@ -122,7 +136,7 @@ struct EventEditorSheet: View {
                     }
                     .disabled(remindersDisabled)
 
-                    Section(L10n.t("event.attachments", appLang)) {
+                    Section {
                         ForEach(existingAttachments.filter { !removedAttachmentIds.contains($0.id) }) { att in
                             HStack {
                                 Image(systemName: att.symbolName).foregroundStyle(.secondary)
@@ -156,6 +170,8 @@ struct EventEditorSheet: View {
                             Label(L10n.t("event.attachment_add", appLang), systemImage: "paperclip")
                         }
                         .disabled(attachmentSlotsUsed >= 10)
+                    } header: {
+                        Text(L10n.t("event.attachments", appLang))
                     } footer: {
                         Text(L10n.t("event.attachment_hint", appLang))
                     }
