@@ -111,6 +111,16 @@ struct CalDAVCalendar: Codable, Identifiable {
         case sidebarHidden = "sidebar_hidden"
         case remindersEnabled = "reminders_enabled"
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id               = try c.decode(Int.self, forKey: .id)
+        name             = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        color            = try c.decodeIfPresent(String.self, forKey: .color)
+        enabled          = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        sidebarHidden    = try c.decodeIfPresent(Bool.self, forKey: .sidebarHidden) ?? false
+        remindersEnabled = try c.decodeIfPresent(Bool.self, forKey: .remindersEnabled)
+    }
 }
 
 struct LocalCalendar: Codable, Identifiable {
@@ -161,12 +171,27 @@ struct ICalSubscription: Codable, Identifiable {
     var refreshMinutes: Int
     var lastFetched: String?
     var remindersEnabled: Bool?
+    var sidebarHidden: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case id, name, url, color, enabled
         case refreshMinutes = "refresh_minutes"
         case lastFetched = "last_fetched"
         case remindersEnabled = "reminders_enabled"
+        case sidebarHidden = "sidebar_hidden"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id               = try c.decode(Int.self, forKey: .id)
+        name             = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        url              = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
+        color            = try c.decodeIfPresent(String.self, forKey: .color) ?? "#4285f4"
+        enabled          = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        refreshMinutes   = try c.decodeIfPresent(Int.self, forKey: .refreshMinutes) ?? 60
+        lastFetched      = try c.decodeIfPresent(String.self, forKey: .lastFetched)
+        remindersEnabled = try c.decodeIfPresent(Bool.self, forKey: .remindersEnabled)
+        sidebarHidden    = try c.decodeIfPresent(Bool.self, forKey: .sidebarHidden) ?? false
     }
 }
 
@@ -189,6 +214,16 @@ struct GoogleCalendar: Codable, Identifiable {
         case sidebarHidden = "sidebar_hidden"
         case remindersEnabled = "reminders_enabled"
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id               = try c.decode(Int.self, forKey: .id)
+        name             = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        color            = try c.decodeIfPresent(String.self, forKey: .color)
+        enabled          = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        sidebarHidden    = try c.decodeIfPresent(Bool.self, forKey: .sidebarHidden) ?? false
+        remindersEnabled = try c.decodeIfPresent(Bool.self, forKey: .remindersEnabled)
+    }
 }
 
 struct HomeAssistantAccount: Codable, Identifiable {
@@ -201,6 +236,15 @@ struct HomeAssistantAccount: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, name, url, calendars
         case authMethod = "auth_method"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id         = try c.decode(Int.self, forKey: .id)
+        name       = try c.decodeIfPresent(String.self, forKey: .name) ?? "Home Assistant"
+        url        = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
+        authMethod = try c.decodeIfPresent(String.self, forKey: .authMethod) ?? "token"
+        calendars  = try c.decodeIfPresent([HACalendar].self, forKey: .calendars)
     }
 }
 

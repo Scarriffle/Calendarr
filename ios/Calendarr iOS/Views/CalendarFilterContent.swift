@@ -213,6 +213,7 @@ struct CalendarFilterContent: View {
         for acc in caldavAccounts { for cal in acc.calendars ?? [] { applyServerHidden("caldav", cal.id, cal.sidebarHidden) } }
         for acc in googleAccounts { for cal in acc.calendars ?? [] { applyServerHidden("google", cal.id, cal.sidebarHidden) } }
         for acc in haAccounts     { for cal in acc.calendars ?? [] { applyServerHidden("homeassistant", cal.id, cal.sidebarHidden) } }
+        for sub in icalSubs       { applyServerHidden("ical", sub.id, sub.sidebarHidden) }
         store.setBanishedCalendars(b)
         banished = b
 

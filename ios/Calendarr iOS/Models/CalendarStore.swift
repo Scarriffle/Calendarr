@@ -287,7 +287,8 @@ class CalendarStore {
         async let c = (try? await api.getCalDAVAccounts()) ?? []
         async let g = (try? await api.getGoogleAccounts()) ?? []
         async let h = (try? await api.getHomeAssistantAccounts()) ?? []
-        let (caldav, google, ha) = await (c, g, h)
+        async let i = (try? await api.getICalSubscriptions()) ?? []
+        let (caldav, google, ha, ical) = await (c, g, h, i)
 
         var b = banishedCalendarKeys
         func applyServerHidden(_ source: String, _ id: Int, _ hidden: Bool) {
@@ -297,6 +298,7 @@ class CalendarStore {
         for acc in caldav { for cal in acc.calendars ?? [] { applyServerHidden("caldav", cal.id, cal.sidebarHidden) } }
         for acc in google { for cal in acc.calendars ?? [] { applyServerHidden("google", cal.id, cal.sidebarHidden) } }
         for acc in ha     { for cal in acc.calendars ?? [] { applyServerHidden("homeassistant", cal.id, cal.sidebarHidden) } }
+        for sub in ical   { applyServerHidden("ical", sub.id, sub.sidebarHidden) }
 
         guard b != banishedCalendarKeys else { return false }
         banishedCalendarKeys = b
@@ -350,7 +352,7 @@ class CalendarStore {
     }
 
     /// Sources whose visibility is backed by the server's `sidebar_hidden`.
-    static let serverManagedSources: Set<String> = ["caldav", "google", "homeassistant"]
+    static let serverManagedSources: Set<String> = ["caldav", "google", "homeassistant", "ical"]
 
     var userCalendar: Calendar {
         var cal = Calendar.current
