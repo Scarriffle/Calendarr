@@ -19,7 +19,7 @@ Repo: https://git.scarriffle.com/Scarriffle/Calendarr-Android.git
 Builds:
   - versionName: 1.1.0
     versionCode: 2
-    commit: v1.1.0
+    commit: dd347a07f1c7c5fc55cc8bfb7fdfc5c5c020793f
     subdir: app
     gradle:
       - yes
