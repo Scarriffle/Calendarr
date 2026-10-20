@@ -514,6 +514,14 @@ class CalendarStore {
         allCachedEvents = []
     }
 
+    /// Force the next fetch to reach the server, without emptying what is on
+    /// screen. `invalidateCache()` drops the events too, which makes the whole
+    /// calendar blink empty and refill — far too much for one new event.
+    func invalidateRange() {
+        cachedStart = nil
+        cachedEnd = nil
+    }
+
     /// Calendars / sources that reported a sync error on the last fetch. Events
     /// matching either must NOT be evicted from the cache on a partial sync —
     /// stale data beats a completely empty calendar.

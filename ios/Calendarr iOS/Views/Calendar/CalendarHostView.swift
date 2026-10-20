@@ -464,9 +464,7 @@ struct CalendarHostView: View {
                        showNewBirthday: $showNewBirthday,
                        api: api,
                        reload: { await onNavigate() },
-                       // Same path as the manual reload button, which is the
-                       // one that demonstrably shows a new Home Assistant event.
-                       reloadForce: { await forceReload() })
+                       reloadForce: { await reloadAfterSave() })
     }
 
     // MARK: – Loading logic
@@ -525,6 +523,17 @@ struct CalendarHostView: View {
     private func onNavigate() async {
         let (s, e) = store.rangeForCurrentView()
         await store.loadEvents(api: api, start: s, end: e)
+    }
+
+    /// After creating or editing: refetch the visible range from the server,
+    /// keeping the current events on screen while it happens. Clearing only the
+    /// range — not the events — is what separates this from the menu's manual
+    /// sync, which is allowed to blank the calendar because the user asked for
+    /// a full refresh.
+    private func reloadAfterSave() async {
+        store.invalidateRange()
+        let (s, e) = store.rangeForCurrentView()
+        await store.loadEvents(api: api, start: s, end: e, force: true)
     }
 
     /// Called when cacheMonths setting changes – clear cache and re-prefetch.
