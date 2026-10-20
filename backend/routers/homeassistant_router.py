@@ -3,7 +3,7 @@ import logging
 import secrets
 import ssl
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -246,6 +246,35 @@ def _ha_create_event(url: str, token: str, entity_id: str, data: dict) -> dict:
             detail = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
         raise Exception(f"HA create_event ({resp.status_code}): {detail}")
     return {}
+
+
+def _ha_wait_until_listed(url: str, token: str, entity_id: str, data: dict) -> None:
+    """Block until HA actually lists the event we just created.
+
+    HA confirms the create before its entity's event list reflects it, so a
+    client that refetches straight away misses the new event, the user assumes
+    it failed, retries — and ends up with a duplicate. Waiting here fixes every
+    client at once instead of each one guessing a delay.
+
+    Gives up quietly: the event exists either way, it may just need one more
+    refresh. Never turn a successful create into an error.
+    """
+    try:
+        start = datetime.fromisoformat(_ha_format_dt(data.get("start", "")))
+        end = datetime.fromisoformat(_ha_format_dt(data.get("end", "")))
+    except Exception:
+        return
+    title = data.get("title", "")
+    # Widen the window so an all-day event or a timezone edge cannot hide it.
+    window_start, window_end = start - timedelta(days=1), end + timedelta(days=1)
+    for _ in range(8):
+        time.sleep(0.25)
+        try:
+            raw = _ha_get_events(url, token, entity_id, window_start, window_end)
+        except Exception:
+            return
+        if any(ev.get("summary") == title for ev in raw):
+            return
 
 
 def _ha_update_event(url: str, token: str, entity_id: str, uid: str, data: dict):
@@ -697,10 +726,9 @@ def create_event(
     account = cal.account
     token = _get_valid_token(account, db)
     try:
-        _ha_create_event(
-            account.url, token, cal.entity_id,
-            data.model_dump(exclude_none=True),
-        )
+        payload = data.model_dump(exclude_none=True)
+        _ha_create_event(account.url, token, cal.entity_id, payload)
+        _ha_wait_until_listed(account.url, token, cal.entity_id, payload)
         return {"ok": True}
     except Exception as exc:
         raise HTTPException(500, f"HA event create failed: {exc}")
