@@ -464,7 +464,9 @@ struct CalendarHostView: View {
                        showNewBirthday: $showNewBirthday,
                        api: api,
                        reload: { await onNavigate() },
-                       reloadForce: { await reloadVisible(force: true) })
+                       // Same path as the manual reload button, which is the
+                       // one that demonstrably shows a new Home Assistant event.
+                       reloadForce: { await forceReload() })
     }
 
     // MARK: – Loading logic
@@ -523,13 +525,6 @@ struct CalendarHostView: View {
     private func onNavigate() async {
         let (s, e) = store.rangeForCurrentView()
         await store.loadEvents(api: api, start: s, end: e)
-    }
-
-    /// Re-fetch the visible range. With `force` it bypasses the cache so a just
-    /// created/edited event shows up immediately (the server is authoritative).
-    private func reloadVisible(force: Bool) async {
-        let (s, e) = store.rangeForCurrentView()
-        await store.loadEvents(api: api, start: s, end: e, force: force)
     }
 
     /// Called when cacheMonths setting changes – clear cache and re-prefetch.
