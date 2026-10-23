@@ -56,7 +56,7 @@ struct EventEditorSheet: View {
     /// controls and explain that they won't fire.
     private var remindersDisabled: Bool {
         guard let cal = selectedCal else { return false }
-        let key = CalendarStore.calendarKey(source: cal.source, calendarId: String(cal.numericId))
+        let key = CalendarStore.calendarKey(source: cal.source, calendarId: cal.calendarIdString)
         return store.reminderDisabledKeys.contains(key)
     }
 
@@ -293,6 +293,8 @@ struct EventEditorSheet: View {
             if ev.source == "homeassistant" {
                 let num = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
                 selectedCalendarId = "ha-\(num)"
+            } else if ev.source == DeviceCalendarService.source {
+                selectedCalendarId = "device-\(ev.calendarId)"
             } else {
                 selectedCalendarId = ev.calendarId
             }
@@ -347,6 +349,10 @@ struct EventEditorSheet: View {
                     try await api.createHAEvent(calendarId: haCalId, title: title,
                                                 start: start, end: end, isAllDay: isAllDay,
                                                 location: location, description: notes)
+                case DeviceCalendarService.source:
+                    try DeviceCalendarService.shared.update(
+                        eventId: ev.id, title: title, start: start, end: end,
+                        isAllDay: isAllDay, location: location, notes: notes)
                 default: // caldav
                     let calId = Int(ev.calendarId)
                     try await api.updateCalDAVEvent(uid: ev.id, url: ev.url, calendarId: calId,
@@ -370,6 +376,10 @@ struct EventEditorSheet: View {
                     try await api.createHAEvent(calendarId: cal.numericId, title: title,
                                                 start: start, end: end, isAllDay: isAllDay,
                                                 location: location, description: notes)
+                case DeviceCalendarService.source:
+                    try DeviceCalendarService.shared.create(
+                        calendarId: cal.calendarIdString, title: title, start: start, end: end,
+                        isAllDay: isAllDay, location: location, notes: notes)
                 default: // caldav
                     try await api.createCalDAVEvent(calendarId: cal.numericId, title: title,
                                                     start: start, end: end, isAllDay: isAllDay,

@@ -297,6 +297,10 @@ private let strings: [String: [String: String]] = [
         "login.totp_placeholder": "6-stelliger Code",
         "login.remember": "Angemeldet bleiben",
         "login.signin": "Anmelden",
+        "device.calendars.header": "Gerätekalender",
+        "device.calendars.enable": "Kalender des iPhones anzeigen",
+        "device.calendars.desc": "Zeigt iCloud-, Outlook- und andere Kalender, die auf diesem iPhone eingerichtet sind. Sie bleiben auf dem Gerät und werden nicht an den Server übertragen — im Web und auf anderen Geräten erscheinen sie deshalb nicht.",
+        "device.calendars.denied": "Kein Zugriff auf die Kalender. Erlaube ihn in den Systemeinstellungen unter Datenschutz → Kalender.",
         "login.choose_server": "Anderen Server wählen",
         // Single sign-on (OpenID Connect)
         "sso.or": "oder",
@@ -694,6 +698,10 @@ private let strings: [String: [String: String]] = [
         "login.totp_placeholder": "6-digit code",
         "login.remember": "Stay signed in",
         "login.signin": "Sign in",
+        "device.calendars.header": "Device calendars",
+        "device.calendars.enable": "Show this iPhone's calendars",
+        "device.calendars.desc": "Shows iCloud, Outlook and other calendars set up on this iPhone. They stay on the device and are never sent to the server, so they do not appear on the web or on your other devices.",
+        "device.calendars.denied": "No calendar access. Grant it in System Settings under Privacy → Calendars.",
         "login.choose_server": "Choose another server",
         // Single sign-on (OpenID Connect)
         "sso.or": "or",

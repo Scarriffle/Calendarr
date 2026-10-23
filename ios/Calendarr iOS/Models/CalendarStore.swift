@@ -44,6 +44,12 @@ struct WritableCalendar: Identifiable {
     let color: String
     let source: String
     let numericId: Int
+    /// EventKit calendar identifier; set only for `source == "device"`, whose
+    /// ids are strings rather than server row ids.
+    var deviceId: String? = nil
+
+    /// The id as it appears in a calendar key, whichever kind it is.
+    var calendarIdString: String { deviceId ?? String(numericId) }
 }
 
 @Observable
@@ -420,8 +426,13 @@ class CalendarStore {
     /// Load events for a specific range. Skips the network if already cached,
     /// unless `force` is set (used after create/edit to pull fresh server data
     /// for the visible range, bypassing the cache).
+    /// Device-calendar generation the cache was filled at (see DeviceCalendarService).
+    private var deviceGeneration = DeviceCalendarService.generation
+
     func loadEvents(api: CalendarrAPI, start: Date, end: Date, force: Bool = false) async {
-        if !force, isCached(start: start, end: end) {
+        let deviceChanged = deviceGeneration != DeviceCalendarService.generation
+        if deviceChanged { deviceGeneration = DeviceCalendarService.generation }
+        if !force, !deviceChanged, isCached(start: start, end: end) {
             refreshFromCache(start: start, end: end)
             return
         }
@@ -453,7 +464,11 @@ class CalendarStore {
             let combined = try await api.fetchGroupCombined(groupId: g.id, start: start, end: end)
             return (combined.map { decorateGroupEvent($0) }, [])
         }
-        return try await api.fetchEvents(start: start, end: end)
+        let (server, errors) = try await api.fetchEvents(start: start, end: end)
+        // Device calendars live on the phone, so they are merged in here rather
+        // than coming from the server. They are deliberately absent from the
+        // group overlay, which is a server-side combined view.
+        return (server + DeviceCalendarService.shared.events(start: start, end: end), errors)
     }
 
     /// Prefix a combined-view event with its owner (others) or 👥 + creator
@@ -684,6 +699,15 @@ class CalendarStore {
         }
         for (accName, id, name, color) in haCals {
             result.append(WritableCalendar(id: "ha-\(id)", name: "\(accName) – \(name)", color: color, source: "homeassistant", numericId: id))
+        }
+        for cal in DeviceCalendarService.shared.calendars() where cal.allowsContentModifications {
+            result.append(WritableCalendar(
+                id: "device-\(cal.calendarIdentifier)",
+                name: cal.title,
+                color: "#8E8E93",
+                source: DeviceCalendarService.source,
+                numericId: 0,
+                deviceId: cal.calendarIdentifier))
         }
         writableCalendars = result
         writableCalendarErrors = errors

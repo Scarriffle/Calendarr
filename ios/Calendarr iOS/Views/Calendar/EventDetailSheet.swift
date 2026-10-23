@@ -264,6 +264,8 @@ struct EventDetailSheet: View {
                 // calendarId looks like "homeassistant-42" → numeric DB id 42
                 let calId = Int(event.calendarId.replacingOccurrences(of: "homeassistant-", with: "")) ?? 0
                 try await api.deleteHAEvent(calendarId: calId, uid: event.id)
+            case DeviceCalendarService.source:
+                try DeviceCalendarService.shared.delete(eventId: event.id)
             default:
                 let calId = Int(event.calendarId)
                 try await api.deleteCalDAVEvent(uid: event.id, url: event.url, calendarId: calId)

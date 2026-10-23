@@ -1084,6 +1084,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Calendarr zeigt die Kalender dieses iPhones (z. B. iCloud und Outlook) an und legt dort Termine an.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Calendarr liest Geburtstage aus deinen Kontakten, um sie in deinen Geburtstagskalender zu übernehmen.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Scarriffleservices";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -1136,6 +1137,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Calendarr zeigt die Kalender dieses iPhones (z. B. iCloud und Outlook) an und legt dort Termine an.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Calendarr liest Geburtstage aus deinen Kontakten, um sie in deinen Geburtstagskalender zu übernehmen.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Scarriffleservices";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

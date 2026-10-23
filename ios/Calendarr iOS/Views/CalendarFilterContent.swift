@@ -244,6 +244,14 @@ struct CalendarFilterContent: View {
         for sub in icalSubs { add("ical", sub.id, sub.name, sub.color) }
         for acc in googleAccounts { for cal in acc.calendars ?? [] { add("google", cal.id, cal.name, cal.color ?? "#4285f4") } }
         for acc in haAccounts { for cal in acc.calendars ?? [] { add("homeassistant", cal.id, cal.name, cal.color ?? "#46bdc6") } }
+        // Device calendars key on an EventKit identifier, not a server row id.
+        for cal in DeviceCalendarService.shared.calendars() {
+            let key = CalendarStore.calendarKey(source: DeviceCalendarService.source,
+                                                calendarId: cal.calendarIdentifier)
+            if b.contains(key) { continue }
+            combined.append(CalRow(id: key, name: cal.title, colorHex: "#8E8E93",
+                                   readOnly: !cal.allowsContentModifications))
+        }
 
         allKeys = Set(combined.map(\.id))
         let orderedKeys = store.ordered(combined.map(\.id))

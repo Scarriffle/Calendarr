@@ -30,6 +30,8 @@ struct AccountsView: View {
     @State private var birthdayNotify = -1
 
     @AppStorage("appLanguage") private var appLang = "system"
+    @AppStorage(DeviceCalendarService.enabledKey) private var deviceCalendarsEnabled = false
+    @State private var deviceCalendarAccessGranted = false
 
     var body: some View {
         NavigationStack {
@@ -42,6 +44,7 @@ struct AccountsView: View {
                         caldavSection
                         localSection
                         birthdayContactsSection
+                        deviceCalendarSection
                         icalSection
                         googleSection
                         haSection
@@ -233,6 +236,30 @@ struct AccountsView: View {
     /// The user's single birthday calendar (created on first sync/activation).
     private var birthdayCalendar: LocalCalendar? {
         localCalendars.first { $0.isBirthday && $0.owned }
+    }
+
+    /// Calendars the phone already has (iCloud, Outlook/Exchange, Google).
+    /// They stay on the device — the server never sees them — so this is the
+    /// way in when publishing an Outlook calendar is blocked by company policy.
+    @ViewBuilder var deviceCalendarSection: some View {
+        Section {
+            Toggle(L10n.t("device.calendars.enable", appLang), isOn: $deviceCalendarsEnabled)
+            if deviceCalendarsEnabled && !deviceCalendarAccessGranted {
+                Text(L10n.t("device.calendars.denied", appLang))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text(L10n.t("device.calendars.header", appLang))
+        } footer: {
+            Text(L10n.t("device.calendars.desc", appLang))
+        }
+        .onChange(of: deviceCalendarsEnabled) { _, on in
+            guard on else { return }
+            // Granting access bumps the service generation, which makes the
+            // calendar reload instead of serving its pre-device cache.
+            Task { deviceCalendarAccessGranted = await DeviceCalendarService.shared.requestAccess() }
+        }
+        .task { deviceCalendarAccessGranted = DeviceCalendarService.shared.hasAccess }
     }
 
     @ViewBuilder var birthdayContactsSection: some View {
