@@ -830,16 +830,18 @@ function renderCalendarList() {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.shared_by || cal.name, color: cal.color, enabled: !hiddenLocal.has(cal.id), readOnly,
       sourceLabel: `${t('shared_with_me')} · ${cal.name}${readOnly ? ' · ' + t('perm_read') : ''}`,
+      reminders: true, remindersEnabled: cal.reminders_enabled !== false,
       remove: { icon: EYE_OFF, title: t('hide_cal') } });
   });
   // Group calendars (owned by the creator or reached via membership) — shown so
-  // they can be toggled/recoloured. Owned group calendars can also be muted
-  // (reminders), which the server then syncs; member-reached ones can't (no PUT).
+  // they can be toggled, recoloured and muted. Muting is per user: the creator
+  // owns the calendar, and silencing it for themselves must not silence the
+  // whole group.
   state.localCalendars.filter(c => c.group).forEach(cal => {
     entries.push({ key: `local:${cal.id}`, source: 'local', dataId: `data-cal-id="${cal.id}"`,
       name: cal.name, color: cal.color,
       enabled: cal.owned !== false ? cal.enabled : !hiddenLocal.has(cal.id),
-      reminders: cal.owned !== false, remindersEnabled: cal.reminders_enabled !== false,
+      reminders: true, remindersEnabled: cal.reminders_enabled !== false,
       sourceLabel: `${t('groups_title')} · ${cal.shared_by || ''}`,
       isGroupCal: true, groupIcon: groupIconForLocalCal(cal.id), remove: null });
   });
@@ -984,7 +986,11 @@ function renderCalendarList() {
       }
       if (!cal) return;
       const newVal = cal.reminders_enabled === false; // toggle
-      const path = source === 'ical'
+      // local has a dedicated endpoint so share recipients can mute for
+      // themselves; the others still take the calendar-wide PUT.
+      const path = source === 'local'
+        ? `/local/calendars/${id}/reminders`
+        : source === 'ical'
         ? `/ical/subscriptions/${id}`
         : `/${source}/calendars/${id}`;
       try {
@@ -4432,7 +4438,7 @@ function renderCalendarTable() {
   const hid  = (src, id, isVisible) =>
     `<button class="icon-btn mini-btn ct-eye" data-ct-hid="${src}" data-ct-id="${id}" data-ct-visible="${isVisible ? '1' : '0'}" title="${isVisible ? 'Ausblenden' : 'Anzeigen'}">${isVisible ? EYE_ON : EYE_OFF}</button>`;
   const rem  = (src, id, on) =>
-    `<button class="icon-btn mini-btn ct-bell" data-ct-rem="${src}" data-ct-id="${id}" data-ct-on="${on ? '1' : '0'}" title="${on ? 'Benachrichtigungen aus' : 'Benachrichtigungen an'}">${on ? BELL_ON : BELL_OFF}</button>`;
+    `<button class="icon-btn mini-btn ct-bell" data-ct-rem="${src}" data-ct-id="${id}" data-ct-on="${on ? '1' : '0'}" title="${on ? t('calendar_reminders_on') : t('calendar_reminders_off')}">${on ? BELL_ON : BELL_OFF}</button>`;
   const dot  = (color, fb) =>
     `<span class="ct-dot" style="background:${color || fb}"></span>`;
 
@@ -4565,7 +4571,8 @@ function renderCalendarTable() {
       rows += `<tr>
         <td>${dot(cal.color, '#34a853')}${escHtml(cal.shared_by || cal.name)}</td>
         <td class="ct-src">${escHtml(cal.name)} <span class="cal-badge">${readOnly ? t('perm_read') : t('perm_read_write')}</span></td>
-        <td>${hid('shared', cal.id, !sharedHidden.has(cal.id))}</td><td>—</td><td>—</td><td>—</td><td>—</td>
+        <td>${hid('shared', cal.id, !sharedHidden.has(cal.id))}</td>
+        <td>${rem('local', cal.id, cal.reminders_enabled !== false)}</td><td>—</td><td>—</td><td>—</td>
       </tr>`;
       rowCount++;
     }
@@ -4577,7 +4584,7 @@ function renderCalendarTable() {
 
   container.innerHTML = `<table class="cal-manage-table">
     <thead><tr>
-      <th>Name</th><th>Herkunft</th><th>Sichtbar</th><th>Benachrichtigungen</th><th>Export / Import</th><th>Sync</th><th></th>
+      <th>Name</th><th>Herkunft</th><th>Sichtbar</th><th>${t('calendar_reminders_col')}</th><th>Export / Import</th><th>Sync</th><th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
@@ -4622,7 +4629,9 @@ function renderCalendarTable() {
     btn.addEventListener('click', async () => {
       const src = btn.dataset.ctRem, id = parseInt(btn.dataset.ctId);
       const enabled = btn.dataset.ctOn !== '1'; // currently on → turn off, currently off → turn on
-      const path = src === 'ical' ? `/ical/subscriptions/${id}` : `/${src === 'ha' ? 'homeassistant' : src}/calendars/${id}`;
+      const path = src === 'local' ? `/local/calendars/${id}/reminders`
+                 : src === 'ical' ? `/ical/subscriptions/${id}`
+                 : `/${src === 'ha' ? 'homeassistant' : src}/calendars/${id}`;
       try {
         await api.put(path, { reminders_enabled: enabled });
         if (src === 'local')       { const c = state.localCalendars.find(c => c.id === id); if (c) c.reminders_enabled = enabled; }
