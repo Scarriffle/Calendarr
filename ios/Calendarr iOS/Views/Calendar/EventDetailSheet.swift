@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 /// `.sheet(item:)` needs Identifiable and URL is not. A retroactive conformance
 /// on a stdlib type would be visible module-wide, so wrap it instead.

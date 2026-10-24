@@ -35,8 +35,13 @@ enum NotificationScheduler {
                     let key = CalendarStore.calendarKey(source: ev.source, calendarId: ev.calendarId)
                     if disabledCalendarKeys.contains(key) { continue }
                 }
+                // Device calendars are already served by the system Calendar
+                // app, so applying our default here notifies twice for one
+                // event. They stay silent unless the event carries its own
+                // reminder; the per-calendar toggle can still switch them on.
+                let allowsDefault = defaultMin >= 0 && ev.source != "device"
                 let offsets = ev.reminders.isEmpty
-                    ? (defaultMin >= 0 ? [defaultMin] : [])
+                    ? (allowsDefault ? [defaultMin] : [])
                     : ev.reminders
                 for m in offsets {
                     let fire = ev.startDate.addingTimeInterval(-Double(m) * 60)

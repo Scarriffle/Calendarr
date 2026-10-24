@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import EventKit
 
 struct EventEditorSheet: View {
     let api: CalendarrAPI

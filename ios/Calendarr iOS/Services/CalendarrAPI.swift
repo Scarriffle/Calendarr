@@ -532,7 +532,7 @@ class CalendarrAPI {
         case "caldav":        path = "/api/caldav/calendars/\(calendarId)"
         case "google":        path = "/api/google/calendars/\(calendarId)"
         case "homeassistant": path = "/api/homeassistant/calendars/\(calendarId)"
-        case "local":         path = "/api/local/calendars/\(calendarId)"
+        case "local":         path = "/api/local/calendars/\(calendarId)/reminders"
         case "ical":          path = "/api/ical/subscriptions/\(calendarId)"
         default:              return
         }

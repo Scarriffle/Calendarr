@@ -1,6 +1,8 @@
 import Foundation
 import SwiftUI
 import CalendarrCore
+// loadWritableCalendars reads EKCalendar.title/.calendarIdentifier directly.
+import EventKit
 
 extension Notification.Name {
     /// Posted whenever the persistent "banished calendars" set is mutated from

@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 /// A single calendar row in the flat, reorderable list.
 private struct CalRow: Identifiable {
@@ -87,39 +88,44 @@ struct CalendarFilterContent: View {
     @ViewBuilder
     private func row(_ cal: CalRow) -> some View {
         let isVisible = !hidden.contains(cal.id)
-        Button {
-            if isVisible { hidden.insert(cal.id) } else { hidden.remove(cal.id) }
-            store.setCalendarHidden(cal.id, hidden: isVisible)
-        } label: {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(Color(hex: cal.colorHex))
-                    .frame(width: 14, height: 14)
-                    .opacity(isVisible ? 1.0 : 0.35)
-                Text(cal.name)
-                    .foregroundStyle(isVisible ? .primary : .secondary)
-                    .strikethrough(!isVisible, color: .secondary)
-                if cal.readOnly {
-                    Image(systemName: "lock.fill").font(.caption2).foregroundStyle(.secondary)
+        let muted = reminderDisabled.contains(cal.id)
+        HStack(spacing: 8) {
+            Button {
+                if isVisible { hidden.insert(cal.id) } else { hidden.remove(cal.id) }
+                store.setCalendarHidden(cal.id, hidden: isVisible)
+            } label: {
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(Color(hex: cal.colorHex))
+                        .frame(width: 14, height: 14)
+                        .opacity(isVisible ? 1.0 : 0.35)
+                    Text(cal.name)
+                        .foregroundStyle(isVisible ? .primary : .secondary)
+                        .strikethrough(!isVisible, color: .secondary)
+                    if cal.readOnly {
+                        Image(systemName: "lock.fill").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: isVisible ? "eye" : "eye.slash")
+                        .foregroundStyle(isVisible ? Color.accentColor : .secondary)
                 }
-                Spacer()
-                if reminderDisabled.contains(cal.id) {
-                    Image(systemName: "bell.slash").font(.caption).foregroundStyle(.secondary)
-                }
-                Image(systemName: isVisible ? "eye" : "eye.slash")
-                    .foregroundStyle(isVisible ? Color.accentColor : .secondary)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
+            .buttonStyle(.plain)
+
+            // A visible control, the way Android already does it. The mute used
+            // to live only behind a long press, with no hint it existed until
+            // after it had been switched on.
             Button {
                 toggleReminders(forKey: cal.id)
             } label: {
-                let disabled = reminderDisabled.contains(cal.id)
-                Label(L10n.t(disabled ? "filter.reminders_on" : "filter.reminders_off", appLang),
-                      systemImage: disabled ? "bell" : "bell.slash")
+                Image(systemName: muted ? "bell.slash" : "bell")
+                    .foregroundStyle(muted ? .secondary : Color.accentColor)
             }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(L10n.t(muted ? "filter.reminders_on" : "filter.reminders_off", appLang))
+        }
+        .contextMenu {
             Button(role: .destructive) {
                 hidden.remove(cal.id)
                 banished.insert(cal.id)
@@ -226,8 +232,16 @@ struct CalendarFilterContent: View {
         for sub in icalSubs       { applyReminders("ical", sub.id, sub.remindersEnabled ?? true) }
         for acc in googleAccounts { for cal in acc.calendars ?? [] { applyReminders("google", cal.id, cal.remindersEnabled ?? true) } }
         for acc in haAccounts     { for cal in acc.calendars ?? [] { applyReminders("homeassistant", cal.id, cal.remindersEnabled) } }
-        store.setReminderDisabledKeys(rd)
-        reminderDisabled = rd
+        // Only server-backed sources are reconciled here. Replacing the whole
+        // set would drop every device-calendar mute — and the mute of any
+        // calendar the server happened not to return on this call.
+        let serverSources: Set<String> = ["local", "caldav", "ical", "google", "homeassistant"]
+        let keptLocally = store.reminderDisabledKeys.filter { key in
+            !serverSources.contains(key.split(separator: ":").first.map(String.init) ?? "")
+        }
+        let merged = rd.union(keptLocally)
+        store.setReminderDisabledKeys(merged)
+        reminderDisabled = merged
 
         // Build the flat row list (banished excluded), then sort by stored order.
         var combined: [CalRow] = []
