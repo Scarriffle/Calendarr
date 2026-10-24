@@ -192,6 +192,11 @@ interface CalendarrApi {
     @PUT("api/local/calendars/{id}/color")
     suspend fun setLocalCalendarColor(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
 
+    // Reminder-only update that works for owners AND share recipients
+    // (recipients get their own per-user mute; owners flip the calendar's flag).
+    @PUT("api/local/calendars/{id}/reminders")
+    suspend fun setLocalCalendarReminders(@Path("id") id: Int, @Body body: RequestBody): Response<ResponseBody>
+
     @DELETE("api/local/calendars/{id}")
     suspend fun deleteLocalCalendar(@Path("id") id: Int): Response<ResponseBody>
 

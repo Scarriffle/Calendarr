@@ -357,7 +357,7 @@ class CalendarRepository @Inject constructor(
         val body = jsonBody("reminders_enabled" to enabled)
         when (source) {
             "caldav" -> api.updateCalDAVCalendar(calendarId, body).ensureSuccess()
-            "local" -> api.updateLocalCalendar(calendarId, body).ensureSuccess()
+            "local" -> api.setLocalCalendarReminders(calendarId, body).ensureSuccess()
             "ical" -> api.updateICalSubscription(calendarId, body).ensureSuccess()
             "google" -> api.updateGoogleCalendar(calendarId, body).ensureSuccess()
             "homeassistant" -> api.updateHACalendar(calendarId, body).ensureSuccess()

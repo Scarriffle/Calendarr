@@ -473,8 +473,10 @@ private fun ReminderRow(
     }
 }
 
-/** Mirrors the server allowlist. "*/*" is deliberately absent — the picker
- *  should not offer files the upload would reject. */
+// Mirrors the server allowlist. The catch-all wildcard type is deliberately
+// absent — the picker should not offer files the upload would reject.
+// (Written as line comments: spelling that wildcard inside a block comment
+// closes it early, which is what used to break this file.)
 private val ATTACHMENT_MIME_TYPES = arrayOf(
     "application/pdf",
     "image/png", "image/jpeg", "image/webp", "image/gif",

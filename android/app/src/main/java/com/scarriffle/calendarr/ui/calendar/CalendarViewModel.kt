@@ -490,6 +490,11 @@ class CalendarViewModel @Inject constructor(
         val caldav = runCatching { repository.getCalDAVAccounts() }.getOrDefault(emptyList())
         val google = runCatching { repository.getGoogleAccounts() }.getOrDefault(emptyList())
         val ha = runCatching { repository.getHomeAssistantAccounts() }.getOrDefault(emptyList())
+        // Needed for the reminder flag, which exists on all five sources. A
+        // failed fetch yields an empty list, which simply reconciles nothing —
+        // never a wrongly cleared mute.
+        val local = runCatching { repository.getLocalCalendars() }.getOrDefault(emptyList())
+        val ical = runCatching { repository.getICalSubscriptions() }.getOrDefault(emptyList())
 
         val banished = settingsStore.banishedCalendarKeys.toMutableSet()
         fun apply(source: String, id: Int, serverHidden: Boolean) {
@@ -500,9 +505,25 @@ class CalendarViewModel @Inject constructor(
         google.forEach { acc -> acc.calendars?.forEach { apply("google", it.id, it.sidebarHidden) } }
         ha.forEach { acc -> acc.calendars?.forEach { apply("homeassistant", it.id, it.sidebarHidden) } }
 
-        if (banished == settingsStore.banishedCalendarKeys) return false
-        settingsStore.banishedCalendarKeys = banished
-        _state.update { it.copy(banishedKeys = banished) }
+        // Reminders were only ever pushed app -> server, so a mute set on the
+        // web or on iOS never arrived here.
+        val muted = settingsStore.reminderDisabledCalendarKeys.toMutableSet()
+        fun applyReminders(source: String, id: Int, enabled: Boolean) {
+            val key = calendarKey(source, id.toString())
+            if (enabled) muted.remove(key) else muted.add(key)
+        }
+        local.forEach { applyReminders("local", it.id, it.remindersEnabled) }
+        ical.forEach { applyReminders("ical", it.id, it.remindersEnabled) }
+        caldav.forEach { acc -> acc.calendars?.forEach { applyReminders("caldav", it.id, it.remindersEnabled) } }
+        google.forEach { acc -> acc.calendars?.forEach { applyReminders("google", it.id, it.remindersEnabled) } }
+        ha.forEach { acc -> acc.calendars?.forEach { applyReminders("homeassistant", it.id, it.remindersEnabled) } }
+
+        val banishedChanged = banished != settingsStore.banishedCalendarKeys
+        val mutedChanged = muted != settingsStore.reminderDisabledCalendarKeys
+        if (!banishedChanged && !mutedChanged) return false
+        if (banishedChanged) settingsStore.banishedCalendarKeys = banished
+        if (mutedChanged) settingsStore.reminderDisabledCalendarKeys = muted
+        _state.update { it.copy(banishedKeys = banished, reminderDisabledKeys = muted) }
         return true
     }
 
