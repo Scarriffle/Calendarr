@@ -81,6 +81,7 @@ class ShareCreate(BaseModel):
 def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
               shared_by: Optional[str] = None, permission: Optional[str] = None,
               color_override: Optional[str] = None,
+              reminders_override: Optional[bool] = None,
               request: Optional[Request] = None) -> dict:
     d = {
         "id": cal.id,
@@ -91,7 +92,9 @@ def _cal_dict(cal: models.LocalCalendar, *, owned: bool = True,
         "color": color_override or cal.color,
         "enabled": cal.enabled,
         "sidebar_hidden": bool(cal.sidebar_hidden),
-        "reminders_enabled": bool(cal.reminders_enabled),
+        # A recipient's own choice wins over the owner's flag.
+        "reminders_enabled": bool(cal.reminders_enabled)
+        if reminders_override is None else reminders_override,
         "caldav_published": bool(cal.caldav_published),
         "is_birthday": bool(cal.is_birthday),
         "birthday_notify_days_before": cal.birthday_notify_days_before,
@@ -141,6 +144,7 @@ def list_calendars(
 
     # Per-user colour overrides for calendars the user doesn't own (any sharing path).
     color_prefs = permissions.color_prefs_for(db, current_user.id)
+    reminder_prefs = permissions.reminder_prefs_for(db, current_user.id)
 
     # Own calendars
     own = (
@@ -175,6 +179,7 @@ def list_calendars(
             shared_by=(owner.display_name or owner.username) if owner else None,
             permission=share.permission,
             color_override=color_prefs.get(cal.id),
+            reminders_override=reminder_prefs.get(cal.id, True),
         )
         if cal.id in group_cal_map:
             d["group"] = True
@@ -190,7 +195,8 @@ def list_calendars(
             continue
         seen_ids.add(cal_id)
         d = _cal_dict(cal, owned=False, shared_by=group_name, permission="read_write",
-                      color_override=color_prefs.get(cal.id))
+                      color_override=color_prefs.get(cal.id),
+                      reminders_override=reminder_prefs.get(cal.id, True))
         d["group"] = True
         result.append(d)
 
@@ -207,6 +213,7 @@ def list_calendars(
             shared_by=(owner.display_name or owner.username) if owner else None,
             permission="read",
             color_override=color_prefs.get(cal.id),
+            reminders_override=reminder_prefs.get(cal.id, True),
             request=request,
         )
         d["group_shared"] = True
@@ -351,6 +358,48 @@ def set_calendar_color(
                 calendar_id=calendar_id, user_id=current_user.id, color=data.color))
     db.commit()
     return {"ok": True, "color": data.color}
+
+
+class CalendarRemindersUpdate(BaseModel):
+    reminders_enabled: bool
+
+
+@router.put("/calendars/{calendar_id}/reminders")
+def set_calendar_reminders(
+    calendar_id: int,
+    data: CalendarRemindersUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Mute or unmute a calendar's reminders. The owner flips the calendar's own
+    flag; anyone else who can see it (direct share, group calendar, or a
+    co-member's group-visible calendar) sets only their OWN override and never
+    touches the owner's. The existing PUT /calendars/{id} stays owner-only,
+    which is what keeps a recipient from reaching the owner's flag at all."""
+    cal = db.query(models.LocalCalendar).filter(models.LocalCalendar.id == calendar_id).first()
+    if cal is None:
+        raise HTTPException(404, "Calendar not found")
+    if cal.user_id == current_user.id:
+        cal.reminders_enabled = data.reminders_enabled
+    else:
+        if calendar_id not in permissions.readable_local_calendar_ids(db, current_user):
+            raise HTTPException(403, "You cannot access this calendar")
+        pref = (
+            db.query(models.CalendarReminderPref)
+            .filter(
+                models.CalendarReminderPref.calendar_id == calendar_id,
+                models.CalendarReminderPref.user_id == current_user.id,
+            )
+            .first()
+        )
+        if pref:
+            pref.enabled = data.reminders_enabled
+        else:
+            db.add(models.CalendarReminderPref(
+                calendar_id=calendar_id, user_id=current_user.id,
+                enabled=data.reminders_enabled))
+    db.commit()
+    return {"ok": True, "reminders_enabled": data.reminders_enabled}
 
 
 @router.post("/calendars/{calendar_id}/dav-token/rotate")

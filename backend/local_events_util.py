@@ -158,7 +158,11 @@ def build_local_event_dict(
             except (ValueError, TypeError):
                 pass
         d["display_title"] = display
-        if not d["reminders"] and cal.birthday_notify_days_before is not None:
+        # Honour the calendar's mute: injecting a reminder here would hand the
+        # schedulers something to fire for a calendar the user silenced.
+        if (not d["reminders"]
+                and cal.birthday_notify_days_before is not None
+                and getattr(cal, "reminders_enabled", True)):
             d["reminders"] = [int(cal.birthday_notify_days_before) * 1440]
     if owner is not None:
         d["owner"] = owner

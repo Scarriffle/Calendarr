@@ -187,6 +187,17 @@ def readable_local_calendar_ids(db: Session, user: models.User) -> list[int]:
     return list(ids)
 
 
+def reminder_prefs_for(db: Session, user_id: int) -> dict[int, bool]:
+    """Map calendar_id -> the user's personal reminder flag for calendars they
+    don't own (any sharing path). Empty when the user set no overrides."""
+    return {
+        p.calendar_id: bool(p.enabled)
+        for p in db.query(models.CalendarReminderPref).filter(
+            models.CalendarReminderPref.user_id == user_id
+        )
+    }
+
+
 def color_prefs_for(db: Session, user_id: int) -> dict[int, str]:
     """Map calendar_id -> the user's personal colour for calendars they don't
     own (any sharing path). Empty when the user set no overrides."""
