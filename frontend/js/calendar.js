@@ -4383,7 +4383,7 @@ function initResizableCalTable(table) {
   // Lock to px + fixed layout so dragging one column doesn't reflow the others.
   // Sensible defaults per column (Name / Herkunft / Sichtbar / Benachrichtigungen
   // / Export-Import / Sync / trash); user drags override and persist.
-  const DEFAULTS = [200, 90, 80, 150, 240, 90, 44];
+  const DEFAULTS = [200, 90, 80, 150, 300, 90, 44];
   ths.forEach((th, i) => {
     const w = (Array.isArray(saved) && saved[i]) ? saved[i]
             : (DEFAULTS[i] || th.offsetWidth || 100);
@@ -4458,7 +4458,7 @@ function renderCalendarTable() {
         <button class="btn btn-ghost btn-sm" data-ct-share="${cal.id}">${t('share')}</button>
         <button class="btn btn-ghost btn-sm" data-ct-export="local" data-ct-id="${cal.id}" data-ct-name="${escHtml(cal.name)}">Export</button>
         <button class="btn btn-ghost btn-sm" data-ct-import="local" data-ct-id="${cal.id}">Import</button>
-        <button class="btn btn-ghost btn-sm ct-dav-toggle${pub ? ' on' : ''}" data-ct-dav-id="${cal.id}" data-ct-dav-on="${pub ? '1' : '0'}">${pub ? t('caldav_unpublish') : t('caldav_publish')}</button>
+        <button class="btn btn-ghost btn-sm ct-dav-toggle${pub ? ' on' : ''}" data-ct-dav-id="${cal.id}" data-ct-dav-on="${pub ? '1' : '0'}" title="${pub ? t('caldav_unpublish') : t('caldav_publish')}">CalDAV</button>
       </td>
       <td>—</td>
       <td><button class="icon-btn mini-btn" data-ct-del="local" data-ct-id="${cal.id}">${TRASH}</button></td>

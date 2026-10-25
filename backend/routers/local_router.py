@@ -15,6 +15,7 @@ import permissions
 from auth import get_current_user
 from database import get_db
 from local_events_util import build_local_event_dict, resolve_creator
+from urllib.parse import quote
 
 router = APIRouter()
 
@@ -839,9 +840,20 @@ def export_calendar(
         atts = attachments_store.by_event(db, [e.id for e in events])
     ics = ical_io.build_ics(cal, events, name_cache=name_cache,
                             attachments_by_event=atts, base_url=base_url)
-    safe_name = "".join(c for c in cal.name if c.isalnum() or c in (" ", "-", "_")).strip() or "calendar"
+    # RFC 6266, the same way attachments_router already does it: str.isalnum()
+    # is true for "ö", so without an explicit ASCII test the "safe" name carries
+    # the very bytes it exists to avoid — a raw umlaut in an HTTP header, which
+    # a reverse proxy rejects outright. That is what made exporting a calendar
+    # called "Persönlich" fail with no usable error.
+    ascii_name = "".join(
+        c for c in cal.name if c.isascii() and (c.isalnum() or c in " -_")
+    ).strip() or "calendar"
+    disposition = (
+        f'attachment; filename="{ascii_name}.ics"; '
+        f"filename*=UTF-8''{quote(cal.name + '.ics')}"
+    )
     return Response(
         content=ics,
         media_type="text/calendar",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.ics"'},
+        headers={"Content-Disposition": disposition},
     )

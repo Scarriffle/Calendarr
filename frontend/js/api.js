@@ -86,8 +86,13 @@ async function downloadRequest(path, fallbackName) {
     return null;
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: t('unknown_error') }));
-    const e = new Error(err.detail || `HTTP ${res.status}`);
+    // A non-JSON body means the failure happened outside the app — a reverse
+    // proxy rejecting the response, say. Showing "unknown error" there hides
+    // the one clue there is, so fall back to the body text and the status.
+    const raw = await res.text().catch(() => '');
+    let detail = '';
+    try { detail = JSON.parse(raw).detail || ''; } catch { detail = raw.trim().slice(0, 200); }
+    const e = new Error(detail || t('unknown_error') + ' (HTTP ' + res.status + ')');
     // Keep the status so callers can map it to a translated message instead of
     // showing the backend's German detail to someone running the app in Finnish.
     e.status = res.status;
