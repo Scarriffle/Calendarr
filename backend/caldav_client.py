@@ -4,7 +4,11 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 import caldav
-from icalendar import Calendar, Event, vDatetime, vRecur
+from icalendar import Calendar, Event, vDatetime
+
+# One parser for both directions: this file used to carry its own copy with
+# the same UNTIL defect.
+from ical_io import _rrule_str_to_vrecur as _parse_rrule_str
 
 logger = logging.getLogger(__name__)
 
@@ -304,20 +308,6 @@ def delete_event(url: str, username: str, password: str, event_url: str,
     else:
         resource = caldav.Event(client=client, url=event_url)
     resource.delete()
-
-
-def _parse_rrule_str(rrule_str: str) -> vRecur:
-    """Parse an RRULE string like 'FREQ=WEEKLY;BYDAY=MO,WE' into a vRecur."""
-    params = {}
-    for part in rrule_str.split(";"):
-        if "=" not in part:
-            continue
-        key, val = part.split("=", 1)
-        if "," in val:
-            params[key] = val.split(",")
-        else:
-            params[key] = val
-    return vRecur(params)
 
 
 def _parse_dt(s: str) -> datetime:

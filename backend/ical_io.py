@@ -135,13 +135,17 @@ def parse_ics(raw: bytes) -> dict:
 
 
 def _rrule_str_to_vrecur(rrule_str: str) -> vRecur:
-    params = {}
-    for part in rrule_str.split(";"):
-        if "=" not in part:
-            continue
-        key, val = part.split("=", 1)
-        params[key] = val.split(",") if "," in val else val
-    return vRecur(params)
+    """Parse an RRULE string into a vRecur with correctly typed values.
+
+    Hand-splitting on ";" and "=" leaves every value a str, which icalendar
+    accepts silently here and then rejects inside ``to_ical()``: vRecur.types
+    maps UNTIL to vDDDTypes, and that demands a date. A single "repeats until
+    <date>" event therefore made the whole calendar fail to serialise — a 500
+    on REPORT, on GET and on export, while PROPFIND kept working because it
+    never builds ICS. Letting icalendar parse its own format gives UNTIL as a
+    datetime and COUNT/INTERVAL as ints.
+    """
+    return vRecur(vRecur.from_ical(rrule_str))
 
 
 def _parse_iso(s: str) -> datetime:
@@ -198,7 +202,10 @@ def build_ics(calendar, events, *, name_cache: dict | None = None,
         if ev.color:
             item.add("x-calendarr-color", ev.color)
         if ev.rrule:
-            item.add("rrule", _rrule_str_to_vrecur(ev.rrule))
+            try:
+                item.add("rrule", _rrule_str_to_vrecur(ev.rrule))
+            except (ValueError, TypeError):
+                logger.warning("Skipping unparsable RRULE %r on event %s", ev.rrule, ev.id)
 
         # ORGANIZER from the creator (local user or imported name).
         organizer_name = None
