@@ -4722,6 +4722,9 @@ function renderCalendarTable() {
         const updated = await api.put(`/local/calendars/${id}`, { caldav_published: newVal });
         cal.caldav_published = updated.caldav_published;
         cal.caldav_url = updated.caldav_url;
+        // The response carries both URLs; dropping this one left the
+        // "with login" field blank until the next full page load.
+        cal.caldav_login_url = updated.caldav_login_url;
         renderCalendarTable();
       } catch (e) { showToast(e.message, true); }
     });
@@ -4741,6 +4744,7 @@ function renderCalendarTable() {
       try {
         const updated = await api.post(`/local/calendars/${id}/dav-token/rotate`);
         cal.caldav_url = updated.caldav_url;
+        cal.caldav_login_url = updated.caldav_login_url;
         renderCalendarTable();
         showToast(t('caldav_token_rotated'));
       } catch (e) { showToast(e.message, true); }
