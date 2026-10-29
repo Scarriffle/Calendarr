@@ -217,3 +217,70 @@ def test_oversized_payload_is_refused(client):
     _admin_with_email(client)
     padded = _ics(summary="X" * (mail_invites.MAX_ICS_BYTES + 10))
     assert _ingest(padded) is False
+
+
+# ── Mailbox configuration ─────────────────────────────────
+
+
+def _mailbox_payload(**over):
+    body = {"imap_host": "imap.example.com", "imap_user": "einladungen@example.com",
+            "imap_password": "geheim", "imap_port": 993, "poll_minutes": 5}
+    body.update(over)
+    return body
+
+
+def test_mailbox_password_is_never_returned(client):
+    token = register_admin(client)
+    client.put("/api/invites/mailbox", json=_mailbox_payload(), headers=auth(token))
+
+    body = client.get("/api/invites/mailbox", headers=auth(token)).json()
+    assert body["imap_host"] == "imap.example.com"
+    assert body["has_imap_password"] is True
+    assert "imap_password" not in body
+
+
+def test_editing_without_a_password_keeps_the_stored_one(client):
+    token = register_admin(client)
+    client.put("/api/invites/mailbox", json=_mailbox_payload(), headers=auth(token))
+    client.put("/api/invites/mailbox",
+               json=_mailbox_payload(imap_password=None, imap_port=143),
+               headers=auth(token))
+
+    db = SessionLocal()
+    try:
+        acc = db.query(models.MailboxAccount).one()
+        assert acc.imap_port == 143
+        assert acc.imap_password == "geheim"
+    finally:
+        db.close()
+
+
+def test_first_save_requires_a_password(client):
+    token = register_admin(client)
+    res = client.put("/api/invites/mailbox", json=_mailbox_payload(imap_password=None),
+                     headers=auth(token))
+    assert res.status_code == 422
+
+
+def test_only_admins_touch_the_mailbox(client):
+    from conftest import create_user
+
+    admin = register_admin(client)
+    user = create_user(client, admin, "lisa")
+    assert client.get("/api/invites/mailbox", headers=auth(user)).status_code == 403
+    assert client.put("/api/invites/mailbox", json=_mailbox_payload(),
+                      headers=auth(user)).status_code == 403
+
+
+def test_disabled_mailbox_counts_as_unconfigured(client):
+    token = register_admin(client)
+    client.put("/api/invites/mailbox", json=_mailbox_payload(enabled=False),
+               headers=auth(token))
+
+    assert client.get("/api/invites/status", headers=auth(token)).json()["imap_configured"] is False
+
+    db = SessionLocal()
+    try:
+        assert mail_invites.get_account(db) is None
+    finally:
+        db.close()

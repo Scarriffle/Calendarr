@@ -418,6 +418,46 @@ class UserEmailAddress(Base):
     user = relationship("User")
 
 
+class MailboxAccount(Base):
+    """The mailbox watched for invitations, configured in the UI.
+
+    One row per instance: this is a shared inbox that invitations are forwarded
+    to, not a per-user account. Administrators manage it.
+
+    The password is stored as given, the same as CalDAVAccount, GoogleAccount
+    and HomeAssistantAccount — IMAP needs the original to log in, so a hash is
+    no use. Worth knowing: unlike those three, this one opens an entire mailbox.
+    No endpoint ever returns it.
+
+    SMTP lives here too so replies to organisers have somewhere to come from.
+    """
+
+    __tablename__ = "mailbox_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    enabled = Column(Boolean, default=True, nullable=False)
+
+    imap_host = Column(String(255), nullable=False)
+    imap_port = Column(Integer, default=993, nullable=False)
+    imap_ssl = Column(Boolean, default=True, nullable=False)
+    imap_user = Column(String(255), nullable=False)
+    imap_password = Column(String(255), nullable=False)
+    imap_folder = Column(String(255), default="INBOX", nullable=False)
+    poll_minutes = Column(Integer, default=5, nullable=False)
+
+    smtp_host = Column(String(255), nullable=True)
+    smtp_port = Column(Integer, default=587, nullable=True)
+    smtp_ssl = Column(Boolean, default=False, nullable=True)
+    smtp_user = Column(String(255), nullable=True)
+    smtp_password = Column(String(255), nullable=True)
+    smtp_from = Column(String(255), nullable=True)
+
+    # Surfaced in the UI so a mailbox that stopped working says so, instead of
+    # invitations quietly never arriving.
+    last_run = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+
+
 class EventInvite(Base):
     """An iTIP invitation (METHOD:REQUEST) that arrived by mail.
 

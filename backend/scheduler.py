@@ -145,12 +145,11 @@ def install_default_jobs() -> None:
     ical_minutes = float(os.environ.get("ICAL_REFRESH_MINUTES", "15"))
     register("attachments.sweep", sweep_hours * 3600, sweep_attachments)
     register("ical.refresh", ical_minutes * 60, refresh_ical_subscriptions)
-    # Only when a mailbox is configured: an unconditional job would log every
-    # few minutes that it has nothing to do, and test_scheduler asserts the
-    # exact job set.
-    if os.environ.get("IMAP_HOST"):
-        poll_minutes = float(os.environ.get("MAIL_POLL_MINUTES", "5"))
-        register("mail.invites", poll_minutes * 60, fetch_mail_invites)
+    # Always registered: the mailbox is configured in the UI, so whether there
+    # is one to read can change without a restart. fetch_invites returns at once
+    # when none is set up.
+    mail_minutes = float(os.environ.get("MAIL_POLL_MINUTES", "5"))
+    register("mail.invites", mail_minutes * 60, fetch_mail_invites)
 
 
 @asynccontextmanager

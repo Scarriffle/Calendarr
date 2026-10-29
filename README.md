@@ -112,12 +112,7 @@ Configuration is done via environment variables. The `install.sh` script generat
 | `SCHEDULER_ENABLED` | `1` | `0` disables all background jobs |
 | `ATTACHMENT_SWEEP_HOURS` | `24` | How often orphaned attachments are cleaned up |
 | `ICAL_REFRESH_MINUTES` | `15` | How often iCal subscriptions are checked in the background |
-| `IMAP_HOST` | — | Mailbox watched for invitations. Unset disables the whole feature *(optional)* |
-| `IMAP_PORT` | `993` | |
-| `IMAP_SSL` | `1` | `0` for a plain connection |
-| `IMAP_USER` / `IMAP_PASSWORD` | — | Mailbox credentials |
-| `IMAP_FOLDER` | `INBOX` | |
-| `MAIL_POLL_MINUTES` | `5` | How often the mailbox is read |
+| `MAIL_POLL_MINUTES` | `5` | How often the watched mailbox is read |
 | `OIDC_PROVIDERS` | — | Comma-separated provider keys, e.g. `authentik` *(optional)* |
 
 Per provider `<KEY>` listed in `OIDC_PROVIDERS` (variable names are uppercased):
@@ -245,7 +240,7 @@ The server runs two periodic jobs in-process:
 |---|---|---|
 | `attachments.sweep` | 24 h | Removes attachment records whose event is gone, and files with no record |
 | `ical.refresh` | 15 min | Re-fetches iCal subscriptions that are due |
-| `mail.invites` | 5 min | Reads the watched mailbox for invitations *(only when `IMAP_HOST` is set)* |
+| `mail.invites` | 5 min | Reads the watched mailbox for invitations *(idle until one is configured)* |
 
 #### Invitations by mail
 
@@ -259,9 +254,12 @@ That matters when mail is forwarded: the invitation still names the original
 address, not the mailbox it arrived in, so put the address people actually
 invite into the user's profile.
 
-Credentials live in the environment rather than the database, so the one secret
-that opens a whole mailbox is never returned by any endpoint. One mailbox per
-instance; a forwarding target is the intended setup.
+The mailbox is set up under **Settings → Invitations** by an administrator: IMAP
+host, user, password, folder and how often to check. One mailbox per instance —
+it is a shared forwarding target, not a per-user account. The password is stored
+the same way CalDAV, Google and Home Assistant credentials are, and no endpoint
+returns it. Worth knowing before you point this at a real account: unlike those
+three, an IMAP password opens an entire mailbox.
 
 Attachments are normally cleaned up the moment an event, calendar or user is
 deleted; the sweep is the safety net for what gets past that — an external

@@ -179,6 +179,7 @@ export async function initCalendar() {
   bindSwipeNavigation();
   handleHAOAuthReturn();
   loadGroups();
+  loadInvites();
   try {
     await fetchAndRender();
   } catch (e) {
@@ -3717,7 +3718,7 @@ function populateSettings() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const usersNavBtn = document.getElementById('settings-nav-users');
   if (usersNavBtn) usersNavBtn.classList.toggle('hidden', !user.is_admin);
-  if (user.is_admin) { loadUsers(); loadAdminPanel(); }
+  if (user.is_admin) { loadUsers(); loadAdminPanel(); loadMailbox(); }
 
   // Activate panel from URL or fall back to first visible
   const urlTab = readUrlState().stab;
@@ -4772,6 +4773,148 @@ function renderCalendarTable() {
   });
 }
 
+// ── Einladungs-Postfach (nur Admin) ──────────────────────
+
+function mailboxFields() {
+  return {
+    enabled: document.getElementById('mb-enabled').checked,
+    imap_host: document.getElementById('mb-imap-host').value.trim(),
+    imap_user: document.getElementById('mb-imap-user').value.trim(),
+    imap_password: document.getElementById('mb-imap-password').value || null,
+    imap_port: parseInt(document.getElementById('mb-imap-port').value) || 993,
+    imap_ssl: document.getElementById('mb-imap-ssl').checked,
+    imap_folder: document.getElementById('mb-imap-folder').value.trim() || 'INBOX',
+    poll_minutes: parseInt(document.getElementById('mb-poll-minutes').value) || 5,
+  };
+}
+
+function renderMailboxStatus(cfg) {
+  const el = document.getElementById('mailbox-status');
+  if (!el) return;
+  if (!cfg) { el.textContent = t('invites_mailbox_none'); return; }
+  // A mailbox that stopped working has to say so, or invitations simply stop
+  // arriving and nothing explains why.
+  if (cfg.last_error) {
+    el.textContent = `${t('invites_last_error')}: ${cfg.last_error}`;
+    el.style.color = 'var(--danger, #ea4335)';
+  } else {
+    el.textContent = cfg.last_run
+      ? `${t('invites_last_run')}: ${new Date(cfg.last_run).toLocaleString()}`
+      : t('invites_never_run');
+    el.style.color = '';
+  }
+}
+
+async function loadMailbox() {
+  const host = document.getElementById('mb-imap-host');
+  if (!host) return;
+  let cfg = null;
+  try { cfg = await api.get('/invites/mailbox'); } catch { return; }
+  renderMailboxStatus(cfg);
+  if (!cfg) return;
+  host.value = cfg.imap_host || '';
+  document.getElementById('mb-imap-user').value = cfg.imap_user || '';
+  document.getElementById('mb-imap-port').value = cfg.imap_port || 993;
+  document.getElementById('mb-imap-folder').value = cfg.imap_folder || 'INBOX';
+  document.getElementById('mb-poll-minutes').value = cfg.poll_minutes || 5;
+  document.getElementById('mb-imap-ssl').checked = cfg.imap_ssl !== false;
+  document.getElementById('mb-enabled').checked = cfg.enabled !== false;
+  // Left blank on purpose: an empty field means "keep what is stored".
+  document.getElementById('mb-imap-password').value = '';
+}
+
+function wireMailbox() {
+  const save = document.getElementById('mb-save');
+  if (!save) return;
+  save.addEventListener('click', async () => {
+    try {
+      const cfg = await api.put('/invites/mailbox', mailboxFields());
+      document.getElementById('mb-imap-password').value = '';
+      renderMailboxStatus(cfg);
+      showToast(t('settings_saved'));
+    } catch (e) { showToast(e.message, true); }
+  });
+  document.getElementById('mb-poll').addEventListener('click', async () => {
+    try {
+      const r = await api.post('/invites/poll', {});
+      showToast(r.last_error ? r.last_error : t('invites_polled'), !!r.last_error);
+      await loadMailbox();
+      await loadInvites();
+    } catch (e) { showToast(e.message, true); }
+  });
+  document.getElementById('mb-delete').addEventListener('click', async () => {
+    if (!await confirmModal(t('invites_mailbox_remove_confirm'), { danger: true })) return;
+    try {
+      await api.delete('/invites/mailbox');
+      document.querySelectorAll('#settings-panel-users input[id^="mb-"]').forEach(el => {
+        if (el.type === 'checkbox') el.checked = true; else el.value = '';
+      });
+      renderMailboxStatus(null);
+      showToast(t('settings_saved'));
+    } catch (e) { showToast(e.message, true); }
+  });
+}
+
+// ── Anfragen ─────────────────────────────────────────────
+
+async function loadInvites() {
+  const box = document.getElementById('invite-list');
+  if (!box) return;
+  let rows = [];
+  try { rows = await api.get('/invites'); } catch { rows = []; }
+  box.classList.toggle('hidden', rows.length === 0);
+  const items = document.getElementById('invite-list-items');
+  items.innerHTML = '';
+  for (const inv of rows) {
+    const row = document.createElement('div');
+    row.className = 'cal-item';
+    const name = document.createElement('span');
+    name.className = 'cal-item-name';
+    // textContent throughout: this text came from a stranger's mail.
+    name.textContent = inv.title;
+    name.title = `${fmtInviteWhen(inv)}${inv.organizer_name ? ' · ' + inv.organizer_name : ''}`;
+    row.appendChild(name);
+    if (inv.status === 'cancelled') {
+      const tag = document.createElement('span');
+      tag.className = 'cal-badge';
+      tag.textContent = t('invite_cancelled');
+      row.appendChild(tag);
+      row.appendChild(inviteBtn(inv, 'dismiss', '✕'));
+    } else {
+      row.appendChild(inviteBtn(inv, 'accept', '✓'));
+      row.appendChild(inviteBtn(inv, 'decline', '✕'));
+    }
+    items.appendChild(row);
+  }
+}
+
+function fmtInviteWhen(inv) {
+  try {
+    const d = new Date(inv.start);
+    return inv.all_day ? d.toLocaleDateString() : d.toLocaleString();
+  } catch { return inv.start; }
+}
+
+function inviteBtn(inv, action, label) {
+  const b = document.createElement('button');
+  b.className = 'icon-btn mini-btn';
+  b.textContent = label;
+  b.title = t(`invite_${action}`);
+  b.addEventListener('click', async () => {
+    try {
+      if (action === 'dismiss') {
+        await api.delete(`/invites/${inv.id}`);
+      } else {
+        await api.post(`/invites/${inv.id}/respond`, { action });
+        showToast(t(action === 'accept' ? 'invite_accepted' : 'invite_declined'));
+      }
+      await loadInvites();
+      if (action === 'accept') fetchAndRender(true);
+    } catch (e) { showToast(e.message, true); }
+  });
+  return b;
+}
+
 async function loadUsers() {
   try {
     const users = await api.get('/users/');
@@ -4992,6 +5135,7 @@ function bindSettingsModal() {
 
   // Admin panel (default-theme editor + branding) — buttons bound once.
   bindAdminPanel();
+  wireMailbox();
 
   // Theme export / import (client-side .theme files).
   const themeExportBtn = document.getElementById('cfg-theme-export');

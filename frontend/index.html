@@ -235,6 +235,14 @@
           </div>
           <div id="group-list-items"></div>
         </div>
+
+        <!-- Invitations awaiting a decision -->
+        <div class="cal-list hidden" id="invite-list">
+          <div class="cal-list-header">
+            <span data-i18n="invites_title">Anfragen</span>
+          </div>
+          <div id="invite-list-items"></div>
+        </div>
       </div>
       <button class="sidebar-copyright" id="sidebar-copyright" onclick="openImpressum()">©&nbsp;2026&nbsp;Scarriffleservices</button>
     </aside>
@@ -902,6 +910,46 @@
               <input type="checkbox" id="new-is-admin" /> Administrator
             </label>
             <button class="btn btn-primary" id="new-user-save">Erstellen</button>
+          </div>
+
+          <!-- Postfach für Einladungen -->
+          <h4 class="panel-title" style="margin-top:28px"><span data-i18n="invites_mailbox">Einladungs-Postfach</span></h4>
+          <p class="panel-desc" data-i18n="invites_mailbox_desc">Ein Postfach, in dem Termin-Einladungen ankommen. Sie erscheinen als Anfrage und werden erst zu Terminen, wenn du sie annimmst. Zugeordnet wird über die Teilnehmer-Adresse der Einladung — trag die Adresse, unter der du eingeladen wirst, in deinem Profil ein.</p>
+          <div id="mailbox-status" class="panel-desc"></div>
+          <div class="form-group">
+            <label data-i18n="invites_imap_host">IMAP-Server</label>
+            <input type="text" id="mb-imap-host" spellcheck="false" autocapitalize="none" placeholder="imap.example.com" />
+          </div>
+          <div class="form-group">
+            <label data-i18n="invites_imap_user">Benutzername</label>
+            <input type="text" id="mb-imap-user" spellcheck="false" autocapitalize="none" />
+          </div>
+          <div class="form-group">
+            <label data-i18n="invites_imap_password">Passwort</label>
+            <input type="password" id="mb-imap-password" autocomplete="new-password" data-i18n-placeholder="invites_password_keep" placeholder="Unverändert lassen" />
+          </div>
+          <div class="form-group">
+            <label data-i18n="invites_imap_port">Port</label>
+            <input type="number" id="mb-imap-port" value="993" min="1" max="65535" />
+          </div>
+          <div class="form-group">
+            <label data-i18n="invites_imap_folder">Ordner</label>
+            <input type="text" id="mb-imap-folder" value="INBOX" spellcheck="false" />
+          </div>
+          <div class="form-group">
+            <label data-i18n="invites_poll_minutes">Abrufintervall (Minuten)</label>
+            <input type="number" id="mb-poll-minutes" value="5" min="1" max="1440" />
+          </div>
+          <label class="toggle-label" style="margin-bottom:8px">
+            <input type="checkbox" id="mb-imap-ssl" checked /> <span data-i18n="invites_imap_ssl">SSL/TLS</span>
+          </label>
+          <label class="toggle-label" style="margin-bottom:8px">
+            <input type="checkbox" id="mb-enabled" checked /> <span data-i18n="invites_enabled">Aktiv</span>
+          </label>
+          <div class="admin-theme-actions">
+            <button class="btn btn-primary btn-sm" id="mb-save" data-i18n="save">Speichern</button>
+            <button class="btn btn-secondary btn-sm" id="mb-poll" data-i18n="invites_poll_now">Jetzt abrufen</button>
+            <button class="btn btn-ghost btn-sm" id="mb-delete" data-i18n="invites_mailbox_remove">Postfach entfernen</button>
           </div>
 
           <!-- Instanz-Standardtheme -->

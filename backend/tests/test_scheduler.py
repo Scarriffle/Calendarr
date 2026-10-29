@@ -19,9 +19,10 @@ def _run(fn):
 def test_default_jobs_are_registered_with_sane_intervals():
     scheduler.install_default_jobs()
     names = {j.name: j for j in scheduler._jobs}
-    assert set(names) == {"attachments.sweep", "ical.refresh"}
+    assert set(names) == {"attachments.sweep", "ical.refresh", "mail.invites"}
     assert names["attachments.sweep"].interval == 24 * 3600
     assert names["ical.refresh"].interval == 15 * 60
+    assert names["mail.invites"].interval == 5 * 60
     # Nothing runs immediately: a restart must not be slowed by maintenance.
     assert all(j.next_run > time.monotonic() for j in scheduler._jobs)
 

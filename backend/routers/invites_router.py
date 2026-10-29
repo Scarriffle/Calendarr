@@ -131,21 +131,134 @@ def dismiss(invite_id: int, db: Session = Depends(get_db),
 
 
 @router.get("/status")
-def status(current_user: models.User = Depends(get_current_user)):
-    return {"imap_configured": mail_invites.is_configured()}
+def status(db: Session = Depends(get_db),
+           current_user: models.User = Depends(get_current_user)):
+    acc = mail_invites.get_account(db)
+    return {
+        "imap_configured": acc is not None,
+        "smtp_configured": bool(acc and acc.smtp_host),
+        "last_run": acc.last_run.isoformat() if acc and acc.last_run else None,
+        "last_error": acc.last_error if acc else None,
+    }
+
+
+# ── Mailbox configuration ─────────────────────────────────
+#
+# One mailbox per instance: it is a shared forwarding target, not a per-user
+# account, so only administrators may see or change it.
+
+
+def _require_admin(user: models.User) -> None:
+    if not user.is_admin:
+        raise HTTPException(403, "Nur für Administratoren")
+
+
+def _mailbox_dict(acc) -> dict | None:
+    if acc is None:
+        return None
+    # Passwords are never returned, the same as the CalDAV account endpoints.
+    return {
+        "id": acc.id,
+        "enabled": bool(acc.enabled),
+        "imap_host": acc.imap_host,
+        "imap_port": acc.imap_port,
+        "imap_ssl": bool(acc.imap_ssl),
+        "imap_user": acc.imap_user,
+        "imap_folder": acc.imap_folder,
+        "poll_minutes": acc.poll_minutes,
+        "has_imap_password": bool(acc.imap_password),
+        "smtp_host": acc.smtp_host,
+        "smtp_port": acc.smtp_port,
+        "smtp_ssl": bool(acc.smtp_ssl),
+        "smtp_user": acc.smtp_user,
+        "smtp_from": acc.smtp_from,
+        "has_smtp_password": bool(acc.smtp_password),
+        "last_run": acc.last_run.isoformat() if acc.last_run else None,
+        "last_error": acc.last_error,
+    }
+
+
+class MailboxUpdate(BaseModel):
+    enabled: bool = True
+    imap_host: str
+    imap_port: int = 993
+    imap_ssl: bool = True
+    imap_user: str
+    # Optional on edit: left out keeps the stored one, so changing a port does
+    # not mean retyping the password.
+    imap_password: Optional[str] = None
+    imap_folder: str = "INBOX"
+    poll_minutes: int = 5
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_ssl: Optional[bool] = False
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from: Optional[str] = None
+
+
+@router.get("/mailbox")
+def get_mailbox(db: Session = Depends(get_db),
+                current_user: models.User = Depends(get_current_user)):
+    _require_admin(current_user)
+    return _mailbox_dict(
+        db.query(models.MailboxAccount).order_by(models.MailboxAccount.id).first())
+
+
+@router.put("/mailbox")
+def set_mailbox(data: MailboxUpdate, db: Session = Depends(get_db),
+                current_user: models.User = Depends(get_current_user)):
+    _require_admin(current_user)
+    acc = db.query(models.MailboxAccount).order_by(models.MailboxAccount.id).first()
+    if acc is None:
+        acc = models.MailboxAccount(imap_host="", imap_user="", imap_password="")
+        db.add(acc)
+
+    if not data.imap_password and not acc.imap_password:
+        raise HTTPException(422, "Passwort fehlt")
+    if not 1 <= data.poll_minutes <= 1440:
+        raise HTTPException(422, "Abrufintervall muss zwischen 1 und 1440 Minuten liegen")
+
+    acc.enabled = data.enabled
+    acc.imap_host = data.imap_host.strip()
+    acc.imap_port = data.imap_port
+    acc.imap_ssl = data.imap_ssl
+    acc.imap_user = data.imap_user.strip()
+    if data.imap_password:
+        acc.imap_password = data.imap_password
+    acc.imap_folder = (data.imap_folder or "INBOX").strip()
+    acc.poll_minutes = data.poll_minutes
+    acc.smtp_host = (data.smtp_host or "").strip() or None
+    acc.smtp_port = data.smtp_port
+    acc.smtp_ssl = bool(data.smtp_ssl)
+    acc.smtp_user = (data.smtp_user or "").strip() or None
+    if data.smtp_password:
+        acc.smtp_password = data.smtp_password
+    acc.smtp_from = (data.smtp_from or "").strip() or None
+    # Settings changed, so whatever went wrong before is no longer current.
+    acc.last_error = None
+    db.commit()
+    return _mailbox_dict(acc)
+
+
+@router.delete("/mailbox")
+def delete_mailbox(db: Session = Depends(get_db),
+                   current_user: models.User = Depends(get_current_user)):
+    _require_admin(current_user)
+    acc = db.query(models.MailboxAccount).order_by(models.MailboxAccount.id).first()
+    if acc:
+        db.delete(acc)
+        db.commit()
+    return {"ok": True}
 
 
 @router.post("/poll")
 def poll_now(db: Session = Depends(get_db),
              current_user: models.User = Depends(get_current_user)):
-    """Fetch right now instead of waiting for the scheduler.
-
-    Admin-only: it opens a connection to the shared mailbox, so it is not a
-    per-user action.
-    """
-    if not current_user.is_admin:
-        raise HTTPException(403, "Nur für Administratoren")
-    if not mail_invites.is_configured():
+    """Fetch right now instead of waiting for the scheduler."""
+    _require_admin(current_user)
+    if not mail_invites.is_configured(db):
         raise HTTPException(400, "Kein Postfach konfiguriert")
     mail_invites.fetch_invites(db)
-    return {"ok": True}
+    acc = mail_invites.get_account(db)
+    return {"ok": True, "last_error": acc.last_error if acc else None}

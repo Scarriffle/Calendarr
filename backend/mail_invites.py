@@ -6,9 +6,10 @@ mail can only ever create a row in ``event_invites``. No calendar read path
 touches that table — an invitation becomes an event when a human accepts it, and
 not before.
 
-Credentials live in the environment, never in the database. The service already
-loads an EnvironmentFile, and this keeps the one secret that grants access to a
-whole mailbox out of a table that an endpoint could return.
+The mailbox is configured in the UI and stored in ``mailbox_accounts`` — one row
+per instance, since it is a shared forwarding target rather than a per-user
+account. The password is kept as given, like every other external account here;
+no endpoint returns it.
 
 Single process assumed, same as the rest of the scheduler (see scheduler.py).
 """
@@ -18,7 +19,6 @@ from __future__ import annotations
 import contextlib
 import imaplib
 import logging
-import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -49,8 +49,15 @@ _ADDR_RE = re.compile(r"^[^@\s<>\",;:]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 _HANDLED_METHODS = ("REQUEST", "CANCEL")
 
 
-def is_configured() -> bool:
-    return bool(os.environ.get("IMAP_HOST"))
+def get_account(db: Session):
+    """The configured mailbox, or None. Disabled counts as not configured."""
+    return (db.query(models.MailboxAccount)
+              .filter(models.MailboxAccount.enabled.is_(True))
+              .order_by(models.MailboxAccount.id).first())
+
+
+def is_configured(db: Session) -> bool:
+    return get_account(db) is not None
 
 
 def _valid_address(addr: str | None) -> str | None:
@@ -193,13 +200,10 @@ def ingest_ics(db: Session, raw: bytes) -> bool:
 # ── Mailbox ───────────────────────────────────────────────
 
 
-def _connect() -> imaplib.IMAP4:
-    host = os.environ["IMAP_HOST"]
-    port = int(os.environ.get("IMAP_PORT", "993"))
-    use_ssl = os.environ.get("IMAP_SSL", "1") != "0"
-    box = (imaplib.IMAP4_SSL(host, port, timeout=30) if use_ssl
-           else imaplib.IMAP4(host, port, timeout=30))
-    box.login(os.environ["IMAP_USER"], os.environ["IMAP_PASSWORD"])
+def _connect(acc) -> imaplib.IMAP4:
+    box = (imaplib.IMAP4_SSL(acc.imap_host, acc.imap_port, timeout=30) if acc.imap_ssl
+           else imaplib.IMAP4(acc.imap_host, acc.imap_port, timeout=30))
+    box.login(acc.imap_user, acc.imap_password)
     return box
 
 
@@ -246,12 +250,29 @@ def _handle_message(db: Session, box: imaplib.IMAP4, uid: bytes) -> None:
 
 
 def fetch_invites(db: Session) -> None:
-    """Scheduler job: read new mail and store any invitations it holds."""
-    if not is_configured():
+    """Scheduler job: read new mail and store any invitations it holds.
+
+    Records what happened on the account so the UI can show a mailbox that
+    stopped working, rather than letting invitations quietly never arrive.
+    """
+    acc = get_account(db)
+    if acc is None:
         return
-    box = _connect()
     try:
-        box.select(os.environ.get("IMAP_FOLDER", "INBOX"))
+        _run(db, acc)
+        acc.last_error = None
+    except Exception as exc:
+        logger.exception("Postfach %s nicht erreichbar", acc.imap_host)
+        acc.last_error = f"{type(exc).__name__}: {exc}"[:500]
+    acc.last_run = datetime.now(timezone.utc)
+    with contextlib.suppress(Exception):
+        db.commit()
+
+
+def _run(db: Session, acc) -> None:
+    box = _connect(acc)
+    try:
+        box.select(acc.imap_folder or "INBOX")
         # UID commands, not sequence numbers: those shift when a message is
         # expunged mid-run and we would read the wrong mail.
         typ, data = box.uid("SEARCH", None, "UNSEEN")
