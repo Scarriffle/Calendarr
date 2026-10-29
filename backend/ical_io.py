@@ -60,8 +60,50 @@ def _organizer_name(component) -> str | None:
     return raw or None
 
 
+def _cal_address(prop) -> str | None:
+    """The bare lowercase address of an ORGANIZER/ATTENDEE property."""
+    if prop is None:
+        return None
+    raw = str(prop).strip()
+    if raw.lower().startswith("mailto:"):
+        raw = raw[7:]
+    raw = raw.strip().strip("<>").lower()
+    return raw or None
+
+
+def _attendees(component) -> list[dict]:
+    """The ATTENDEE list with the parameters an iTIP reply needs.
+
+    icalendar hands back a single property when there is one attendee and a
+    list when there are several, so both shapes have to be normalised.
+    """
+    raw = component.get("ATTENDEE")
+    if raw is None:
+        return []
+    items = raw if isinstance(raw, list) else [raw]
+    out = []
+    for prop in items:
+        email = _cal_address(prop)
+        if not email:
+            continue
+        params = getattr(prop, "params", {}) or {}
+        out.append({
+            "email": email,
+            "cn": str(params.get("CN")) if params.get("CN") else None,
+            "partstat": str(params.get("PARTSTAT") or "NEEDS-ACTION").upper(),
+            "role": str(params.get("ROLE") or "REQ-PARTICIPANT").upper(),
+            "rsvp": str(params.get("RSVP") or "").upper() == "TRUE",
+        })
+    return out
+
+
 def parse_ics(raw: bytes) -> dict:
-    """Parse .ics bytes into {"events": [dict, ...], "errors": [str, ...]}.
+    """Parse .ics bytes into {"method": str|None, "events": [...], "errors": [...]}.
+
+    ``method`` sits on the VCALENDAR, not on a VEVENT, so it is read outside the
+    component loop — it is the only reliable way to tell an invitation
+    (METHOD:REQUEST) from a plain calendar file. Every key added for iTIP is
+    additive: existing callers read the ones they already knew.
 
     Raises ValueError if the payload is not a parseable calendar at all.
     """
@@ -127,11 +169,19 @@ def parse_ics(raw: bytes) -> dict:
                 "rrule": _rrule_to_str(component),
                 "exdate": _exdate_to_csv(component),
                 "organizer": _organizer_name(component),
+                "organizer_email": _cal_address(component.get("ORGANIZER")),
+                "attendees": _attendees(component),
+                "sequence": int(component.get("SEQUENCE", 0) or 0),
+                # A single occurrence of a series. Applying one as if it were
+                # the whole series would silently replace every other date.
+                "recurrence_id": (str(component.get("RECURRENCE-ID").dt)
+                                  if component.get("RECURRENCE-ID") is not None else None),
             })
         except Exception as exc:
             logger.warning("Skipping malformed VEVENT: %s", exc)
             errors.append(f"Fehlerhafter Eintrag übersprungen: {exc}")
-    return {"events": events, "errors": errors}
+    method = str(cal.get("METHOD") or "").upper() or None
+    return {"method": method, "events": events, "errors": errors}
 
 
 def _rrule_str_to_vrecur(rrule_str: str) -> vRecur:

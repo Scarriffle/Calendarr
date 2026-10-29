@@ -398,6 +398,74 @@ class HomeAssistantCalendar(Base):
 # ── Collaboration: sharing & groups (local calendars only) ────────────────
 
 
+class UserEmailAddress(Base):
+    """An address under which this user appears in an ATTENDEE list.
+
+    A list rather than a column: the mail arrives at a forwarding mailbox while
+    the invitation still names the original address, and people hand out more
+    than one. Globally unique so nobody can claim someone else's address and
+    push events into their calendar.
+    """
+
+    __tablename__ = "user_email_addresses"
+    __table_args__ = (UniqueConstraint("address", name="uq_user_email_address"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # Always lowercase and without the "mailto:" prefix.
+    address = Column(String(255), nullable=False)
+
+    user = relationship("User")
+
+
+class EventInvite(Base):
+    """An iTIP invitation (METHOD:REQUEST) that arrived by mail.
+
+    Raw *and* parsed. ``raw_ics`` is the only thing the organiser actually sent,
+    and the reply is built from it — a rebuilt DTSTART is what strict
+    counterparts reject. The parsed columns exist so clients can render a list
+    without parsing iCalendar, and use the same formats as LocalEvent.
+
+    Nothing here is visible in any calendar read path: an invitation becomes an
+    event only when a human accepts it.
+    """
+
+    __tablename__ = "event_invites"
+    __table_args__ = (UniqueConstraint("user_id", "uid", name="uq_event_invite_user_uid"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # The organiser's UID. Only ever matched together with user_id, so two
+    # users invited to the same meeting never collide.
+    uid = Column(String(255), nullable=False)
+    sequence = Column(Integer, default=0, nullable=False)
+    # pending | accepted | declined | cancelled
+    status = Column(String(12), default="pending", nullable=False)
+
+    title = Column(String(255), nullable=False)
+    start = Column(String(50), nullable=False)
+    end = Column(String(50), nullable=False)
+    all_day = Column(Boolean, default=False)
+    location = Column(String(500), nullable=True)
+    description = Column(Text, nullable=True)
+    rrule = Column(Text, nullable=True)
+
+    organizer_email = Column(String(255), nullable=True)
+    organizer_name = Column(String(255), nullable=True)
+    # The ATTENDEE address that matched this user. The reply must name exactly
+    # this one or the organiser will not recognise the answer.
+    attendee_email = Column(String(255), nullable=False)
+
+    raw_ics = Column(Text, nullable=False)
+    # The event created on acceptance, so an update or a CANCEL can find it.
+    event_id = Column(Integer, ForeignKey("local_events.id"), nullable=True)
+    received_at = Column(DateTime, default=datetime.utcnow)
+    # None | sent | failed | skipped
+    reply_state = Column(String(12), nullable=True)
+
+    user = relationship("User")
+
+
 class CalendarShare(Base):
     """A local calendar shared with another Calendarr user."""
 

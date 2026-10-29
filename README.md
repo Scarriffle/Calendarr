@@ -112,6 +112,12 @@ Configuration is done via environment variables. The `install.sh` script generat
 | `SCHEDULER_ENABLED` | `1` | `0` disables all background jobs |
 | `ATTACHMENT_SWEEP_HOURS` | `24` | How often orphaned attachments are cleaned up |
 | `ICAL_REFRESH_MINUTES` | `15` | How often iCal subscriptions are checked in the background |
+| `IMAP_HOST` | — | Mailbox watched for invitations. Unset disables the whole feature *(optional)* |
+| `IMAP_PORT` | `993` | |
+| `IMAP_SSL` | `1` | `0` for a plain connection |
+| `IMAP_USER` / `IMAP_PASSWORD` | — | Mailbox credentials |
+| `IMAP_FOLDER` | `INBOX` | |
+| `MAIL_POLL_MINUTES` | `5` | How often the mailbox is read |
 | `OIDC_PROVIDERS` | — | Comma-separated provider keys, e.g. `authentik` *(optional)* |
 
 Per provider `<KEY>` listed in `OIDC_PROVIDERS` (variable names are uppercased):
@@ -239,6 +245,23 @@ The server runs two periodic jobs in-process:
 |---|---|---|
 | `attachments.sweep` | 24 h | Removes attachment records whose event is gone, and files with no record |
 | `ical.refresh` | 15 min | Re-fetches iCal subscriptions that are due |
+| `mail.invites` | 5 min | Reads the watched mailbox for invitations *(only when `IMAP_HOST` is set)* |
+
+#### Invitations by mail
+
+With a mailbox configured, invitations sent to it appear under **Requests** and
+become calendar entries only once someone accepts them. Nothing a mail contains
+is written to a calendar on its own.
+
+An invitation is matched to a user by its `ATTENDEE` address, never by the
+sender — compared against that user's `email` plus any additional addresses.
+That matters when mail is forwarded: the invitation still names the original
+address, not the mailbox it arrived in, so put the address people actually
+invite into the user's profile.
+
+Credentials live in the environment rather than the database, so the one secret
+that opens a whole mailbox is never returned by any endpoint. One mailbox per
+instance; a forwarding target is the intended setup.
 
 Attachments are normally cleaned up the moment an event, calendar or user is
 deleted; the sweep is the safety net for what gets past that — an external

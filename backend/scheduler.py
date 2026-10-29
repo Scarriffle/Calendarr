@@ -133,11 +133,24 @@ def refresh_ical_subscriptions(db: Session) -> None:
                 db.rollback()
 
 
+def fetch_mail_invites(db: Session) -> None:
+    """Read the watched mailbox for new invitations."""
+    import mail_invites
+
+    mail_invites.fetch_invites(db)
+
+
 def install_default_jobs() -> None:
     sweep_hours = float(os.environ.get("ATTACHMENT_SWEEP_HOURS", "24"))
     ical_minutes = float(os.environ.get("ICAL_REFRESH_MINUTES", "15"))
     register("attachments.sweep", sweep_hours * 3600, sweep_attachments)
     register("ical.refresh", ical_minutes * 60, refresh_ical_subscriptions)
+    # Only when a mailbox is configured: an unconditional job would log every
+    # few minutes that it has nothing to do, and test_scheduler asserts the
+    # exact job set.
+    if os.environ.get("IMAP_HOST"):
+        poll_minutes = float(os.environ.get("MAIL_POLL_MINUTES", "5"))
+        register("mail.invites", poll_minutes * 60, fetch_mail_invites)
 
 
 @asynccontextmanager
