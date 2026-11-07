@@ -117,6 +117,17 @@ def _migrate():
         except Exception:
             pass
 
+        for col, ddl in (
+            ("allday_reminder_days", "ALTER TABLE user_settings ADD COLUMN allday_reminder_days INTEGER"),
+            ("allday_reminder_time", "ALTER TABLE user_settings ADD COLUMN allday_reminder_time VARCHAR(5)"),
+        ):
+            try:
+                conn.execute(text(ddl))
+                conn.commit()
+                logging.info("Migration: added %s to user_settings", col)
+            except Exception:
+                pass
+
         try:
             conn.execute(text("ALTER TABLE user_settings ADD COLUMN month_divider_color VARCHAR(7) DEFAULT '#7090c0'"))
             conn.commit()

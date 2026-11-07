@@ -32,6 +32,12 @@ enum L10n {
 
 private let strings: [String: [String: String]] = [
     "de": [
+        "reminder.allday.title": "Ganztägige Termine",
+        "reminder.allday.at": "Uhrzeit",
+        "reminder.allday.same_day": "Am selben Tag",
+        "reminder.allday.one_day": "1 Tag vorher",
+        "reminder.allday.one_week": "1 Woche vorher",
+        "reminder.allday.days": "Tage vorher",
         // Top bar / navigation
         "nav.today": "Heute",
         "nav.menu": "Menü",
@@ -439,6 +445,12 @@ private let strings: [String: [String: String]] = [
         "ha.connect": "Verbinden"
     ],
     "en": [
+        "reminder.allday.title": "All-day events",
+        "reminder.allday.at": "Time",
+        "reminder.allday.same_day": "Same day",
+        "reminder.allday.one_day": "1 day before",
+        "reminder.allday.one_week": "1 week before",
+        "reminder.allday.days": "days before",
         "nav.today": "Today",
         "nav.menu": "Menu",
         "nav.done": "Done",

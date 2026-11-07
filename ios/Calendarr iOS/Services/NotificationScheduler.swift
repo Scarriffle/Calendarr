@@ -27,6 +27,8 @@ enum NotificationScheduler {
                     || settings.authorizationStatus == .provisional else { return }
 
             let defaultMin = (UserDefaults.standard.object(forKey: "defaultReminderMinutes") as? Int) ?? -1
+            let allDayDays = (UserDefaults.standard.object(forKey: "allDayReminderDays") as? Int) ?? -1
+            let allDayTime = UserDefaults.standard.string(forKey: "allDayReminderTime") ?? "09:00"
             let now = Date()
             var pending: [(fire: Date, event: CalEvent)] = []
             for ev in events {
@@ -39,12 +41,15 @@ enum NotificationScheduler {
                 // app, so applying our default here notifies twice for one
                 // event. They stay silent unless the event carries its own
                 // reminder; the per-calendar toggle can still switch them on.
-                let allowsDefault = defaultMin >= 0 && ev.source != "device"
+                let allowsDefault = (ev.isAllDay ? allDayDays >= 0 : defaultMin >= 0)
+                    && ev.source != "device"
+                let fallback = ev.isAllDay ? allDayDays * 1440 : defaultMin
                 let offsets = ev.reminders.isEmpty
-                    ? (allowsDefault ? [defaultMin] : [])
+                    ? (allowsDefault ? [fallback] : [])
                     : ev.reminders
                 for m in offsets {
-                    let fire = ev.startDate.addingTimeInterval(-Double(m) * 60)
+                    guard let fire = fireDate(for: ev, offsetMinutes: m, allDayTime: allDayTime)
+                    else { continue }
                     if fire > now { pending.append((fire, ev)) }
                 }
             }
@@ -55,8 +60,9 @@ enum NotificationScheduler {
             for item in limited {
                 let content = UNMutableNotificationContent()
                 content.title = item.event.title
-                let minutes = Int(item.event.startDate.timeIntervalSince(item.fire) / 60)
-                let rel     = relativeText(minutes)
+                let rel = item.event.isAllDay
+                    ? allDayRelativeText(from: item.fire, to: item.event.startDate)
+                    : relativeText(Int(item.event.startDate.timeIntervalSince(item.fire) / 60))
                 let detail  = bodyText(item.event)
                 content.body = detail.isEmpty ? rel : "\(rel) · \(detail)"
                 content.sound = .default
@@ -68,12 +74,48 @@ enum NotificationScheduler {
         }
     }
 
+    /// When a reminder should fire.
+    ///
+    /// An all-day event starts at local midnight, so a minute offset puts the
+    /// reminder in the middle of the night — 30 minutes before becomes 23:30.
+    /// For those the offset is read as whole days instead, and the time of day
+    /// comes from the setting. Birthday calendars inherit that for free: the
+    /// offsets the server injects for them are always multiples of 1440.
+    private static func fireDate(for ev: CalEvent, offsetMinutes m: Int,
+                                 allDayTime: String) -> Date? {
+        guard ev.isAllDay else {
+            return ev.startDate.addingTimeInterval(-Double(m) * 60)
+        }
+        let cal = Calendar.current
+        let days = Int((Double(m) / 1440.0).rounded())
+        guard let day = cal.date(byAdding: .day, value: -days,
+                                 to: cal.startOfDay(for: ev.startDate)) else { return nil }
+        let parts = allDayTime.split(separator: ":")
+        let hour = parts.count == 2 ? (Int(parts[0]) ?? 9) : 9
+        let minute = parts.count == 2 ? (Int(parts[1]) ?? 0) : 0
+        return cal.date(bySettingHour: min(max(hour, 0), 23),
+                        minute: min(max(minute, 0), 59), second: 0, of: day)
+    }
+
     private static func relativeText(_ minutes: Int) -> String {
         if minutes < 60    { return "in \(minutes) Min." }
         if minutes == 60   { return "in 1 Std." }
         if minutes < 1440  { return "in \(minutes / 60) Std." }
         if minutes == 1440 { return "morgen" }
         return "in \(minutes / 1440) Tagen"
+    }
+
+    /// "heute" / "morgen" / "in N Tagen" — counted in calendar days, because a
+    /// reminder at 09:00 for a midnight start is 15 hours away, not a day.
+    private static func allDayRelativeText(from fire: Date, to start: Date) -> String {
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: fire),
+                                      to: cal.startOfDay(for: start)).day ?? 0
+        switch days {
+        case ..<1: return "heute"
+        case 1:    return "morgen"
+        default:   return "in \(days) Tagen"
+        }
     }
 
     private static func bodyText(_ ev: CalEvent) -> String {

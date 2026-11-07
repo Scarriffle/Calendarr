@@ -4,6 +4,19 @@ import Foundation
 /// their localized labels. Shared by the event editor, the settings default
 /// picker, and the notification scheduler so the choices stay consistent.
 enum ReminderOptions {
+    /// Day counts offered for all-day events. Stored as minutes (days * 1440)
+    /// so the on-disk format does not change — only how it is read back.
+    static let allDayDays = [0, 1, 2, 3, 7]
+
+    static func allDayLabel(_ days: Int, _ lang: String) -> String {
+        switch days {
+        case 0:  return L10n.t("reminder.allday.same_day", lang)
+        case 1:  return L10n.t("reminder.allday.one_day", lang)
+        case 7:  return L10n.t("reminder.allday.one_week", lang)
+        default: return "\(days) " + L10n.t("reminder.allday.days", lang)
+        }
+    }
+
     /// Selectable offsets in minutes-before-start.
     static let all: [Int] = [0, 5, 15, 30, 60, 1440, 10080]
 

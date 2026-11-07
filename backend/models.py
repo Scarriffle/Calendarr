@@ -132,6 +132,11 @@ class UserSettings(Base):
     # Default reminder in minutes-before-start applied to all events client-side
     # (0 = at start time). NULL = no default reminder.
     default_reminder_minutes = Column(Integer, nullable=True)
+    # All-day events start at local midnight, so a minute offset puts the
+    # reminder at 23:30 the night before. These two say it properly: N days
+    # ahead, at a time of day.
+    allday_reminder_days = Column(Integer, nullable=True)   # NULL = off, 0 = same day
+    allday_reminder_time = Column(String(5), nullable=True)  # "HH:MM", NULL = 09:00
     # Default duration (in minutes) applied to a newly created event's end time.
     default_event_duration_minutes = Column(Integer, default=60)
     # Icon key (from GROUP_ICON_KEYS) shown next to calendars this user shares with groups.

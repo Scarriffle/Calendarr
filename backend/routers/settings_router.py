@@ -32,6 +32,8 @@ DEFAULT_SYNC = {
     "month_label_color": True,
     "default_event_duration_minutes": True,
     "default_reminder_minutes": True,
+    "allday_reminder_days": True,
+    "allday_reminder_time": True,
     "language": False,
     "share_calendar_icon": False,
     "cache_months": False,
@@ -89,6 +91,8 @@ class SettingsUpdate(BaseModel):
     private_event_visibility: Optional[str] = None
     group_visible_calendar_id: Optional[int] = None
     default_reminder_minutes: Optional[int] = None  # null = off
+    allday_reminder_days: Optional[int] = None  # null = off, 0 = same day
+    allday_reminder_time: Optional[str] = None  # "HH:MM"
     default_event_duration_minutes: Optional[int] = None
     share_calendar_icon: Optional[str] = None
     cache_months: Optional[int] = None
@@ -126,6 +130,8 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "private_event_visibility": s.private_event_visibility or "busy",
         "group_visible_calendar_id": s.group_visible_calendar_id,
         "default_reminder_minutes": s.default_reminder_minutes,
+        "allday_reminder_days": s.allday_reminder_days,
+        "allday_reminder_time": s.allday_reminder_time or "09:00",
         "default_event_duration_minutes": s.default_event_duration_minutes or 60,
         "share_calendar_icon": s.share_calendar_icon,
         "cache_months": s.cache_months or 3,
@@ -188,7 +194,7 @@ def update_settings(
     # For these three override colours, an explicit null is meaningful
     # ("reset to default") and must be persisted as NULL. All other fields
     # keep the previous behaviour where a null/missing value is ignored.
-    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "surface_color", "hover_highlight_color", "icon_inactive_color", "icon_active_color", "day_hover_color", "day_selected_color", "day_bg_color", "today_bg_color", "group_visible_calendar_id", "default_reminder_minutes", "default_event_duration_minutes", "share_calendar_icon", "primary_color", "accent_color", "today_color", "month_divider_color", "month_label_color"}
+    NULLABLE_OVERRIDES = {"text_color", "line_color", "bg_color", "surface_color", "hover_highlight_color", "icon_inactive_color", "icon_active_color", "day_hover_color", "day_selected_color", "day_bg_color", "today_bg_color", "group_visible_calendar_id", "default_reminder_minutes", "allday_reminder_days", "default_event_duration_minutes", "share_calendar_icon", "primary_color", "accent_color", "today_color", "month_divider_color", "month_label_color"}
     update_data = data.model_dump(exclude_unset=True)
 
     # Merge sync-flag overrides into the stored account-wide JSON map. Only known
@@ -208,7 +214,10 @@ def update_settings(
 
     for field, value in update_data.items():
         if field in NULLABLE_OVERRIDES:
-            setattr(settings, field, value or None)
+            # Not `value or None`: that turned 0 into NULL, so "at start time"
+            # and "same day" silently became "off" — the one setting birthdays
+            # need most. Only an actual null and an empty string mean "unset".
+            setattr(settings, field, None if value is None or value == "" else value)
         elif value is not None:
             setattr(settings, field, value)
 

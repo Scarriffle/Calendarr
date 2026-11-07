@@ -19,6 +19,9 @@ struct AppSettings: Codable {
     var privateEventVisibility: String = "busy"   // 'hidden' | 'busy'
     var groupVisibleCalendarId: Int? = nil
     var defaultReminderMinutes: Int? = nil         // minutes before start; nil = off
+    // All-day events start at midnight, so minutes are meaningless for them.
+    var allDayReminderDays: Int? = nil             // days before; nil = off, 0 = same day
+    var allDayReminderTime: String = "09:00"
     var defaultEventDurationMinutes: Int = 60      // applied to a new event's end time
     var cacheMonths: Int = 3                       // preloaded month range (device-local by default)
     var monthViewPaged: Bool = false               // month view swipe-paging (device-local by default)
@@ -43,6 +46,8 @@ struct AppSettings: Codable {
         case privateEventVisibility = "private_event_visibility"
         case groupVisibleCalendarId = "group_visible_calendar_id"
         case defaultReminderMinutes = "default_reminder_minutes"
+        case allDayReminderDays = "allday_reminder_days"
+        case allDayReminderTime = "allday_reminder_time"
         case defaultEventDurationMinutes = "default_event_duration_minutes"
         case cacheMonths = "cache_months"
         case monthViewPaged = "month_view_paged"
@@ -77,6 +82,8 @@ struct AppSettings: Codable {
         privateEventVisibility = try c.decodeIfPresent(String.self, forKey: .privateEventVisibility) ?? d.privateEventVisibility
         groupVisibleCalendarId = try c.decodeIfPresent(Int.self, forKey: .groupVisibleCalendarId)
         defaultReminderMinutes = try c.decodeIfPresent(Int.self, forKey: .defaultReminderMinutes)
+        allDayReminderDays = try c.decodeIfPresent(Int.self, forKey: .allDayReminderDays)
+        allDayReminderTime = try c.decodeIfPresent(String.self, forKey: .allDayReminderTime) ?? "09:00"
         defaultEventDurationMinutes = try c.decodeIfPresent(Int.self, forKey: .defaultEventDurationMinutes) ?? d.defaultEventDurationMinutes
         cacheMonths = try c.decodeIfPresent(Int.self, forKey: .cacheMonths) ?? d.cacheMonths
         monthViewPaged = try c.decodeIfPresent(Bool.self, forKey: .monthViewPaged) ?? d.monthViewPaged

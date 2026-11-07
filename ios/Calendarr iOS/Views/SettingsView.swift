@@ -26,6 +26,9 @@ struct SettingsView: View {
     @AppStorage("dimPastEvents")     private var dimPastEvents = false
     @AppStorage("monthViewPaged")    private var monthViewPaged = false
     @AppStorage("defaultReminderMinutes") private var defaultReminderMinutes = -1
+    @AppStorage("allDayReminderDays") private var allDayReminderDays = -1
+    @AppStorage("allDayReminderTime") private var allDayReminderTime = "09:00"
+    @State private var allDayTime = Date()
     @AppStorage("defaultEventDurationMinutes") private var defaultEventDurationMinutes = 60
 
     // Profile chapter (server-backed; loaded on appear). Account settings are not
@@ -274,7 +277,55 @@ struct SettingsView: View {
                     NotificationCenter.default.post(name: .rescheduleReminders, object: nil)
                 }
             }
+            // All-day events need their own category: their start is midnight,
+            // so "30 minutes before" lands at 23:30 the night before.
+            HStack(spacing: 12) {
+                syncIcon("allday_reminder_days")
+                Text(L10n.t("reminder.allday.title", appLang))
+                Spacer()
+                Picker("", selection: $allDayReminderDays) {
+                    Text(ReminderOptions.off(appLang)).tag(-1)
+                    ForEach(ReminderOptions.allDayDays, id: \.self) { d in
+                        Text(ReminderOptions.allDayLabel(d, appLang)).tag(d)
+                    }
+                }
+                .pickerStyle(.menu).labelsHidden()
+                .onChange(of: allDayReminderDays) { _, _ in
+                    SettingsSync.push(api: api)
+                    NotificationCenter.default.post(name: .rescheduleReminders, object: nil)
+                }
+            }
+            if allDayReminderDays >= 0 {
+                HStack(spacing: 12) {
+                    syncIcon("allday_reminder_time")
+                    Text(L10n.t("reminder.allday.at", appLang))
+                    Spacer()
+                    DatePicker("", selection: $allDayTime, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .onAppear { allDayTime = Self.date(fromHHMM: allDayReminderTime) }
+                        .onChange(of: allDayTime) { _, newValue in
+                            allDayReminderTime = Self.hhmm(from: newValue)
+                            SettingsSync.push(api: api)
+                            NotificationCenter.default.post(name: .rescheduleReminders, object: nil)
+                        }
+                }
+            }
         }
+    }
+
+    /// The picker works in Date; the setting is stored as "HH:MM".
+    private static func hhmm(from date: Date) -> String {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", c.hour ?? 9, c.minute ?? 0)
+    }
+
+    private static func date(fromHHMM s: String) -> Date {
+        let parts = s.split(separator: ":")
+        let h = parts.count == 2 ? (Int(parts[0]) ?? 9) : 9
+        let m = parts.count == 2 ? (Int(parts[1]) ?? 0) : 0
+        return Calendar.current.date(bySettingHour: min(max(h, 0), 23),
+                                     minute: min(max(m, 0), 59), second: 0,
+                                     of: Date()) ?? Date()
     }
 
     // MARK: – Ansicht (synced)

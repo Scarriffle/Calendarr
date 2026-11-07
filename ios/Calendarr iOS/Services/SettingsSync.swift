@@ -27,6 +27,8 @@ enum SettingsSync {
         "hour_height": "hourHeight",
         "default_event_duration_minutes": "defaultEventDurationMinutes",
         "default_reminder_minutes": "defaultReminderMinutes",
+        "allday_reminder_days": "allDayReminderDays",
+        "allday_reminder_time": "allDayReminderTime",
         "primary_color": "primaryColor",
         "accent_color": "accentColor",
         "today_color": "todayColor",
@@ -46,7 +48,8 @@ enum SettingsSync {
     static let defaultSync: [String: Bool] = [
         "default_view": true, "week_start_day": true, "dim_past_events": true,
         "hour_height": true, "default_event_duration_minutes": true,
-        "default_reminder_minutes": true, "primary_color": true, "accent_color": true,
+        "default_reminder_minutes": true, "allday_reminder_days": true,
+        "allday_reminder_time": true, "primary_color": true, "accent_color": true,
         "today_color": true, "text_color": true, "bg_color": true, "line_color": true,
         "month_divider_color": true, "month_label_color": true,
         "cache_months": false, "month_view_paged": false,
@@ -123,6 +126,9 @@ enum SettingsSync {
         s.monthViewPaged    = UserDefaults.standard.bool(forKey: "monthViewPaged")
         let rem = int("defaultReminderMinutes", -1)
         s.defaultReminderMinutes = rem < 0 ? nil : rem
+        let allDay = int("allDayReminderDays", -1)
+        s.allDayReminderDays = allDay < 0 ? nil : allDay
+        s.allDayReminderTime = str("allDayReminderTime", "09:00")
         s.defaultEventDurationMinutes = int("defaultEventDurationMinutes", 60)
         return s
     }
@@ -136,6 +142,8 @@ enum SettingsSync {
         case "hour_height":                     dst.hourHeight = src.hourHeight
         case "default_event_duration_minutes":  dst.defaultEventDurationMinutes = src.defaultEventDurationMinutes
         case "default_reminder_minutes":        dst.defaultReminderMinutes = src.defaultReminderMinutes
+        case "allday_reminder_days":            dst.allDayReminderDays = src.allDayReminderDays
+        case "allday_reminder_time":            dst.allDayReminderTime = src.allDayReminderTime
         case "primary_color":                   dst.primaryColor = src.primaryColor
         case "accent_color":                    dst.accentColor = src.accentColor
         case "today_color":                     dst.todayColor = src.todayColor
@@ -160,6 +168,8 @@ enum SettingsSync {
         case "hour_height":                     d.set(s.hourHeight, forKey: "hourHeight")
         case "default_event_duration_minutes":  d.set(s.defaultEventDurationMinutes, forKey: "defaultEventDurationMinutes")
         case "default_reminder_minutes":        d.set(s.defaultReminderMinutes ?? -1, forKey: "defaultReminderMinutes")
+        case "allday_reminder_days":            d.set(s.allDayReminderDays ?? -1, forKey: "allDayReminderDays")
+        case "allday_reminder_time":            d.set(s.allDayReminderTime, forKey: "allDayReminderTime")
         case "primary_color":                   d.set(s.primaryColor, forKey: "primaryColor")
         case "accent_color":                    d.set(s.accentColor, forKey: "accentColor")
         case "today_color":                     d.set(s.todayColor, forKey: "todayColor")
