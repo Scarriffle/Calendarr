@@ -131,6 +131,24 @@ fun SettingsScreen(
                     { update(settings.copy(defaultReminderMinutes = it.toInt().takeIf { m -> m >= 0 })) },
                     synced("default_reminder_minutes"), { toggle("default_reminder_minutes") },
                 )
+                // All-day events start at midnight, so minutes would put the
+                // reminder in the middle of the night. Days plus a time instead.
+                SyncDropdownRow(
+                    tr("settings.alldayreminder"),
+                    allDayReminderOptions(),
+                    (settings.allDayReminderDays ?: -1).toString(),
+                    { update(settings.copy(allDayReminderDays = it.toInt().takeIf { d -> d >= 0 })) },
+                    synced("allday_reminder_days"), { toggle("allday_reminder_days") },
+                )
+                if ((settings.allDayReminderDays ?: -1) >= 0) {
+                    SyncDropdownRow(
+                        tr("settings.alldaytime"),
+                        allDayTimeOptions(),
+                        settings.allDayReminderTime,
+                        { update(settings.copy(allDayReminderTime = it)) },
+                        synced("allday_reminder_time"), { toggle("allday_reminder_time") },
+                    )
+                }
                 Divider(Modifier.padding(vertical = 16.dp))
 
                 // ---- Ansicht (synced) ----
@@ -223,6 +241,19 @@ private fun reminderOptions(): List<Pair<String, String>> = listOf(
     "-1" to tr("reminder.off"), "0" to tr("reminder.at_start"), "5" to "5 min", "15" to "15 min",
     "30" to "30 min", "60" to "1 h", "1440" to tr("reminder.1d"), "10080" to tr("reminder.1w"),
 )
+
+@Composable
+private fun allDayReminderOptions(): List<Pair<String, String>> = listOf(
+    "-1" to tr("reminder.off"), "0" to tr("reminder.same_day"),
+    "1" to tr("reminder.1d"), "2" to "2", "3" to "3", "7" to tr("reminder.1w"),
+)
+
+/** Half-hour steps: a dropdown beats a dialog for a value set this coarse. */
+private fun allDayTimeOptions(): List<Pair<String, String>> =
+    (0..47).map { i ->
+        val t = "%02d:%02d".format(i / 2, if (i % 2 == 0) 0 else 30)
+        t to t
+    }
 
 @Composable
 private fun Section(title: String) {

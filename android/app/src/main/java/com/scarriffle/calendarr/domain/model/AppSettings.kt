@@ -32,6 +32,9 @@ data class AppSettings(
     @Json(name = "group_visible_calendar_id") val groupVisibleCalendarId: Int? = null,
     // Minutes-before-start applied to all events client-side; null = off.
     @Json(name = "default_reminder_minutes") val defaultReminderMinutes: Int? = null,
+    // All-day events start at midnight, so minutes are meaningless for them.
+    @Json(name = "allday_reminder_days") val allDayReminderDays: Int? = null,
+    @Json(name = "allday_reminder_time") val allDayReminderTime: String = "09:00",
     // Duration (minutes) applied to a newly created event's end time.
     @Json(name = "default_event_duration_minutes") val defaultEventDurationMinutes: Int = 60,
     // Preload range in months (device-local by default) and month-view paging.

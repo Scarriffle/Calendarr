@@ -116,7 +116,8 @@ fun CalendarScreen(
     }
     androidx.compose.runtime.LaunchedEffect(state.events, state.reminderDisabledKeys) {
         com.scarriffle.calendarr.notifications.NotificationScheduler.reschedule(
-            context, state.events, state.reminderDisabledKeys, vm.defaultReminderMinutes
+            context, state.events, state.reminderDisabledKeys, vm.defaultReminderMinutes,
+            vm.allDayReminderDays, vm.allDayReminderTime
         )
     }
     // Re-check server-side calendar visibility whenever the app returns to the

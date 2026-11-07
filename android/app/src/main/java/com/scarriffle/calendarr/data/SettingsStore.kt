@@ -38,6 +38,8 @@ class SettingsStore @Inject constructor(
         backgroundColor = prefs.getString(K_BG_COLOR, null) ?: "#000000",
         lineColor = prefs.getString(K_LINE_COLOR, null) ?: "#3A3A52",
         defaultReminderMinutes = prefs.getInt(K_DEFAULT_REMINDER, -1).takeIf { it >= 0 },
+        allDayReminderDays = prefs.getInt(K_ALLDAY_DAYS, -1).takeIf { it >= 0 },
+        allDayReminderTime = prefs.getString(K_ALLDAY_TIME, "09:00") ?: "09:00",
         defaultEventDurationMinutes = prefs.getInt(K_DEFAULT_DURATION, 60),
         cacheMonths = prefs.getInt(K_CACHE_MONTHS, 3),
         monthViewPaged = prefs.getBoolean(K_MONTH_PAGED, false),
@@ -61,6 +63,8 @@ class SettingsStore @Inject constructor(
             .putString(K_BG_COLOR, s.backgroundColor)
             .putString(K_LINE_COLOR, s.lineColor)
             .putInt(K_DEFAULT_REMINDER, s.defaultReminderMinutes ?: -1)
+            .putInt(K_ALLDAY_DAYS, s.allDayReminderDays ?: -1)
+            .putString(K_ALLDAY_TIME, s.allDayReminderTime)
             .putInt(K_DEFAULT_DURATION, s.defaultEventDurationMinutes)
             .putInt(K_CACHE_MONTHS, s.cacheMonths)
             .putBoolean(K_MONTH_PAGED, s.monthViewPaged)
@@ -129,6 +133,8 @@ class SettingsStore @Inject constructor(
             hourHeight = if (on("hour_height")) server.hourHeight else local.hourHeight,
             defaultEventDurationMinutes = if (on("default_event_duration_minutes")) server.defaultEventDurationMinutes else local.defaultEventDurationMinutes,
             defaultReminderMinutes = if (on("default_reminder_minutes")) server.defaultReminderMinutes else local.defaultReminderMinutes,
+            allDayReminderDays = if (on("allday_reminder_days")) server.allDayReminderDays else local.allDayReminderDays,
+            allDayReminderTime = if (on("allday_reminder_time")) server.allDayReminderTime else local.allDayReminderTime,
             primaryColor = if (on("primary_color")) server.primaryColor else local.primaryColor,
             accentColor = if (on("accent_color")) server.accentColor else local.accentColor,
             todayColor = if (on("today_color")) server.todayColor else local.todayColor,
@@ -229,6 +235,8 @@ class SettingsStore @Inject constructor(
         const val K_LINE_COLOR = "line_color"
         const val K_SYNC_FLAGS = "sync_flags"
         const val K_DEFAULT_REMINDER = "default_reminder_minutes"
+        const val K_ALLDAY_DAYS = "allday_reminder_days"
+        const val K_ALLDAY_TIME = "allday_reminder_time"
         const val K_DEFAULT_DURATION = "default_event_duration_minutes"
         const val K_CACHE_MONTHS = "cache_months"
         const val K_MONTH_PAGED = "month_view_paged"

@@ -215,6 +215,8 @@ class CalendarViewModel @Inject constructor(
 
     /** Default reminder offset (minutes before start), or -1 when off. */
     val defaultReminderMinutes: Int get() = settingsStore.loadSettings().defaultReminderMinutes ?: -1
+    val allDayReminderDays: Int get() = settingsStore.loadSettings().allDayReminderDays ?: -1
+    val allDayReminderTime: String get() = settingsStore.loadSettings().allDayReminderTime
 
     /** Toggle a calendar's reminders without deleting any event reminders. */
     fun setCalendarRemindersDisabled(key: String, disabled: Boolean) {

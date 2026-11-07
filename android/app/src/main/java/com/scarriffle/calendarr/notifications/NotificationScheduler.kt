@@ -8,6 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.scarriffle.calendarr.domain.model.CalEvent
+import java.time.Instant
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import com.scarriffle.calendarr.ui.calendar.calendarKey
 
 /**
@@ -38,6 +41,11 @@ object NotificationScheduler {
         }
     }
 
+    // Known limit: alarms do not survive a reboot. They are only re-registered
+    // when the calendar screen opens, and there is no local event cache to
+    // rebuild them from at boot — a BOOT_COMPLETED receiver would have to reach
+    // the server before the user has unlocked the device. Matters most for
+    // all-day reminders, which are set days ahead.
     private data class Pending(val fire: Long, val title: String, val body: String)
 
     fun reschedule(
@@ -45,6 +53,8 @@ object NotificationScheduler {
         events: List<CalEvent>,
         disabledKeys: Set<String>,
         defaultMinutes: Int,
+        allDayDays: Int = -1,
+        allDayTime: String = "09:00",
     ) {
         ensureChannel(context)
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -53,13 +63,16 @@ object NotificationScheduler {
         val pending = mutableListOf<Pending>()
         for (ev in events) {
             if (disabledKeys.contains(calendarKey(ev.source, ev.calendarId))) continue
+            val fallback = if (ev.isAllDay) allDayDays * 1440 else defaultMinutes
+            val enabled = if (ev.isAllDay) allDayDays >= 0 else defaultMinutes >= 0
             val offsets = if (ev.reminders.isEmpty()) {
-                if (defaultMinutes >= 0) listOf(defaultMinutes) else emptyList()
+                if (enabled) listOf(fallback) else emptyList()
             } else ev.reminders
             for (m in offsets) {
-                val fire = ev.startDate.toEpochMilli() - m * 60_000L
+                val fire = fireAt(ev, m, allDayTime)
                 if (fire > now) {
-                    val rel  = relativeText(m)
+                    val rel = if (ev.isAllDay) allDayRelativeText(fire, ev.startDate.toEpochMilli())
+                              else relativeText(m)
                     val body = if (ev.location.isNotBlank()) "$rel · ${ev.location}" else rel
                     pending.add(Pending(fire, ev.title, body))
                 }
@@ -84,6 +97,42 @@ object NotificationScheduler {
             }
         }
         prefs.edit().putInt(KEY_COUNT, limited.size).apply()
+    }
+
+    /**
+     * When a reminder fires.
+     *
+     * An all-day event starts at local midnight, so a minute offset puts the
+     * reminder in the middle of the night — 30 minutes before becomes 23:30.
+     * For those the offset is read as whole days instead, fired at a configured
+     * time of day. Birthday calendars inherit that for free: the offsets the
+     * server injects for them are always multiples of 1440.
+     */
+    private fun fireAt(ev: CalEvent, minutes: Int, allDayTime: String): Long {
+        if (!ev.isAllDay) return ev.startDate.toEpochMilli() - minutes * 60_000L
+        val zone = ZoneId.systemDefault()
+        val days = Math.round(minutes / 1440.0).toInt()
+        val parts = allDayTime.split(":")
+        val hour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 9
+        val minute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
+        return ev.startDate.atZone(zone).toLocalDate()
+            .minusDays(days.toLong())
+            .atTime(hour, minute)
+            .atZone(zone).toInstant().toEpochMilli()
+    }
+
+    /** "heute" / "morgen" / "in N Tagen" — counted in days, not in minutes. */
+    private fun allDayRelativeText(fire: Long, start: Long): String {
+        val zone = ZoneId.systemDefault()
+        val days = ChronoUnit.DAYS.between(
+            Instant.ofEpochMilli(fire).atZone(zone).toLocalDate(),
+            Instant.ofEpochMilli(start).atZone(zone).toLocalDate(),
+        )
+        return when {
+            days < 1L -> "heute"
+            days == 1L -> "morgen"
+            else -> "in $days Tagen"
+        }
     }
 
     private fun relativeText(minutes: Int): String = when {
