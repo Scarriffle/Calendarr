@@ -66,6 +66,24 @@ a { color: var(--primary); text-decoration: none; }
 /* Version im Impressum verlinkt aufs Gitea-Repo — dezent, erst beim Hover als Link erkennbar */
 .impressum-version-link { color: var(--text-3); text-decoration: none; transition: color .15s ease; }
 .impressum-version-link:hover { color: var(--primary); text-decoration: underline; }
+/* Light scheme: applyTheme stamps data-scheme on <html>. Only the values that
+   are calibrated for a dark ground need a counterpart — the rest are set from
+   the theme itself and already follow the background. */
+:root[data-scheme="light"] {
+  --scrollbar: #c8c8d0;
+  --shadow: 0 2px 12px rgba(0,0,0,.12);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.18);
+  color-scheme: light;
+}
+/* Native controls (date/time inputs, selects) are inverted for the dark UI;
+   on a light ground that would make them unreadable. */
+:root[data-scheme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+:root[data-scheme="light"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+/* A locked colour row still shows its value, it just cannot be edited. */
+.settings-color-ctl.is-locked { opacity: .55; pointer-events: none; }
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }

@@ -7,7 +7,9 @@ import { renderQuarter } from './views/quarter.js';
 import { openColorPicker } from './color-picker.js';
 import { openDatePicker, formatDtDisplay } from './date-picker.js';
 import { t, setLang, getLocale } from './i18n.js';
-import { DEFAULT_COLORS, SETTING_GROUPS, SYNCABLE_KEYS, loadLocal, saveLocal, mergeEffective, baseColor, setInstanceDefaults } from './settings-sync.js';
+import { DEFAULT_COLORS, SETTING_GROUPS, SYNCABLE_KEYS, loadLocal, saveLocal, mergeEffective,
+         baseColor, setInstanceDefaults, setThemeMode, colorsEditable, resolvedScheme }
+  from './settings-sync.js';
 import { loadInstance, reloadInstance, instanceConfig } from './instance.js';
 import { APP_VERSION } from './version.js';
 
@@ -178,6 +180,13 @@ export async function initCalendar() {
   bindGroupUI();
   bindSwipeNavigation();
   handleHAOAuthReturn();
+  setThemeMode(state.settings.theme_mode || 'dark');
+  // System mode has to react while the page is open, not only on reload.
+  if (typeof matchMedia === 'function') {
+    matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+      if ((state.settings.theme_mode || 'dark') === 'system') applyTheme(state.settings);
+    });
+  }
   loadGroups();
   loadInvites();
   try {
@@ -3772,14 +3781,17 @@ function settingRowHtml(def) {
   } else if (def.type === 'toggle') {
     valueHtml = `<button type="button" class="sync-toggle ${val ? 'on' : ''}" data-vtoggle="${def.key}" role="switch" aria-checked="${!!val}"></button>`;
   } else if (def.type === 'color') {
+    // Outside manual mode these do not apply, so they are shown disabled rather
+    // than hidden — you can still see what the instance theme picked.
+    const locked = !colorsEditable();
     const hex = normalizeHex(val, baseColor(def.key));
     // No own value means the row inherits the admin instance default. The
     // field still shows that colour, but saving must send null — writing the
     // hex back would freeze today's admin default into the user's row and
     // later admin changes would stop reaching them.
     const inherits = val == null ? ' data-inherit="1"' : '';
-    valueHtml = `<div class="settings-color-ctl">
-      <input type="text" class="ev-color-hex" data-shex="${def.key}" maxlength="7" spellcheck="false" value="${hex}"${inherits} />
+    valueHtml = `<div class="settings-color-ctl${locked ? ' is-locked' : ''}">
+      <input type="text" class="ev-color-hex" data-shex="${def.key}" maxlength="7" spellcheck="false" value="${hex}"${inherits}${locked ? ' disabled' : ''} />
       <div class="ev-color-preview" data-sprev="${def.key}" style="background:${hex}" title="${escHtml(t('color_pick'))}"></div>
       <button type="button" class="icon-btn ev-color-reset" data-sreset="${def.key}" title="${escHtml(t('reset'))}">${RESET_ICON_SVG}</button>
     </div>`;
@@ -3811,6 +3823,15 @@ function wireSettingRow(def) {
 
   if (def.type === 'select') {
     // Hour height affects the theme — preview it live; other selects apply on Save.
+    if (def.key === 'theme_mode') {
+      const sel = row.querySelector('[data-skey]');
+      if (sel) sel.addEventListener('change', () => {
+        state.settings.theme_mode = sel.value;
+        setThemeMode(sel.value);
+        applyTheme(state.settings);
+        renderSettingsTable();     // the colour rows lock or unlock with it
+      });
+    }
     if (def.key === 'hour_height') {
       const sel = row.querySelector('[data-skey]');
       if (sel) sel.addEventListener('change', () => {
@@ -3828,6 +3849,7 @@ function wireSettingRow(def) {
       vt.setAttribute('aria-checked', String(on));
     });
   } else if (def.type === 'color') {
+    if (!colorsEditable()) return;   // locked: nothing to wire
     const hex = row.querySelector('[data-shex]');
     const prev = row.querySelector('[data-sprev]');
     const reset = row.querySelector('[data-sreset]');
@@ -5103,6 +5125,25 @@ async function removeBranding(kind) {
 }
 
 function bindAdminPanel() {
+  // "This is now the instance's light/dark theme." Takes whatever the colour
+  // table currently shows, which is how an admin builds one: switch to manual,
+  // tune the colours, then promote it.
+  for (const [id, slot] of [['admin-theme-as-light', 'light'], ['admin-theme-as-dark', 'dark']]) {
+    const btn = document.getElementById(id);
+    if (!btn) continue;
+    btn.addEventListener('click', async () => {
+      const all = readAppearanceTable();
+      const colors = {};
+      for (const key of Object.keys(DEFAULT_COLORS)) if (all[key]) colors[key] = all[key];
+      try {
+        await api.put('/instance/theme', { default_theme: colors, slot });
+        await reloadInstance();
+        applyTheme(state.settings);
+        showToast(t('settings_saved'));
+      } catch (e) { showToast(e.message, true); }
+    });
+  }
+
   const save = document.getElementById('admin-theme-save');
   if (save) save.addEventListener('click', async () => {
     try {

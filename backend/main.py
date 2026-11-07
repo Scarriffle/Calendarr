@@ -120,11 +120,14 @@ def _migrate():
         for col, ddl in (
             ("allday_reminder_days", "ALTER TABLE user_settings ADD COLUMN allday_reminder_days INTEGER"),
             ("allday_reminder_time", "ALTER TABLE user_settings ADD COLUMN allday_reminder_time VARCHAR(5)"),
+            ("theme_mode", "ALTER TABLE user_settings ADD COLUMN theme_mode VARCHAR(10)"),
+            ("default_theme_light", "ALTER TABLE instance_settings ADD COLUMN default_theme_light TEXT"),
+            ("default_theme_dark", "ALTER TABLE instance_settings ADD COLUMN default_theme_dark TEXT"),
         ):
             try:
                 conn.execute(text(ddl))
                 conn.commit()
-                logging.info("Migration: added %s to user_settings", col)
+                logging.info("Migration: added %s", col)
             except Exception:
                 pass
 

@@ -56,6 +56,16 @@ def _mtime(filename: Optional[str]) -> int:
         return 0
 
 
+def _theme_json(raw) -> dict:
+    """Parse a stored theme defensively — a broken blob must not 500 the app."""
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw) or {}
+    except Exception:
+        return {}
+
+
 def _public_dict(inst: models.InstanceSettings) -> dict:
     theme = {}
     if inst.default_theme:
@@ -67,6 +77,10 @@ def _public_dict(inst: models.InstanceSettings) -> dict:
     has_favicon = bool(inst.favicon_filename) and (BRANDING_DIR / (inst.favicon_filename or "")).exists()
     return {
         "default_theme": theme,
+        "default_theme_light": _theme_json(inst.default_theme_light),
+        # Falls back to the legacy column: an instance that set a theme before
+        # light and dark existed had a dark one.
+        "default_theme_dark": _theme_json(inst.default_theme_dark) or theme,
         "has_logo": has_logo,
         "has_favicon": has_favicon,
         # Cache-busted URLs so a freshly uploaded asset is fetched immediately.
@@ -106,6 +120,7 @@ def get_favicon(db: Session = Depends(get_db)):
 # ── Admin writes ──────────────────────────────────────────
 class ThemeUpdate(BaseModel):
     default_theme: dict  # {colorKey: "#RRGGBB"}; empty = reset to built-in
+    slot: Optional[str] = None  # "light" | "dark"; omitted = dark
 
 
 @router.put("/theme")
@@ -114,6 +129,15 @@ def set_default_theme(
     db: Session = Depends(get_db),
     admin: models.User = Depends(get_current_admin),
 ):
+    """Store one of the two instance themes.
+
+    `slot` omitted means dark, which is what an older client sends and what the
+    single theme used to be — so nothing an existing deployment does changes
+    meaning.
+    """
+    slot = (data.slot or "dark").lower()
+    if slot not in ("light", "dark"):
+        raise HTTPException(422, "slot muss light oder dark sein")
     # Keep only known colour keys with valid hex values.
     clean = {
         k: v.upper()
@@ -121,9 +145,16 @@ def set_default_theme(
         if k in THEME_COLOR_KEYS and isinstance(v, str) and HEX_RE.match(v)
     }
     inst = _get_or_create(db)
-    inst.default_theme = json.dumps(clean) if clean else None
+    payload = json.dumps(clean) if clean else None
+    if slot == "light":
+        inst.default_theme_light = payload
+    else:
+        inst.default_theme_dark = payload
+        # Keep the legacy column in step so a client that has not learned about
+        # slots yet still sees the dark theme it used to.
+        inst.default_theme = payload
     db.commit()
-    return {"ok": True, "default_theme": clean}
+    return {"ok": True, "slot": slot, "default_theme": clean}
 
 
 async def _save_branding(file: UploadFile, kind: str) -> str:

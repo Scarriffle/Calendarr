@@ -1,4 +1,5 @@
-import { DEFAULT_COLORS, INSTANCE_DEFAULTS, baseColor } from './settings-sync.js';
+import { DEFAULT_COLORS, INSTANCE_DEFAULTS, baseColor, colorsEditable, resolvedScheme }
+  from './settings-sync.js';
 import { getLocale } from './i18n.js';
 
 export function isToday(d) {
@@ -106,6 +107,14 @@ export const DEFAULT_LINE_COLOR = DEFAULT_COLORS.line_color;
 export const DEFAULT_BG_COLOR   = DEFAULT_COLORS.bg_color;
 
 export function applyTheme(settings) {
+  // Outside manual mode the instance theme decides; the user's own colours stay
+  // stored but do not apply, so switching back to manual restores them intact.
+  if (!colorsEditable()) {
+    const inst = INSTANCE_DEFAULTS || {};
+    settings = { ...settings };
+    for (const key of Object.keys(DEFAULT_COLORS)) settings[key] = inst[key] || null;
+  }
+  document.documentElement.dataset.scheme = resolvedScheme();
   const root = document.documentElement;
   // Fallback chain for a colour that has no per-user value: admin instance
   // default → built-in default (baseColor()).
@@ -125,9 +134,18 @@ export function applyTheme(settings) {
   // erzwinge weiss-auf-schwarz, damit man nicht in einer unbedienbaren
   // Seite landet.
   if (contrastRatio(textColor, bgColor) < 2.5) {
-    textColor = DEFAULT_TEXT_COLOR;
-    bgColor   = DEFAULT_BG_COLOR;
+    // Fall back in the direction the theme was going: forcing white-on-black
+    // onto a light theme would be just as unreadable as what it replaced.
+    const wasLight = luminance(bgColor) > 0.5;
+    textColor = wasLight ? '#111111' : DEFAULT_TEXT_COLOR;
+    bgColor   = wasLight ? '#FFFFFF' : DEFAULT_BG_COLOR;
   }
+
+  // Surfaces, hovers and the dimmer text shades are all derived by nudging a
+  // colour away from the background. On a dark ground that means lightening; on
+  // a light one the same nudge washes everything out, so the sign flips.
+  const dir = luminance(bgColor) > 0.5 ? -1 : 1;
+  const away = (hex, amount) => shadeHex(hex, amount * dir);
 
   root.style.setProperty('--text-1', textColor);
   root.style.setProperty('--text-2', shadeHex(textColor, -0.25));
@@ -138,13 +156,13 @@ export function applyTheme(settings) {
 
   // Surface family (sidebar / top bar / cards). Explicit surface_color drives
   // it; otherwise derive from the app background as before.
-  const surfaceBase = settings.surface_color || shadeHex(bgColor, 0.10);
+  const surfaceBase = settings.surface_color || away(bgColor, 0.10);
   root.style.setProperty('--bg-app',     bgColor);
   root.style.setProperty('--bg-topbar',  surfaceBase);
   root.style.setProperty('--bg-sidebar', surfaceBase);
-  root.style.setProperty('--bg-surface', shadeHex(surfaceBase, 0.10));
-  root.style.setProperty('--bg-hover',   shadeHex(surfaceBase, 0.20));
-  root.style.setProperty('--bg-active',  shadeHex(surfaceBase, 0.34));
+  root.style.setProperty('--bg-surface', away(surfaceBase, 0.10));
+  root.style.setProperty('--bg-hover',   away(surfaceBase, 0.20));
+  root.style.setProperty('--bg-active',  away(surfaceBase, 0.34));
 
   const hh = settings.hour_height || 44;
   root.style.setProperty('--hour-h', hh + 'px');

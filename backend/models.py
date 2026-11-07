@@ -137,6 +137,9 @@ class UserSettings(Base):
     # ahead, at a time of day.
     allday_reminder_days = Column(Integer, nullable=True)   # NULL = off, 0 = same day
     allday_reminder_time = Column(String(5), nullable=True)  # "HH:MM", NULL = 09:00
+    # system | light | dark | manual. Anything but manual means the instance
+    # theme for that mode wins and the per-colour settings are ignored.
+    theme_mode = Column(String(10), nullable=True)
     # Default duration (in minutes) applied to a newly created event's end time.
     default_event_duration_minutes = Column(Integer, default=60)
     # Icon key (from GROUP_ICON_KEYS) shown next to calendars this user shares with groups.
@@ -163,7 +166,11 @@ class InstanceSettings(Base):
     id = Column(Integer, primary_key=True)  # always 1
     # JSON {colorKey: "#RRGGBB"} — the instance default theme. Empty/NULL = use the
     # client's built-in defaults. A user's own colour wins over this.
+    # Legacy single theme. Still read as the dark slot so an instance that set
+    # one before light/dark existed keeps the look it had.
     default_theme = Column(Text, nullable=True)
+    default_theme_light = Column(Text, nullable=True)
+    default_theme_dark = Column(Text, nullable=True)
     # Uploaded branding files (stored under DATA_DIR/branding). NULL = use bundled.
     logo_filename = Column(String(255), nullable=True)
     favicon_filename = Column(String(255), nullable=True)

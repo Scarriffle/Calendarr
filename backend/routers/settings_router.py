@@ -34,6 +34,7 @@ DEFAULT_SYNC = {
     "default_reminder_minutes": True,
     "allday_reminder_days": True,
     "allday_reminder_time": True,
+    "theme_mode": True,
     "language": False,
     "share_calendar_icon": False,
     "cache_months": False,
@@ -93,6 +94,7 @@ class SettingsUpdate(BaseModel):
     default_reminder_minutes: Optional[int] = None  # null = off
     allday_reminder_days: Optional[int] = None  # null = off, 0 = same day
     allday_reminder_time: Optional[str] = None  # "HH:MM"
+    theme_mode: Optional[str] = None  # system | light | dark | manual
     default_event_duration_minutes: Optional[int] = None
     share_calendar_icon: Optional[str] = None
     cache_months: Optional[int] = None
@@ -132,6 +134,7 @@ def _settings_dict(s: models.UserSettings) -> dict:
         "default_reminder_minutes": s.default_reminder_minutes,
         "allday_reminder_days": s.allday_reminder_days,
         "allday_reminder_time": s.allday_reminder_time or "09:00",
+        "theme_mode": s.theme_mode or "dark",
         "default_event_duration_minutes": s.default_event_duration_minutes or 60,
         "share_calendar_icon": s.share_calendar_icon,
         "cache_months": s.cache_months or 3,

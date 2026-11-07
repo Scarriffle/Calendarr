@@ -2,7 +2,7 @@
 // early as possible so the login screen is already branded. See
 // backend/routers/admin_router.py.
 
-import { setInstanceDefaults } from './settings-sync.js';
+import { setInstanceThemes } from './settings-sync.js';
 import { setCustomFavicon, applyFavicon } from './utils.js';
 
 export let instanceConfig = {};
@@ -25,7 +25,7 @@ function setBrandLogo(url) {
 
 export function applyInstanceBranding(cfg) {
   cfg = cfg || {};
-  setInstanceDefaults(cfg.default_theme || {});
+  setInstanceThemes(cfg.default_theme_light, cfg.default_theme_dark || cfg.default_theme);
   setCustomFavicon(cfg.has_favicon ? cfg.favicon_url : null);
   setBrandLogo(cfg.has_logo ? cfg.logo_url : null);
   applyFavicon();  // no arg → uses instance/built-in primary as fallback

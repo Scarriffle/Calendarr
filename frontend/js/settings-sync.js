@@ -75,6 +75,17 @@ export const SETTING_GROUPS = [
     ],
   },
   {
+    titleKey: 'settings_theme_mode_section',
+    rows: [
+      // Light and dark come from the instance; manual unlocks the colour rows
+      // below. System follows the device and switches between the two.
+      { key: 'theme_mode', labelKey: 'settings_theme_mode', type: 'select', opts: [
+        { v: 'system', tk: 'theme_mode_system' }, { v: 'light', tk: 'theme_mode_light' },
+        { v: 'dark', tk: 'theme_mode_dark' }, { v: 'manual', tk: 'theme_mode_manual' },
+      ] },
+    ],
+  },
+  {
     titleKey: 'settings_language',
     rows: [
       // Derived from the i18n registry: adding a language there adds it here.
@@ -115,7 +126,38 @@ export const SYNCABLE_KEYS = SETTING_GROUPS.flatMap(g => g.rows.map(r => r.key))
 // the base a user inherits and the target that a per-colour "Reset" returns to.
 // A user's own value always overrides it. See backend/routers/admin_router.py.
 export let INSTANCE_DEFAULTS = {};
+// Both instance themes, kept so switching mode needs no round trip.
+export let INSTANCE_THEMES = { light: {}, dark: {} };
+export let THEME_MODE = 'dark';
+
 export function setInstanceDefaults(obj) { INSTANCE_DEFAULTS = obj || {}; }
+
+export function setInstanceThemes(light, dark) {
+  INSTANCE_THEMES = { light: light || {}, dark: dark || {} };
+  applyModeDefaults();
+}
+
+/** Which of the two themes a mode resolves to. `system` asks the OS. */
+export function resolvedScheme(mode = THEME_MODE) {
+  if (mode === 'light' || mode === 'dark') return mode;
+  if (mode === 'system') {
+    return (typeof matchMedia === 'function'
+      && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+  }
+  return 'dark';   // manual: the user's own colours sit on the dark base
+}
+
+export function setThemeMode(mode) {
+  THEME_MODE = ['system', 'light', 'dark', 'manual'].includes(mode) ? mode : 'dark';
+  applyModeDefaults();
+}
+
+function applyModeDefaults() {
+  INSTANCE_DEFAULTS = INSTANCE_THEMES[resolvedScheme()] || {};
+}
+
+/** True when the per-colour settings apply at all. */
+export function colorsEditable() { return THEME_MODE === 'manual'; }
 // The effective default for a colour key: admin instance default → built-in.
 export function baseColor(key) { return INSTANCE_DEFAULTS[key] || DEFAULT_COLORS[key]; }
 
