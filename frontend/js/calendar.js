@@ -3761,9 +3761,14 @@ function settingRowHtml(def) {
   if (def.type === 'select') {
     valueHtml = `<select data-skey="${def.key}">` + def.opts.map(o => {
       const lbl = o.tk ? t(o.tk) : o.label;
-      const sel = String(o.v) === String(val) ? ' selected' : '';
-      return `<option value="${o.v}"${sel}>${escHtml(lbl)}</option>`;
+      // An option may legitimately be null ("off"); "" carries that through the
+      // DOM, where every value is a string, and readAppearanceTable maps it back.
+      const raw = o.v === null ? '' : String(o.v);
+      const sel = raw === (val == null ? '' : String(val)) ? ' selected' : '';
+      return `<option value="${raw}"${sel}>${escHtml(lbl)}</option>`;
     }).join('') + '</select>';
+  } else if (def.type === 'time') {
+    valueHtml = `<input type="time" class="settings-time" data-stime="${def.key}" value="${escHtml(val || '09:00')}" />`;
   } else if (def.type === 'toggle') {
     valueHtml = `<button type="button" class="sync-toggle ${val ? 'on' : ''}" data-vtoggle="${def.key}" role="switch" aria-checked="${!!val}"></button>`;
   } else if (def.type === 'color') {
@@ -3813,6 +3818,8 @@ function wireSettingRow(def) {
         applyTheme(state.settings);
       });
     }
+  } else if (def.type === 'time') {
+    // Nothing to wire: the value is read straight off the input on save.
   } else if (def.type === 'toggle') {
     const vt = row.querySelector('[data-vtoggle]');
     if (vt) vt.addEventListener('click', () => {
@@ -3863,11 +3870,15 @@ function readAppearanceTable() {
   const out = {};
   const numKeys = new Set(['hour_height', 'default_event_duration_minutes']);
   const boolKeys = new Set(['month_view_paged']);
+  // These may legitimately be null ("off"), and 0 is a real value — so an
+  // empty string means null and everything else goes through Number().
+  const nullableNumKeys = new Set(['default_reminder_minutes', 'allday_reminder_days']);
   SETTING_GROUPS.forEach(g => g.rows.forEach(def => {
     if (def.type === 'select') {
       const el = document.querySelector(`[data-skey="${def.key}"]`);
       let v = el ? el.value : state.settings[def.key];
-      if (numKeys.has(def.key)) v = Number(v);
+      if (nullableNumKeys.has(def.key)) v = (v === '' || v == null) ? null : Number(v);
+      else if (numKeys.has(def.key)) v = Number(v);
       else if (boolKeys.has(def.key)) v = (String(v) === 'true');
       out[def.key] = v;
     } else if (def.type === 'toggle') {
@@ -3878,6 +3889,9 @@ function readAppearanceTable() {
       out[def.key] = (el && el.dataset.inherit === '1')
         ? null                                   // inherit the admin default
         : normalizeHex(el && el.value, baseColor(def.key));
+    } else if (def.type === 'time') {
+      const el = document.querySelector(`[data-stime="${def.key}"]`);
+      out[def.key] = (el && el.value) || '09:00';
     } else if (def.type === 'icon') {
       const on = document.querySelector(`[data-sicon="${def.key}"] .group-icon-opt.on`);
       out[def.key] = on ? on.dataset.shareIcon : (state.settings[def.key] || 'share');

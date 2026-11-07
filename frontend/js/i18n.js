@@ -1,5 +1,13 @@
 const translations = {
   de: {
+    settings_default_reminder: 'Standard-Erinnerung',
+    settings_allday_reminder: 'Ganztägige Termine',
+    settings_allday_time: 'Uhrzeit',
+    reminder_off: 'Aus',
+    reminder_at_start: 'Zur Startzeit',
+    reminder_same_day: 'Am selben Tag',
+    reminder_one_day: '1 Tag vorher',
+    reminder_one_week: '1 Woche vorher',
     invites_title: 'Anfragen',
     invite_accept: 'Annehmen',
     invite_decline: 'Ablehnen',
@@ -459,6 +467,14 @@ const translations = {
   },
 
   ch: {
+    settings_default_reminder: 'Standard-Erinnerig',
+    settings_allday_reminder: 'Ganztägigi Termin',
+    settings_allday_time: 'Uhrziit',
+    reminder_off: 'Us',
+    reminder_at_start: 'Zur Startziit',
+    reminder_same_day: 'Am gliche Tag',
+    reminder_one_day: '1 Tag vorher',
+    reminder_one_week: '1 Wuche vorher',
     invites_title: 'Aafrage',
     invite_accept: 'Aanäh',
     invite_decline: 'Ablehne',
@@ -880,6 +896,14 @@ const translations = {
   },
 
   en: {
+    settings_default_reminder: 'Default reminder',
+    settings_allday_reminder: 'All-day events',
+    settings_allday_time: 'Time',
+    reminder_off: 'Off',
+    reminder_at_start: 'At start time',
+    reminder_same_day: 'Same day',
+    reminder_one_day: '1 day before',
+    reminder_one_week: '1 week before',
     invites_title: 'Requests',
     invite_accept: 'Accept',
     invite_decline: 'Decline',
@@ -1339,6 +1363,14 @@ const translations = {
   },
 
   fr: {
+    settings_default_reminder: 'Rappel par défaut',
+    settings_allday_reminder: 'Journée entière',
+    settings_allday_time: 'Heure',
+    reminder_off: 'Désactivé',
+    reminder_at_start: "À l'heure de début",
+    reminder_same_day: 'Le jour même',
+    reminder_one_day: '1 jour avant',
+    reminder_one_week: '1 semaine avant',
     invites_title: 'Demandes',
     invite_accept: 'Accepter',
     invite_decline: 'Refuser',
@@ -1760,6 +1792,14 @@ const translations = {
   },
 
   it: {
+    settings_default_reminder: 'Promemoria predefinito',
+    settings_allday_reminder: 'Eventi di tutto il giorno',
+    settings_allday_time: 'Ora',
+    reminder_off: 'Disattivato',
+    reminder_at_start: "All'inizio",
+    reminder_same_day: 'Lo stesso giorno',
+    reminder_one_day: '1 giorno prima',
+    reminder_one_week: '1 settimana prima',
     invites_title: 'Richieste',
     invite_accept: 'Accetta',
     invite_decline: 'Rifiuta',
@@ -2181,6 +2221,14 @@ const translations = {
   },
 
   nl: {
+    settings_default_reminder: 'Standaardherinnering',
+    settings_allday_reminder: 'Hele dag',
+    settings_allday_time: 'Tijd',
+    reminder_off: 'Uit',
+    reminder_at_start: 'Bij aanvang',
+    reminder_same_day: 'Dezelfde dag',
+    reminder_one_day: '1 dag ervoor',
+    reminder_one_week: '1 week ervoor',
     invites_title: 'Verzoeken',
     invite_accept: 'Accepteren',
     invite_decline: 'Weigeren',
@@ -2602,6 +2650,14 @@ const translations = {
   },
 
   da: {
+    settings_default_reminder: 'Standardpåmindelse',
+    settings_allday_reminder: 'Heldagsbegivenheder',
+    settings_allday_time: 'Tidspunkt',
+    reminder_off: 'Fra',
+    reminder_at_start: 'Ved start',
+    reminder_same_day: 'Samme dag',
+    reminder_one_day: '1 dag før',
+    reminder_one_week: '1 uge før',
     invites_title: 'Anmodninger',
     invite_accept: 'Accepter',
     invite_decline: 'Afvis',
@@ -3023,6 +3079,14 @@ const translations = {
   },
 
   no: {
+    settings_default_reminder: 'Standardpåminnelse',
+    settings_allday_reminder: 'Heldagshendelser',
+    settings_allday_time: 'Tidspunkt',
+    reminder_off: 'Av',
+    reminder_at_start: 'Ved start',
+    reminder_same_day: 'Samme dag',
+    reminder_one_day: '1 dag før',
+    reminder_one_week: '1 uke før',
     invites_title: 'Forespørsler',
     invite_accept: 'Godta',
     invite_decline: 'Avslå',
@@ -3444,6 +3508,14 @@ const translations = {
   },
 
   sv: {
+    settings_default_reminder: 'Standardpåminnelse',
+    settings_allday_reminder: 'Heldagshändelser',
+    settings_allday_time: 'Tidpunkt',
+    reminder_off: 'Av',
+    reminder_at_start: 'Vid start',
+    reminder_same_day: 'Samma dag',
+    reminder_one_day: '1 dag före',
+    reminder_one_week: '1 vecka före',
     invites_title: 'Förfrågningar',
     invite_accept: 'Acceptera',
     invite_decline: 'Avböj',
@@ -3865,6 +3937,14 @@ const translations = {
   },
 
   fi: {
+    settings_default_reminder: 'Oletusmuistutus',
+    settings_allday_reminder: 'Koko päivän tapahtumat',
+    settings_allday_time: 'Kellonaika',
+    reminder_off: 'Pois',
+    reminder_at_start: 'Alkaessa',
+    reminder_same_day: 'Samana päivänä',
+    reminder_one_day: '1 päivä ennen',
+    reminder_one_week: '1 viikko ennen',
     invites_title: 'Pyynnöt',
     invite_accept: 'Hyväksy',
     invite_decline: 'Hylkää',

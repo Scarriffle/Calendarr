@@ -56,6 +56,22 @@ export const SETTING_GROUPS = [
         { v: 15, label: '15 min' }, { v: 30, label: '30 min' }, { v: 45, label: '45 min' },
         { v: 60, label: '1 h' }, { v: 90, label: '1,5 h' }, { v: 120, label: '2 h' },
       ] },
+      // The web delivers no notifications itself; these steer the apps, the
+      // same way the per-calendar bell does.
+      { key: 'default_reminder_minutes', labelKey: 'settings_default_reminder', type: 'select', opts: [
+        { v: null, tk: 'reminder_off' }, { v: 0, tk: 'reminder_at_start' },
+        { v: 5, label: '5 min' }, { v: 15, label: '15 min' }, { v: 30, label: '30 min' },
+        { v: 60, label: '1 h' }, { v: 1440, tk: 'reminder_one_day' },
+        { v: 10080, tk: 'reminder_one_week' },
+      ] },
+      // All-day events start at midnight, so minutes would put the reminder in
+      // the middle of the night. These two say it as days plus a time of day.
+      { key: 'allday_reminder_days', labelKey: 'settings_allday_reminder', type: 'select', opts: [
+        { v: null, tk: 'reminder_off' }, { v: 0, tk: 'reminder_same_day' },
+        { v: 1, tk: 'reminder_one_day' }, { v: 2, label: '2' }, { v: 3, label: '3' },
+        { v: 7, tk: 'reminder_one_week' },
+      ] },
+      { key: 'allday_reminder_time', labelKey: 'settings_allday_time', type: 'time' },
     ],
   },
   {
