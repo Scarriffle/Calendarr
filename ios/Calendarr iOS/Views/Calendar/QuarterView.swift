@@ -91,6 +91,19 @@ private struct MiniDayCell: View {
     let onEventTap: (CalEvent) -> Void
 
     var body: some View {
+        // Die Punkte sind 4pt gross - weit unter den 28pt Mindestgroesse (HIG).
+        // Darum ist die ganze Zelle die Trefferflaeche.
+        if let first = events.first {
+            Button { onEventTap(first) } label: { cell }
+                .buttonStyle(.plain)
+                .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                .accessibilityValue(events.count > 1 ? "\(first.title) +\(events.count - 1)" : first.title)
+        } else {
+            cell
+        }
+    }
+
+    private var cell: some View {
         VStack(spacing: 1) {
             Text("\(Calendar.current.component(.day, from: date))")
                 .font(.system(size: 12, weight: isToday ? .bold : .regular))
@@ -108,7 +121,6 @@ private struct MiniDayCell: View {
                     Circle()
                         .fill(Color(hex: ev.effectiveColor))
                         .frame(width: 4, height: 4)
-                        .onTapGesture { onEventTap(ev) }
                 }
             }
             .frame(height: 6)

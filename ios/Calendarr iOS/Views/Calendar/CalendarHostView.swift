@@ -250,11 +250,13 @@ struct CalendarHostView: View {
                         .font(.system(size: 17, weight: .medium))
                         .frame(width: 36, height: 36)
                 }
+                .accessibilityLabel(L10n.t("nav.prev", appLang))
                 Button { store.navigateNext() } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 17, weight: .medium))
                         .frame(width: 36, height: 36)
                 }
+                .accessibilityLabel(L10n.t("nav.next", appLang))
             }
             .padding(.leading, hideMenuButton ? 6 : 0)
             Spacer(minLength: 6)
@@ -439,6 +441,7 @@ struct CalendarHostView: View {
                 .clipShape(Circle())
                 .shadow(radius: 4, y: 2)
         }
+        .accessibilityLabel(L10n.t("event.new_title", appLang))
         .contextMenu { fabMenu }
         .padding(.trailing, 20).padding(.bottom, 20)
     }
@@ -457,6 +460,7 @@ struct CalendarHostView: View {
             }
             .buttonStyle(.plain)
             .glassEffect(in: Circle())
+            .accessibilityLabel(L10n.t("event.new_title", appLang))
             .contextMenu { fabMenu }
             .padding(.trailing, 20).padding(.bottom, 20)
         } else {

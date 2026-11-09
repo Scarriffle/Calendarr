@@ -133,13 +133,17 @@ struct GroupEditSheet: View {
                 Section(L10n.t("group.icon", appLang)) {
                     LazyVGrid(columns: cols, spacing: 8) {
                         ForEach(icons, id: \.self) { ic in
-                            Image(systemName: GroupIcons.symbol(ic))
-                                .font(.title3)
-                                .frame(width: 44, height: 44)
-                                .background(ic == icon ? Color.accentColor.opacity(0.25) : Color(.systemGray6))
-                                .foregroundStyle(ic == icon ? Color.accentColor : .primary)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .onTapGesture { icon = ic }
+                            Button { icon = ic } label: {
+                                Image(systemName: GroupIcons.symbol(ic))
+                                    .font(.title3)
+                                    .frame(width: 44, height: 44)
+                                    .background(ic == icon ? Color.accentColor.opacity(0.25) : Color(.systemGray6))
+                                    .foregroundStyle(ic == icon ? Color.accentColor : .primary)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            // Die Auswahl zeigt sich nur ueber die Farbe - VoiceOver braucht das Trait.
+                            .accessibilityAddTraits(ic == icon ? [.isButton, .isSelected] : .isButton)
                         }
                     }
                 }
@@ -209,13 +213,17 @@ struct GroupManageSheet: View {
                 Section(L10n.t("group.icon", appLang)) {
                     LazyVGrid(columns: cols, spacing: 8) {
                         ForEach(icons, id: \.self) { ic in
-                            Image(systemName: GroupIcons.symbol(ic))
-                                .font(.title3)
-                                .frame(width: 44, height: 44)
-                                .background(ic == icon ? Color.accentColor.opacity(0.25) : Color(.systemGray6))
-                                .foregroundStyle(ic == icon ? Color.accentColor : .primary)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .onTapGesture { icon = ic }
+                            Button { icon = ic } label: {
+                                Image(systemName: GroupIcons.symbol(ic))
+                                    .font(.title3)
+                                    .frame(width: 44, height: 44)
+                                    .background(ic == icon ? Color.accentColor.opacity(0.25) : Color(.systemGray6))
+                                    .foregroundStyle(ic == icon ? Color.accentColor : .primary)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            // Die Auswahl zeigt sich nur ueber die Farbe - VoiceOver braucht das Trait.
+                            .accessibilityAddTraits(ic == icon ? [.isButton, .isSelected] : .isButton)
                         }
                     }
                 }

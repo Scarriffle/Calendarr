@@ -42,6 +42,8 @@ private let strings: [String: [String: String]] = [
         "nav.today": "Heute",
         "nav.menu": "Menü",
         "nav.done": "Fertig",
+        "nav.prev": "Zurück",
+        "nav.next": "Weiter",
 
         // View types
         "view.month": "Monat",
@@ -454,6 +456,8 @@ private let strings: [String: [String: String]] = [
         "nav.today": "Today",
         "nav.menu": "Menu",
         "nav.done": "Done",
+        "nav.prev": "Previous",
+        "nav.next": "Next",
 
         "view.month": "Month",
         "view.week": "Week",

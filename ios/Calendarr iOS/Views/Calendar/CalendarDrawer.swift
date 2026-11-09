@@ -65,6 +65,7 @@ struct CalendarDrawer: View {
                     Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
+                .accessibilityLabel(L10n.t("common.close", appLang))
             }
         }
         .padding(.horizontal, 18).padding(.top, 20).padding(.bottom, 16)
