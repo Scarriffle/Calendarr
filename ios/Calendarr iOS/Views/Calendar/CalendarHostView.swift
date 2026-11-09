@@ -29,6 +29,7 @@ struct CalendarHostView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var store = CalendarStore()
+    @State private var containerWidth: CGFloat = 0
     @State private var editorContext: CalEditorContext? = nil
     @State private var selectedEvent: CalEvent? = nil
     @State private var showFilter = false
@@ -103,9 +104,16 @@ struct CalendarHostView: View {
                     )
             }
         }
+        // The drawer is sized against the window, not the screen. On iPad in
+        // Split View or Stage Manager those differ, and a screen-wide drawer
+        // would overflow a half-width window.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { containerWidth = $0 }
     }
 
-    private var drawerWidth: CGFloat { min(UIScreen.main.bounds.width - 40, 360) }
+    private var drawerWidth: CGFloat {
+        let available = containerWidth > 0 ? containerWidth : 360
+        return min(available - 40, 360)
+    }
 
     private func closeDrawer() {
         withAnimation(.easeInOut(duration: 0.25)) { showDrawer = false }

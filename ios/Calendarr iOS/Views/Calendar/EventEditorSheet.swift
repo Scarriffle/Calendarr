@@ -23,7 +23,18 @@ struct EventEditorSheet: View {
     @State private var selectedCalendarId: String = ""
     @State private var color = ""
     @State private var isPrivate = false
-    @State private var reminders: [Int] = []
+    /// Reminder rows carry their own identity.
+    ///
+    /// The list was keyed on the array index, which SwiftUI reuses: deleting a
+    /// row made the one below inherit its identity, so the delete animated as
+    /// "this row changed value" and the binding briefly addressed a stale
+    /// index. A minute count is not unique either — two rows may both say 30.
+    private struct ReminderDraft: Identifiable, Equatable {
+        let id = UUID()
+        var minutes: Int
+    }
+
+    @State private var reminders: [ReminderDraft] = []
     @State private var isSaving = false
     // Files picked before the event exists are staged and uploaded after it is
     // created; existing ones are removed only on save, so Cancel really cancels.
@@ -117,14 +128,15 @@ struct EventEditorSheet: View {
                     }
 
                     Section {
-                        ForEach(reminders.indices, id: \.self) { idx in
-                            ReminderEditRow(minutes: $reminders[idx], appLang: appLang)
+                        ForEach($reminders) { $row in
+                            ReminderEditRow(minutes: $row.minutes, appLang: appLang)
                         }
                         .onDelete { reminders.remove(atOffsets: $0) }
                         Button {
-                            let next = ReminderOptions.presets.first { !reminders.contains($0) }
+                            let used = Set(reminders.map(\.minutes))
+                            let next = ReminderOptions.presets.first { !used.contains($0) }
                                 ?? ReminderOptions.customDefault
-                            reminders.append(next)
+                            reminders.append(ReminderDraft(minutes: next))
                         } label: {
                             Label(ReminderOptions.addLabel(appLang), systemImage: "bell.badge.plus")
                         }
@@ -289,7 +301,7 @@ struct EventEditorSheet: View {
             notes = ev.notes
             color = ev.color ?? ""
             isPrivate = ev.isPrivate
-            reminders = ev.reminders
+            reminders = ev.reminders.map { ReminderDraft(minutes: $0) }
             // HA events use "homeassistant-42" in CalEvent but "ha-42" in WritableCalendar
             if ev.source == "homeassistant" {
                 let num = ev.calendarId.replacingOccurrences(of: "homeassistant-", with: "")
@@ -310,7 +322,7 @@ struct EventEditorSheet: View {
             notes = ev.notes
             color = ev.color ?? ""
             isPrivate = ev.isPrivate
-            reminders = ev.reminders
+            reminders = ev.reminders.map { ReminderDraft(minutes: $0) }
             selectedCalendarId = store.writableCalendars.first?.id ?? ""
         } else {
             let cal = Calendar.current
@@ -320,7 +332,7 @@ struct EventEditorSheet: View {
             endDate = startDate.addingTimeInterval(Double(durMin) * 60)
             selectedCalendarId = store.writableCalendars.first?.id ?? ""
             // New events inherit the user's default reminder (editable).
-            if defaultReminderMinutes >= 0 { reminders = [defaultReminderMinutes] }
+            if defaultReminderMinutes >= 0 { reminders = [ReminderDraft(minutes: defaultReminderMinutes)] }
         }
     }
 
@@ -340,7 +352,7 @@ struct EventEditorSheet: View {
                 case "local":
                     try await api.updateLocalEvent(uid: ev.id, title: title, start: start, end: end,
                                                    isAllDay: isAllDay, location: location, description: notes, color: colorVal,
-                                                   isPrivate: isPrivate, reminders: reminders)
+                                                   isPrivate: isPrivate, reminders: reminders.map(\.minutes))
                     await applyAttachmentChanges(uid: ev.id)
                 case "homeassistant":
                     // No update API exists – delete the old event and recreate with new data.
@@ -366,7 +378,7 @@ struct EventEditorSheet: View {
                     let created = try await api.createLocalEvent(calendarId: cal.numericId, title: title,
                                                        start: start, end: end, isAllDay: isAllDay,
                                                        location: location, description: notes, color: colorVal,
-                                                       isPrivate: isPrivate, reminders: reminders)
+                                                       isPrivate: isPrivate, reminders: reminders.map(\.minutes))
                     // Only now does a uid exist to attach the staged files to.
                     await applyAttachmentChanges(uid: created.id)
                 case "google":
