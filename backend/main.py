@@ -419,6 +419,13 @@ def _migrate():
                 pass
 
 
+        # ── Revocable sessions ───────────────────────────────────────────
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN token_epoch INTEGER DEFAULT 0"))
+            conn.commit()
+        except Exception:
+            pass
+
         # ── Login throttling ─────────────────────────────────────────────
         for ddl in (
             "ALTER TABLE users ADD COLUMN failed_logins INTEGER DEFAULT 0",

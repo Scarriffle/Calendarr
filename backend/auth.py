@@ -64,7 +64,10 @@ def create_user_token(user: "models.User", expires_delta: Optional[timedelta] = 
     silently invalidate every session on their other devices, and an identity
     provider that changes a name would break the mapping.
     """
-    return create_access_token({"sub": user.username, "uid": user.id}, expires_delta)
+    return create_access_token(
+        {"sub": user.username, "uid": user.id, "ep": user.token_epoch or 0},
+        expires_delta,
+    )
 
 
 def get_current_user(
@@ -95,6 +98,14 @@ def get_current_user(
         # days, so these stay in circulation for a while.
         user = db.query(models.User).filter(models.User.username == username).first()
     if not user:
+        raise exc
+
+    # Revocation: a password or 2FA change bumps the epoch, which retires every
+    # token minted before it. Tokens predating this column carry no "ep" and
+    # stay valid until they expire — refusing them would sign everyone out on
+    # deploy, and "remember me" runs for 180 days.
+    ep = payload.get("ep")
+    if ep is not None and ep != (user.token_epoch or 0):
         raise exc
     return user
 

@@ -218,8 +218,12 @@ def change_password(
     if len(data.new_password) < 6:
         raise HTTPException(400, "Passwort muss mindestens 6 Zeichen haben")
     current_user.password_hash = get_password_hash(data.new_password)
+    # Changing the password is how someone reacts to a stolen session. Retire
+    # every token issued so far, then re-issue for this caller so they are not
+    # signed out of the browser they just did it in.
+    current_user.token_epoch = (current_user.token_epoch or 0) + 1
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "access_token": create_user_token(current_user)}
 
 
 # ── 2FA / TOTP ───────────────────────────────────────────
@@ -261,8 +265,11 @@ def enable_totp(
         raise HTTPException(400, "Ungültiger Code")
 
     current_user.totp_enabled = True
+    # Sessions established before the second factor existed should not outlive
+    # the decision to require one.
+    current_user.token_epoch = (current_user.token_epoch or 0) + 1
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "access_token": create_user_token(current_user)}
 
 
 @router.post("/2fa/disable")
@@ -276,6 +283,22 @@ def disable_totp(
 
     current_user.totp_secret = None
     current_user.totp_enabled = False
+    current_user.token_epoch = (current_user.token_epoch or 0) + 1
+    db.commit()
+    return {"ok": True, "access_token": create_user_token(current_user)}
+
+
+@router.post("/logout-all")
+def logout_all(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Invalidate every session token, including this one.
+
+    App passwords are deliberately untouched: they are revoked individually
+    and CalDAV clients would otherwise all break at once.
+    """
+    current_user.token_epoch = (current_user.token_epoch or 0) + 1
     db.commit()
     return {"ok": True}
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     let api: CalendarrAPI
+    @Environment(AppState.self) private var appState
     @State private var profile: UserProfile?
     @State private var isLoading = true
 
@@ -180,7 +181,11 @@ struct ProfileView: View {
             return
         }
         do {
-            try await api.changePassword(current: currentPW, new: newPW)
+            // The server rotated the session; keep the new token or the next
+            // request is a 401 and the user is thrown back to the login screen.
+            if let fresh = try await api.changePassword(current: currentPW, new: newPW) {
+                appState.saveLogin(token: fresh, user: appState.username, admin: appState.isAdmin)
+            }
             currentPW = ""; newPW = ""; confirmPW = ""
             showNotice(L10n.t("profile.password_changed", appLang))
         } catch {
@@ -203,7 +208,9 @@ struct ProfileView: View {
     private func enable2FA() async {
         isSaving2FA = true
         do {
-            try await api.enable2FA(code: totpCode)
+            if let fresh = try await api.enable2FA(code: totpCode) {
+                appState.saveLogin(token: fresh, user: appState.username, admin: appState.isAdmin)
+            }
             show2FASetup = false
             showNotice(L10n.t("profile.twofa.enabled_toast", appLang))
             await load()
@@ -215,7 +222,9 @@ struct ProfileView: View {
 
     private func disable2FA() async {
         do {
-            try await api.disable2FA(password: disablePW)
+            if let fresh = try await api.disable2FA(password: disablePW) {
+                appState.saveLogin(token: fresh, user: appState.username, admin: appState.isAdmin)
+            }
             show2FADisable = false
             showNotice(L10n.t("profile.twofa.disabled_toast", appLang))
             await load()

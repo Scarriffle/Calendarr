@@ -108,6 +108,7 @@ Configuration is done via environment variables. The `install.sh` script generat
 | `GOOGLE_CLIENT_SECRET` | — | Google OAuth2 Client Secret *(optional)* |
 | `GOOGLE_REDIRECT_URI` | — | e.g. `https://yourdomain.com/api/google/callback` *(optional)* |
 | `PUBLIC_BASE_URL` | *(derived)* | Public origin behind a reverse proxy — **required for SSO** and for attachment links in CalDAV |
+| `HA_CA_BUNDLE` | — | Path to the CA (or the self-signed certificate itself) of your Home Assistant. TLS is always verified; set this when HA does not use a publicly trusted certificate, otherwise the connection fails |
 | `ATTACHMENT_PUBLIC_LINKS` | `1` | `0` disables the unauthenticated attachment URLs (see below) |
 | `SCHEDULER_ENABLED` | `1` | `0` disables all background jobs |
 | `ATTACHMENT_SWEEP_HOURS` | `24` | How often orphaned attachments are cleaned up |

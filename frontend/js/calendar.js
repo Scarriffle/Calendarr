@@ -5417,7 +5417,10 @@ function bindProfileModal() {
     if (newPw !== confirm) { showToast(t('error_pw_mismatch'), true); return; }
     if (newPw.length < 6) { showToast(t('error_pw_length'), true); return; }
     try {
-      await api.post('/profile/password', { current_password: current, new_password: newPw });
+      // The server retires every existing token on a password change and
+      // hands back a fresh one — without storing it we would log ourselves out.
+      const res = await api.post('/profile/password', { current_password: current, new_password: newPw });
+      if (res && res.access_token) localStorage.setItem('token', res.access_token);
       showToast(t('password_changed'));
       document.getElementById('profile-pw-current').value = '';
       document.getElementById('profile-pw-new').value = '';
@@ -5445,7 +5448,8 @@ function bindProfileModal() {
     const code = document.getElementById('2fa-verify-code').value.trim();
     if (!code || code.length !== 6) { showToast(t('error_enter_6digit'), true); return; }
     try {
-      await api.post('/profile/2fa/enable', { code });
+      const res2 = await api.post('/profile/2fa/enable', { code });
+      if (res2 && res2.access_token) localStorage.setItem('token', res2.access_token);
       showToast(t('totp_enabled'));
       document.getElementById('2fa-setup-section').classList.add('hidden');
       document.getElementById('2fa-enabled-section').classList.remove('hidden');
@@ -5461,7 +5465,8 @@ function bindProfileModal() {
     const pw = document.getElementById('2fa-disable-pw').value;
     if (!pw) { showToast(t('error_enter_password'), true); return; }
     try {
-      await api.post('/profile/2fa/disable', { password: pw });
+      const res3 = await api.post('/profile/2fa/disable', { password: pw });
+      if (res3 && res3.access_token) localStorage.setItem('token', res3.access_token);
       showToast(t('totp_disabled'));
       document.getElementById('2fa-enabled-section').classList.add('hidden');
       document.getElementById('2fa-disabled-section').classList.remove('hidden');

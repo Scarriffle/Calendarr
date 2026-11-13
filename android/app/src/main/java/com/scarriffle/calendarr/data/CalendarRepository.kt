@@ -235,9 +235,19 @@ class CalendarRepository @Inject constructor(
     }
 
     suspend fun changePassword(current: String, new: String) = guarded {
-        api.changePassword(
+        val resp = api.changePassword(
             jsonBody("current_password" to current, "new_password" to new)
-        ).ensureSuccess()
+        )
+        resp.ensureSuccess()
+        adoptReissuedToken(resp)
+    }
+
+    /** The server retires existing tokens on a password or 2FA change and
+     *  returns a fresh one; without adopting it we log ourselves out. */
+    private fun adoptReissuedToken(resp: retrofit2.Response<okhttp3.ResponseBody>) {
+        val raw = runCatching { resp.body()?.string() }.getOrNull() ?: return
+        val token = runCatching { JSONObject(raw).optString("access_token") }.getOrNull()
+        if (!token.isNullOrBlank()) credentialStore.token = token
     }
 
     suspend fun setup2fa(): TotpSetup = guarded {
@@ -248,11 +258,15 @@ class CalendarRepository @Inject constructor(
     }
 
     suspend fun enable2fa(code: String) = guarded {
-        api.enable2fa(jsonBody("code" to code)).ensureSuccess()
+        val resp = api.enable2fa(jsonBody("code" to code))
+        resp.ensureSuccess()
+        adoptReissuedToken(resp)
     }
 
     suspend fun disable2fa(password: String) = guarded {
-        api.disable2fa(jsonBody("password" to password)).ensureSuccess()
+        val resp = api.disable2fa(jsonBody("password" to password))
+        resp.ensureSuccess()
+        adoptReissuedToken(resp)
     }
 
     // ---- Accounts ----

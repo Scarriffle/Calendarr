@@ -22,6 +22,10 @@ class User(Base):
     # When true, the user is hidden from sharing/group picker directories
     # (/users/directory). Admin user management (/users/) still shows them.
     directory_hidden = Column(Boolean, default=False, nullable=False)
+    # Bumped to invalidate every session token issued so far (password change,
+    # 2FA change, "sign out everywhere"). Tokens carry the value they were
+    # minted with; a mismatch fails authentication.
+    token_epoch = Column(Integer, default=0)
     # Login throttling. Counted per account rather than per IP: an account is
     # what an attacker is actually after, and it survives a changing source
     # address. Reset on every success.

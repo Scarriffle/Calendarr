@@ -182,8 +182,19 @@ class CalendarrAPI {
         _ = try await request("/api/profile/", method: "PATCH", body: ["email": email])
     }
 
-    func changePassword(current: String, new: String) async throws {
-        _ = try await request("/api/profile/password", method: "POST", body: ["current_password": current, "new_password": new])
+    /// Returns the re-issued session token. The server retires every existing
+    /// token on a password change, so ignoring this signs the app out.
+    @discardableResult
+    func changePassword(current: String, new: String) async throws -> String? {
+        let data = try await request("/api/profile/password", method: "POST", body: ["current_password": current, "new_password": new])
+        return Self.reissuedToken(data)
+    }
+
+    /// `access_token` from a response that rotated the session, if present.
+    static func reissuedToken(_ data: Data) -> String? {
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let token = json?["access_token"] as? String
+        return (token?.isEmpty == false) ? token : nil
     }
 
     func getCalDAVAccounts() async throws -> [CalDAVAccount] {
@@ -300,12 +311,16 @@ class CalendarrAPI {
         return (secret, qr)
     }
 
-    func enable2FA(code: String) async throws {
-        _ = try await request("/api/profile/2fa/enable", method: "POST", body: ["code": code])
+    @discardableResult
+    func enable2FA(code: String) async throws -> String? {
+        let data = try await request("/api/profile/2fa/enable", method: "POST", body: ["code": code])
+        return Self.reissuedToken(data)
     }
 
-    func disable2FA(password: String) async throws {
-        _ = try await request("/api/profile/2fa/disable", method: "POST", body: ["password": password])
+    @discardableResult
+    func disable2FA(password: String) async throws -> String? {
+        let data = try await request("/api/profile/2fa/disable", method: "POST", body: ["password": password])
+        return Self.reissuedToken(data)
     }
 
     // MARK: – Events
