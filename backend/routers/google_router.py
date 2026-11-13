@@ -1,11 +1,12 @@
 import logging
 import os
+import secrets
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlencode
 
 import requests as http_requests
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 import models
 from auth import get_current_user
 from database import get_db
+from oauth_state import cookie_kwargs, decode_state, encode_state, pkce_pair
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,6 +27,11 @@ SCOPES = "https://www.googleapis.com/auth/calendar https://www.googleapis.com/au
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 CALENDAR_API = "https://www.googleapis.com/calendar/v3"
+
+# The browser holds the flow state; only its id travels as `state`.
+FLOW_COOKIE = "clr_google_flow"
+FLOW_TTL = 600          # 10 minutes to finish the consent screen
+COOKIE_PATH = "/api/google"
 
 # System/virtual Google calendars that should never be shown
 SKIP_GOOGLE_CALENDAR_IDS = {
@@ -192,9 +199,17 @@ def is_configured():
 
 
 @router.get("/auth-url")
-def get_auth_url(current_user: models.User = Depends(get_current_user)):
+def get_auth_url(request: Request, response: Response,
+                 current_user: models.User = Depends(get_current_user)):
     if not _google_configured():
         raise HTTPException(400, "Google OAuth nicht konfiguriert")
+
+    # The state is an opaque id; who started the flow is remembered in a signed
+    # HttpOnly cookie. Putting the user id in the state (as this did) let anyone
+    # finish a consent of their own and have the callback attach their Google
+    # account to a guessed user id — user 1 being the first-run admin.
+    state = secrets.token_urlsafe(32)
+    verifier, challenge = pkce_pair()
 
     redirect_uri = GOOGLE_REDIRECT_URI or ""
     params = {
@@ -204,19 +219,37 @@ def get_auth_url(current_user: models.User = Depends(get_current_user)):
         "scope": SCOPES,
         "access_type": "offline",
         "prompt": "consent",
-        "state": str(current_user.id),
+        "state": state,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
     }
+    response.set_cookie(
+        FLOW_COOKIE,
+        encode_state({"uid": current_user.id, "jti": state, "cv": verifier},
+                     "google_flow", FLOW_TTL),
+        **cookie_kwargs(request, COOKIE_PATH, FLOW_TTL),
+    )
     return {"url": f"{AUTH_URL}?{urlencode(params)}"}
 
 
 @router.get("/callback")
 def oauth_callback(
+    request: Request,
     code: str = Query(...),
     state: str = Query(""),
     db: Session = Depends(get_db),
 ):
     if not _google_configured():
         raise HTTPException(400, "Google OAuth nicht konfiguriert")
+
+    # Double submit: the opaque id in the URL must match the one in the signed
+    # cookie, so a callback assembled by someone else cannot pass.
+    payload = decode_state(request.cookies.get(FLOW_COOKIE) or "", "google_flow")
+    if not payload or not state or payload.get("jti") != state:
+        raise HTTPException(400, "Ungültiger State-Parameter")
+    user_id = payload.get("uid")
+    if not user_id:
+        raise HTTPException(400, "Ungültiger State-Parameter")
 
     # Exchange code for tokens
     resp = http_requests.post(TOKEN_URL, data={
@@ -225,6 +258,7 @@ def oauth_callback(
         "code": code,
         "grant_type": "authorization_code",
         "redirect_uri": GOOGLE_REDIRECT_URI,
+        "code_verifier": payload.get("cv", ""),
     }, timeout=15)
 
     if resp.status_code != 200:
@@ -243,10 +277,6 @@ def oauth_callback(
         timeout=10,
     ).json()
     email = user_info.get("email", "Unbekannt")
-
-    user_id = int(state) if state.isdigit() else None
-    if not user_id:
-        raise HTTPException(400, "Ungültiger State-Parameter")
 
     # Check if account already exists
     existing = (
@@ -280,7 +310,10 @@ def oauth_callback(
     # Sync calendars after connecting/reconnecting
     _sync_google_calendars(account, db)
 
-    return RedirectResponse(url="/", status_code=302)
+    redirect = RedirectResponse(url="/", status_code=302)
+    # One flow per cookie: spend it so the same consent cannot be replayed.
+    redirect.delete_cookie(FLOW_COOKIE, path=COOKIE_PATH)
+    return redirect
 
 
 # ── Account Management ───────────────────────────────────

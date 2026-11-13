@@ -16,8 +16,6 @@ with more than one worker.
 
 from __future__ import annotations
 
-import base64
-import hashlib
 import logging
 import secrets
 from datetime import datetime, timedelta
@@ -37,6 +35,7 @@ from auth import ALGORITHM, SECRET_KEY, create_user_token, get_current_user
 from database import get_db
 from dav_util import public_base
 from oidc_client import OIDCError
+from oauth_state import cookie_kwargs, decode_state, encode_state, pkce_pair
 from oidc_identity import OIDCPolicyError, link_identity, resolve_user
 
 logger = logging.getLogger(__name__)
@@ -64,24 +63,8 @@ LINK_RETURN = "/?sso_linked=1"
 
 # ── flow-state cookie ────────────────────────────────────────────────────────
 
-def _cookie_kwargs(request: Request, path: str, max_age: int) -> dict:
-    return {
-        "httponly": True,
-        # Lax, NOT Strict: the cookie has to survive the identity provider's
-        # top-level cross-site redirect back to /callback. With Strict the
-        # browser drops it and every single login fails with state_mismatch.
-        "samesite": "lax",
-        "secure": public_base(request).startswith("https"),
-        "path": path,
-        "max_age": max_age,
-    }
-
-
 def _encode_flow(payload: dict) -> str:
-    data = dict(payload)
-    data["typ"] = "oidc_flow"
-    data["exp"] = datetime.utcnow() + timedelta(seconds=FLOW_TTL)
-    return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
+    return encode_state(payload, "oidc_flow", FLOW_TTL)
 
 
 def _encode_link(claims: dict, provider_key: str) -> str:
@@ -109,21 +92,7 @@ def _decode_link(token: str) -> Optional[dict]:
 
 
 def _decode_flow(token: str) -> Optional[dict]:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
-        return None
-    # Guard against another token type being replayed here.
-    if payload.get("typ") != "oidc_flow":
-        return None
-    return payload
-
-
-def _pkce_pair() -> tuple:
-    verifier = secrets.token_urlsafe(64)
-    digest = hashlib.sha256(verifier.encode("ascii")).digest()
-    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
-    return verifier, challenge
+    return decode_state(token, "oidc_flow")
 
 
 def _redirect_uri(request: Request, provider) -> str:
@@ -194,7 +163,7 @@ def oidc_start(provider_key: str, request: Request, db: Session = Depends(get_db
         logger.warning("OIDC start failed for %s: %s", provider.key, e.detail)
         return _fail(request, e.slug)
 
-    verifier, challenge = _pkce_pair()
+    verifier, challenge = pkce_pair()
     nonce = secrets.token_urlsafe(24)
     state = secrets.token_urlsafe(16)
     redirect_uri = _redirect_uri(request, provider)
@@ -215,7 +184,7 @@ def oidc_start(provider_key: str, request: Request, db: Session = Depends(get_db
     resp.set_cookie(
         FLOW_COOKIE,
         _encode_flow({"p": provider.key, "n": nonce, "cv": verifier, "jti": state}),
-        **_cookie_kwargs(request, "/api/auth/oidc", FLOW_TTL),
+        **cookie_kwargs(request, "/api/auth/oidc", FLOW_TTL),
     )
     return resp
 
@@ -269,7 +238,7 @@ def oidc_callback(provider_key: str, request: Request,
             resp.delete_cookie(FLOW_COOKIE, path="/api/auth/oidc")
             resp.set_cookie(
                 LINK_COOKIE, _encode_link(claims, provider.key),
-                **_cookie_kwargs(request, "/api/auth/oidc", LINK_TTL),
+                **cookie_kwargs(request, "/api/auth/oidc", LINK_TTL),
             )
             return resp
         return _fail(request, e.slug)
@@ -284,7 +253,7 @@ def oidc_callback(provider_key: str, request: Request,
     # and a fragment would persist in browser history.
     resp.set_cookie(
         HANDOFF_COOKIE, token,
-        **_cookie_kwargs(request, "/api/auth/oidc", HANDOFF_TTL),
+        **cookie_kwargs(request, "/api/auth/oidc", HANDOFF_TTL),
     )
     return resp
 
