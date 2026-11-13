@@ -16,6 +16,7 @@ import permissions
 from auth import get_current_user
 from colors import HexColor, OptHexColor, safe_hex
 from database import get_db
+from url_guard import validate_reachable_url
 from local_events_util import (
     apply_event_privacy,
     build_local_event_dict,
@@ -153,7 +154,10 @@ def add_account(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    # shortcut: pre-connect check only — the caldav library owns the session,
+    # so a redirect to an internal host cannot be re-checked per hop here.
     try:
+        validate_reachable_url(data.url)
         remote_cals = caldav_client.fetch_calendars(data.url, data.username, data.password)
     except ValueError as e:
         raise HTTPException(400, str(e))

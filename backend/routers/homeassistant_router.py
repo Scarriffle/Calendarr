@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import secrets
 import ssl
 import time
@@ -18,11 +19,22 @@ import models
 from auth import get_current_user
 from colors import HexColor, OptHexColor
 from database import get_db
+from url_guard import validate_reachable_url
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 HA_DEFAULT_COLOR = "#03a9f4"
+
+# Every call below carries an access, refresh or long-lived token, so the
+# certificate has to be checked — otherwise anyone on the path can impersonate
+# Home Assistant and collect them. A self-signed HA is its own CA: point
+# HA_CA_BUNDLE at that certificate and verification stays on.
+# shortcut: one bundle for all HA accounts, upgrade to a per-account column
+# once two instances with different certificates have to coexist.
+HA_CA_BUNDLE = os.environ.get("HA_CA_BUNDLE", "").strip()
+#: Passed to requests' `verify`: True = system trust store, or a CA file path.
+HA_VERIFY = HA_CA_BUNDLE or True
 
 # In-memory store for pending OAuth states (short-lived, ~10 min TTL)
 _pending_oauth: dict[str, dict] = {}
@@ -46,7 +58,7 @@ def _ha_refresh(url: str, refresh_token: str, client_id: str) -> tuple:
             "client_id": client_id,
         },
         timeout=10,
-        verify=False,
+        verify=HA_VERIFY,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -82,7 +94,7 @@ def _ha_get_calendars(url: str, token: str) -> list:
             f"{url.rstrip('/')}/api/calendars",
             headers={"Authorization": f"Bearer {token}"},
             timeout=10,
-            verify=False,
+            verify=HA_VERIFY,
         )
         resp.raise_for_status()
         return resp.json()
@@ -103,7 +115,7 @@ def _ha_get_events(url: str, token: str, entity_id: str, start_dt: datetime, end
             headers={"Authorization": f"Bearer {token}"},
             params={"start": start_dt.isoformat(), "end": end_dt.isoformat()},
             timeout=15,
-            verify=False,
+            verify=HA_VERIFY,
         )
         resp.raise_for_status()
         return resp.json()
@@ -162,7 +174,10 @@ def _ha_ws_call(url: str, token: str, command: dict) -> dict:
     # Convert http(s):// → ws(s)://
     if url.startswith("https://"):
         ws_url = "wss://" + url[len("https://"):].rstrip("/") + "/api/websocket"
-        sslopt = {"cert_reqs": ssl.CERT_NONE}
+        # Same trust anchor as the HTTP calls; the auth frame carries the token.
+        sslopt = {"cert_reqs": ssl.CERT_REQUIRED}
+        if HA_CA_BUNDLE:
+            sslopt["ca_certs"] = HA_CA_BUNDLE
     elif url.startswith("http://"):
         ws_url = "ws://" + url[len("http://"):].rstrip("/") + "/api/websocket"
         sslopt = None
@@ -238,7 +253,7 @@ def _ha_create_event(url: str, token: str, entity_id: str, data: dict) -> dict:
     logger.info("HA create_event body: %s", body)
     resp = http_requests.post(
         f"{base}/api/services/calendar/create_event",
-        headers=headers, json=body, timeout=15, verify=False,
+        headers=headers, json=body, timeout=15, verify=HA_VERIFY,
     )
     if not resp.ok:
         try:
@@ -456,6 +471,10 @@ def add_account(
     current_user: models.User = Depends(get_current_user),
 ):
     """Create a HA account from a Long-Lived Access Token."""
+    try:
+        validate_reachable_url(data.url)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     remote_cals = _ha_get_calendars(data.url, data.token)
 
     account = models.HomeAssistantAccount(
@@ -541,7 +560,7 @@ def oauth_callback(
                 "client_id": client_id,
             },
             timeout=15,
-            verify=False,
+            verify=HA_VERIFY,
         )
     except Exception as exc:
         logger.error("HA token exchange connection error: %s", exc)
