@@ -100,7 +100,7 @@ Configuration is done via environment variables. The `install.sh` script generat
 
 | Variable | Default | Description |
 |---|---|---|
-| `SECRET_KEY` | *(auto-generated)* | JWT signing key — use a strong random value in production |
+| `SECRET_KEY` | *(auto-generated)* | JWT signing key, **at least 32 characters** — the server refuses to start without one. `install.sh` generates it; set it by hand only for unscripted starts |
 | `PORT` | `8080` | Server port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `DATA_DIR` | `./data` | Directory for the SQLite database, avatars, branding and attachments |

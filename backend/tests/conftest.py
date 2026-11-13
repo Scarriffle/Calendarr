@@ -8,7 +8,8 @@ from pathlib import Path
 # Use a throwaway data dir BEFORE importing the app (database.py reads DATA_DIR
 # at import time and builds the engine from it).
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="calendarr-test-"))
-os.environ.setdefault("SECRET_KEY", "test-secret-key")
+# 64 chars: auth.py refuses to import with a short or missing key.
+os.environ.setdefault("SECRET_KEY", "test-secret-key-" + "0" * 48)
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))

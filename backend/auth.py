@@ -10,9 +10,21 @@ import os
 import models
 from database import get_db
 
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "insecure-default-key-change-in-production-use-env-var"
-)
+_INSECURE_DEFAULT = "insecure-default-key-change-in-production-use-env-var"
+SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()
+
+# Refuse to start rather than sign with a key the whole internet knows. The
+# same key signs session tokens and the OIDC flow/link/handoff cookies, so a
+# known value means forgeable logins. install.sh writes a real secret and
+# start.sh/calendarr.service pass it on; what used to slip through unnoticed
+# was running main.py directly without an .env.
+if not SECRET_KEY or SECRET_KEY == _INSECURE_DEFAULT or len(SECRET_KEY) < 32:
+    raise RuntimeError(
+        "SECRET_KEY fehlt oder ist zu kurz (mindestens 32 Zeichen). "
+        "Erzeugen mit: python3 -c 'import secrets; print(secrets.token_hex(32))' "
+        "und in /opt/calendarr/.env als SECRET_KEY=... eintragen."
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
