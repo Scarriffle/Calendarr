@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 import attachments_store
 import models
 from auth import get_current_user
+from colors import HexColor, OptHexColor
 from database import get_db
 from local_events_util import build_local_event_dict, expand_recurring_local, mask_busy_event
 
@@ -254,7 +255,7 @@ def add_member(
 
 
 class MemberColorUpdate(BaseModel):
-    color: str
+    color: HexColor
 
 
 @router.put("/{group_id}/members/{user_id}/color")

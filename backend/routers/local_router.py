@@ -13,6 +13,7 @@ import ical_io
 import models
 import permissions
 from auth import get_current_user
+from colors import HexColor, OptHexColor
 from database import get_db
 from local_events_util import build_local_event_dict, resolve_creator
 from urllib.parse import quote
@@ -26,14 +27,14 @@ def _now_iso() -> str:
 
 class CalendarCreate(BaseModel):
     name: str
-    color: str = "#34a853"
+    color: HexColor = "#34a853"
     is_birthday: bool = False
     birthday_notify_days_before: Optional[int] = None
 
 
 class CalendarUpdate(BaseModel):
     name: Optional[str] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     enabled: Optional[bool] = None
     sidebar_hidden: Optional[bool] = None
     reminders_enabled: Optional[bool] = None
@@ -50,7 +51,7 @@ class EventCreate(BaseModel):
     allDay: bool = False
     location: Optional[str] = None
     description: Optional[str] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     rrule: Optional[str] = None
     private: bool = False
     reminders: Optional[List[int]] = None  # minutes before start (0 = at start)
@@ -65,7 +66,7 @@ class EventUpdate(BaseModel):
     allDay: Optional[bool] = None
     location: Optional[str] = None
     description: Optional[str] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     rrule: Optional[str] = None
     exdate: Optional[str] = None
     private: Optional[bool] = None
@@ -322,7 +323,7 @@ def update_calendar(
 
 
 class CalendarColorUpdate(BaseModel):
-    color: str
+    color: HexColor
 
 
 @router.put("/calendars/{calendar_id}/color")

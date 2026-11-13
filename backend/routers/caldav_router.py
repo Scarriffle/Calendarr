@@ -14,6 +14,7 @@ import caldav_client
 import models
 import permissions
 from auth import get_current_user
+from colors import HexColor, OptHexColor, safe_hex
 from database import get_db
 from local_events_util import (
     apply_event_privacy,
@@ -35,12 +36,12 @@ class AccountCreate(BaseModel):
     url: str
     username: str
     password: str
-    color: str = "#4285f4"
+    color: HexColor = "#4285f4"
 
 
 class CalendarUpdate(BaseModel):
     enabled: Optional[bool] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     name: Optional[str] = None
     sidebar_hidden: Optional[bool] = None
     reminders_enabled: Optional[bool] = None
@@ -54,7 +55,7 @@ class EventCreate(BaseModel):
     allDay: bool = False
     location: Optional[str] = None
     description: Optional[str] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     rrule: Optional[str] = None
 
 
@@ -65,7 +66,7 @@ class EventUpdate(BaseModel):
     allDay: Optional[bool] = None
     location: Optional[str] = None
     description: Optional[str] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     rrule: Optional[str] = None
     exdate: Optional[str] = None
 
@@ -174,7 +175,7 @@ def add_account(
                 account_id=account.id,
                 cal_id=cal["url"],
                 name=cal["name"],
-                color=cal.get("color") or PALETTE[idx % len(PALETTE)],
+                color=safe_hex(cal.get("color"), PALETTE[idx % len(PALETTE)]),
                 enabled=True,
             )
         )
@@ -236,7 +237,7 @@ def sync_account(
                     account_id=account.id,
                     cal_id=cal["url"],
                     name=cal["name"],
-                    color=cal.get("color") or PALETTE[idx % len(PALETTE)],
+                    color=safe_hex(cal.get("color"), PALETTE[idx % len(PALETTE)]),
                     enabled=True,
                 )
             )

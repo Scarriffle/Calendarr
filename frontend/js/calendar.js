@@ -5748,8 +5748,14 @@ function fmtTime(d) {
 function fmtDatetime(d) {
   return d.toLocaleString(getLocale(), { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
 }
+// Quotes too: this is interpolated into attributes (title=, data-*=, value=)
+// as often as into text, and without them a name containing a double quote
+// closes the attribute and can add its own — stored XSS via a shared calendar
+// name. Escaping them in text content is invisible, so one function is enough.
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function buildWritableCalendars(excludeEv) {

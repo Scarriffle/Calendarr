@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 import models
 from auth import get_current_user
+from colors import HexColor, OptHexColor, safe_hex
 from database import get_db
 from oauth_state import cookie_kwargs, decode_state, encode_state, pkce_pair
 
@@ -178,13 +179,13 @@ def _sync_google_calendars(account: models.GoogleAccount, db: Session):
                     account_id=account.id,
                     cal_id=cal_id,
                     name=cal.get("summary", cal_id),
-                    color=cal.get("backgroundColor", "#4285f4"),
+                    color=safe_hex(cal.get("backgroundColor"), "#4285f4"),
                     enabled=True,
                 ))
             else:
                 existing[cal_id].name = cal.get("summary", cal_id)
                 if not existing[cal_id].color:
-                    existing[cal_id].color = cal.get("backgroundColor", "#4285f4")
+                    existing[cal_id].color = safe_hex(cal.get("backgroundColor"), "#4285f4")
         db.commit()
         db.refresh(account)
     except Exception as exc:
@@ -375,7 +376,7 @@ def sync_account(
 
 class GoogleCalendarUpdate(BaseModel):
     enabled: Optional[bool] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     name: Optional[str] = None
     sidebar_hidden: Optional[bool] = None
     reminders_enabled: Optional[bool] = None

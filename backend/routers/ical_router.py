@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 import models
 from auth import get_current_user
 from caldav_client import _parse_ics
+from colors import HexColor, OptHexColor
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -22,14 +23,14 @@ router = APIRouter()
 class SubscriptionCreate(BaseModel):
     name: str
     url: str
-    color: str = "#46bdc6"
+    color: HexColor = "#46bdc6"
     refresh_minutes: int = 60
 
 
 class SubscriptionUpdate(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     enabled: Optional[bool] = None
     sidebar_hidden: Optional[bool] = None
     refresh_minutes: Optional[int] = None
@@ -338,7 +339,7 @@ class ICalEventUpdate(BaseModel):
     allDay: Optional[bool] = None
     location: Optional[str] = None
     description: Optional[str] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
 
 
 @router.put("/events/{sub_id}/{event_uid}")

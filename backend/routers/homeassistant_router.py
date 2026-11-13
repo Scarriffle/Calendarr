@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 import models
 from auth import get_current_user
+from colors import HexColor, OptHexColor
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -427,7 +428,7 @@ class HAOAuthStart(BaseModel):
 
 class HACalendarUpdate(BaseModel):
     enabled: Optional[bool] = None
-    color: Optional[str] = None
+    color: OptHexColor = None
     name: Optional[str] = None
     sidebar_hidden: Optional[bool] = None
     reminders_enabled: Optional[bool] = None
