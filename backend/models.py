@@ -22,6 +22,11 @@ class User(Base):
     # When true, the user is hidden from sharing/group picker directories
     # (/users/directory). Admin user management (/users/) still shows them.
     directory_hidden = Column(Boolean, default=False, nullable=False)
+    # Login throttling. Counted per account rather than per IP: an account is
+    # what an attacker is actually after, and it survives a changing source
+    # address. Reset on every success.
+    failed_logins = Column(Integer, default=0)
+    locked_until = Column(String(50), nullable=True)   # ISO 8601, UTC
     # 'local' (password login) or 'sso' (provisioned via OpenID Connect).
     # SSO users have a random, unusable password_hash — see oidc_identity.
     auth_source = Column(String(20), default="local")

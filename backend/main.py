@@ -419,6 +419,18 @@ def _migrate():
                 pass
 
 
+        # ── Login throttling ─────────────────────────────────────────────
+        for ddl in (
+            "ALTER TABLE users ADD COLUMN failed_logins INTEGER DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN locked_until VARCHAR(50)",
+        ):
+            try:
+                conn.execute(text(ddl))
+                conn.commit()
+            except Exception:
+                pass
+
+
 _migrate()
 
 app = FastAPI(title="Calendarr", docs_url=None, redoc_url=None,

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 
 import pyotp
@@ -29,6 +29,44 @@ class LoginRequest(BaseModel):
     password: str
     totp_code: Optional[str] = None
     remember_me: Optional[bool] = False
+
+
+MAX_FAILED_LOGINS = 10
+LOCKOUT = timedelta(minutes=15)
+
+
+def _check_not_locked(user: Optional[models.User]) -> None:
+    """429 while an account is locked out. Called before the password check so
+    a locked account costs an attacker a bcrypt-free round trip."""
+    if user is None or not user.locked_until:
+        return
+    try:
+        until = datetime.fromisoformat(user.locked_until)
+    except ValueError:
+        return
+    if until > datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Zu viele Fehlversuche. Bitte später erneut versuchen.",
+        )
+
+
+def _note_failure(user: Optional[models.User], db: Session) -> None:
+    """Count a wrong password or a wrong 2FA code — both gate the same account."""
+    if user is None:
+        return      # no such user: nothing to count, and nothing to reveal
+    user.failed_logins = (user.failed_logins or 0) + 1
+    if user.failed_logins >= MAX_FAILED_LOGINS:
+        user.locked_until = (datetime.utcnow() + LOCKOUT).isoformat()
+        user.failed_logins = 0
+    db.commit()
+
+
+def _note_success(user: models.User, db: Session) -> None:
+    if user.failed_logins or user.locked_until:
+        user.failed_logins = 0
+        user.locked_until = None
+        db.commit()
 
 
 def _user_dict(user: models.User) -> dict:
@@ -72,7 +110,9 @@ def login(
     user = (
         db.query(models.User).filter(func.lower(models.User.username) == form_data.username.lower()).first()
     )
+    _check_not_locked(user)
     if not user or not verify_password(form_data.password, user.password_hash):
+        _note_failure(user, db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -83,6 +123,7 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="2fa_required",
         )
+    _note_success(user, db)
     token = create_user_token(user)
     return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
 
@@ -92,7 +133,9 @@ def login_json(req: LoginRequest, db: Session = Depends(get_db)):
     user = (
         db.query(models.User).filter(func.lower(models.User.username) == req.username.lower()).first()
     )
+    _check_not_locked(user)
     if not user or not verify_password(req.password, user.password_hash):
+        _note_failure(user, db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Benutzername oder Passwort falsch",
@@ -105,10 +148,14 @@ def login_json(req: LoginRequest, db: Session = Depends(get_db)):
             )
         totp = pyotp.TOTP(user.totp_secret)
         if not totp.verify(req.totp_code, valid_window=1):
+            # Counts against the same budget: with valid_window=1 three codes
+            # are live at once, so the second factor needs the limit too.
+            _note_failure(user, db)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Ungültiger 2FA-Code",
             )
+    _note_success(user, db)
     expires = REMEMBER_ME_EXPIRY if req.remember_me else None
     token = create_user_token(user, expires_delta=expires)
     return {"access_token": token, "token_type": "bearer", "user": _user_dict(user)}
