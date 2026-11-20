@@ -14,6 +14,10 @@
   <meta name="apple-mobile-web-app-title" content="Calendarr" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+  <!-- Preloaded so the first paint is already Roboto; font-display:swap would
+       otherwise show a frame of the system font. crossorigin is required even
+       same-origin, because font fetches are CORS-mode. -->
+  <link rel="preload" href="/static/fonts/roboto-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/static/css/app.css" />
 </head>
 <body>
