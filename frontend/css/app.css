@@ -1111,7 +1111,7 @@ a { color: var(--primary); text-decoration: none; }
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--bg-2);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
@@ -1260,7 +1260,7 @@ a { color: var(--primary); text-decoration: none; }
 .rec-weekdays { display: flex; gap: 4px; margin-top: 8px; }
 .rec-day-btn {
   width: 36px; height: 36px; border-radius: 50%;
-  border: 1px solid var(--border); background: var(--bg-card);
+  border: 1px solid var(--border); background: var(--bg-surface);
   color: var(--text-2); cursor: pointer; font-size: 12px;
   display: flex; align-items: center; justify-content: center;
   transition: background var(--transition), color var(--transition);
@@ -1774,7 +1774,7 @@ a { color: var(--primary); text-decoration: none; }
 .ct-src { font-size: 11px; color: var(--text-3); white-space: nowrap; }
 .ct-badge {
   display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 5px;
-  border-radius: 3px; background: var(--surface-2); color: var(--text-3);
+  border-radius: 3px; background: var(--bg-hover); color: var(--text-3);
   margin-left: 6px; vertical-align: middle;
 }
 .ct-badge-g  { background: #e8f0fe; color: #1a73e8; }
@@ -1789,7 +1789,7 @@ a { color: var(--primary); text-decoration: none; }
 .ct-dav-url {
   flex: 1; min-width: 220px; font-size: 12px; padding: 5px 8px;
   border: 1px solid var(--border); border-radius: 6px;
-  background: var(--surface-2); color: var(--text-1);
+  background: var(--bg-hover); color: var(--text-1);
 }
 .ct-dav-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; max-width: 640px; }
 /* Row (not the column inherited from .form-group) so the "Erstellen" button
