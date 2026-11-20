@@ -335,6 +335,10 @@ a { color: var(--primary); text-decoration: none; }
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
+/* Room for the caret that the `select` rule below draws. Needed at this
+   specificity because the field box above is (0,1,1) and would otherwise
+   win over the element selector, putting the caret on top of the text. */
+.form-group select, .form-row select { padding-right: 32px; }
 /* width:100% belongs to .form-group's stacked column, not to .form-row, which
    is display:flex — there a control sizes itself, or the markup gives it
    flex:1. */
@@ -354,6 +358,70 @@ a { color: var(--primary); text-decoration: none; }
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 .form-group textarea, .form-row textarea { resize: vertical; }
+
+/* ── Form controls ──────────────────────────────────────────
+   appearance:none wherever a native control would otherwise draw its own OS
+   chrome. Before this there was not one appearance:none in the file: thirteen
+   selects showed the system caret and opened the system option list, and
+   checkboxes and radios were native boxes merely recoloured with
+   accent-color — in three different sizes, with two radios left at the plain
+   browser default.
+   These are deliberately element selectors, so a control added anywhere is
+   styled by default rather than by the next per-ID spot fix.
+   ───────────────────────────────────────────────────────── */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  /* Caret built from two gradients instead of an SVG data URI: a data URI
+     cannot read a custom property, so its colour would be frozen into the
+     stylesheet and stop following the theme. */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-2) 50%),
+    linear-gradient(135deg, var(--text-2) 50%, transparent 50%);
+  background-size: 5px 5px, 5px 5px;
+  background-position: right 17px center, right 12px center;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+input[type=checkbox],
+input[type=radio] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--text-3);
+  background: none;
+  cursor: pointer;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+input[type=checkbox] { border-radius: 3px; }
+input[type=radio]    { border-radius: 50%; }
+input[type=checkbox]:hover:not(:disabled),
+input[type=radio]:hover:not(:disabled) { border-color: var(--text-2); }
+input[type=checkbox]:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  /* White on the primary fill, so this is the one colour safe to inline. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.2l3 3 5.8-5.8'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+input[type=radio]:checked {
+  border-color: var(--primary);
+  background-image: radial-gradient(circle, var(--primary) 0 3.5px, transparent 3.5px);
+}
+input[type=checkbox]:disabled,
+input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Was styled for exactly one element (#share-user-search); every other
+   placeholder in the app was the browser's own grey. */
+::placeholder { color: var(--text-3); opacity: 1; }
+
 
 /* ── Custom calendar dropdown (shows colour dot + group icon) ── */
 .cal-native-hidden { display: none !important; }
@@ -400,17 +468,6 @@ a { color: var(--primary); text-decoration: none; }
 .cal-select-option:hover { background: var(--hover-highlight); }
 .cal-select-option.selected { background: var(--primary-dim); }
 
-/* ── Date/time input dark mode ──────────────────────────── */
-.form-group input[type="datetime-local"],
-.form-group input[type="date"] {
-  color-scheme: dark;
-}
-.form-group input[type="datetime-local"]::-webkit-calendar-picker-indicator,
-.form-group input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.8);
-  opacity: 0.7;
-  cursor: pointer;
-}
 
 .form-row {
   display: flex; gap: 12px; margin-bottom: 16px; align-items: center;
@@ -438,17 +495,6 @@ a { color: var(--primary); text-decoration: none; }
   display: flex; align-items: center; gap: 8px;
   cursor: pointer; color: var(--text-1);
 }
-.toggle-label input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary); }
-.color-input {
-  width: 52px; height: 40px; padding: 3px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
-  cursor: pointer;
-  outline: none;
-}
-.color-input::-webkit-color-swatch-wrapper { padding: 2px; }
-.color-input::-webkit-color-swatch { border-radius: 3px; border: none; }
 .color-row { display: flex; align-items: center; gap: 10px; }
 .color-label { font-size: 12px; color: var(--text-2); font-family: var(--font-mono); }
 
@@ -770,7 +816,6 @@ a { color: var(--primary); text-decoration: none; }
   width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; cursor: pointer;
 }
 .cal-item-dot:hover { outline: 2px solid var(--text-2); outline-offset: 1px; }
-.cal-item input[type=checkbox] { accent-color: var(--primary); width: 14px; height: 14px; }
 .cal-item-name { font-size: 13px; flex: 1; min-width: 0; color: var(--text-1); cursor: default; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-item-remove { flex-shrink: 0; display: none; }
 .cal-rename-input {
@@ -1576,10 +1621,10 @@ a { color: var(--primary); text-decoration: none; }
 .settings-row-name { font-size: 14px; color: var(--text-1); }
 .settings-row-value { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .settings-row-value select {
-  background: var(--bg-app);
+  background-color: var(--bg-app);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 8px 32px 8px 12px;
   color: var(--text-1);
   outline: none;
   cursor: pointer;
@@ -2348,14 +2393,11 @@ a { color: var(--primary); text-decoration: none; }
 }
 .share-user-item:last-child { border-bottom: none; }
 .share-user-item:hover { background: var(--bg-surface); }
-.share-user-item input[type=checkbox] {
-  flex-shrink: 0; width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer;
-}
 /* Add-user row: match the app's dark inputs instead of raw white browser
    controls, with a subtle focus ring for a modern feel. */
 #share-user-search,
 #share-permission {
-  background: var(--bg-app);
+  background-color: var(--bg-app);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
@@ -2365,7 +2407,7 @@ a { color: var(--primary); text-decoration: none; }
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 #share-user-search::placeholder { color: var(--text-3); }
-#share-permission { cursor: pointer; }
+#share-permission { cursor: pointer; padding-right: 32px; }
 #share-user-search:focus,
 #share-permission:focus {
   border-color: var(--primary);
@@ -2384,13 +2426,6 @@ a { color: var(--primary); text-decoration: none; }
   display: flex; align-items: center; justify-content: flex-start; gap: 8px;
   cursor: pointer; text-transform: none; letter-spacing: normal;
   font-size: 14px; font-weight: 400; color: var(--text-1);
-}
-/* Undo the global ".form-group input { width:100%; padding; border }" so the
-   checkbox stays a small native box instead of a full-width field that shoves
-   the label text into a narrow, wrapping column. */
-.checkbox-row input[type=checkbox] {
-  flex: none; width: 16px; height: 16px; margin: 0; padding: 0;
-  border: 0; border-radius: 0; background: none; accent-color: var(--primary);
 }
 /* .popup-creator styling moved into the .popup-row / #popup-creator rules above. */
 
