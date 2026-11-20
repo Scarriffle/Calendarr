@@ -334,8 +334,11 @@ a { color: var(--primary); text-decoration: none; }
   color: var(--text-1);
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
-  width: 100%;
 }
+/* width:100% belongs to .form-group's stacked column, not to .form-row, which
+   is display:flex — there a control sizes itself, or the markup gives it
+   flex:1. */
+.form-group input, .form-group select, .form-group textarea { width: 100%; }
 .form-group input:hover:not(:focus),
 .form-group select:hover:not(:focus),
 .form-group textarea:hover:not(:focus),
