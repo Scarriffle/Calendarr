@@ -364,7 +364,11 @@ a { color: var(--primary); text-decoration: none; }
    control outside it was naked by default. */
 .form-group input, .form-group select, .form-group textarea,
 .form-row input, .form-row select, .form-row textarea {
-  background: var(--bg-app);
+  /* background-COLOR, not the shorthand: the shorthand resets background-image
+     to none, and this rule (0,1,1) outranks the `select` element rule that
+     draws the caret (0,0,1) — so every select in a form would lose its arrow
+     entirely, native one suppressed and custom one wiped. */
+  background-color: var(--bg-app);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 11px 14px;
