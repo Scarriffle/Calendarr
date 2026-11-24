@@ -125,6 +125,12 @@
   --fs-headline: 22px;    /* page headline, month name */
 
   --transition: .15s ease;
+
+  /* The one native surface appearance:none cannot reach: the option list a
+     <select> drops down, and the autofill menu. The browser draws those, and
+     it draws them light unless told otherwise — so a dark app answered every
+     dropdown with a white OS list. The light theme sets this to light below. */
+  color-scheme: dark;
 }
 
 /* ── Reset ──────────────────────────────────────────────── */
@@ -1669,7 +1675,6 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
   color: var(--text-1);
   outline: none;
   cursor: pointer;
-  color-scheme: dark;
   min-width: 130px; max-width: 100%;
   transition: border-color var(--transition);
 }
