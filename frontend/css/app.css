@@ -63,6 +63,12 @@
   --text-3: #55556a;
   --border: #2e2e40;
   --border-light: #242438;
+  /* The edge of a floating surface — menu, popover, modal, toast. A panel is
+     separated by its own surface and its shadow; the line is only there to
+     catch the light, so it is translucent. An opaque hairline around a panel
+     is what makes a UI read as a document rather than as depth. */
+  --border-float: var(--border);
+  --border-float: color-mix(in srgb, var(--border) 55%, transparent);
   --scrollbar: #30303c;
 
   /* Fine-grained element colours (customisable via Settings → Farben).
@@ -107,13 +113,14 @@
   --radius: var(--radius-field);
 
   /* Three elevations. 2 and 3 are the two values already in use, so the
-     shadows that are already right do not move. --shadow was defined and
-     never referenced once. */
+     shadows that are already right do not move. */
   --shadow-1: 0 1px 3px rgba(0,0,0,.35);
   --shadow-2: 0 2px 12px rgba(0,0,0,.45);
   --shadow-3: 0 8px 28px rgba(0,0,0,.55);
-  --shadow: var(--shadow-2);
-  --shadow-lg: var(--shadow-3);
+  /* Top edge catching the light. Goes first in a box-shadow list, before the
+     elevation. Light theme sets it to a no-op: a white highlight on a white
+     card does nothing. */
+  --edge-highlight: inset 0 1px 0 rgba(255,255,255,.04);
 
   /* Six steps, nothing below 11. Named fs- so they cannot be mistaken for
      --text-1/2/3, which are colours. */
@@ -164,6 +171,7 @@ a { color: var(--primary); text-decoration: none; }
   --shadow-1: 0 1px 3px rgba(0,0,0,.08);
   --shadow-2: 0 2px 12px rgba(0,0,0,.12);
   --shadow-3: 0 8px 28px rgba(0,0,0,.18);
+  --edge-highlight: 0 0 #0000;
   color-scheme: light;
 }
 /* A locked colour row still shows its value, it just cannot be edited. */
@@ -334,11 +342,11 @@ a { color: var(--primary); text-decoration: none; }
 }
 .auth-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-float);
   border-radius: var(--radius);
   padding: 40px;
   width: 100%; max-width: 400px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--edge-highlight), var(--shadow-2);
 }
 .auth-logo {
   display: flex; align-items: center; gap: 10px;
@@ -498,9 +506,9 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 .cal-select-menu {
   position: absolute; left: 0; right: 0; top: calc(100% + 4px);
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-float);
   border-radius: 12px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--edge-highlight), var(--shadow-3);
   max-height: 280px; overflow-y: auto;
   z-index: 50; padding: 4px;
 }
@@ -625,8 +633,8 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 .gcp {
   position: fixed; z-index: 600;
   width: 252px; padding: 16px;
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  background: var(--bg-surface); border: 1px solid var(--border-float);
+  border-radius: var(--radius); box-shadow: var(--edge-highlight), var(--shadow-3);
 }
 .gcp-sv {
   display: block; width: 100%; height: 160px;
@@ -715,9 +723,9 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 }
 .user-dropdown {
   position: absolute; top: 42px; right: 0;
-  background: var(--bg-surface); border: 1px solid var(--border);
+  background: var(--bg-surface); border: 1px solid var(--border-float);
   border-radius: var(--radius); min-width: 180px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 200;
+  box-shadow: var(--edge-highlight), var(--shadow-3); z-index: 200;
   overflow: hidden;
 }
 .dropdown-user {
@@ -842,8 +850,8 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 .add-cal-dropdown {
   position: absolute; top: 100%; right: 0; z-index: 200;
   min-width: 180px; padding: 4px 0;
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  background: var(--bg-surface); border: 1px solid var(--border-float);
+  border-radius: var(--radius); box-shadow: var(--edge-highlight), var(--shadow-3);
 }
 .add-cal-dropdown button {
   display: block; width: 100%; padding: 8px 14px;
@@ -1022,9 +1030,9 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 .month-overflow-popup {
   position: fixed; z-index: 800;
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-float);
   border-radius: 12px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--edge-highlight), var(--shadow-3);
   padding: 10px 0;
   min-width: 220px; max-width: 300px;
   overflow: hidden;
@@ -1335,17 +1343,17 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 }
 .modal-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-float);
   border-radius: 20px;
   width: 100%;
   max-height: 90vh;
   overflow: hidden;
   display: flex; flex-direction: column;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--edge-highlight), var(--shadow-3);
 }
 .modal-header {
   display: flex; align-items: center;
-  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  padding: 16px 20px; border-bottom: 1px solid var(--border-light);
   gap: 8px;
 }
 .modal-header h3 { font-size: 18px; font-weight: 500; flex: 1; }
@@ -1358,7 +1366,7 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 .modal-body a:hover { text-decoration: underline; }
 .modal-footer {
   display: flex; align-items: center; gap: 8px;
-  padding: 12px 20px; border-top: 1px solid var(--border);
+  padding: 12px 20px; border-top: 1px solid var(--border-light);
 }
 
 /* ── Recurrence UI ─────────────────────────────────────── */
@@ -1376,8 +1384,8 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 /* ── Day Context Menu ──────────────────────────────────── */
 .cal-context-menu {
   position: fixed; z-index: 1000;
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  background: var(--bg-surface); border: 1px solid var(--border-float);
+  border-radius: var(--radius-sm); box-shadow: var(--edge-highlight), var(--shadow-3);
   min-width: 180px; padding: 4px 0;
 }
 .ctx-item {
@@ -1806,10 +1814,10 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 /* ── Toast ──────────────────────────────────────────────── */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: var(--bg-surface); border: 1px solid var(--border);
+  background: var(--bg-surface); border: 1px solid var(--border-float);
   border-radius: 24px; padding: 10px 24px;
   font-size: 14px; color: var(--text-1);
-  box-shadow: var(--shadow-lg); z-index: 9999;
+  box-shadow: var(--edge-highlight), var(--shadow-3); z-index: 9999;
   transition: opacity .3s;
 }
 .toast.error { border-color: rgba(234,67,53,.5); background: rgba(234,67,53,.15); color: #f28b82; }
@@ -1980,9 +1988,9 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 .dtp-card {
   position: fixed; z-index: 701;
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-float);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--edge-highlight), var(--shadow-3);
   padding: 16px;
   width: 272px;
   user-select: none;
@@ -2100,7 +2108,7 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
     z-index: 600;
     transform: translateX(-100%);
     transition: transform .25s ease;
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-3);
     margin-right: 0 !important;
   }
   body.sidebar-open .sidebar { transform: translateX(0); }
@@ -2359,10 +2367,10 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
     width: min(75vw, 280px);
     z-index: 50;
     background: var(--bg-app);
-    border-right: 1px solid var(--border);
+    border-right: 1px solid var(--border-float);
     transform: translateX(-100%);
     transition: transform .25s ease;
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-3);
   }
   .settings-page-card.nav-open .settings-nav {
     transform: translateX(0);
