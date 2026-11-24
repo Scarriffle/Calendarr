@@ -78,10 +78,52 @@
 
   --topbar-h: 64px;
   --sidebar-w: 256px;
-  --shadow: 0 2px 12px rgba(0,0,0,.45);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
-  --radius: 8px;
-  --radius-sm: 4px;
+
+  /* ── Ladders (docs/DESIGN.md) ──────────────────────────────
+     Nothing below the colour level was ever decided once. Counted before
+     this: 78 distinct padding values, 53 margins, 17 font sizes, 20 corner
+     radii, 28 shadows — including 1px-apart variants of the same intent and
+     a 14.5px font size. These are the values DESIGN.md already specifies;
+     the literals are collapsed onto them view by view.
+     ──────────────────────────────────────────────────────── */
+
+  /* Every margin, padding and gap is one of these. lg (16) is the one
+     screen gutter — the value that stops the left text edge from jumping. */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+
+  /* Radii by role, not by number, so one object cannot drift between views.
+     --radius and --radius-sm stay as aliases: 21 call sites still use them
+     and move over with the rest of the literals. */
+  --radius-event: 4px;    /* event pills, in every view */
+  --radius-field: 8px;    /* fields, rows, small cards, popovers */
+  --radius-sheet: 20px;   /* modals, bottom sheets, day preview */
+  --radius-full: 999px;   /* buttons, chips, FAB */
+  --radius-sm: var(--radius-event);
+  --radius: var(--radius-field);
+
+  /* Three elevations. 2 and 3 are the two values already in use, so the
+     shadows that are already right do not move. --shadow was defined and
+     never referenced once. */
+  --shadow-1: 0 1px 3px rgba(0,0,0,.35);
+  --shadow-2: 0 2px 12px rgba(0,0,0,.45);
+  --shadow-3: 0 8px 28px rgba(0,0,0,.55);
+  --shadow: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
+
+  /* Six steps, nothing below 11. Named fs- so they cannot be mistaken for
+     --text-1/2/3, which are colours. */
+  --fs-caption: 11px;     /* timestamps, metadata, hints */
+  --fs-label: 12px;       /* field labels, chips */
+  --fs-body: 13px;        /* default reading size */
+  --fs-body-lg: 14px;     /* primary list text, input text */
+  --fs-title: 18px;       /* screen and section titles */
+  --fs-headline: 22px;    /* page headline, month name */
+
   --transition: .15s ease;
 }
 
@@ -113,15 +155,10 @@ a { color: var(--primary); text-decoration: none; }
    the theme itself and already follow the background. */
 :root[data-scheme="light"] {
   --scrollbar: #c8c8d0;
-  --shadow: 0 2px 12px rgba(0,0,0,.12);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.18);
+  --shadow-1: 0 1px 3px rgba(0,0,0,.08);
+  --shadow-2: 0 2px 12px rgba(0,0,0,.12);
+  --shadow-3: 0 8px 28px rgba(0,0,0,.18);
   color-scheme: light;
-}
-/* Native controls (date/time inputs, selects) are inverted for the dark UI;
-   on a light ground that would make them unreadable. */
-:root[data-scheme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
-:root[data-scheme="light"] input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: none;
 }
 /* A locked colour row still shows its value, it just cannot be edited. */
 .settings-color-ctl.is-locked { opacity: .55; pointer-events: none; }
