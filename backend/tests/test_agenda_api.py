@@ -233,6 +233,24 @@ def test_days_extends_the_range(client):
     assert {e["title"] for e in two["events"]} == {"Heute", "Morgen"}
 
 
+def test_timestamps_are_normalised_per_source():
+    """The sources disagree on format — CalDAV and Google send a bare date for
+    an all-day event, a local event keeps the client's full timestamp. The API
+    promises one shape per field, so this is pinned as a unit."""
+    from routers.agenda_router import _iso
+
+    assert _iso("2026-11-26", all_day=True) == "2026-11-26"
+    assert _iso("2026-11-26T00:00:00+00:00", all_day=True) == "2026-11-26"
+    assert _iso("2026-11-26T09:30:00+01:00", all_day=False) == "2026-11-26T09:30:00+01:00"
+    assert _iso("2026-11-26T09:30:00Z", all_day=False) == "2026-11-26T09:30:00+00:00"
+    # No offset from the source is read as UTC, not as local server time.
+    assert _iso("2026-11-26T09:30:00", all_day=False) == "2026-11-26T09:30:00+00:00"
+    # Unparseable is passed through: a wrong timestamp debugs better than none.
+    assert _iso("kaputt", all_day=False) == "kaputt"
+    assert _iso("", all_day=False) is None
+    assert _iso(None, all_day=True) is None
+
+
 def test_bad_input_is_rejected(client):
     admin = register_admin(client)
     key = _key(client, admin)["key"]

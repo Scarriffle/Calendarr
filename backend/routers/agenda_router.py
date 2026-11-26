@@ -37,6 +37,32 @@ router = APIRouter()
 MAX_DAYS = 31
 
 
+def _iso(value, *, all_day: bool) -> Optional[str]:
+    """One format per field, whatever the source happened to write.
+
+    The sources disagree. CalDAV and Google emit a bare date for an all-day
+    event ("2026-11-26"), while a local event keeps whatever the client sent,
+    usually a full timestamp. Leaking that through would make every caller
+    handle three shapes, which is exactly what a documented contract is for.
+
+    All-day -> "YYYY-MM-DD". Timed -> ISO 8601 with an offset, read as UTC when
+    the source gave none. An unparseable value is passed through rather than
+    dropped: a wrong timestamp is more useful to debug than a missing one.
+    """
+    if not value:
+        return None
+    raw = str(value)
+    if all_day:
+        return raw[:10]
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return raw
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
+
+
 def _brief(ev: dict) -> dict:
     """The one shape this API promises.
 
@@ -44,11 +70,12 @@ def _brief(ev: dict) -> dict:
     carry their group prefix there and birthdays their age, and that decoration
     belongs to the server, not to each client.
     """
+    all_day = bool(ev.get("allDay"))
     return {
         "title": ev.get("display_title") or ev.get("title") or "",
-        "start": ev.get("start"),
-        "end": ev.get("end"),
-        "all_day": bool(ev.get("allDay")),
+        "start": _iso(ev.get("start"), all_day=all_day),
+        "end": _iso(ev.get("end"), all_day=all_day),
+        "all_day": all_day,
         "location": ev.get("location") or "",
         "calendar": ev.get("calendar_name") or "",
         "color": ev.get("color") or ev.get("calendarColor") or None,
