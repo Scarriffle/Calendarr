@@ -205,6 +205,39 @@ class AppPassword(Base):
     user = relationship("User")
 
 
+class ApiKey(Base):
+    """Read-only API key for an external integration (a morning briefing, a
+    dashboard, a home-automation flow).
+
+    Unlike AppPassword this stores a SHA-256 digest rather than a bcrypt hash.
+    A password is low-entropy and arrives together with a username, so bcrypt
+    earns its cost and the row can be found first. A key is 256 bits of random
+    and arrives alone: there is nothing to brute-force, and a fast digest is
+    what lets the row be found by one indexed lookup instead of a bcrypt
+    comparison against every key in the table.
+
+    ``calendars`` is a JSON array of the same calendar keys the event payload
+    uses ("7" for CalDAV, "local-3", "google-5", "ical-2",
+    "homeassistant-1"). NULL means every calendar the owner can read, including
+    ones added later.
+    """
+
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    label = Column(String(100), nullable=False)
+    key_hash = Column(String(64), nullable=False, unique=True, index=True)
+    # Leading characters, kept in the clear so the list can tell two keys apart
+    # once the secret itself is gone.
+    key_prefix = Column(String(24), nullable=False)
+    calendars = Column(Text, nullable=True)
+    created_at = Column(String(50), nullable=True)
+    last_used_at = Column(String(50), nullable=True)
+
+    user = relationship("User")
+
+
 class LocalCalendar(Base):
     __tablename__ = "local_calendars"
 

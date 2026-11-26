@@ -3721,6 +3721,7 @@ function populateSettings() {
     if (dh) dh.checked = !!p.directory_hidden;
   }).catch(() => {});
   initAppPasswords();
+  initApiKeys();
   initSSOIdentities();
 
   // Show users nav button only for admins
@@ -5577,6 +5578,136 @@ function initAppPasswords() {
     if (!confirm(t('app_pw_revoke_confirm'))) return;
     try {
       await api.delete(`/profile/app-passwords/${btn.dataset.id}`);
+      load();
+    } catch (err) { showToast(err.message, true); }
+  };
+}
+
+// ── API keys (read-only agenda API) — Settings → Profile ──
+// The scope list offers every source whose events reach the agenda endpoint,
+// which includes iCal subscriptions — unlike calSelectData(), which lists only
+// calendars you can write an event into. Values are the same calendar keys the
+// event payload carries, so the server can match them without translating.
+function apiKeyCalOptions() {
+  const out = [];
+  (state.accounts || []).forEach(acc => {
+    (acc.calendars || []).forEach(cal => out.push({
+      value: String(cal.id),
+      name: `${acc.name} – ${cal.name}`,
+      color: cal.color || acc.color || '#4285f4',
+    }));
+  });
+  (state.localCalendars || []).forEach(cal => out.push({
+    value: `local-${cal.id}`, name: cal.name, color: cal.color,
+  }));
+  (state.icalSubscriptions || []).forEach(sub => out.push({
+    value: `ical-${sub.id}`, name: sub.name, color: sub.color,
+  }));
+  (state.googleAccounts || []).forEach(acc => {
+    (acc.calendars || []).forEach(cal => out.push({
+      value: `google-${cal.id}`,
+      name: `${acc.email} – ${cal.name}`,
+      color: cal.color || '#4285f4',
+    }));
+  });
+  (state.haAccounts || []).forEach(acc => {
+    (acc.calendars || []).forEach(cal => out.push({
+      value: `homeassistant-${cal.id}`,
+      name: `${acc.name} – ${cal.name}`,
+      color: cal.color || '#03a9f4',
+    }));
+  });
+  return out;
+}
+
+function initApiKeys() {
+  const list = document.getElementById('api-key-list');
+  if (!list) return;
+  const newBox = document.getElementById('api-key-new');
+  const allBox = document.getElementById('api-key-all-cals');
+  const calList = document.getElementById('api-key-cal-list');
+  newBox.classList.add('hidden');
+  document.getElementById('api-key-new-value').textContent = '';
+
+  const renderCalPicker = () => {
+    const opts = apiKeyCalOptions();
+    calList.innerHTML = opts.length
+      ? opts.map(o => `<label class="toggle-label">
+          <input type="checkbox" class="api-key-cal" value="${escHtml(o.value)}" />
+          <span class="cal-select-dot" style="background:${escHtml(o.color || '#4285f4')}"></span>
+          <span>${escHtml(o.name)}</span>
+        </label>`).join('')
+      : `<p class="text-muted">${t('api_key_no_cals')}</p>`;
+  };
+
+  const syncPicker = () => {
+    calList.classList.toggle('hidden', allBox.checked);
+    if (!allBox.checked) renderCalPicker();
+  };
+  allBox.onchange = syncPicker;
+  syncPicker();
+
+  // Names the scope in words rather than echoing raw keys like "local-3",
+  // which mean nothing to someone reading their own key list.
+  const scopeLabel = (cals) => {
+    if (!cals || !cals.length) return t('api_key_scope_all');
+    const byValue = {};
+    apiKeyCalOptions().forEach(o => { byValue[o.value] = o.name; });
+    const names = cals.map(c => byValue[c]).filter(Boolean);
+    // A calendar that was deleted or disconnected leaves a key behind that
+    // names it; say so instead of showing a shorter list than the key holds.
+    const missing = cals.length - names.length;
+    if (missing > 0) names.push(t('api_key_scope_unknown', { n: missing }));
+    return names.join(', ');
+  };
+
+  const load = async () => {
+    try {
+      const rows = await api.get('/profile/api-keys');
+      list.innerHTML = rows.length
+        ? rows.map(r => `<div class="app-pw-item">
+            <span class="app-pw-name">${escHtml(r.label)}</span>
+            <span class="app-pw-meta">${escHtml(r.prefix)}… · ${escHtml(scopeLabel(r.calendars))} · ${
+              r.last_used_at
+                ? t('app_pw_last_used') + ' ' + new Date(r.last_used_at).toLocaleDateString(getLocale())
+                : t('app_pw_never_used')}</span>
+            <button class="btn btn-ghost btn-sm api-key-del" data-id="${r.id}">${t('app_pw_revoke')}</button>
+          </div>`).join('')
+        : `<p class="text-muted">${t('api_key_none')}</p>`;
+    } catch (e) { /* ignore */ }
+  };
+  load();
+
+  document.getElementById('api-key-create-btn').onclick = async () => {
+    const label = document.getElementById('api-key-label').value.trim() || 'API';
+    let calendars = null;
+    if (!allBox.checked) {
+      calendars = Array.from(calList.querySelectorAll('.api-key-cal:checked')).map(c => c.value);
+      if (!calendars.length) { showToast(t('api_key_pick_one'), true); return; }
+    }
+    try {
+      const res = await api.post('/profile/api-keys', { label, calendars });
+      document.getElementById('api-key-new-value').textContent = res.key;
+      document.getElementById('api-key-endpoint').textContent =
+        `${location.origin}/api/agenda?tz=${encodeURIComponent(
+          Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')}`;
+      newBox.classList.remove('hidden');
+      document.getElementById('api-key-label').value = '';
+      load();
+    } catch (e) { showToast(e.message, true); }
+  };
+
+  document.getElementById('api-key-copy').onclick = () => {
+    const v = document.getElementById('api-key-new-value').textContent;
+    if (v) navigator.clipboard.writeText(v).then(() => showToast(t('api_key_copied')));
+  };
+
+  list.onclick = async (e) => {
+    const btn = e.target.closest('.api-key-del');
+    if (!btn) return;
+    if (!confirm(t('api_key_revoke_confirm'))) return;
+    try {
+      await api.delete(`/profile/api-keys/${btn.dataset.id}`);
       load();
     } catch (err) { showToast(err.message, true); }
   };

@@ -1916,6 +1916,24 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
 .app-pw-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); }
 .app-pw-name { font-weight: 500; }
 .app-pw-meta { font-size: 11px; color: var(--text-3); margin-left: auto; }
+
+/* ── API keys ───────────────────────────────────────────────
+   The calendar scope picker, and a wider meta line: a key carries its
+   prefix, its calendar scope and its last use, which is far more text than
+   an app password's single timestamp. Name and Revoke keep the first line,
+   the scope gets its own below instead of squeezing the name. */
+.api-key-cals {
+  max-height: 180px; overflow-y: auto;
+  margin-top: var(--space-sm); padding: var(--space-sm);
+  background-color: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  display: flex; flex-direction: column; gap: var(--space-sm);
+}
+#api-key-list .app-pw-item { flex-wrap: wrap; }
+#api-key-list .app-pw-name { order: 1; }
+#api-key-list .app-pw-item > button { order: 2; margin-left: auto; }
+#api-key-list .app-pw-meta { order: 3; flex-basis: 100%; margin-left: 0; }
 .ct-eye, .ct-bell { opacity: .45; transition: opacity .15s; }
 .ct-eye[data-ct-visible="1"], .ct-bell[data-ct-on="1"] { opacity: 1; }
 .ct-eye:hover, .ct-bell:hover { opacity: 1; }

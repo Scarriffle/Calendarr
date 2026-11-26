@@ -1,4 +1,5 @@
 import io
+import json
 import re
 import base64
 import secrets
@@ -17,7 +18,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import models
-from auth import create_user_token, get_current_user, get_password_hash, verify_password
+from auth import (
+    create_user_token,
+    generate_api_key,
+    get_current_user,
+    get_password_hash,
+    hash_api_key,
+    verify_password,
+)
 from database import DATA_DIR, get_db
 
 router = APIRouter()
@@ -351,6 +359,106 @@ def create_app_password(
     out = _app_pw_dict(ap)
     out["password"] = password
     return out
+
+
+# ── API keys (read-only agenda for external integrations) ────────────
+class ApiKeyCreate(BaseModel):
+    label: str = Field(default="API", max_length=100)
+    # Calendar keys exactly as the event payload carries them ("7" for CalDAV,
+    # "local-3", "google-5", "ical-2", "homeassistant-1"). None or [] means
+    # every calendar the account can read, now and in future.
+    calendars: Optional[list[str]] = None
+
+
+def _api_key_dict(k: models.ApiKey) -> dict:
+    return {
+        "id": k.id,
+        "label": k.label,
+        "prefix": k.key_prefix,
+        "calendars": json.loads(k.calendars) if k.calendars else None,
+        "created_at": k.created_at,
+        "last_used_at": k.last_used_at,
+    }
+
+
+def _clean_cal_scope(cals: Optional[list[str]]) -> Optional[str]:
+    """Normalise a requested scope to a JSON array, or None for "everything".
+
+    Not validated against the user's actual calendars on purpose: a key may
+    legitimately name a calendar that is temporarily disabled, and a calendar
+    that disappears simply stops matching. Entries are capped so a key cannot
+    be used to store arbitrary amounts of text.
+    """
+    if not cals:
+        return None
+    seen = []
+    for c in cals:
+        c = str(c).strip()[:64]
+        if c and c not in seen:
+            seen.append(c)
+        if len(seen) >= 200:
+            break
+    return json.dumps(seen) if seen else None
+
+
+@router.get("/api-keys")
+def list_api_keys(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    rows = (
+        db.query(models.ApiKey)
+        .filter(models.ApiKey.user_id == current_user.id)
+        .order_by(models.ApiKey.id.desc())
+        .all()
+    )
+    return [_api_key_dict(r) for r in rows]
+
+
+@router.post("/api-keys")
+def create_api_key(
+    data: ApiKeyCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    key = generate_api_key()
+    row = models.ApiKey(
+        user_id=current_user.id,
+        label=(data.label or "API")[:100],
+        key_hash=hash_api_key(key),
+        # Enough to recognise the key, far too little to reconstruct it.
+        key_prefix=key[:14],
+        calendars=_clean_cal_scope(data.calendars),
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    out = _api_key_dict(row)
+    # Shown exactly once; only the digest is stored.
+    out["key"] = key
+    return out
+
+
+@router.delete("/api-keys/{key_id}")
+def delete_api_key(
+    key_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    row = (
+        db.query(models.ApiKey)
+        .filter(
+            models.ApiKey.id == key_id,
+            models.ApiKey.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(404, "API key not found")
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
 
 
 @router.delete("/app-passwords/{ap_id}")

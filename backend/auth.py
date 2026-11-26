@@ -1,8 +1,10 @@
-from datetime import datetime, timedelta
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import os
@@ -116,3 +118,72 @@ def get_current_admin(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+
+# ── API keys (read-only, for external integrations) ──────────────────────
+# Prefixed so a leaked key is recognisable in a log or a paste and can be
+# searched for, the way cloud providers do it.
+API_KEY_PREFIX = "calrr_"
+
+
+def generate_api_key() -> str:
+    return API_KEY_PREFIX + secrets.token_urlsafe(32)
+
+
+def hash_api_key(key: str) -> str:
+    return hashlib.sha256(key.strip().encode("utf-8")).hexdigest()
+
+
+def get_api_key(
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> "models.ApiKey":
+    """Authenticate a request by API key instead of by session.
+
+    Accepts ``Authorization: Bearer <key>`` (what most HTTP clients send) and
+    ``X-API-Key: <key>``. A session JWT presented here cannot match, because the
+    lookup is against the digest column and nothing else.
+
+    Deliberately never falls back to session auth: an endpoint built for keys
+    should not quietly start serving browser sessions, or the calendar scope
+    the key carries would be skipped.
+    """
+    exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Valid API key required",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    raw = (x_api_key or "").strip()
+    if not raw and authorization:
+        scheme, _, value = authorization.partition(" ")
+        if scheme.lower() == "bearer":
+            raw = value.strip()
+    if not raw:
+        raise exc
+
+    row = (
+        db.query(models.ApiKey)
+        .filter(models.ApiKey.key_hash == hash_api_key(raw))
+        .first()
+    )
+    if not row:
+        raise exc
+
+    # "Last used" is what makes a forgotten key identifiable in the list, so it
+    # is worth one UPDATE. Written at most once a minute: a caller polling hard
+    # should not turn every read into a write.
+    now = datetime.now(timezone.utc)
+    stale = True
+    if row.last_used_at:
+        try:
+            prev = datetime.fromisoformat(row.last_used_at)
+            if prev.tzinfo is None:
+                prev = prev.replace(tzinfo=timezone.utc)
+            stale = (now - prev).total_seconds() > 60
+        except (ValueError, TypeError):
+            stale = True
+    if stale:
+        row.last_used_at = now.isoformat()
+        db.commit()
+    return row
