@@ -144,6 +144,65 @@ def test_response_carries_only_the_documented_fields(client):
     assert "Geheime Notiz" not in str(body)
 
 
+def test_own_private_events_are_included_in_full(client):
+    """The briefing is for the calendar's own owner, so their private events
+    belong in it with their real title. Only OTHER people's private events are
+    redacted, and that rule lives in apply_event_privacy, not here.
+
+    Pinned by a test because a key is the one caller that is not a browser
+    session: a future tightening of the API surface could plausibly start
+    masking private events and silently empty the morning briefing.
+    """
+    admin = register_admin(client)
+    cal = _cal(client, admin)
+    r = client.post("/api/local/events", headers=auth(admin), json={
+        "calendar_id": cal, "title": "Therapie",
+        "start": "2026-06-10T09:00:00+00:00", "end": "2026-06-10T10:00:00+00:00",
+        "location": "Praxis", "private": True,
+    })
+    assert r.status_code == 200, r.text
+
+    body = _agenda(client, _key(client, admin)["key"], date="2026-06-10", tz="UTC").json()
+    assert [e["title"] for e in body["events"]] == ["Therapie"]
+    assert body["events"][0]["location"] == "Praxis"
+
+
+def test_another_users_private_event_stays_redacted(client):
+    """A key must not become a way around someone else's privacy setting. The
+    default visibility masks a foreign private event as busy; what must never
+    appear is its title."""
+    admin = register_admin(client)
+    b_id, bob = create_user(client, admin, "bob")
+    bobs_cal = _cal(client, bob, "Bobs")
+    r = client.post("/api/local/events", headers=auth(bob), json={
+        "calendar_id": bobs_cal, "title": "Bobs Geheimnis",
+        "start": "2026-06-10T09:00:00+00:00", "end": "2026-06-10T10:00:00+00:00",
+        "private": True,
+    })
+    assert r.status_code == 200, r.text
+
+    # Bob shares the calendar, so the event reaches admin's read at all. The
+    # share must really succeed: without it admin sees nothing anyway and the
+    # assertion below would pass for the wrong reason.
+    admin_id = client.get("/api/profile/", headers=auth(admin)).json()["id"]
+    r2 = client.post(f"/api/local/calendars/{bobs_cal}/shares", headers=auth(bob),
+                     json={"user_id": admin_id, "permission": "read"})
+    assert r2.status_code == 200, r2.text
+
+    key = _key(client, admin)["key"]
+    body = _agenda(client, key, date="2026-06-10", tz="UTC").json()
+    assert "Bobs Geheimnis" not in str(body)
+    # Proof the share works and the event is reaching the read at all: the same
+    # calendar's non-private event does come through.
+    r3 = client.post("/api/local/events", headers=auth(bob), json={
+        "calendar_id": bobs_cal, "title": "Bobs offener Termin",
+        "start": "2026-06-10T14:00:00+00:00", "end": "2026-06-10T15:00:00+00:00",
+    })
+    assert r3.status_code == 200, r3.text
+    body2 = _agenda(client, key, date="2026-06-10", tz="UTC").json()
+    assert "Bobs offener Termin" in str(body2)
+
+
 # ── Range ─────────────────────────────────────────────────
 
 def test_date_and_timezone_pick_the_local_day(client):
