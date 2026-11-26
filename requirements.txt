@@ -13,7 +13,3 @@ Pillow==11.0.0
 python-dateutil==2.9.0
 websocket-client==1.8.0
 Authlib==1.3.2
-# Completes the stdlib zoneinfo database. Present on Debian/Ubuntu via the
-# system tzdata, missing on slim images - without it every timezone the
-# agenda API is asked for would fail to resolve.
-tzdata==2024.2

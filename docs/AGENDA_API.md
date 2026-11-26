@@ -226,24 +226,26 @@ example above. A local all-day event stores whatever the client wrote, which is
 usually the same, but this is not enforced server-side. Treat `end` as
 exclusive and tolerate an inclusive value.
 
-**`tzdata` is a dependency.** `zoneinfo` needs a timezone database. Debian and
-Ubuntu provide it through the system package; a slim image does not, and every
-`tz` would then come back `400`. Pinned in `requirements.txt`, so a deploy has
-to install it — **into the venv**, which is what `calendarr.service` runs:
+**Timezones come from the system.** `zoneinfo` reads the operating system's
+timezone database, which Debian and Ubuntu always provide — verified on the
+production host. No Python package is needed and none is pinned: this project
+deploys through `install.sh` on Debian, and there is no container build where
+the database could be missing.
 
-```bash
-/opt/calendarr/venv/bin/pip install -r /opt/calendarr/requirements.txt
-systemctl restart calendarr
-```
-
-A bare `pip install` as root fails on Debian 12 with
-`error: externally-managed-environment` (PEP 668), and installing outside the
-venv would not reach the interpreter the service uses anyway. Re-running
-`./install.sh` also works: it keeps an existing venv and never overwrites
-`.env`.
-
-Whether the system already had a timezone database:
+If a future deployment ever lacks it, every `tz` comes back
+`400 Unknown timezone: ...` and the fix is one package, either
+`apt install tzdata` or `/opt/calendarr/venv/bin/python -m pip install tzdata`.
+Check with:
 
 ```bash
 /opt/calendarr/venv/bin/python -c "from zoneinfo import ZoneInfo; print(ZoneInfo('Europe/Berlin'))"
 ```
+
+**Deploying a change.** `calendarr.service` runs `/opt/calendarr/venv/bin/python`,
+so anything installed must go into that venv — a bare `pip install` as root
+fails on Debian 12 with PEP 668's `externally-managed-environment`, and would
+not reach the service's interpreter anyway. Use
+`/opt/calendarr/venv/bin/python -m pip ...` (the `venv/bin/pip` wrapper script
+can have a stale shebang), or re-run `./install.sh`, which keeps an existing
+venv and never overwrites `.env`. This change needs neither: a restart is
+enough.
