@@ -488,6 +488,50 @@
 </div>
 
 <!-- Delete Confirm Modal -->
+<!-- API key: a two-step flow, because creating one is a sequence with an end,
+     not a pile of fields on a settings page. Step 2 is the only time the
+     secret exists, so it closes with an explicit acknowledgement. -->
+<div id="modal-api-key" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:460px">
+    <div class="modal-header">
+      <h3 data-i18n="api_key_create">Schlüssel erstellen</h3>
+      <button class="icon-btn modal-close" data-modal="modal-api-key">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="api-key-step-form">
+        <div class="form-group">
+          <label data-i18n="name">Name</label>
+          <input type="text" id="api-key-label" data-i18n-ph="api_key_label_ph" placeholder="Name (z.B. Morgenbriefing)" maxlength="100" />
+        </div>
+        <div class="form-group">
+          <label data-i18n="settings_calendars">Kalender</label>
+          <label class="toggle-label api-key-scope-all">
+            <input type="checkbox" id="api-key-all-cals" checked />
+            <span data-i18n="api_key_all_cals">Alle Kalender (auch künftig hinzugefügte)</span>
+          </label>
+          <div id="api-key-cal-list" class="api-key-cals hidden"></div>
+        </div>
+      </div>
+      <div id="api-key-step-done" class="hidden">
+        <p class="panel-desc api-key-warn" data-i18n="api_key_once_warn">Dieser Schlüssel wird nur jetzt angezeigt. Kopiere ihn und trage ihn in deiner Anwendung ein, bevor du schliesst — danach ist er nicht mehr einsehbar.</p>
+        <div class="totp-secret-row">
+          <code id="api-key-new-value" class="selectable"></code>
+          <button class="btn btn-ghost btn-sm" id="api-key-copy" data-i18n-title="api_key_copy" title="Kopieren"><svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" id="api-key-foot-form">
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" data-modal="modal-api-key" data-i18n="cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="api-key-create-btn" data-i18n="api_key_create">Schlüssel erstellen</button>
+    </div>
+    <div class="modal-footer hidden" id="api-key-foot-done">
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" id="api-key-done-btn" data-i18n="done">Fertig</button>
+    </div>
+  </div>
+</div>
+
 <div id="modal-delete-confirm" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:400px">
     <div class="modal-header">
@@ -829,35 +873,14 @@
           <div id="app-pw-list"></div>
 
           <h4 class="panel-title" style="margin-top:24px" data-i18n="api_key_title">API-Schlüssel</h4>
-          <p class="panel-desc" data-i18n="api_key_desc">Nur-Lese-Zugriff auf deine Termine für eigene Anwendungen, z.B. ein Morgenbriefing. Jeder Schlüssel gilt für die Kalender, die du hier auswählst, und ist jederzeit widerrufbar.</p>
+          <p class="panel-desc" data-i18n="api_key_desc">Nur-Lese-Zugriff auf deine Termine für eigene Anwendungen, z.B. ein Morgenbriefing. Jeder Schlüssel gilt für die Kalender, die du beim Anlegen auswählst, und ist jederzeit widerrufbar.</p>
           <p class="panel-desc" data-i18n="api_key_usage">Aufrufen mit dem Header „Authorization: Bearer &lt;Schlüssel&gt;“ auf:</p>
           <div class="totp-secret-row">
             <code id="api-key-endpoint" class="selectable"></code>
             <button class="btn btn-ghost btn-sm" id="api-key-endpoint-copy" data-i18n-title="api_key_copy" title="Kopieren"><svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></button>
           </div>
-          <div class="form-group" style="margin-top:16px">
-            <input type="text" id="api-key-label" data-i18n-ph="api_key_label_ph" placeholder="Name (z.B. Morgenbriefing)" maxlength="100" />
-          </div>
-          <div class="form-group">
-            <label class="toggle-label">
-              <input type="checkbox" id="api-key-all-cals" checked />
-              <span data-i18n="api_key_all_cals">Alle Kalender (auch künftig hinzugefügte)</span>
-            </label>
-            <div id="api-key-cal-list" class="api-key-cals hidden"></div>
-          </div>
-          <div class="form-group">
-            <button class="btn btn-primary btn-sm" id="api-key-create-btn" data-i18n="api_key_create">Schlüssel erstellen</button>
-          </div>
-          <div id="api-key-new" class="app-pw-new hidden">
-            <label data-i18n="api_key_new_label">Neuer Schlüssel (nur jetzt sichtbar):</label>
-            <div class="totp-secret-row">
-              <code id="api-key-new-value" class="selectable"></code>
-              <button class="btn btn-ghost btn-sm" id="api-key-copy" data-i18n-title="api_key_copy" title="Kopieren">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-              </button>
-            </div>
-          </div>
           <div id="api-key-list"></div>
+          <button class="btn btn-secondary btn-sm" id="api-key-open-btn" style="margin-top:12px" data-i18n="api_key_create">Schlüssel erstellen</button>
 
           <!-- Single sign-on: hidden unless the server has a provider or the
                account already holds a linked identity. -->

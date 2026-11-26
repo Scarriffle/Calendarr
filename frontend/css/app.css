@@ -1922,6 +1922,15 @@ input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
    prefix, its calendar scope and its last use, which is far more text than
    an app password's single timestamp. Name and Revoke keep the first line,
    the scope gets its own below instead of squeezing the name. */
+/* .form-group label is the uppercase field-label style (app.css:373). A
+   checkbox's own label is body text and must not inherit it — every calendar
+   name was being shouted. */
+.api-key-cals .toggle-label,
+.toggle-label.api-key-scope-all {
+  text-transform: none; letter-spacing: normal;
+  font-size: var(--fs-body); font-weight: 400; color: var(--text-1);
+}
+.api-key-warn { color: var(--text-1); margin-bottom: var(--space-md); }
 .api-key-cals {
   max-height: 180px; overflow-y: auto;
   margin-top: var(--space-sm); padding: var(--space-sm);

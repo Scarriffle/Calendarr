@@ -5623,12 +5623,15 @@ function apiKeyCalOptions() {
 function initApiKeys() {
   const list = document.getElementById('api-key-list');
   if (!list) return;
-  const newBox = document.getElementById('api-key-new');
-  const allBox = document.getElementById('api-key-all-cals');
-  const calList = document.getElementById('api-key-cal-list');
-  newBox.classList.add('hidden');
-  document.getElementById('api-key-new-value').textContent = '';
+  const allBox   = document.getElementById('api-key-all-cals');
+  const calList  = document.getElementById('api-key-cal-list');
+  const stepForm = document.getElementById('api-key-step-form');
+  const stepDone = document.getElementById('api-key-step-done');
+  const footForm = document.getElementById('api-key-foot-form');
+  const footDone = document.getElementById('api-key-foot-done');
 
+  // The endpoint is the same for every key and never changes, so it lives in
+  // the section, not in the dialog, and is there before a key exists.
   const endpoint = `${location.origin}/api/agenda?tz=${encodeURIComponent(
     Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')}`;
   document.getElementById('api-key-endpoint').textContent = endpoint;
@@ -5652,7 +5655,6 @@ function initApiKeys() {
     if (!allBox.checked) renderCalPicker();
   };
   allBox.onchange = syncPicker;
-  syncPicker();
 
   // Names the scope in words rather than echoing raw keys like "local-3",
   // which mean nothing to someone reading their own key list.
@@ -5685,6 +5687,25 @@ function initApiKeys() {
   };
   load();
 
+  const showResult = (done) => {
+    stepForm.classList.toggle('hidden', done);
+    footForm.classList.toggle('hidden', done);
+    stepDone.classList.toggle('hidden', !done);
+    footDone.classList.toggle('hidden', !done);
+  };
+
+  // Always reopens on step 1 with an empty form. The dialog can also be closed
+  // from step 2 by the × or the scrim, like every other modal here, so the
+  // reset belongs on open rather than on close.
+  document.getElementById('api-key-open-btn').onclick = () => {
+    document.getElementById('api-key-label').value = '';
+    document.getElementById('api-key-new-value').textContent = '';
+    allBox.checked = true;
+    syncPicker();
+    showResult(false);
+    openModal('modal-api-key');
+  };
+
   document.getElementById('api-key-create-btn').onclick = async () => {
     const label = document.getElementById('api-key-label').value.trim() || 'API';
     let calendars = null;
@@ -5695,8 +5716,7 @@ function initApiKeys() {
     try {
       const res = await api.post('/profile/api-keys', { label, calendars });
       document.getElementById('api-key-new-value').textContent = res.key;
-      newBox.classList.remove('hidden');
-      document.getElementById('api-key-label').value = '';
+      showResult(true);
       load();
     } catch (e) { showToast(e.message, true); }
   };
@@ -5705,6 +5725,8 @@ function initApiKeys() {
     const v = document.getElementById('api-key-new-value').textContent;
     if (v) navigator.clipboard.writeText(v).then(() => showToast(t('api_key_copied')));
   };
+
+  document.getElementById('api-key-done-btn').onclick = () => closeModal('modal-api-key');
 
   list.onclick = async (e) => {
     const btn = e.target.closest('.api-key-del');
