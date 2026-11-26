@@ -5629,6 +5629,13 @@ function initApiKeys() {
   newBox.classList.add('hidden');
   document.getElementById('api-key-new-value').textContent = '';
 
+  const endpoint = `${location.origin}/api/agenda?tz=${encodeURIComponent(
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')}`;
+  document.getElementById('api-key-endpoint').textContent = endpoint;
+  document.getElementById('api-key-endpoint-copy').onclick = () => {
+    navigator.clipboard.writeText(endpoint).then(() => showToast(t('api_key_url_copied')));
+  };
+
   const renderCalPicker = () => {
     const opts = apiKeyCalOptions();
     calList.innerHTML = opts.length
@@ -5688,9 +5695,6 @@ function initApiKeys() {
     try {
       const res = await api.post('/profile/api-keys', { label, calendars });
       document.getElementById('api-key-new-value').textContent = res.key;
-      document.getElementById('api-key-endpoint').textContent =
-        `${location.origin}/api/agenda?tz=${encodeURIComponent(
-          Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')}`;
       newBox.classList.remove('hidden');
       document.getElementById('api-key-label').value = '';
       load();
