@@ -228,5 +228,22 @@ exclusive and tolerate an inclusive value.
 
 **`tzdata` is a dependency.** `zoneinfo` needs a timezone database. Debian and
 Ubuntu provide it through the system package; a slim image does not, and every
-`tz` would then come back `400`. Pinned in `requirements.txt`, so a deploy must
-run `pip install -r requirements.txt`.
+`tz` would then come back `400`. Pinned in `requirements.txt`, so a deploy has
+to install it — **into the venv**, which is what `calendarr.service` runs:
+
+```bash
+/opt/calendarr/venv/bin/pip install -r /opt/calendarr/requirements.txt
+systemctl restart calendarr
+```
+
+A bare `pip install` as root fails on Debian 12 with
+`error: externally-managed-environment` (PEP 668), and installing outside the
+venv would not reach the interpreter the service uses anyway. Re-running
+`./install.sh` also works: it keeps an existing venv and never overwrites
+`.env`.
+
+Whether the system already had a timezone database:
+
+```bash
+/opt/calendarr/venv/bin/python -c "from zoneinfo import ZoneInfo; print(ZoneInfo('Europe/Berlin'))"
+```
